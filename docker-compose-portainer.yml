@@ -1,9 +1,9 @@
 version: "3.7"
 services:
   app:
-    image: avaliarh:latest
+    image: jeanjonathas/avaliarh:latest
     build:
-      context: .
+      context: https://github.com/jeanjonathas/avaliarh.git
       dockerfile: Dockerfile
     networks:
       - avaliarh_network
@@ -56,7 +56,7 @@ services:
           memory: 512M
 
   setup:
-    image: avaliarh:latest
+    image: jeanjonathas/avaliarh:latest
     command: sh -c "npx prisma migrate deploy && node prisma/seed.js"
     environment:
       - DATABASE_URL=postgresql://postgres:02e821629ceff274c853f24327a36132@postgres:5432/avaliacao_candidatos
@@ -71,10 +71,10 @@ services:
 
 volumes:
   postgres_data:
-    external: true
+    external: false
     name: avaliarh_postgres_data
 
 networks:
   avaliarh_network:
-    external: true
+    external: false
     name: ralliugaNet
