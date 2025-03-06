@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { PrismaClient } from '@prisma/client'
 import { getServerSession } from 'next-auth/next'
-import { authOptions } from '../auth/[...nextauth]'
+import { authOptions } from '../../../lib/auth'
 
 const prisma = new PrismaClient()
 
@@ -57,7 +57,16 @@ export default async function handler(
       const candidatesWithScores = await prisma.candidate.findMany({
         where: { completed: true },
         include: {
-          responses: true
+          responses: {
+            include: {
+              question: {
+                include: {
+                  stage: true
+                }
+              },
+              option: true
+            }
+          }
         },
       });
 
