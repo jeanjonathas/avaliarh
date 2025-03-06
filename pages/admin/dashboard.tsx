@@ -813,7 +813,7 @@ const Dashboard: NextPage = () => {
     },
     plugins: {
       legend: {
-        position: 'top',
+        position: 'top' as const,
       },
       tooltip: {
         callbacks: {
@@ -838,7 +838,7 @@ const Dashboard: NextPage = () => {
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: 'right',
+        position: 'right' as const,
       },
       tooltip: {
         callbacks: {
