@@ -1,14 +1,18 @@
 import { PrismaClient } from '@prisma/client'
 
-// Declarar a variável global para o PrismaClient
-declare global {
-  var prisma: PrismaClient | undefined
+// Usar uma variável para armazenar a instância do PrismaClient
+let prisma: PrismaClient
+
+// Verificar se já existe uma instância global do PrismaClient
+if (process.env.NODE_ENV === 'production') {
+  // Em produção, sempre criar uma nova instância
+  prisma = new PrismaClient()
+} else {
+  // Em desenvolvimento, reutilizar a instância global para evitar múltiplas conexões
+  if (!(global as any).prisma) {
+    (global as any).prisma = new PrismaClient()
+  }
+  prisma = (global as any).prisma
 }
 
-// Criar uma instância do PrismaClient que será reutilizada
-export const prisma = global.prisma || new PrismaClient()
-
-// Em desenvolvimento, anexar o cliente ao objeto global para evitar múltiplas instâncias
-if (process.env.NODE_ENV !== 'production') {
-  global.prisma = prisma
-}
+export { prisma }
