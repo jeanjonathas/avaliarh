@@ -1,0 +1,110 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(ADMIN)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Admin {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  company   String?
+  position  String?
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Candidate {
+  id             String     @id @default(uuid())
+  name           String
+  email          String
+  phone          String?
+  position       String?
+  testDate       DateTime   @default(now())
+  interviewDate  DateTime?
+  completed      Boolean    @default(false)
+  responses      Response[]
+  status         Status     @default(PENDING)
+  rating         Float?     // Avaliação de 0.5 a 5 estrelas, de 0.5 em 0.5
+  observations   String?    // Observações sobre o candidato
+  infoJobsLink   String?    // Link do perfil no InfoJobs
+  socialMediaUrl String?    // Link para rede social
+  resumeFile     String?    // Caminho do arquivo do currículo
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+}
+
+model Stage {
+  id          String     @id @default(uuid())
+  title       String
+  description String?
+  order       Int
+  questions   Question[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Question {
+  id          String     @id @default(uuid())
+  text        String
+  stageId     String
+  stage       Stage      @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  options     Option[]
+  responses   Response[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Option {
+  id          String     @id @default(uuid())
+  text        String
+  isCorrect   Boolean    @default(false)
+  questionId  String
+  question    Question   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  responses   Response[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Response {
+  id          String     @id @default(uuid())
+  candidateId String
+  candidate   Candidate  @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  questionId  String
+  question    Question   @relation(fields: [questionId], references: [id])
+  optionId    String
+  option      Option     @relation(fields: [optionId], references: [id])
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([candidateId, questionId])
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum Status {
+  PENDING
+  APPROVED
+  REJECTED
+}
