@@ -1,16 +1,17 @@
 version: "3.7"
 services:
   app:
-    image: jeanjonathas/avaliarh:latest
-    build:
-      context: https://github.com/jeanjonathas/avaliarh.git
-      dockerfile: Dockerfile
+    image: node:18-alpine
+    command: sh -c "cd /app && npm install && npx prisma generate && npm run build && npm run start"
+    volumes:
+      - app_data:/app
     networks:
       - avaliarh_network
     environment:
       - DATABASE_URL=postgresql://postgres:02e821629ceff274c853f24327a36132@postgres:5432/avaliacao_candidatos
       - NEXTAUTH_SECRET=1cb8ab490649f272b366a6343f0e223c
       - NEXTAUTH_URL=https://selecao.doutoranimal.com.br
+      - NODE_ENV=production
     depends_on:
       - postgres
     deploy:
@@ -55,8 +56,10 @@ services:
           memory: 512M
 
   setup:
-    image: jeanjonathas/avaliarh:latest
-    command: sh -c "npx prisma migrate deploy && node prisma/seed.js"
+    image: node:18-alpine
+    command: sh -c "cd /app && npm install && npx prisma generate && npx prisma migrate deploy && node prisma/seed.js"
+    volumes:
+      - app_data:/app
     environment:
       - DATABASE_URL=postgresql://postgres:02e821629ceff274c853f24327a36132@postgres:5432/avaliacao_candidatos
     networks:
@@ -68,10 +71,23 @@ services:
         condition: on-failure
         max_attempts: 3
 
+  init:
+    image: alpine/git
+    command: sh -c "git clone https://github.com/jeanjonathas/avaliarh.git /app"
+    volumes:
+      - app_data:/app
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 1
+
 volumes:
   postgres_data:
     external: false
     name: avaliarh_postgres_data
+  app_data:
+    external: false
+    name: avaliarh_app_data
 
 networks:
   avaliarh_network:
