@@ -78,11 +78,17 @@ export default async function handler(
         const stageTotals = Array(6).fill(0);
         const stageCounts = Array(6).fill(0);
         
+        // Definir interface para os scores por etapa
+        interface StageScore {
+          correct: number;
+          total: number;
+        }
+        
         // Agrupar respostas por etapa e calcular pontuações
         candidatesWithScores.forEach(candidate => {
           if (candidate.responses) {
             // Agrupar respostas por etapa
-            const responsesByStage = candidate.responses.reduce((acc, response) => {
+            const responsesByStage = candidate.responses.reduce<Record<string, StageScore>>((acc, response) => {
               const stageId = response.question?.stageId;
               if (stageId) {
                 if (!acc[stageId]) {
