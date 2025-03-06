@@ -1,18 +1,51 @@
-version: '3.8'
-
+version: "3.7"
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    networks:
+      - avaliarh_network
+    environment:
+      - DATABASE_URL=postgresql://postgres:02e821629ceff274c853f24327a36132@postgres:5432/avaliacao_candidatos
+      - NEXTAUTH_SECRET=1cb8ab490649f272b366a6343f0e223c
+      - NEXTAUTH_URL=https://selecao.doutoranimal.com.br
+      - NODE_ENV=production
+    depends_on:
+      - postgres
+    restart: always
+
   postgres:
     image: postgres:14
-    container_name: avaliacao_candidatos_db
-    restart: always
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: avaliacao_candidatos
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - avaliarh_network
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=02e821629ceff274c853f24327a36132
+      - POSTGRES_DB=avaliacao_candidatos
+    restart: always
+
+  setup:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: sh -c "npx prisma migrate deploy && node prisma/seed.js"
+    environment:
+      - DATABASE_URL=postgresql://postgres:02e821629ceff274c853f24327a36132@postgres:5432/avaliacao_candidatos
+    networks:
+      - avaliarh_network
+    depends_on:
+      - postgres
+    restart: on-failure
 
 volumes:
   postgres_data:
+
+networks:
+  avaliarh_network:
+    external: true
+    name: ralliugaNet
