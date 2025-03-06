@@ -18,7 +18,11 @@ import {
   RadialLinearScale,
   Filler
 } from 'chart.js'
+<<<<<<< HEAD
 import { Bar, Pie, Line, Radar, Doughnut } from 'react-chartjs-2'
+=======
+import { Bar, Pie, Line, Radar } from 'react-chartjs-2'
+>>>>>>> 475a6247 (Mensagem do commit)
 import { Rating } from '@mui/material'
 
 // Registrar componentes do Chart.js
@@ -231,6 +235,7 @@ const Dashboard: NextPage = () => {
       }
     ]
   })
+<<<<<<< HEAD
   const [categorySuccessData, setCategorySuccessData] = useState({
     labels: [
       'Raciocínio Lógico',
@@ -313,6 +318,9 @@ const Dashboard: NextPage = () => {
     ]
   })
 
+=======
+  
+>>>>>>> 475a6247 (Mensagem do commit)
   useEffect(() => {
     // Inicializar os perfis editáveis quando idealProfiles for definido
     setEditableProfiles({...idealProfiles});
@@ -357,6 +365,7 @@ const Dashboard: NextPage = () => {
         
         const data = await response.json()
         setStatistics(data)
+<<<<<<< HEAD
 
         // Atualizar dados dos novos gráficos com os dados estatísticos
         if (data && data.stageStats) {
@@ -399,6 +408,8 @@ const Dashboard: NextPage = () => {
             }]
           }));
         }
+=======
+>>>>>>> 475a6247 (Mensagem do commit)
       } catch (error) {
         console.error('Erro ao carregar estatísticas:', error)
         // Não definir erro global para não bloquear a visualização dos candidatos
@@ -470,7 +481,11 @@ const Dashboard: NextPage = () => {
   }
   
   const handleViewCandidate = (candidate: Candidate) => {
+<<<<<<< HEAD
     window.location.href = `/admin/candidate/${candidate.id}`
+=======
+    router.push(`/admin/candidate/${candidate.id}`)
+>>>>>>> 475a6247 (Mensagem do commit)
   }
   
   if (status === 'loading' || loading) {
@@ -746,6 +761,7 @@ const Dashboard: NextPage = () => {
     },
   };
   
+<<<<<<< HEAD
   // Dados para o gráfico de taxa de sucesso por categoria
   const categorySuccessOptions = {
     responsive: true,
@@ -846,6 +862,8 @@ const Dashboard: NextPage = () => {
     },
   };
   
+=======
+>>>>>>> 475a6247 (Mensagem do commit)
   // Função para calcular a compatibilidade do candidato com o perfil ideal
   const calculateCompatibility = (candidate) => {
     if (!candidate || !candidate.stageScores || candidate.stageScores.length === 0) {
@@ -1229,6 +1247,7 @@ return (
       <div className="container mx-auto px-4 py-3">
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-8">
+<<<<<<< HEAD
             <Link href="/admin/dashboard" className="text-xl font-bold text-primary-700" onClick={(e) => {
               e.preventDefault();
               window.location.href = '/admin/dashboard';
@@ -1258,20 +1277,47 @@ return (
                 e.preventDefault();
                 window.location.href = '/admin/stages';
               }}>
+=======
+            <Link href="/admin/dashboard" className="flex items-center">
+              <Image 
+                src="/images/logo_horizontal.png" 
+                alt="AvaliaRH" 
+                width={150} 
+                height={40} 
+                className="h-10 w-auto"
+              />
+            </Link>
+            <div className="hidden md:flex space-x-4">
+              <Link href="/admin/dashboard" className="px-3 py-2 text-secondary-700 hover:text-primary-600 font-medium">
+                Dashboard
+              </Link>
+              <Link href="/admin/questions" className="px-3 py-2 text-secondary-700 hover:text-primary-600 font-medium">
+                Perguntas
+              </Link>
+              <Link href="/admin/stages" className="px-3 py-2 text-secondary-700 hover:text-primary-600 font-medium">
+>>>>>>> 475a6247 (Mensagem do commit)
                 Etapas
               </Link>
             </div>
           </div>
           <div className="flex items-center space-x-4">
+<<<<<<< HEAD
             <Link href="/admin/profile" className="text-secondary-700 hover:text-primary-600" onClick={(e) => {
               e.preventDefault();
               window.location.href = '/admin/profile';
             }}>
+=======
+            <Link href="/admin/profile" className="text-secondary-700 hover:text-primary-600">
+>>>>>>> 475a6247 (Mensagem do commit)
               <div className="flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                 </svg>
+<<<<<<< HEAD
                 {session?.user?.email || 'admin@empresa.com'}
+=======
+                {session?.user?.email}
+>>>>>>> 475a6247 (Mensagem do commit)
               </div>
             </Link>
             <button
@@ -1558,6 +1604,7 @@ return (
           {renderTrendChart()}
         </div>
         
+<<<<<<< HEAD
         {/* Novos gráficos de análise */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
           <div className="bg-white rounded-lg shadow-md p-6">
@@ -1638,6 +1685,8 @@ return (
           </div>
         </div>
         
+=======
+>>>>>>> 475a6247 (Mensagem do commit)
         {showProfileEditor && (
           <IdealProfileEditor 
             isOpen={showProfileEditor} 
