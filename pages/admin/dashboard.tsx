@@ -98,7 +98,19 @@ const Dashboard: NextPage = () => {
   const [ratingFilter, setRatingFilter] = useState('ALL')
   const [scoreFilter, setScoreFilter] = useState('ALL')
   const [showProfileEditor, setShowProfileEditor] = useState(false)
-  const [editableProfiles, setEditableProfiles] = useState({})
+  const [editableProfiles, setEditableProfiles] = useState<Record<string, number[]>>({
+    'Desenvolvedor Frontend': [85, 70, 65, 80, 75, 60],
+    'Desenvolvedor Backend': [80, 85, 60, 65, 75, 70],
+    'Analista de Dados': [70, 90, 75, 60, 80, 65],
+    'Designer UX/UI': [60, 65, 80, 90, 75, 70],
+    'Gerente de Projetos': [70, 75, 85, 65, 70, 90],
+    'Analista de QA': [80, 75, 70, 75, 85, 80],
+    'DevOps Engineer': [75, 85, 65, 70, 80, 75],
+    'Analista de Segurança': [85, 80, 70, 65, 90, 75],
+    'Analista de Sistemas': [75, 80, 75, 70, 80, 75],
+    'Suporte Técnico': [70, 65, 80, 65, 70, 85],
+    'Padrão': [80, 75, 70, 75, 80, 85]
+  })
   const [currentProfile, setCurrentProfile] = useState('Padrão')
   const [newProfileName, setNewProfileName] = useState('')
   const [candidateFormData, setCandidateFormData] = useState({
@@ -315,7 +327,9 @@ const Dashboard: NextPage = () => {
 
   useEffect(() => {
     // Inicializar os perfis editáveis quando idealProfiles for definido
-    setEditableProfiles({...idealProfiles});
+    if (Object.keys(idealProfiles).length > 0) {
+      setEditableProfiles({...idealProfiles});
+    }
   }, [idealProfiles]);
 
   useEffect(() => {
@@ -882,7 +896,10 @@ const Dashboard: NextPage = () => {
   const IdealProfileEditor = ({ isOpen, onClose }) => {
     // Função para salvar as alterações nos perfis
     const saveProfiles = () => {
-      setIdealProfiles(editableProfiles);
+      setIdealProfiles(prevProfiles => ({
+        ...prevProfiles,
+        ...editableProfiles
+      }));
       onClose();
     };
     
