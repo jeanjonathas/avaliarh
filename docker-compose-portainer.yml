@@ -10,8 +10,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:02e821629ceff274c853f24327a36132@postgres:5432/avaliacao_candidatos
       - NEXTAUTH_SECRET=1cb8ab490649f272b366a6343f0e223c
-      - NEXTAUTH_URL=https://avaliacao.doutoranimal.com.br
-    restart: always
+      - NEXTAUTH_URL=https://selecao.doutoranimal.com.br
     depends_on:
       - postgres
     deploy:
@@ -26,7 +25,7 @@ services:
           memory: 1024M
       labels:
         - traefik.enable=true
-        - traefik.http.routers.avaliarh.rule=Host(`avaliacao.doutoranimal.com.br`)
+        - traefik.http.routers.avaliarh.rule=Host(`selecao.doutoranimal.com.br`)
         - traefik.http.routers.avaliarh.entrypoints=websecure
         - traefik.http.routers.avaliarh.tls.certresolver=letsencryptresolver
         - traefik.http.services.avaliarh.loadbalancer.server.port=3000
@@ -43,7 +42,6 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=02e821629ceff274c853f24327a36132
       - POSTGRES_DB=avaliacao_candidatos
-    restart: always
     deploy:
       mode: replicated
       replicas: 1
@@ -76,5 +74,5 @@ volumes:
 
 networks:
   avaliarh_network:
-    external: false
+    external: true
     name: ralliugaNet
