@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 version: "3.7"
 services:
   app:
@@ -43,30 +42,9 @@ services:
       - postgres
     restart: on-failure
 
-volumes:
-  postgres_data:
-
 networks:
   avaliarh_network:
-    external: true
-    name: ralliugaNet
-=======
-version: '3.8'
-
-services:
-  postgres:
-    image: postgres:14
-    container_name: avaliacao_candidatos_db
-    restart: always
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: avaliacao_candidatos
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+    external: false
 
 volumes:
   postgres_data:
->>>>>>> 475a6247 (Mensagem do commit)
