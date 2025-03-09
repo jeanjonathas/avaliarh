@@ -15,11 +15,14 @@ export default async function handler(
         return res.status(400).json({ error: 'ID da etapa é obrigatório' })
       }
 
+      // Verificar se stageId é um número (ordem da etapa) ou um UUID
+      const isOrderNumber = /^\d+$/.test(stageId)
+
       // Buscar informações da etapa
-      const stage = await prisma.stage.findUnique({
-        where: {
-          id: stageId,
-        },
+      const stage = await prisma.stage.findFirst({
+        where: isOrderNumber
+          ? { order: parseInt(stageId) }
+          : { id: stageId },
       })
 
       if (!stage) {
@@ -29,7 +32,7 @@ export default async function handler(
       // Buscar as perguntas da etapa com suas opções
       const questions = await prisma.question.findMany({
         where: {
-          stageId,
+          stageId: stage.id, // Usar o ID real da etapa
         },
         include: {
           options: {
