@@ -3,9 +3,10 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
+import Navbar from '../../components/admin/Navbar'
+import QuestionForm from '../../components/admin/QuestionForm'
 import { Formik, Form, Field, ErrorMessage, FieldArray } from 'formik'
 import * as Yup from 'yup'
-import Navbar from '../../components/admin/Navbar'
 
 interface Stage {
   id: string
@@ -49,6 +50,7 @@ const Questions: NextPage = () => {
   const [questions, setQuestions] = useState<Question[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
   const [isEditing, setIsEditing] = useState(false)
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
   const [selectedStageId, setSelectedStageId] = useState<string>('all')
@@ -96,11 +98,10 @@ const Questions: NextPage = () => {
   
   const handleSubmit = async (values: any, { resetForm }: any) => {
     try {
-      const url = isEditing 
-        ? `/api/admin/questions/${currentQuestion?.id}` 
-        : '/api/admin/questions'
+      setError('');
       
-      const method = isEditing ? 'PUT' : 'POST'
+      const method = isEditing ? 'PUT' : 'POST';
+      const url = isEditing ? `/api/admin/questions/${currentQuestion?.id}` : '/api/admin/questions';
       
       const response = await fetch(url, {
         method,
@@ -108,27 +109,30 @@ const Questions: NextPage = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(values),
-      })
+      });
       
       if (!response.ok) {
-        throw new Error(`Erro ao ${isEditing ? 'atualizar' : 'criar'} a pergunta`)
+        throw new Error('Erro ao salvar a pergunta');
       }
       
-      // Recarregar perguntas
+      // Atualizar a lista de perguntas
       const questionsResponse = await fetch('/api/admin/questions')
       const questionsData = await questionsResponse.json()
       setQuestions(questionsData)
       
-      // Limpar formulário e estado
-      resetForm()
-      setIsEditing(false)
-      setCurrentQuestion(null)
+      // Limpar o formulário e o estado de edição
+      resetForm();
+      setIsEditing(false);
+      setCurrentQuestion(null);
       
+      // Exibir mensagem de sucesso
+      setSuccessMessage(isEditing ? 'Pergunta atualizada com sucesso!' : 'Pergunta criada com sucesso!');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (error) {
-      console.error('Erro:', error)
-      setError(`Ocorreu um erro ao ${isEditing ? 'atualizar' : 'salvar'} a pergunta. Por favor, tente novamente.`)
+      console.error('Erro:', error);
+      setError('Ocorreu um erro ao salvar a pergunta. Por favor, tente novamente.');
     }
-  }
+  };
   
   const handleEdit = (question: Question) => {
     setCurrentQuestion(question)
@@ -193,182 +197,29 @@ const Questions: NextPage = () => {
           </div>
         )}
         
+        {successMessage && (
+          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md mb-6">
+            {successMessage}
+          </div>
+        )}
+        
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Formulário de Pergunta */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold text-secondary-800 mb-4">
-              {isEditing ? 'Editar Pergunta' : 'Nova Pergunta'}
-            </h2>
-            
-            <Formik
-              initialValues={
-                isEditing && currentQuestion
-                  ? {
-                      text: currentQuestion.text,
-                      stageId: currentQuestion.stageId,
-                      options: currentQuestion.options,
-                    }
-                  : {
-                      text: '',
-                      stageId: stages.length > 0 ? stages[0].id : '',
-                      options: [
-                        { text: '', isCorrect: false },
-                        { text: '', isCorrect: false },
-                        { text: '', isCorrect: false },
-                        { text: '', isCorrect: false },
-                      ],
-                    }
-              }
-              validationSchema={validationSchema}
-              onSubmit={handleSubmit}
-              enableReinitialize
-            >
-              {({ values, isSubmitting, setFieldValue }) => (
-                <Form className="space-y-6">
-                  <div>
-                    <label htmlFor="text" className="block text-sm font-medium text-secondary-700 mb-1">
-                      Pergunta
-                    </label>
-                    <Field
-                      as="textarea"
-                      name="text"
-                      id="text"
-                      rows={3}
-                      className="input-field"
-                      placeholder="Digite o texto da pergunta"
-                    />
-                    <ErrorMessage name="text" component="div" className="text-red-500 text-sm mt-1" />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="stageId" className="block text-sm font-medium text-secondary-700 mb-1">
-                      Etapa
-                    </label>
-                    <Field
-                      as="select"
-                      name="stageId"
-                      id="stageId"
-                      className="input-field"
-                    >
-                      {stages.length === 0 ? (
-                        <option value="">Nenhuma etapa disponível</option>
-                      ) : (
-                        stages
-                          .sort((a, b) => a.order - b.order)
-                          .map((stage) => (
-                            <option key={stage.id} value={stage.id}>
-                              {stage.title} (Etapa {stage.order})
-                            </option>
-                          ))
-                      )}
-                    </Field>
-                    <ErrorMessage name="stageId" component="div" className="text-red-500 text-sm mt-1" />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-secondary-700 mb-3">
-                      Opções (marque a correta)
-                    </label>
-                    
-                    <FieldArray name="options">
-                      {({ remove, push }) => (
-                        <div className="space-y-3">
-                          {values.options.map((option, index) => (
-                            <div key={index} className="flex items-start space-x-3">
-                              <div className="pt-2">
-                                <Field
-                                  type="radio"
-                                  name={`options.${index}.isCorrect`}
-                                  id={`option-correct-${index}`}
-                                  checked={option.isCorrect}
-                                  onChange={() => {
-                                    setFieldValue(`options.${index}.isCorrect`, true)
-                                    values.options.forEach((_, i) => {
-                                      if (i !== index) {
-                                        setFieldValue(`options.${i}.isCorrect`, false)
-                                      }
-                                    })
-                                  }}
-                                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-secondary-300"
-                                />
-                              </div>
-                              <div className="flex-grow">
-                                <Field
-                                  type="text"
-                                  name={`options.${index}.text`}
-                                  placeholder={`Opção ${index + 1}`}
-                                  className="input-field"
-                                />
-                                <ErrorMessage
-                                  name={`options.${index}.text`}
-                                  component="div"
-                                  className="text-red-500 text-sm mt-1"
-                                />
-                              </div>
-                              {values.options.length > 2 && (
-                                <button
-                                  type="button"
-                                  onClick={() => remove(index)}
-                                  className="text-red-500 hover:text-red-700"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                                  </svg>
-                                </button>
-                              )}
-                            </div>
-                          ))}
-                          
-                          {values.options.length < 5 && (
-                            <button
-                              type="button"
-                              onClick={() => push({ text: '', isCorrect: false })}
-                              className="mt-2 text-primary-600 hover:text-primary-800 font-medium flex items-center"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 01-1 1h-3a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-                              </svg>
-                              Adicionar Opção
-                            </button>
-                          )}
-                          
-                          <ErrorMessage
-                            name="options"
-                            component="div"
-                            className="text-red-500 text-sm mt-1"
-                          />
-                        </div>
-                      )}
-                    </FieldArray>
-                  </div>
-                  
-                  <div className="flex justify-end space-x-3 pt-4">
-                    {isEditing && (
-                      <button
-                        type="button"
-                        onClick={handleCancel}
-                        className="btn-secondary"
-                      >
-                        Cancelar
-                      </button>
-                    )}
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="btn-primary"
-                    >
-                      {isSubmitting 
-                        ? 'Salvando...' 
-                        : isEditing 
-                          ? 'Atualizar Pergunta' 
-                          : 'Adicionar Pergunta'
-                      }
-                    </button>
-                  </div>
-                </Form>
-              )}
-            </Formik>
-          </div>
+          <QuestionForm 
+            stages={stages}
+            onSubmit={handleSubmit}
+            onCancel={isEditing ? handleCancel : undefined}
+            initialValues={
+              isEditing && currentQuestion
+                ? {
+                    text: currentQuestion.text,
+                    stageId: currentQuestion.stageId,
+                    options: currentQuestion.options,
+                  }
+                : undefined
+            }
+            isEditing={isEditing}
+          />
           
           {/* Lista de Perguntas */}
           <div className="bg-white rounded-lg shadow-md p-6">

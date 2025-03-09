@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Formik, Form, Field, ErrorMessage, FieldArray } from 'formik'
 import * as Yup from 'yup'
 import Navbar from '../../../components/admin/Navbar'
+import QuestionForm from '../../../components/admin/QuestionForm'
 
 interface Test {
   id: string
@@ -80,6 +81,7 @@ const TestDetail: NextPage = () => {
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([])
   const [newStageName, setNewStageName] = useState('')
   const [newStageDescription, setNewStageDescription] = useState('')
+  const [showNewQuestionForm, setShowNewQuestionForm] = useState(false)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -261,6 +263,7 @@ const TestDetail: NextPage = () => {
 
   const addQuestionsToStage = async () => {
     if (!selectedStageId || selectedQuestions.length === 0) {
+      setError('Selecione pelo menos uma pergunta para adicionar ao estágio')
       return
     }
 
@@ -279,12 +282,13 @@ const TestDetail: NextPage = () => {
         throw new Error('Erro ao adicionar perguntas ao estágio')
       }
 
-      // Atualizar o teste com os dados atualizados
+      // Atualizar a interface
       const updatedTestResponse = await fetch(`/api/admin/tests/${id}`)
       const updatedTest = await updatedTestResponse.json()
       setTest(updatedTest)
 
-      // Fechar modal e mostrar mensagem de sucesso
+      // Limpar seleção e fechar modal
+      setSelectedQuestions([])
       setShowAddQuestionsModal(false)
       setSuccessMessage('Perguntas adicionadas com sucesso!')
       setTimeout(() => setSuccessMessage(''), 3000)
@@ -334,6 +338,50 @@ const TestDetail: NextPage = () => {
       setError('Ocorreu um erro ao remover a pergunta. Por favor, tente novamente.')
     }
   }
+
+  const handleCreateQuestion = async (values: any, { resetForm }: any) => {
+    try {
+      // Garantir que stageId esteja definido
+      if (!values.stageId && selectedStageId) {
+        values.stageId = selectedStageId;
+      }
+      
+      // Criar a pergunta
+      const response = await fetch('/api/admin/questions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(values),
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao criar a pergunta');
+      }
+
+      const newQuestion = await response.json();
+
+      // Atualizar a lista de perguntas disponíveis
+      const questionsResponse = await fetch('/api/admin/questions');
+      const questionsData = await questionsResponse.json();
+      setAvailableQuestions(questionsData);
+
+      // Selecionar automaticamente a nova pergunta
+      setSelectedQuestions([...selectedQuestions, newQuestion.id]);
+
+      // Esconder o formulário de nova pergunta
+      setShowNewQuestionForm(false);
+      
+      // Resetar o formulário
+      resetForm();
+      
+      setSuccessMessage('Pergunta criada com sucesso!');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (error) {
+      console.error('Erro:', error);
+      setError('Ocorreu um erro ao criar a pergunta. Por favor, tente novamente.');
+    }
+  };
 
   if (status === 'loading' || loading) {
     return (
@@ -743,7 +791,32 @@ const TestDetail: NextPage = () => {
               >
                 Adicionar {selectedQuestions.length} pergunta(s)
               </button>
+              <button
+                onClick={() => setShowNewQuestionForm(true)}
+                className="px-4 py-2 text-sm text-white bg-primary-600 rounded-md hover:bg-primary-700"
+              >
+                Criar Nova Pergunta
+              </button>
             </div>
+          </div>
+        </div>
+      )}
+      
+      {showNewQuestionForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h2 className="text-xl font-semibold text-secondary-800 mb-4">Criar Nova Pergunta</h2>
+            
+            <QuestionForm
+              stages={stages}
+              preSelectedStageId={selectedStageId || undefined}
+              onSubmit={handleCreateQuestion}
+              onCancel={() => setShowNewQuestionForm(false)}
+              onSuccess={() => {
+                setSuccessMessage('Pergunta criada com sucesso!');
+                setTimeout(() => setSuccessMessage(''), 3000);
+              }}
+            />
           </div>
         </div>
       )}
