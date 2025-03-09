@@ -448,17 +448,17 @@ const Dashboard: NextPage = () => {
       });
       
       // Atualizar dados do gráfico
-      const newDatasets = [...stageDistributionData.datasets];
-      for (let i = 0; i < 6; i++) {
-        newDatasets[i].data = stageCounts[i];
-      }
+      const newDatasets = stageDistributionData.datasets.map((dataset, i) => ({
+        ...dataset,
+        data: i < 6 ? stageCounts[i] : dataset.data
+      }));
       
-      setStageDistributionData({
-        ...stageDistributionData,
+      setStageDistributionData(prevData => ({
+        ...prevData,
         datasets: newDatasets
-      });
+      }));
     }
-  }, [candidates, stageDistributionData]);
+  }, [candidates]); // Removido stageDistributionData das dependências
   
   // Função para atualizar o gráfico de perfil ideal quando um candidato é selecionado
   useEffect(() => {
@@ -467,19 +467,26 @@ const Dashboard: NextPage = () => {
       const candidatePosition = selectedCandidate.position || 'Padrão';
       const profileToUse = idealProfiles[candidatePosition] || idealProfiles['Padrão'];
       
-      // Atualizar o gráfico com o perfil ideal correspondente
-      const updatedDatasets = [...idealProfileData.datasets];
-      updatedDatasets[1].data = profileToUse;
-      
-      // Atualizar os dados do candidato
-      updatedDatasets[0].data = selectedCandidate.stageScores?.map(stage => stage.percentage) || [0, 0, 0, 0, 0, 0];
-      
-      setIdealProfileData({
-        ...idealProfileData,
-        datasets: updatedDatasets
+      // Atualizar o gráfico com o perfil ideal correspondente e os dados do candidato
+      setIdealProfileData(prevData => {
+        const updatedDatasets = [
+          {
+            ...prevData.datasets[0],
+            data: selectedCandidate.stageScores?.map(stage => stage.percentage) || [0, 0, 0, 0, 0, 0]
+          },
+          {
+            ...prevData.datasets[1],
+            data: profileToUse
+          }
+        ];
+        
+        return {
+          ...prevData,
+          datasets: updatedDatasets
+        };
       });
     }
-  }, [selectedCandidate, idealProfiles, idealProfileData]);
+  }, [selectedCandidate, idealProfiles]); // Removido idealProfileData das dependências
   
   const handleLogout = async () => {
     await signOut({ callbackUrl: '/' })
@@ -1156,6 +1163,23 @@ const Dashboard: NextPage = () => {
   const trendOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    interaction: {
+      mode: 'index' as const,
+      intersect: false,
+    },
+    stacked: false,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      tooltip: {
+        callbacks: {
+          label: function(context: any) {
+            return `${context.dataset.label}: ${context.raw}%`;
+          }
+        }
+      }
+    },
     scales: {
       y: {
         beginAtZero: false,
@@ -1173,18 +1197,6 @@ const Dashboard: NextPage = () => {
         }
       }
     },
-    plugins: {
-      legend: {
-        position: 'top' as const,
-      },
-      tooltip: {
-        callbacks: {
-          label: function(context: any) {
-            return `${context.dataset.label}: ${context.raw}%`;
-          }
-        }
-      }
-    },
   };
 
   // Componente para o gráfico de tendências
@@ -1193,63 +1205,6 @@ const Dashboard: NextPage = () => {
       <div className="bg-white rounded-lg shadow-md p-6">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-secondary-700">Tendências de Desempenho</h3>
-          <button
-            onClick={() => {
-              // Simular dados de tendência (em um sistema real, isso viria do backend)
-              const months = [];
-              const currentDate = new Date();
-              
-              for (let i = 5; i >= 0; i--) {
-                const date = new Date(currentDate);
-                date.setMonth(currentDate.getMonth() - i);
-                const monthName = date.toLocaleString('pt-BR', { month: 'long' });
-                months.push(monthName.charAt(0).toUpperCase() + monthName.slice(1));
-              }
-              
-              // Gerar dados simulados com alguma variação realista
-              const scoreData = [];
-              const approvalData = [];
-              
-              // Começar com valores base
-              let baseScore = 65 + Math.random() * 10;
-              let baseApproval = 60 + Math.random() * 15;
-              
-              // Gerar dados para cada mês com uma tendência de melhoria gradual
-              for (let i = 0; i < 6; i++) {
-                // Adicionar variação aleatória mas com tendência de melhoria
-                baseScore = Math.min(95, baseScore + (Math.random() * 6 - 2));
-                baseApproval = Math.min(95, baseApproval + (Math.random() * 8 - 3));
-                
-                scoreData.push(baseScore.toFixed(1));
-                approvalData.push(baseApproval.toFixed(1));
-              }
-              
-              setTrendData({
-                labels: months,
-                datasets: [
-                  {
-                    label: 'Pontuação Média',
-                    data: scoreData,
-                    borderColor: 'rgba(54, 162, 235, 1)',
-                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                    fill: true,
-                    tension: 0.4,
-                  },
-                  {
-                    label: 'Taxa de Aprovação (%)',
-                    data: approvalData,
-                    borderColor: 'rgba(75, 192, 192, 1)',
-                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                    fill: true,
-                    tension: 0.4,
-                  }
-                ]
-              });
-            }}
-            className="text-xs px-2 py-1 bg-secondary-100 text-secondary-700 rounded hover:bg-secondary-200"
-          >
-            Atualizar Dados
-          </button>
         </div>
         <div className="h-80">
           <Line 
@@ -1267,9 +1222,11 @@ const Dashboard: NextPage = () => {
 // Renderização do componente principal
 return (
   <div className="min-h-screen bg-secondary-50">
-    <Navbar />
+    <header className="sticky top-0 z-50 bg-white shadow-sm">
+      <Navbar />
+    </header>
     
-    <main className="container mx-auto px-4 py-8">
+    <main className="container mx-auto px-4 py-8 relative z-10">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold text-secondary-900">Dashboard de Avaliação</h1>
         <div className="flex space-x-2">
@@ -1372,7 +1329,7 @@ return (
                 setRatingFilter('ALL');
                 setScoreFilter('ALL');
               }}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-secondary-600 hover:bg-secondary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary-500"
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary-500"
             >
               Limpar Filtros
             </button>
