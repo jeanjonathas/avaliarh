@@ -51,7 +51,7 @@ const Tests: NextPage = () => {
           throw new Error('Erro ao carregar os testes')
         }
         const data = await response.json()
-        setTests(data)
+        setTests(data.tests || [])
       } catch (error) {
         console.error('Erro:', error)
         setError('Não foi possível carregar os testes. Por favor, tente novamente.')
@@ -87,7 +87,7 @@ const Tests: NextPage = () => {
       // Atualizar a lista de testes
       const testsResponse = await fetch('/api/admin/tests')
       const testsData = await testsResponse.json()
-      setTests(testsData)
+      setTests(testsData.tests || [])
       
       // Limpar o formulário e o estado de edição
       resetForm()

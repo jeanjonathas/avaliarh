@@ -112,7 +112,7 @@ const Questions: NextPage = () => {
         throw new Error('Erro ao carregar os testes')
       }
       const data = await response.json()
-      setTests(data)
+      setTests(data.tests || [])
     } catch (error) {
       console.error('Erro ao buscar testes:', error)
       setError('Ocorreu um erro ao carregar os testes. Por favor, tente novamente.')
