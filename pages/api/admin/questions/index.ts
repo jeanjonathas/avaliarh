@@ -101,13 +101,22 @@ export default async function handler(
           // Buscar categoria da pergunta (se existir)
           let categoryName = 'Sem categoria';
           try {
-            const category = await prisma.$queryRaw`
-              SELECT c.name FROM "Category" c
-              JOIN "Question" q ON q."categoryId" = c.id
-              WHERE q.id = ${question.id}
+            // Verificar se a coluna categoryId existe na tabela Question
+            const checkColumn = await prisma.$queryRaw`
+              SELECT column_name 
+              FROM information_schema.columns 
+              WHERE table_name = 'Question' AND column_name = 'categoryId'
             `;
-            if (Array.isArray(category) && category.length > 0) {
-              categoryName = category[0].name;
+            
+            if (Array.isArray(checkColumn) && checkColumn.length > 0) {
+              const category = await prisma.$queryRaw`
+                SELECT c.name FROM "Category" c
+                JOIN "Question" q ON q."categoryId" = c.id
+                WHERE q.id = ${question.id}
+              `;
+              if (Array.isArray(category) && category.length > 0) {
+                categoryName = category[0].name;
+              }
             }
           } catch (error) {
             console.error(`Erro ao buscar categoria para a pergunta ${question.id}:`, error);
@@ -264,13 +273,22 @@ export default async function handler(
       // Buscar categoria da pergunta (se existir)
       let categoryName = 'Sem categoria';
       try {
-        const category = await prisma.$queryRaw`
-          SELECT c.name FROM "Category" c
-          JOIN "Question" q ON q."categoryId" = c.id
-          WHERE q.id = ${questionId}
+        // Verificar se a coluna categoryId existe na tabela Question
+        const checkColumn = await prisma.$queryRaw`
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_name = 'Question' AND column_name = 'categoryId'
         `;
-        if (Array.isArray(category) && category.length > 0) {
-          categoryName = category[0].name;
+        
+        if (Array.isArray(checkColumn) && checkColumn.length > 0) {
+          const category = await prisma.$queryRaw`
+            SELECT c.name FROM "Category" c
+            JOIN "Question" q ON q."categoryId" = c.id
+            WHERE q.id = ${questionId}
+          `;
+          if (Array.isArray(category) && category.length > 0) {
+            categoryName = category[0].name;
+          }
         }
       } catch (error) {
         console.error(`Erro ao buscar categoria para a pergunta ${questionId}:`, error);
