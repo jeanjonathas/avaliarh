@@ -36,12 +36,21 @@ export default async function handler(
   // Remover estágio do teste (DELETE)
   if (req.method === 'DELETE') {
     try {
-      // Usar uma abordagem mais simples com string literal para evitar problemas de tipo
-      const result = await prisma.$executeRawUnsafe(`
+      // Verificar se a etapa existe e pertence ao teste
+      const stageExists = await prisma.$queryRaw`
+        SELECT id FROM "Stage" WHERE id = ${stageId}::uuid AND "testId" = ${id}::uuid
+      `;
+
+      if (!Array.isArray(stageExists) || stageExists.length === 0) {
+        return res.status(404).json({ error: 'Etapa não encontrada neste teste' });
+      }
+
+      // Usar conversão explícita de UUID para evitar problemas de tipo
+      const result = await prisma.$executeRaw`
         UPDATE "Stage"
         SET "testId" = NULL, "updatedAt" = NOW()
-        WHERE id = '${stageId}' AND "testId" = '${id}'
-      `);
+        WHERE id = ${stageId}::uuid AND "testId" = ${id}::uuid
+      `;
 
       if (result === 0) {
         return res.status(404).json({ error: 'Etapa não encontrada neste teste' });
@@ -62,11 +71,21 @@ export default async function handler(
         return res.status(400).json({ error: 'Ordem é obrigatória' });
       }
 
-      const result = await prisma.$executeRawUnsafe(`
+      // Verificar se a etapa existe e pertence ao teste
+      const stageExists = await prisma.$queryRaw`
+        SELECT id FROM "Stage" WHERE id = ${stageId}::uuid AND "testId" = ${id}::uuid
+      `;
+
+      if (!Array.isArray(stageExists) || stageExists.length === 0) {
+        return res.status(404).json({ error: 'Etapa não encontrada neste teste' });
+      }
+
+      // Atualizar a ordem da etapa com conversão explícita de UUID
+      const result = await prisma.$executeRaw`
         UPDATE "Stage"
         SET "order" = ${order}, "updatedAt" = NOW()
-        WHERE id = '${stageId}' AND "testId" = '${id}'
-      `);
+        WHERE id = ${stageId}::uuid AND "testId" = ${id}::uuid
+      `;
 
       if (result === 0) {
         return res.status(404).json({ error: 'Etapa não encontrada neste teste' });

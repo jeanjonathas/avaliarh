@@ -212,6 +212,93 @@ const TestDetail: NextPage = () => {
     }
   }
 
+  // Função para atualizar a ordem de uma etapa
+  const updateStageOrder = async (stageId: string, newOrder: number) => {
+    try {
+      const response = await fetch(`/api/admin/tests/${id}/stages/${stageId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ order: newOrder }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro ao atualizar a ordem da etapa')
+      }
+
+      // Recarregar os dados do teste
+      await reloadTestData()
+    } catch (error) {
+      console.error('Erro:', error)
+      notify.showError('Ocorreu um erro ao reordenar as etapas. Por favor, tente novamente.')
+    }
+  }
+
+  // Função para mover uma etapa para cima
+  const moveStageUp = async (testStage: TestStage, index: number) => {
+    if (index === 0) return // Já está no topo
+
+    const stages = [...test.testStages].sort((a, b) => a.order - b.order)
+    const prevStage = stages[index - 1]
+    
+    // Trocar as ordens
+    const tempOrder = prevStage.order
+    await updateStageOrder(prevStage.id, testStage.order)
+    await updateStageOrder(testStage.id, tempOrder)
+  }
+
+  // Função para mover uma etapa para baixo
+  const moveStageDown = async (testStage: TestStage, index: number) => {
+    const stages = [...test.testStages].sort((a, b) => a.order - b.order)
+    if (index === stages.length - 1) return // Já está no final
+    
+    const nextStage = stages[index + 1]
+    
+    // Trocar as ordens
+    const tempOrder = nextStage.order
+    await updateStageOrder(nextStage.id, testStage.order)
+    await updateStageOrder(testStage.id, tempOrder)
+  }
+
+  // Função para mover uma etapa para o topo
+  const moveStageToTop = async (testStage: TestStage) => {
+    const stages = [...test.testStages].sort((a, b) => a.order - b.order)
+    if (stages[0].id === testStage.id) return // Já está no topo
+    
+    // Reordenar todas as etapas
+    const updates = stages.map(async (stage, idx) => {
+      if (stage.id === testStage.id) {
+        return updateStageOrder(stage.id, 0)
+      } else if (stage.order < testStage.order) {
+        return updateStageOrder(stage.id, stage.order + 1)
+      }
+      return Promise.resolve()
+    })
+    
+    await Promise.all(updates)
+  }
+
+  // Função para mover uma etapa para o final
+  const moveStageToBottom = async (testStage: TestStage) => {
+    const stages = [...test.testStages].sort((a, b) => a.order - b.order)
+    if (stages[stages.length - 1].id === testStage.id) return // Já está no final
+    
+    const maxOrder = stages.length - 1
+    
+    // Reordenar todas as etapas
+    const updates = stages.map(async (stage, idx) => {
+      if (stage.id === testStage.id) {
+        return updateStageOrder(stage.id, maxOrder)
+      } else if (stage.order > testStage.order) {
+        return updateStageOrder(stage.id, stage.order - 1)
+      }
+      return Promise.resolve()
+    })
+    
+    await Promise.all(updates)
+  }
+
   const addStageToTest = async () => {
     if (!newStageName.trim()) {
       notify.showError('O nome da etapa é obrigatório')
@@ -541,118 +628,146 @@ const TestDetail: NextPage = () => {
               {test.testStages
                 .sort((a, b) => a.order - b.order)
                 .map((testStage, index) => (
-                  <div key={testStage.id} className="bg-white rounded-lg shadow-md overflow-hidden">
-                    <div className="bg-secondary-50 px-6 py-4 flex justify-between items-center">
-                      <div>
-                        <h3 className="text-lg font-medium text-secondary-800">
-                          {index + 1}. {testStage.stage.title}
-                        </h3>
-                        {testStage.stage.description && (
-                          <p className="mt-1 text-sm text-secondary-600">{testStage.stage.description}</p>
-                        )}
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => openAddQuestionsModal(testStage.stage.id)}
-                          className="px-3 py-1 text-xs text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50"
-                        >
-                          Adicionar Perguntas
-                        </button>
-                        <button
-                          onClick={() => removeStageFromTest(testStage.id)}
-                          className="px-3 py-1 text-xs text-red-600 border border-red-600 rounded-md hover:bg-red-50"
-                        >
-                          Remover Etapa
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="p-6">
-                      <h4 className="text-sm font-medium text-secondary-500 mb-3">
-                        Perguntas ({testStage.stage.questionStages.length})
-                      </h4>
-                      
-                      {testStage.stage.questionStages.length === 0 ? (
-                        <div className="text-center py-4 text-secondary-500">
-                          <p>Nenhuma pergunta nesta etapa.</p>
+                  <div key={testStage.id} className="flex items-stretch">
+                    <div className="bg-white rounded-lg shadow-md overflow-hidden flex-grow">
+                      <div className="bg-secondary-50 px-6 py-4 flex justify-between items-center">
+                        <div>
+                          <h3 className="text-lg font-medium text-secondary-800">
+                            {index + 1}. {testStage.stage.title}
+                          </h3>
+                          {testStage.stage.description && (
+                            <p className="mt-1 text-sm text-secondary-600">{testStage.stage.description}</p>
+                          )}
+                        </div>
+                        <div>
                           <button
                             onClick={() => openAddQuestionsModal(testStage.stage.id)}
-                            className="mt-2 text-sm text-primary-600 hover:text-primary-800"
+                            className="px-3 py-1 text-xs text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50 mb-2 block w-full"
                           >
-                            Adicionar perguntas
+                            Adicionar Perguntas
+                          </button>
+                          <button
+                            onClick={() => removeStageFromTest(testStage.id)}
+                            className="px-3 py-1 text-xs text-red-600 border border-red-600 rounded-md hover:bg-red-50 block w-full"
+                          >
+                            Remover Etapa
                           </button>
                         </div>
-                      ) : (
-                        <div className="space-y-4">
-                          {testStage.stage.questionStages
-                            .sort((a, b) => a.order - b.order)
-                            .map((questionStage, qIndex) => (
-                              <div key={questionStage.id} className="border border-secondary-200 rounded-md p-4">
-                                <div className="flex justify-between">
-                                  <div className="flex-1">
-                                    <div className="font-medium text-secondary-800">
-                                      {qIndex + 1}. {questionStage.question.text}
-                                    </div>
-                                    <div className="mt-2 flex flex-wrap gap-2">
-                                      <span className={`px-2 py-1 text-xs rounded-full ${
-                                        questionStage.question.difficulty === 'EASY' 
-                                          ? 'bg-green-100 text-green-800' 
-                                          : questionStage.question.difficulty === 'MEDIUM'
-                                          ? 'bg-yellow-100 text-yellow-800'
-                                          : 'bg-red-100 text-red-800'
-                                      }`}>
-                                        {questionStage.question.difficulty === 'EASY' 
-                                          ? 'Fácil' 
-                                          : questionStage.question.difficulty === 'MEDIUM'
-                                          ? 'Médio'
-                                          : 'Difícil'}
-                                      </span>
-                                      
-                                      {questionStage.question.categories && questionStage.question.categories.map(category => (
-                                        <span 
-                                          key={category.id}
-                                          className="px-2 py-1 text-xs bg-secondary-100 text-secondary-800 rounded-full"
-                                        >
-                                          {category.name}
+                      </div>
+                      
+                      <div className="p-6">
+                        <h4 className="text-sm font-medium text-secondary-500 mb-3">
+                          Perguntas ({testStage.stage.questionStages.length})
+                        </h4>
+                        
+                        {testStage.stage.questionStages.length === 0 ? (
+                          <div className="text-center py-4 text-secondary-500">
+                            <p>Nenhuma pergunta nesta etapa.</p>
+                            <button
+                              onClick={() => openAddQuestionsModal(testStage.stage.id)}
+                              className="mt-2 text-sm text-primary-600 hover:text-primary-800"
+                            >
+                              Adicionar perguntas
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {testStage.stage.questionStages
+                              .sort((a, b) => a.order - b.order)
+                              .map((questionStage, qIndex) => (
+                                <div key={questionStage.id} className="border border-secondary-200 rounded-md p-4">
+                                  <div className="flex justify-between">
+                                    <div className="flex-1">
+                                      <div className="font-medium text-secondary-800">
+                                        {qIndex + 1}. {questionStage.question.text}
+                                      </div>
+                                      <div className="mt-2 flex flex-wrap gap-2">
+                                        <span className={`px-2 py-1 text-xs rounded-full ${
+                                          questionStage.question.difficulty === 'EASY' 
+                                            ? 'bg-green-100 text-green-800' 
+                                            : questionStage.question.difficulty === 'MEDIUM'
+                                            ? 'bg-yellow-100 text-yellow-800'
+                                            : 'bg-red-100 text-red-800'
+                                        }`}>
+                                          {questionStage.question.difficulty === 'EASY' 
+                                            ? 'Fácil' 
+                                            : questionStage.question.difficulty === 'MEDIUM'
+                                            ? 'Médio'
+                                            : 'Difícil'
+                                          }
                                         </span>
-                                      ))}
+                                        {questionStage.question.categories && questionStage.question.categories.length > 0 && 
+                                          questionStage.question.categories.map(category => (
+                                            <span 
+                                              key={category.id}
+                                              className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full"
+                                            >
+                                              {category.name}
+                                            </span>
+                                          ))
+                                        }
+                                      </div>
                                     </div>
-                                    
-                                    {/* Opções */}
-                                    <div className="mt-3 space-y-2">
-                                      {questionStage.question.options.map(option => (
-                                        <div 
-                                          key={option.id}
-                                          className={`text-sm pl-3 py-1 border-l-2 ${
-                                            option.isCorrect
-                                              ? 'border-green-500 text-green-800'
-                                              : 'border-secondary-300 text-secondary-600'
-                                          }`}
-                                        >
-                                          {option.text}
-                                          {option.isCorrect && (
-                                            <span className="ml-2 text-xs text-green-600">(Correta)</span>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                  
-                                  <div>
                                     <button
                                       onClick={() => removeQuestionFromStage(questionStage.stageId, questionStage.questionId)}
                                       className="text-red-600 hover:text-red-800"
                                     >
-                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                       </svg>
                                     </button>
                                   </div>
                                 </div>
-                              </div>
-                            ))}
-                        </div>
-                      )}
+                              ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Botões de reordenação */}
+                    <div className="ml-4 flex flex-col justify-center">
+                      <div className="flex flex-col border border-secondary-300 rounded-md overflow-hidden bg-white shadow-sm">
+                        <button
+                          onClick={() => moveStageToTop(testStage)}
+                          title="Mover para o topo"
+                          className="px-2 py-2 text-xs text-secondary-600 hover:bg-secondary-100 flex items-center justify-center"
+                          disabled={index === 0}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 11l7-7 7 7" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => moveStageUp(testStage, index)}
+                          title="Mover para cima"
+                          className="px-2 py-2 text-xs text-secondary-600 hover:bg-secondary-100 flex items-center justify-center border-t border-secondary-300"
+                          disabled={index === 0}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => moveStageDown(testStage, index)}
+                          title="Mover para baixo"
+                          className="px-2 py-2 text-xs text-secondary-600 hover:bg-secondary-100 flex items-center justify-center border-t border-secondary-300"
+                          disabled={index === test.testStages.length - 1}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => moveStageToBottom(testStage)}
+                          title="Mover para o final"
+                          className="px-2 py-2 text-xs text-secondary-600 hover:bg-secondary-100 flex items-center justify-center border-t border-secondary-300"
+                          disabled={index === test.testStages.length - 1}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 13l-7 7-7-7" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -790,7 +905,8 @@ const TestDetail: NextPage = () => {
                               ? 'Fácil' 
                               : question.difficulty === 'MEDIUM'
                               ? 'Médio'
-                              : 'Difícil'}
+                              : 'Difícil'
+                            }
                           </span>
                           
                           {question.categories && question.categories.map(category => (
