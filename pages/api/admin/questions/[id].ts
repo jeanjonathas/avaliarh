@@ -9,127 +9,339 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Verificar autenticação
   const session = await getServerSession(req, res, authOptions)
-  if (!session) {
+
+  if (!session || session.user.role !== 'ADMIN') {
     return res.status(401).json({ error: 'Não autorizado' })
   }
 
   const { id } = req.query
-  if (!id || typeof id !== 'string') {
-    return res.status(400).json({ error: 'ID da pergunta é obrigatório' })
+  if (!id || Array.isArray(id)) {
+    return res.status(400).json({ error: 'ID inválido' })
   }
 
+  console.log(`[${req.method}] /api/admin/questions/${id}`);
+
   if (req.method === 'PUT') {
+    // Validação das entradas
+    const { text, stageId, categoryUuid, options } = req.body
+    
+    if (!text || text.trim() === '') {
+      return res.status(400).json({ error: 'Texto da pergunta é obrigatório' })
+    }
+    
+    if (!stageId || stageId.trim() === '') {
+      return res.status(400).json({ error: 'Etapa é obrigatória' })
+    }
+    
+    if (!options || !Array.isArray(options) || options.length < 2) {
+      return res.status(400).json({ error: 'Pelo menos duas opções são necessárias' })
+    }
+    
+    if (!options.some(option => option.isCorrect)) {
+      return res.status(400).json({ error: 'Pelo menos uma opção deve ser marcada como correta' })
+    }
+    
+    console.log('Atualizando a pergunta com os seguintes valores:');
+    console.log('ID:', id);
+    console.log('Text:', text);
+    console.log('StageId:', stageId);
+    console.log('CategoryUuid:', categoryUuid);
+    console.log('CategoryUuid é nulo ou vazio?', !categoryUuid || categoryUuid.trim() === '');
+
     try {
-      const { text, stageId, categoryId, options } = req.body
-
-      if (!text || !stageId || !options || !Array.isArray(options) || options.length < 2) {
-        return res.status(400).json({ error: 'Dados inválidos' })
+      // Verificações básicas
+      const questionExists = await prisma.question.findUnique({
+        where: { id }
+      });
+      
+      if (!questionExists) {
+        return res.status(404).json({ error: 'Pergunta não encontrada' });
       }
-
-      // Verificar se a etapa existe
+      
       const stage = await prisma.stage.findUnique({
-        where: {
-          id: stageId,
-        },
-      })
-
+        where: { id: stageId }
+      });
+      
       if (!stage) {
-        return res.status(404).json({ error: 'Etapa não encontrada' })
+        return res.status(404).json({ error: 'Etapa não encontrada' });
       }
-
-      // Verificar se a categoria existe (se fornecida)
-      if (categoryId) {
-        try {
-          const categories = await prisma.$queryRaw`
-            SELECT id FROM "Category" WHERE id = ${categoryId}
-          `;
-
-          if (!Array.isArray(categories) || categories.length === 0) {
-            return res.status(404).json({ error: 'Categoria não encontrada' });
-          }
-        } catch (error) {
-          console.error('Erro ao verificar categoria:', error);
-          // Continuar mesmo se a categoria não for encontrada
-        }
-      }
-
-      // Verificar se pelo menos uma opção está marcada como correta
-      const hasCorrectOption = options.some(option => option.isCorrect)
-      if (!hasCorrectOption) {
-        return res.status(400).json({ error: 'Pelo menos uma opção deve ser marcada como correta' })
-      }
-
-      // Atualizar a pergunta usando SQL raw para suportar o campo categoryId
-      await prisma.$executeRaw`
+      
+      // Vamos usar a abordagem mais direta possível para resolver o problema
+      // Converter todos os UUIDs para texto nas consultas SQL
+      
+      // 1. Atualizar os campos básicos da pergunta
+      const textQuery = `
         UPDATE "Question"
-        SET 
-          text = ${text},
-          "stageId" = ${stageId},
-          "categoryId" = ${categoryId === '' ? null : categoryId},
-          "updatedAt" = NOW()
-        WHERE id = ${id}
+        SET text = '${text}', "updatedAt" = NOW()
+        WHERE id::text = '${id}'
       `;
-
-      // Continuar com a atualização das opções
-      const updatedQuestion = await prisma.$transaction(async (prisma) => {
-        // Buscar a pergunta atualizada
-        const question = await prisma.question.findUnique({
-          where: { id: id as string },
-        })
-
-        if (!question) {
-          throw new Error('Pergunta não encontrada após atualização')
-        }
-
-        // Excluir todas as opções existentes
-        await prisma.option.deleteMany({
-          where: {
+      await prisma.$executeRawUnsafe(textQuery);
+      
+      // 2. Atualizar a etapa
+      const stageQuery = `
+        UPDATE "Question"
+        SET "stageId" = '${stageId}'::uuid
+        WHERE id::text = '${id}'
+      `;
+      await prisma.$executeRawUnsafe(stageQuery);
+      
+      // 3. Atualizar a categoria
+      let categoryQuery;
+      if (!categoryUuid || categoryUuid.trim() === '') {
+        categoryQuery = `
+          UPDATE "Question"
+          SET "categoryId" = NULL
+          WHERE id::text = '${id}'
+        `;
+      } else {
+        categoryQuery = `
+          UPDATE "Question"
+          SET "categoryId" = '${categoryUuid}'::uuid
+          WHERE id::text = '${id}'
+        `;
+      }
+      await prisma.$executeRawUnsafe(categoryQuery);
+      
+      // 4. Excluir opções existentes
+      const deleteOptionsQuery = `
+        DELETE FROM "Option"
+        WHERE "questionId"::text = '${id}'
+      `;
+      await prisma.$executeRawUnsafe(deleteOptionsQuery);
+      
+      // 5. Inserir novas opções usando Prisma ORM
+      for (const option of options) {
+        await prisma.option.create({
+          data: {
             questionId: id,
-          },
-        })
+            text: option.text,
+            isCorrect: option.isCorrect
+          }
+        });
+      }
+      
+      // Buscar a pergunta atualizada com suas relações
+      const questionQuery = `
+        SELECT 
+          q.id, 
+          q.text, 
+          q."stageId",
+          q."categoryId",
+          s.id as "stage_id",
+          s.title as "stage_title",
+          s.description as "stage_description",
+          s.order as "stage_order",
+          c.id as "category_id",
+          c.name as "category_name",
+          c.description as "category_description"
+        FROM "Question" q
+        LEFT JOIN "Stage" s ON q."stageId" = s.id
+        LEFT JOIN "Category" c ON q."categoryId" = c.id
+        WHERE q.id = '${id}'
+      `;
+      
+      const optionsQuery = `
+        SELECT id, text, "isCorrect", "createdAt", "updatedAt"
+        FROM "Option"
+        WHERE "questionId" = '${id}'
+      `;
+      
+      const questionResult = await prisma.$queryRawUnsafe(questionQuery);
+      const optionsResult = await prisma.$queryRawUnsafe(optionsQuery);
+      
+      if (!questionResult || !Array.isArray(questionResult) || questionResult.length === 0) {
+        return res.status(500).json({ error: 'Falha ao recuperar a pergunta atualizada' });
+      }
 
-        // Criar novas opções
-        const newOptions = await Promise.all(
-          options.map(option => 
-            prisma.option.create({
-              data: {
-                text: option.text,
-                isCorrect: option.isCorrect,
-                questionId: id,
-              },
-            })
-          )
-        )
+      // Definir interface para o tipo do resultado da query
+      interface QuestionQueryResult {
+        id: string;
+        text: string;
+        stageId: string;
+        categoryId: string | null;
+        stage_id: string;
+        stage_title: string;
+        stage_description: string | null;
+        stage_order: number | null;
+        category_id: string | null;
+        category_name: string | null;
+        category_description: string | null;
+      }
 
-        return {
-          ...question,
-          options: newOptions,
-        }
-      })
+      // Usar asserção de tipo
+      const question = questionResult[0] as QuestionQueryResult;
+      const optionsList = Array.isArray(optionsResult) ? optionsResult : [];
 
-      return res.status(200).json(updatedQuestion)
+      // Formatar a resposta
+      const formattedQuestion = {
+        id: question.id,
+        text: question.text,
+        stageId: question.stageId,
+        categoryId: question.category_id || null,
+        categoryUuid: question.category_id || null, 
+        options: optionsList.map(option => ({
+          id: option.id,
+          text: option.text,
+          isCorrect: option.isCorrect,
+          createdAt: new Date(option.createdAt).toISOString(),
+          updatedAt: new Date(option.updatedAt).toISOString()
+        })),
+        stage: {
+          id: question.stage_id,
+          title: question.stage_title,
+          description: question.stage_description || '',
+          order: question.stage_order || 0
+        },
+        category: question.category_id ? {
+          id: question.category_id,
+          name: question.category_name || '',
+          description: question.category_description || ''
+        } : null
+      };
+
+      console.assert(typeof question.id === 'string', 'question.id deve ser uma string');
+      console.assert(typeof question.text === 'string', 'question.text deve ser uma string');
+      console.assert(typeof question.stageId === 'string', 'question.stageId deve ser uma string');
+      console.assert(typeof question.category_id === 'string' || question.category_id === null, 'question.category_id deve ser uma string ou null');
+      console.assert(typeof question.stage_id === 'string', 'question.stage_id deve ser uma string');
+      console.assert(typeof question.stage_title === 'string', 'question.stage_title deve ser uma string');
+      console.assert(typeof question.stage_description === 'string', 'question.stage_description deve ser uma string');
+      console.assert(typeof question.stage_order === 'number', 'question.stage_order deve ser um número');
+      console.assert(typeof question.category_id === 'string' || question.category_id === null, 'question.category_id deve ser uma string ou null');
+      console.assert(typeof question.category_name === 'string', 'question.category_name deve ser uma string');
+      console.assert(typeof question.category_description === 'string', 'question.category_description deve ser uma string');
+
+      console.log('API retornando pergunta formatada:', {
+        id: formattedQuestion.id,
+        categoryId: formattedQuestion.categoryId,
+        categoryUuid: formattedQuestion.categoryUuid,
+        'category?.id': formattedQuestion.category?.id
+      });
+
+      return res.status(200).json(formattedQuestion);
     } catch (error) {
-      console.error('Erro ao atualizar pergunta:', error)
-      return res.status(500).json({ error: 'Erro ao atualizar pergunta' })
+      console.error('Erro ao atualizar pergunta:', error);
+      return res.status(500).json({ error: 'Erro ao atualizar a pergunta' });
     }
   } else if (req.method === 'DELETE') {
     try {
-      // Excluir a pergunta (as opções associadas serão excluídas automaticamente devido à relação onDelete: Cascade)
-      await prisma.question.delete({
-        where: {
-          id,
-        },
-      })
+      // Excluir a pergunta usando SQL puro
+      await prisma.$executeRaw`DELETE FROM "Question" WHERE id = ${id}::uuid`;
 
       return res.status(204).end()
     } catch (error) {
-      console.error('Erro ao excluir pergunta:', error)
-      return res.status(500).json({ error: 'Erro ao excluir pergunta' })
+      console.error('Erro ao excluir pergunta:', error);
+      return res.status(500).json({ error: 'Erro ao excluir a pergunta' })
+    }
+  } else if (req.method === 'GET') {
+    try {
+      console.log(`Buscando detalhes da pergunta com ID: ${id}`);
+      
+      // Vamos usar SQL bruto para evitar problemas de tipagem
+      const questionQuery = `
+        SELECT 
+          q.id, 
+          q.text, 
+          q."stageId",
+          q."categoryId",
+          s.id as "stage_id",
+          s.title as "stage_title",
+          s.description as "stage_description",
+          s.order as "stage_order",
+          c.id as "category_id",
+          c.name as "category_name",
+          c.description as "category_description"
+        FROM "Question" q
+        LEFT JOIN "Stage" s ON q."stageId" = s.id
+        LEFT JOIN "Category" c ON q."categoryId" = c.id
+        WHERE q.id = '${id}'
+      `;
+      
+      const optionsQuery = `
+        SELECT id, text, "isCorrect", "createdAt", "updatedAt"
+        FROM "Option"
+        WHERE "questionId" = '${id}'
+      `;
+      
+      const questionResult = await prisma.$queryRawUnsafe(questionQuery);
+      const optionsResult = await prisma.$queryRawUnsafe(optionsQuery);
+      
+      if (!questionResult || !Array.isArray(questionResult) || questionResult.length === 0) {
+        return res.status(404).json({ error: 'Pergunta não encontrada' });
+      }
+
+      // Definir interface para o tipo do resultado da query
+      interface QuestionQueryResult {
+        id: string;
+        text: string;
+        stageId: string;
+        categoryId: string | null;
+        stage_id: string;
+        stage_title: string;
+        stage_description: string | null;
+        stage_order: number | null;
+        category_id: string | null;
+        category_name: string | null;
+        category_description: string | null;
+      }
+
+      // Usar asserção de tipo
+      const question = questionResult[0] as QuestionQueryResult;
+      const optionsList = Array.isArray(optionsResult) ? optionsResult : [];
+
+      // Formatar a resposta
+      const formattedQuestion = {
+        id: question.id,
+        text: question.text,
+        stageId: question.stageId,
+        categoryId: question.category_id || null,
+        categoryUuid: question.category_id || null, 
+        options: optionsList.map(option => ({
+          id: option.id,
+          text: option.text,
+          isCorrect: option.isCorrect,
+          createdAt: new Date(option.createdAt).toISOString(),
+          updatedAt: new Date(option.updatedAt).toISOString()
+        })),
+        stage: {
+          id: question.stage_id,
+          title: question.stage_title,
+          description: question.stage_description || '',
+          order: question.stage_order || 0
+        },
+        category: question.category_id ? {
+          id: question.category_id,
+          name: question.category_name || '',
+          description: question.category_description || ''
+        } : null
+      };
+
+      console.assert(typeof question.id === 'string', 'question.id deve ser uma string');
+      console.assert(typeof question.text === 'string', 'question.text deve ser uma string');
+      console.assert(typeof question.stageId === 'string', 'question.stageId deve ser uma string');
+      console.assert(typeof question.category_id === 'string' || question.category_id === null, 'question.category_id deve ser uma string ou null');
+      console.assert(typeof question.stage_id === 'string', 'question.stage_id deve ser uma string');
+      console.assert(typeof question.stage_title === 'string', 'question.stage_title deve ser uma string');
+      console.assert(typeof question.stage_description === 'string', 'question.stage_description deve ser uma string');
+      console.assert(typeof question.stage_order === 'number', 'question.stage_order deve ser um número');
+      console.assert(typeof question.category_id === 'string' || question.category_id === null, 'question.category_id deve ser uma string ou null');
+      console.assert(typeof question.category_name === 'string', 'question.category_name deve ser uma string');
+      console.assert(typeof question.category_description === 'string', 'question.category_description deve ser uma string');
+
+      console.log('API retornando pergunta formatada:', {
+        id: formattedQuestion.id,
+        categoryId: formattedQuestion.categoryId,
+        categoryUuid: formattedQuestion.categoryUuid,
+        'category?.id': formattedQuestion.category?.id
+      });
+
+      return res.status(200).json(formattedQuestion);
+    } catch (error) {
+      console.error('Erro ao buscar pergunta:', error);
+      return res.status(500).json({ error: 'Erro ao buscar a pergunta' });
     }
   } else {
-    res.setHeader('Allow', ['PUT', 'DELETE'])
-    res.status(405).end(`Method ${req.method} Not Allowed`)
+    return res.status(405).json({ error: 'Método não permitido' });
   }
 }

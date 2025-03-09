@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Formik, Form, Field, ErrorMessage, FieldArray } from 'formik';
+import React, { useState, useEffect } from 'react';
+import { Formik, Form, Field, ErrorMessage, FieldArray, FormikConsumer } from 'formik';
 import * as Yup from 'yup';
 
 interface Stage {
@@ -25,7 +25,13 @@ interface Question {
   text: string;
   stageId: string;
   categoryId?: string;
+  categoryUuid?: string;
   options: Option[];
+  category?: {
+    id: string;
+    name: string;
+    description?: string;
+  };
 }
 
 interface QuestionFormProps {
@@ -54,17 +60,111 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
   hideStageField = false
 }) => {
   const [error, setError] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
+    preSelectedCategoryId || null
+  );
+
+  // Debug das props recebidas
+  useEffect(() => {
+    if (initialValues) {
+      console.log('DEBUG - QuestionForm recebeu initialValues:', initialValues);
+      console.log('DEBUG - categoryId recebido:', initialValues.categoryId);
+      console.log('DEBUG - categoryUuid recebido:', initialValues.categoryUuid);
+      console.log('DEBUG - categorias disponíveis:', categories.map(c => ({ id: c.id, name: c.name })));
+    }
+  }, [initialValues, categories]);
+
+  // Efeito para depurar e verificar quando os valores iniciais são recebidos
+  useEffect(() => {
+    if (initialValues) {
+      console.log('DEBUG - VALORES INICIAIS RECEBIDOS:', {
+        categoryId: initialValues.categoryId,
+        categoryUuid: initialValues.categoryUuid,
+        'category?.id': initialValues.category?.id
+      });
+    }
+  }, [initialValues]);
+
+  // Efeito para inicializar corretamente o categoryId quando os valores iniciais mudam
+  useEffect(() => {
+    console.log('Valores iniciais mudaram:', initialValues);
+    
+    // Defina o categoryId diretamente do valor inicial ou do valor da categoria aninhada
+    if (initialValues && initialValues.categoryId) {
+      console.log('Definindo selectedCategoryId para:', initialValues.categoryId);
+      setSelectedCategoryId(initialValues.categoryId);
+    }
+  }, [initialValues]);
+
+  // Synchronize categoryId with categoryUuid when component mounts
+  useEffect(() => {
+    if (initialValues?.categoryUuid && categories.length > 0) {
+      const matchingCategory = categories.find(cat => cat.id === initialValues.categoryUuid);
+      if (matchingCategory) {
+        console.log('Categoria encontrada pelo UUID:', matchingCategory.name);
+        setSelectedCategoryId(matchingCategory.id);
+      }
+    }
+  }, [initialValues, categories]);
 
   const defaultValues = {
     text: '',
     stageId: preSelectedStageId || (stages.length > 0 ? stages[0].id : null),
-    categoryId: preSelectedCategoryId || '',
+    categoryId: '',
+    categoryUuid: '',
     options: [
       { text: '', isCorrect: false },
       { text: '', isCorrect: false },
       { text: '', isCorrect: false },
       { text: '', isCorrect: false },
     ],
+  };
+
+  // Prepare initial values for Formik form
+  const prepareInitialValues = () => {
+    console.log('Preparando valores iniciais para o formulário. Valores recebidos:', initialValues);
+    
+    // Verificar se há categoria quando estamos editando
+    if (isEditing && initialValues) {
+      // Garantir consistência entre categoryId e categoryUuid
+      if (initialValues.categoryUuid && (!initialValues.categoryId || initialValues.categoryId === '')) {
+        console.log('Definindo categoryId a partir de categoryUuid:', initialValues.categoryUuid);
+        initialValues.categoryId = initialValues.categoryUuid;
+      } else if (initialValues.categoryId && (!initialValues.categoryUuid || initialValues.categoryUuid === '')) {
+        console.log('Definindo categoryUuid a partir de categoryId:', initialValues.categoryId);
+        initialValues.categoryUuid = initialValues.categoryId;
+      }
+      
+      // Se temos o objeto category, garantir que as propriedades estejam atualizadas
+      if (initialValues.category) {
+        console.log('Categoria encontrada nos valores iniciais:', initialValues.category);
+        initialValues.categoryId = initialValues.category.id;
+        initialValues.categoryUuid = initialValues.category.id;
+      }
+    }
+    
+    // Se não houver opções, criar duas opções vazias por padrão
+    if (!initialValues?.options || initialValues.options.length === 0) {
+      return {
+        text: initialValues?.text || '',
+        stageId: initialValues?.stageId || (preSelectedStageId || ''),
+        categoryId: initialValues?.categoryId || (preSelectedCategoryId || ''),
+        categoryUuid: initialValues?.categoryUuid || (preSelectedCategoryId || ''),
+        options: [
+          { text: '', isCorrect: true },
+          { text: '', isCorrect: false },
+        ],
+      };
+    }
+
+    // Retornar valores existentes
+    return {
+      text: initialValues?.text || '',
+      stageId: initialValues?.stageId || (preSelectedStageId || ''),
+      categoryId: initialValues?.categoryId || (preSelectedCategoryId || ''),
+      categoryUuid: initialValues?.categoryUuid || (preSelectedCategoryId || ''),
+      options: initialValues?.options || [],
+    };
   };
 
   const getValidationSchema = () => {
@@ -117,10 +217,10 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
       )}
 
       <Formik
-        initialValues={initialValues || defaultValues}
+        initialValues={prepareInitialValues()}
         validationSchema={getValidationSchema()}
+        enableReinitialize={true}
         onSubmit={handleSubmit}
-        enableReinitialize
       >
         {({ values, isSubmitting, setFieldValue }) => (
           <Form className="space-y-6">
@@ -196,14 +296,63 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                 id="categoryId"
                 className="input-field"
                 disabled={!!preSelectedCategoryId}
+                value={values.categoryId || ''}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                  const categoryId = e.target.value;
+                  setFieldValue('categoryId', categoryId);
+                  
+                  // Encontrar o UUID correspondente à categoria selecionada
+                  if (categoryId) {
+                    const selectedCategory = categories.find(cat => cat.id === categoryId);
+                    if (selectedCategory) {
+                      console.log('Categoria selecionada no dropdown:', selectedCategory.name);
+                      // Importante: definir o UUID para uso no backend
+                      setFieldValue('categoryUuid', selectedCategory.id);
+                      setSelectedCategoryId(selectedCategory.id);
+                    } else {
+                      console.log('Categoria não encontrada com ID:', categoryId);
+                      setFieldValue('categoryUuid', '');
+                      setSelectedCategoryId(null);
+                    }
+                  } else {
+                    console.log('Nenhuma categoria selecionada no dropdown');
+                    setFieldValue('categoryUuid', '');
+                    setSelectedCategoryId(null);
+                  }
+                }}
               >
                 <option value="">Sem categoria</option>
                 {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
+                  <option 
+                    key={category.id} 
+                    value={category.id}
+                    data-uuid={category.id}
+                  >
                     {category.name}
                   </option>
                 ))}
               </Field>
+              
+              {/* Campo oculto para armazenar o UUID da categoria */}
+              <Field type="hidden" name="categoryUuid" />
+              
+              <FormikConsumer>
+                {({ values }) => {
+                  // Encontrar o nome da categoria a partir do UUID
+                  const categoryName = values.categoryId ? 
+                    categories.find(c => c.id === values.categoryId)?.name || 'não encontrada' : 
+                    'nenhuma';
+                  
+                  return (
+                    <div className="mt-1 text-xs text-gray-500">
+                      <p>CategoryId: {values.categoryId || 'não definido'}</p>
+                      <p>CategoryUuid: {values.categoryUuid || 'não definido'}</p>
+                      <p>Categoria: {categoryName}</p>
+                    </div>
+                  );
+                }}
+              </FormikConsumer>
+              
               <ErrorMessage
                 name="categoryId"
                 render={msg => {

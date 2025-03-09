@@ -24,7 +24,7 @@ interface Question {
   id: string
   text: string
   stageId: string
-  categoryId?: string
+  categoryUuid?: string
   categoryName?: string
   options: {
     id: string
@@ -339,12 +339,21 @@ const Questions: NextPage = () => {
       const url = isEditing ? `/api/admin/questions/${currentQuestion?.id}` : '/api/admin/questions';
 
       console.log('Enviando dados para o servidor:', values);
+      console.log('Valores de categoria:', {
+        categoryId: values.categoryId,
+        categoryUuid: values.categoryUuid
+      });
 
       // Garantir que stageId seja null se for uma string vazia
+      // Usar categoryUuid para enviar o UUID da categoria
       const dataToSend = {
         ...values,
-        stageId: values.stageId || null
+        stageId: values.stageId || null,
+        categoryUuid: values.categoryUuid || null,
+        categoryId: undefined // Não enviar categoryId para evitar conflitos
       };
+
+      console.log('Dados formatados para envio:', dataToSend);
 
       const response = await fetch(url, {
         method,
@@ -357,7 +366,12 @@ const Questions: NextPage = () => {
       if (!response.ok) {
         const errorData = await response.json();
         console.error('Erro do servidor:', errorData);
-        throw new Error(errorData.error || 'Erro ao salvar a pergunta');
+        if (errorData.error === 'UUID de categoria inválido') {
+          // Erro específico de UUID inválido
+          setError('UUID de categoria inválido. Por favor, selecione a categoria novamente.');
+        } else {
+          throw new Error(errorData.error || 'Erro ao salvar a pergunta');
+        }
       }
 
       // Atualizar a lista de perguntas
@@ -448,10 +462,39 @@ const Questions: NextPage = () => {
     setPendingFormValues(null);
   };
 
-  const handleEdit = (question: Question) => {
-    setCurrentQuestion(question)
-    setIsEditing(true)
-  }
+  const handleEditQuestion = async (question: Question) => {
+    try {
+      // Buscar os detalhes completos da pergunta
+      const response = await fetch(`/api/admin/questions/${question.id}`);
+      if (!response.ok) {
+        throw new Error('Erro ao carregar detalhes da pergunta');
+      }
+      
+      const questionDetails = await response.json();
+      console.log('Detalhes da pergunta para edição:', questionDetails);
+      
+      // Garantir que categoryId esteja definido corretamente a partir do objeto category
+      const completeQuestion = {
+        ...questionDetails,
+        // Explicitamente definir categoryId com base na categoria
+        categoryId: questionDetails.category?.id || null,
+        categoryUuid: questionDetails.category?.id || null
+      };
+      
+      console.log('Pergunta processada para edição:', completeQuestion);
+      console.log('Verificação específica de categoria:', {
+        'category.id': questionDetails.category?.id,
+        categoryId: completeQuestion.categoryId,
+        categoryUuid: completeQuestion.categoryUuid
+      });
+      
+      setCurrentQuestion(completeQuestion);
+      setIsEditing(true);
+    } catch (error) {
+      console.error('Erro ao editar pergunta:', error);
+      setError('Ocorreu um erro ao carregar os detalhes da pergunta para edição.');
+    }
+  };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Tem certeza que deseja excluir esta pergunta?')) {
@@ -528,7 +571,7 @@ const Questions: NextPage = () => {
                 ? {
                     text: currentQuestion.text,
                     stageId: currentQuestion.stageId,
-                    categoryId: currentQuestion.categoryId || '',
+                    categoryUuid: currentQuestion.categoryUuid || '',
                     options: currentQuestion.options,
                   }
                 : undefined
@@ -637,7 +680,7 @@ const Questions: NextPage = () => {
                             </span>
                             <div className="flex space-x-2">
                               <button
-                                onClick={() => handleEdit(question)}
+                                onClick={() => handleEditQuestion(question)}
                                 className="text-primary-600 hover:text-primary-800"
                               >
                                 <svg

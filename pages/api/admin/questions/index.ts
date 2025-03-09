@@ -36,42 +36,50 @@ export default async function handler(
               q."updatedAt",
               'MEDIUM' as difficulty
             FROM "Question" q
-            LEFT JOIN "Stage" s ON q."stageId"::text = s.id::text
-            WHERE q."stageId"::text = ${stageId}::text
+            LEFT JOIN "Stage" s ON q."stageId"::uuid = s.id::uuid
+            WHERE q."stageId"::uuid = ${stageId}::uuid
             ORDER BY COALESCE(s.order, 0) ASC, q."createdAt" DESC
           `;
         } else if (testId && testId !== 'all') {
           console.log('Buscando perguntas por teste:', testId);
           questions = await prisma.$queryRaw`
             SELECT 
-              q.id, 
-              q.text, 
+              q.id,
+              q.text,
               q."stageId",
-              s.title as "stageTitle", 
-              s.order as "stageOrder",
-              q."createdAt", 
+              q."categoryId",
+              q."createdAt",
               q."updatedAt",
+              s.title as "stageTitle",
+              s.description as "stageDescription",
+              s.order as "stageOrder",
               'MEDIUM' as difficulty
             FROM "Question" q
-            LEFT JOIN "Stage" s ON q."stageId"::text = s.id::text
-            LEFT JOIN "TestStage" ts ON s.id::text = ts."stageId"::text
-            WHERE ts."testId"::text = ${testId}::text
+            LEFT JOIN "Stage" s ON q."stageId"::uuid = s.id::uuid
+            LEFT JOIN "TestStage" ts ON s.id::uuid = ts."stageId"::uuid
+            WHERE ts."testId"::uuid = ${testId}::uuid
             ORDER BY COALESCE(s.order, 0) ASC, q."createdAt" DESC
           `;
         } else {
           console.log('Buscando todas as perguntas');
+          // Obter todas as perguntas
           questions = await prisma.$queryRaw`
             SELECT 
               q.id, 
               q.text, 
               q."stageId",
-              s.title as "stageTitle", 
-              s.order as "stageOrder",
+              q."categoryId",
               q."createdAt", 
               q."updatedAt",
+              s.title as "stageTitle", 
+              s.description as "stageDescription",
+              s.order as "stageOrder",
+              c.name as "categoryName",
+              c.description as "categoryDescription",
               'MEDIUM' as difficulty
             FROM "Question" q
-            LEFT JOIN "Stage" s ON q."stageId"::text = s.id::text
+            LEFT JOIN "Stage" s ON q."stageId"::uuid = s.id::uuid
+            LEFT JOIN "Category" c ON q."categoryId"::uuid = c.id::uuid
             ORDER BY COALESCE(s.order, 0) ASC, q."createdAt" DESC
           `;
         }
@@ -90,7 +98,7 @@ export default async function handler(
           let options = [];
           try {
             options = await prisma.$queryRaw`
-              SELECT id, text, "isCorrect" FROM "Option" WHERE "questionId"::text = ${question.id}::text
+              SELECT id, text, "isCorrect" FROM "Option" WHERE "questionId"::uuid = ${question.id}::uuid
             `;
             console.log(`Encontradas ${Array.isArray(options) ? options.length : 0} opções para a pergunta ${question.id}`);
           } catch (error) {
@@ -110,9 +118,15 @@ export default async function handler(
             
             if (Array.isArray(checkColumn) && checkColumn.length > 0) {
               const category = await prisma.$queryRaw`
-                SELECT c.name FROM "Category" c
-                JOIN "Question" q ON q."categoryId"::text = c.id::text
-                WHERE q.id::text = ${question.id}::text
+                SELECT 
+                  c.id,
+                  c.name,
+                  c.description,
+                  COUNT(q.id) as "questionCount"
+                FROM "Category" c
+                LEFT JOIN "Question" q ON q."categoryId"::uuid = c.id::uuid
+                WHERE c.id::uuid = ${question.categoryId}::uuid
+                GROUP BY c.id, c.name, c.description
               `;
               if (Array.isArray(category) && category.length > 0) {
                 categoryName = category[0].name;
@@ -146,13 +160,13 @@ export default async function handler(
     }
   } else if (req.method === 'POST') {
     try {
-      const { text, categoryId, options } = req.body;
-      let { stageId } = req.body;
+      const { text, stageId: originalStageId, categoryUuid, options } = req.body;
+      let stageId = originalStageId;
       
       console.log('Recebendo requisição POST para criar pergunta:', { 
         text: text ? 'presente' : 'ausente', 
         stageId: stageId ? stageId : 'ausente',
-        categoryId: categoryId ? categoryId : 'ausente',
+        categoryUuid: categoryUuid ? categoryUuid : 'ausente',
         options: options ? `${Array.isArray(options) ? options.length : 'não é array'}` : 'ausente'
       });
 
@@ -175,13 +189,13 @@ export default async function handler(
       if (stageId) {
         try {
           console.log('Verificando se a etapa existe:', stageId);
-          const stages = await prisma.$queryRaw`
-            SELECT id FROM "Stage" WHERE id::text = ${stageId}::text
+          const stage = await prisma.$queryRaw`
+            SELECT id FROM "Stage" WHERE id::uuid = ${stageId}::uuid
           `;
 
-          console.log('Resultado da consulta de etapa:', stages);
+          console.log('Resultado da consulta de etapa:', stage);
 
-          if (!Array.isArray(stages) || stages.length === 0) {
+          if (!Array.isArray(stage) || stage.length === 0) {
             console.log('Erro: etapa não encontrada');
             return res.status(404).json({ error: 'Etapa não encontrada' });
           }
@@ -247,18 +261,31 @@ export default async function handler(
       }
 
       // Verificar se a categoria existe (se fornecida)
-      if (categoryId) {
+      if (categoryUuid) {
         try {
-          const categories = await prisma.$queryRaw`
-            SELECT id FROM "Category" WHERE id::text = ${categoryId}::text
+          console.log('Verificando se a categoria existe:', categoryUuid);
+          
+          // Verificar se o categoryUuid é um UUID válido
+          const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(categoryUuid);
+          
+          if (!isValidUuid) {
+            console.error('UUID de categoria inválido:', categoryUuid);
+            return res.status(400).json({ error: 'UUID de categoria inválido' });
+          }
+          
+          const category = await prisma.$queryRaw`
+            SELECT id FROM "Category" WHERE id::uuid = ${categoryUuid}::uuid
           `;
 
-          if (!Array.isArray(categories) || categories.length === 0) {
+          console.log('Resultado da consulta de categoria:', category);
+
+          if (!Array.isArray(category) || category.length === 0) {
+            console.log('Erro: categoria não encontrada');
             return res.status(404).json({ error: 'Categoria não encontrada' });
           }
         } catch (error) {
-          console.error('Erro ao verificar categoria (tabela pode não existir):', error);
-          // Continuar mesmo se a categoria não for encontrada
+          console.error('Erro ao verificar categoria:', error);
+          return res.status(500).json({ error: 'Erro ao verificar categoria' });
         }
       }
 
@@ -272,7 +299,7 @@ export default async function handler(
         console.log('Criando pergunta com os seguintes dados:', {
           text,
           stageId,
-          categoryId: categoryId || undefined
+          categoryUuid: categoryUuid || undefined
         });
         
         // Usar SQL bruto para evitar problemas de tipagem com o Prisma
@@ -282,7 +309,7 @@ export default async function handler(
             gen_random_uuid(), 
             ${text}, 
             ${stageId}::uuid, 
-            ${categoryId ? `${categoryId}::uuid` : null}, 
+            ${categoryUuid ? categoryUuid : null}::uuid, 
             NOW(), 
             NOW()
           )
@@ -331,9 +358,9 @@ export default async function handler(
             c.name as "categoryName",
             c.description as "categoryDescription"
           FROM "Question" q
-          LEFT JOIN "Stage" s ON q."stageId"::text = s.id::text
-          LEFT JOIN "Category" c ON q."categoryId"::text = c.id::text
-          WHERE q.id::text = ${questionId}::text
+          LEFT JOIN "Stage" s ON q."stageId"::uuid = s.id::uuid
+          LEFT JOIN "Category" c ON q."categoryId"::uuid = c.id::uuid
+          WHERE q.id::uuid = ${questionId}::uuid
         `;
         
         // Buscar opções
@@ -345,7 +372,7 @@ export default async function handler(
             "createdAt", 
             "updatedAt"
           FROM "Option" 
-          WHERE "questionId"::text = ${questionId}::text
+          WHERE "questionId"::uuid = ${questionId}::uuid
         `;
         
         if (!Array.isArray(questionData) || questionData.length === 0) {
