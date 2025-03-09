@@ -36,74 +36,90 @@ export default async function handler(
   // Adicionar estágio ao teste (POST)
   if (req.method === 'POST') {
     try {
-      const { stageId, order } = req.body;
+      const { title, description } = req.body;
 
-      if (!stageId) {
-        return res.status(400).json({ error: 'ID do estágio é obrigatório' });
-      }
+      // Se estamos recebendo um stageId, é porque queremos associar um estágio existente
+      if (req.body.stageId) {
+        const { stageId, order } = req.body;
+        
+        if (!stageId) {
+          return res.status(400).json({ error: 'ID do estágio é obrigatório' });
+        }
 
-      console.log('Recebido stageId:', stageId);
-      console.log('Recebido order:', order);
+        console.log('Recebido stageId:', stageId);
+        console.log('Recebido order:', order);
 
-      // Verificar se o estágio existe
-      const stageExists = await prisma.$queryRaw`
-        SELECT id FROM "Stage" WHERE id = ${stageId}
-      `;
-
-      if (!Array.isArray(stageExists) || stageExists.length === 0) {
-        return res.status(404).json({ error: 'Estágio não encontrado' });
-      }
-
-      // Criar a tabela TestStage se não existir
-      try {
-        await prisma.$executeRawUnsafe(`
-          CREATE TABLE IF NOT EXISTS "TestStage" (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            "testId" UUID NOT NULL,
-            "stageId" UUID NOT NULL,
-            "order" INTEGER NOT NULL DEFAULT 0,
-            "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-            "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-            UNIQUE("testId", "stageId"),
-            FOREIGN KEY ("testId") REFERENCES "tests"(id) ON DELETE CASCADE
-          )
-        `);
-        console.log('Tabela TestStage verificada ou criada com sucesso');
-      } catch (tableError) {
-        console.error('Erro ao criar tabela TestStage:', tableError);
-        return res.status(500).json({ error: 'Erro ao criar tabela TestStage: ' + tableError.message });
-      }
-
-      // Verificar se a relação já existe
-      try {
-        const existingRelation = await prisma.$queryRaw`
-          SELECT * FROM "TestStage" 
-          WHERE "testId" = ${id} AND "stageId" = ${stageId}
+        // Verificar se o estágio existe
+        const stageExists = await prisma.$queryRaw`
+          SELECT id FROM "Stage" WHERE id = ${stageId}
         `;
 
-        if (Array.isArray(existingRelation) && existingRelation.length > 0) {
+        if (!Array.isArray(stageExists) || stageExists.length === 0) {
+          return res.status(404).json({ error: 'Estágio não encontrado' });
+        }
+
+        // Verificar se o estágio já está associado ao teste
+        const stageAlreadyAssociated = await prisma.$queryRaw`
+          SELECT id FROM "Stage" 
+          WHERE id = ${stageId} AND "testId" = ${id}::uuid
+        `;
+
+        if (Array.isArray(stageAlreadyAssociated) && stageAlreadyAssociated.length > 0) {
           return res.status(400).json({ error: 'Este estágio já está associado a este teste' });
         }
-      } catch (error) {
-        console.error('Erro ao verificar relação existente:', error);
-        // Se der erro aqui, provavelmente a tabela não existe ainda
-      }
 
-      // Adicionar o estágio ao teste
-      try {
-        await prisma.$executeRawUnsafe(`
-          INSERT INTO "TestStage" ("testId", "stageId", "order", "createdAt", "updatedAt")
-          VALUES ('${id}', '${stageId}', ${order || 0}, NOW(), NOW())
-        `);
-        console.log('Estágio adicionado ao teste com sucesso');
-        return res.status(201).json({ success: true });
-      } catch (insertError) {
-        console.error('Erro ao inserir na tabela TestStage:', insertError);
-        return res.status(500).json({ error: 'Erro ao adicionar estágio ao teste: ' + insertError.message });
+        // Associar o estágio ao teste atualizando o testId
+        try {
+          await prisma.$queryRaw`
+            UPDATE "Stage"
+            SET "testId" = ${id}::uuid, "order" = ${order || 0}
+            WHERE id = ${stageId}
+          `;
+          
+          console.log('Estágio associado ao teste com sucesso');
+          return res.status(201).json({ success: true });
+        } catch (updateError) {
+          console.error('Erro ao associar estágio ao teste:', updateError);
+          return res.status(500).json({ error: 'Erro ao associar estágio ao teste: ' + updateError.message });
+        }
+      } 
+      // Se não recebemos um stageId, é porque queremos criar um novo estágio
+      else if (title) {
+        // Criar um novo estágio já associado ao teste
+        try {
+          const newStageId = await prisma.$queryRaw`
+            INSERT INTO "Stage" (
+              id,
+              title,
+              description,
+              "order",
+              "testId",
+              "createdAt",
+              "updatedAt"
+            ) VALUES (
+              gen_random_uuid(),
+              ${title},
+              ${description || null},
+              0,
+              ${id}::uuid,
+              NOW(),
+              NOW()
+            )
+            RETURNING id
+          `;
+          
+          console.log('Novo estágio criado e associado ao teste:', newStageId);
+          return res.status(201).json({ success: true, stageId: newStageId });
+        } catch (insertError) {
+          console.error('Erro ao criar novo estágio:', insertError);
+          return res.status(500).json({ error: 'Erro ao criar novo estágio: ' + insertError.message });
+        }
+      } else {
+        return res.status(400).json({ error: 'É necessário fornecer um stageId existente ou um título para criar um novo estágio' });
       }
     } catch (error) {
-      console.error('Erro ao adicionar estágio ao teste:', error);
-      return res.status(500).json({ error: 'Erro ao adicionar estágio ao teste' });
+      console.error('Erro ao processar requisição:', error);
+      return res.status(500).json({ error: 'Erro ao processar requisição: ' + error.message });
     }
   } 
   // Obter todos os estágios de um teste (GET)

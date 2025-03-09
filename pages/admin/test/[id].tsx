@@ -14,30 +14,17 @@ interface Test {
   description: string | null
   timeLimit: number | null
   active: boolean
-  testStages: TestStage[]
-}
-
-interface TestStage {
-  id: string
-  testId: string
-  stageId: string
-  order: number
-  stage: Stage
+  stages: Stage[]
+  testStages?: TestStage[] // Adicionado para compatibilidade
 }
 
 interface Stage {
   id: string
   title: string
   description: string | null
-  questionStages: QuestionStage[]
-}
-
-interface QuestionStage {
-  id: string
-  questionId: string
-  stageId: string
   order: number
-  question: Question
+  questions: Question[]
+  questionStages?: QuestionStage[] // Adicionado para compatibilidade
 }
 
 interface Question {
@@ -57,6 +44,22 @@ interface Option {
 interface Category {
   id: string
   name: string
+}
+
+interface TestStage {
+  id: string
+  testId: string
+  stageId: string
+  order: number
+  stage: Stage
+}
+
+interface QuestionStage {
+  id: string
+  questionId: string
+  stageId: string
+  order: number
+  question: Question
 }
 
 const TestDetail: NextPage = () => {
@@ -105,7 +108,29 @@ const TestDetail: NextPage = () => {
           throw new Error('Erro ao carregar os dados do teste')
         }
         const testData = await testResponse.json()
-        setTest(testData)
+        
+        // Adaptar a estrutura de dados para o formato esperado pelo componente
+        const adaptedTest = {
+          ...testData,
+          testStages: testData.stages ? testData.stages.map(stage => ({
+            id: stage.id,
+            testId: testData.id,
+            stageId: stage.id,
+            order: stage.order || 0,
+            stage: {
+              ...stage,
+              questionStages: stage.questions ? stage.questions.map(question => ({
+                id: `${stage.id}_${question.id}`,
+                questionId: question.id,
+                stageId: stage.id,
+                order: 0,
+                question: question
+              })) : []
+            }
+          })) : []
+        }
+        
+        setTest(adaptedTest)
         
         // Buscar todas as etapas disponíveis
         const stagesResponse = await fetch('/api/admin/stages')
@@ -152,6 +177,7 @@ const TestDetail: NextPage = () => {
     }
 
     try {
+      // Enviar diretamente os dados da nova etapa para o endpoint
       const response = await fetch(`/api/admin/tests/${id}/stages`, {
         method: 'POST',
         headers: {
@@ -164,7 +190,8 @@ const TestDetail: NextPage = () => {
       })
 
       if (!response.ok) {
-        throw new Error('Erro ao adicionar etapa ao teste')
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Erro ao adicionar etapa ao teste')
       }
 
       // Atualizar o teste com os dados atualizados
