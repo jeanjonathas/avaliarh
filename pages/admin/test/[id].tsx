@@ -540,12 +540,29 @@ const TestDetail: NextPage = () => {
       'Tem certeza que deseja excluir esta etapa? Esta ação não pode ser desfeita.',
       async () => {
         try {
+          console.log(`[TestDetail] Excluindo etapa com ID: ${stageId}`);
+          
+          // Verificar se o ID da etapa é válido
+          if (!stageId || typeof stageId !== 'string') {
+            throw new Error('ID da etapa inválido');
+          }
+          
           const response = await fetch(`/api/admin/stages/${stageId}`, {
             method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+            },
           });
 
           if (!response.ok) {
-            throw new Error('Erro ao excluir etapa');
+            // Se o status for 404, a etapa não foi encontrada
+            if (response.status === 404) {
+              throw new Error('Etapa não encontrada');
+            }
+            
+            // Para outros erros, tentar obter a mensagem de erro da API
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || 'Erro ao excluir etapa');
           }
 
           // Recarregar os dados do teste
@@ -553,7 +570,7 @@ const TestDetail: NextPage = () => {
           
           notify.showSuccess('Etapa excluída com sucesso!');
         } catch (error) {
-          console.error('Erro:', error);
+          console.error('Erro ao excluir etapa:', error);
           notify.showError(error instanceof Error ? error.message : 'Ocorreu um erro ao excluir a etapa');
         }
       },
@@ -563,7 +580,7 @@ const TestDetail: NextPage = () => {
         cancelText: 'Cancelar',
       }
     );
-  }
+  };
 
   const openAddQuestionsModal = (stageId: string) => {
     setSelectedStageId(stageId)
@@ -902,7 +919,7 @@ const TestDetail: NextPage = () => {
                                 Adicionar Perguntas
                               </button>
                               <button
-                                onClick={() => handleDeleteStage(testStage.id)}
+                                onClick={() => handleDeleteStage(testStage.stage.id)}
                                 className="px-3 py-1 text-xs text-red-600 border border-red-600 rounded-md hover:bg-red-50 block w-full"
                               >
                                 Remover Etapa

@@ -69,19 +69,37 @@ export default async function handler(
     }
   } else if (req.method === 'DELETE') {
     try {
+      console.log(`[API] Iniciando exclusão da etapa com ID: ${id}`);
+      
       // Verificar se a etapa existe
-      const existingStages = await prisma.$queryRaw`
-        SELECT id FROM "Stage" WHERE id = ${id}
-      `;
+      const stage = await prisma.stage.findUnique({
+        where: { id }
+      });
 
-      if (!Array.isArray(existingStages) || existingStages.length === 0) {
+      if (!stage) {
+        console.log(`[API] Etapa com ID ${id} não encontrada`);
         return res.status(404).json({ error: 'Etapa não encontrada' });
       }
 
-      // Excluir a etapa usando SQL raw
-      await prisma.$executeRaw`DELETE FROM "Stage" WHERE id = ${id}`;
-
-      return res.status(204).end();
+      try {
+        // Primeiro, remover todas as associações com testes
+        console.log(`[API] Removendo associações da etapa ${id} com testes`);
+        
+        // Usando transação para garantir que todas as operações sejam concluídas ou nenhuma
+        await prisma.$transaction(async (tx) => {
+          // Excluir as associações TestStage
+          await tx.$executeRaw`DELETE FROM "TestStage" WHERE "stageId" = ${id}`;
+          
+          // Excluir a etapa
+          await tx.$executeRaw`DELETE FROM "Stage" WHERE id = ${id}`;
+        });
+        
+        console.log(`[API] Etapa ${id} excluída com sucesso`);
+        return res.status(204).end();
+      } catch (transactionError) {
+        console.error('Erro na transação:', transactionError);
+        throw transactionError;
+      }
     } catch (error) {
       console.error('Erro ao excluir etapa:', error);
       return res.status(500).json({ error: 'Erro ao excluir etapa' });
