@@ -659,20 +659,27 @@ const TestDetail: NextPage = () => {
   }
 
   const removeQuestionFromStage = (stageId: string, questionId: string) => {
+    console.log(`[Frontend] Removendo questão ${questionId} da etapa ${stageId}...`);
     notify.confirm(
       'Remover Pergunta',
       'Tem certeza que deseja remover esta pergunta da etapa? Esta ação não pode ser desfeita.',
       async () => {
         try {
+          console.log(`[Frontend] Enviando requisição DELETE para /api/admin/stages/${stageId}/questions/${questionId}`);
           const response = await fetch(`/api/admin/stages/${stageId}/questions/${questionId}`, {
             method: 'DELETE',
           })
 
+          console.log(`[Frontend] Resposta recebida: status ${response.status}`);
+          
           if (!response.ok) {
-            throw new Error('Erro ao remover pergunta da etapa')
+            const errorData = await response.json();
+            console.error(`[Frontend] Erro ao remover pergunta: ${JSON.stringify(errorData)}`);
+            throw new Error(errorData.error || 'Erro ao remover pergunta da etapa');
           }
 
           const result = await response.json()
+          console.log(`[Frontend] Pergunta removida com sucesso: ${JSON.stringify(result)}`);
 
           // Recarregar os dados do teste após um pequeno delay para garantir que o banco de dados foi atualizado
           setTimeout(async () => {
