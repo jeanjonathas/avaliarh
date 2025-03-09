@@ -56,8 +56,8 @@ interface Candidate {
   portfolio?: string
   resumeUrl?: string
   inviteCode?: string
-  inviteSent: boolean
   inviteExpires?: string
+  inviteSent: boolean
   inviteAttempts: number
   score?: number
   createdAt: string
@@ -90,9 +90,14 @@ const CandidateDetails = () => {
     status: 'PENDING',
     observations: '',
     rating: '0',
+    inviteCode: '',
+    inviteExpires: null,
+    inviteSent: false,
+    inviteAttempts: 0
   })
   const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isNewCodeGenerated, setIsNewCodeGenerated] = useState(false);
 
   // Verificar autenticação
   useEffect(() => {
@@ -138,6 +143,10 @@ const CandidateDetails = () => {
         status: data.status || 'PENDING',
         observations: data.observations || '',
         rating: data.rating?.toString() || '0',
+        inviteCode: data.inviteCode || '',
+        inviteExpires: data.inviteExpires || null,
+        inviteSent: data.inviteSent || false,
+        inviteAttempts: data.inviteAttempts || 0
       })
       
       setLoading(false)
@@ -221,38 +230,75 @@ const CandidateDetails = () => {
   const generateNewInvite = async () => {
     try {
       setIsGeneratingInvite(true);
+      console.log('Gerando novo convite para candidato:', candidate?.id);
+      
+      if (!candidate || !candidate.id) {
+        console.error('Erro: candidato não definido ou sem ID');
+        alert('Erro: dados do candidato não disponíveis. Recarregue a página e tente novamente.');
+        setIsGeneratingInvite(false);
+        return;
+      }
+      
       const response = await fetch(`/api/admin/candidates/generate-invite`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ candidateId: candidate.id }),
+        body: JSON.stringify({ 
+          candidateId: candidate.id,
+          forceNew: true // Forçar a geração de um novo código
+        }),
       });
 
+      console.log('Resposta do servidor:', response.status, response.statusText);
+      
       if (!response.ok) {
-        throw new Error('Erro ao gerar novo convite');
+        const errorText = await response.text();
+        console.error('Erro na resposta:', errorText);
+        throw new Error(`Erro ao gerar novo convite: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
-      setFormData(prev => ({
-        ...prev,
-        inviteCode: data.inviteCode,
-        inviteExpires: data.inviteExpires,
-        inviteSent: false,
-        inviteAttempts: 0
-      }));
-
-      // Atualiza o candidato com o novo código
+      console.log('Dados recebidos:', data);
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Erro desconhecido ao gerar convite');
+      }
+      
+      // Atualizar o candidato com os novos dados
       const updatedCandidate = {
         ...candidate,
         inviteCode: data.inviteCode,
         inviteExpires: data.inviteExpires,
-        inviteSent: false,
+        inviteSent: data.emailSent || false,
         inviteAttempts: 0
       };
+      
+      setCandidate(updatedCandidate);
+
+      // Atualizar o formulário também
+      setFormData(prev => ({
+        ...prev,
+        inviteCode: data.inviteCode,
+        inviteExpires: data.inviteExpires,
+        inviteSent: data.emailSent || false,
+        inviteAttempts: 0
+      }));
+
+      // Atualiza a lista de candidatos
       setCandidates(prev => 
-        prev.map(c => c.id === candidate.id ? updatedCandidate : c)
+        prev.map(c => c.id === candidate.id ? {
+          ...c,
+          inviteCode: data.inviteCode,
+          inviteExpires: data.inviteExpires,
+          inviteSent: data.emailSent || false,
+          inviteAttempts: 0
+        } : c)
       );
+      
+      // Abrir o modal de compartilhamento em vez de mostrar um alert
+      setIsShareModalOpen(true);
+      setIsNewCodeGenerated(true);
     } catch (error) {
       console.error('Erro ao gerar convite:', error);
       alert('Erro ao gerar novo convite. Por favor, tente novamente.');
@@ -262,7 +308,7 @@ const CandidateDetails = () => {
   };
 
   const handleShare = () => {
-    if (candidate && candidate.inviteCode) {
+    if (candidate?.inviteCode) {
       setIsShareModalOpen(true);
     } else {
       alert('Não há código de convite para compartilhar. Gere um código primeiro.');
@@ -271,6 +317,13 @@ const CandidateDetails = () => {
 
   const shareByEmail = async () => {
     try {
+      if (!candidate || !candidate.id) {
+        console.error('Erro: candidato não definido ou sem ID');
+        alert('Erro: dados do candidato não disponíveis. Recarregue a página e tente novamente.');
+        return;
+      }
+      
+      console.log('Enviando convite por email para candidato:', candidate.id);
       const response = await fetch('/api/admin/candidates/send-invite', {
         method: 'POST',
         headers: {
@@ -279,18 +332,24 @@ const CandidateDetails = () => {
         body: JSON.stringify({ candidateId: candidate.id }),
       });
 
+      console.log('Resposta do servidor:', response.status, response.statusText);
+      
       if (!response.ok) {
-        throw new Error('Erro ao enviar convite por email');
+        const errorText = await response.text();
+        console.error('Erro na resposta:', errorText);
+        throw new Error(`Erro ao enviar convite por email: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
       
       // Atualiza o candidato com o status de envio
-      const updatedCandidate = {
-        ...candidate,
-        inviteSent: true
-      };
-      setCandidate(updatedCandidate);
+      setCandidate(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          inviteSent: true
+        };
+      });
       
       alert('Convite enviado com sucesso para o email do candidato!');
       setIsShareModalOpen(false);
@@ -301,10 +360,26 @@ const CandidateDetails = () => {
   };
 
   const shareByWhatsApp = () => {
-    const message = `Olá ${candidate.name}, seu código de convite para o teste é: ${candidate.inviteCode}. Acesse http://localhost:3000 para realizar o teste.`;
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
-    setIsShareModalOpen(false);
+    try {
+      if (!candidate?.inviteCode) {
+        alert('Não há código de convite para compartilhar. Gere um código primeiro.');
+        return;
+      }
+      
+      console.log('Compartilhando convite via WhatsApp para candidato:', candidate.name);
+      
+      // Criar mensagem para o WhatsApp
+      const message = `Olá ${candidate.name}, aqui está seu código de convite para o processo seletivo: ${candidate.inviteCode}. Acesse o sistema AvaliaRH para realizar sua avaliação.`;
+      
+      // Codificar a mensagem para URL
+      const encodedMessage = encodeURIComponent(message);
+      
+      // Abrir WhatsApp Web com a mensagem pré-preenchida
+      window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
+    } catch (error) {
+      console.error('Erro ao compartilhar via WhatsApp:', error);
+      alert('Erro ao compartilhar via WhatsApp. Por favor, tente novamente.');
+    }
   };
 
   // Dados para o gráfico de radar
@@ -873,7 +948,7 @@ const CandidateDetails = () => {
                             <div className="flex items-center justify-between mt-1">
                               <p className="font-medium text-lg text-primary-600">{candidate?.inviteCode || 'Não gerado'}</p>
                               <button
-                                onClick={() => generateNewInvite()}
+                                onClick={generateNewInvite}
                                 disabled={isGeneratingInvite}
                                 className={`px-3 py-1 text-sm ${
                                   isGeneratingInvite 
@@ -883,7 +958,7 @@ const CandidateDetails = () => {
                               >
                                 {isGeneratingInvite 
                                   ? 'Gerando...' 
-                                  : candidate.inviteCode 
+                                  : candidate?.inviteCode 
                                     ? 'Gerar Novo' 
                                     : 'Gerar Código'
                                 }
@@ -1008,7 +1083,7 @@ const CandidateDetails = () => {
                           >
                             <span>Ver currículo</span>
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2v-1H4v1a2 2 0 01-2 2H2a2 2 0 01-2-2V4h.586a1 1 0 01.707-.293l5.414 5.414a1 1 0 01.293.707V8a2 2 0 00-2-2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-5.414-5.414a1 1 0 01.293-.707H4z" clipRule="evenodd" />
+                              <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2v-1H4v1a2 2 0 01-2 2H2a2 2 0 01-2-2V4h.586a1 1 0 01.707-.293l5.414 5.414a1 1 0 01.293.707V8a2 2 0 00-2-2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-5.414-5.414a1 1 0 01.293-.707H4z" />
                             </svg>
                           </Link>
                         </div>
@@ -1054,9 +1129,14 @@ const CandidateDetails = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-secondary-800">Compartilhar Convite</h2>
+              <h2 className="text-xl font-bold text-secondary-800">
+                {isNewCodeGenerated ? 'Novo Código Gerado' : 'Compartilhar Convite'}
+              </h2>
               <button 
-                onClick={() => setIsShareModalOpen(false)}
+                onClick={() => {
+                  setIsShareModalOpen(false);
+                  setIsNewCodeGenerated(false);
+                }}
                 className="text-gray-500 hover:text-gray-700"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1064,6 +1144,26 @@ const CandidateDetails = () => {
                 </svg>
               </button>
             </div>
+            
+            {isNewCodeGenerated && (
+              <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-4 rounded">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm leading-5 font-medium text-green-800">
+                      Código de convite gerado com sucesso!
+                    </p>
+                    <p className="text-sm leading-5 text-green-700 mt-1">
+                      Você pode compartilhar este código com o candidato usando as opções abaixo.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
             
             <div className="bg-primary-50 p-4 rounded-lg mb-6">
               <p className="text-center text-secondary-800 font-medium mb-2">Código do Convite</p>
@@ -1097,10 +1197,13 @@ const CandidateDetails = () => {
               
               <div className="pt-4 mt-4 border-t border-gray-200">
                 <button
-                  onClick={() => setIsShareModalOpen(false)}
+                  onClick={() => {
+                    setIsShareModalOpen(false);
+                    setIsNewCodeGenerated(false);
+                  }}
                   className="w-full px-4 py-2 bg-gray-200 text-gray-600 rounded-md hover:bg-gray-300"
                 >
-                  Cancelar
+                  Fechar
                 </button>
               </div>
             </div>

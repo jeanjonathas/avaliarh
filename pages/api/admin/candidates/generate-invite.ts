@@ -18,22 +18,19 @@ async function generateUniqueInviteCode(): Promise<string> {
     // Verificar se o código já está em uso por algum candidato
     const existingCandidate = await prisma.candidate.findFirst({
       where: {
-        OR: [
-          // Verificar se algum candidato está usando este código atualmente
-          { inviteCode },
-          // Verificar se algum candidato já usou este código no passado
-          {
-            AND: [
-              { inviteCode },
-              { inviteExpires: { lt: new Date() } } // Códigos expirados
-            ]
-          }
-        ]
+        inviteCode: inviteCode
       }
     });
     
-    // O código é único se não existir nenhum candidato com ele
-    if (!existingCandidate) {
+    // Verificar se o código já foi usado anteriormente (histórico)
+    const usedInviteCode = await prisma.usedInviteCode.findUnique({
+      where: {
+        code: inviteCode
+      }
+    });
+    
+    // O código é único se não existir nenhum candidato com ele e não estiver no histórico
+    if (!existingCandidate && !usedInviteCode) {
       isUnique = true;
     }
   }
@@ -54,7 +51,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
   
   try {
-    const { candidateId, expirationDays = 7, sendEmail = false } = req.body;
+    const { candidateId, expirationDays = 7, sendEmail = false, forceNew = false } = req.body;
     
     if (!candidateId) {
       return res.status(400).json({ error: 'ID do candidato é obrigatório' });
@@ -77,10 +74,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let message: string;
     
     // Se o candidato já tem um código válido e não expirado, reutilizá-lo
-    if (candidate.inviteCode && candidate.inviteExpires && new Date(candidate.inviteExpires) > new Date()) {
+    if (candidate.inviteCode && candidate.inviteExpires && new Date(candidate.inviteExpires) > new Date() && req.body.forceNew !== true) {
       inviteCode = candidate.inviteCode;
       message = 'Código de convite existente recuperado com sucesso!';
     } else {
+      // Se o candidato já tinha um código, salvar no histórico antes de gerar um novo
+      if (candidate.inviteCode) {
+        try {
+          await prisma.usedInviteCode.create({
+            data: {
+              code: candidate.inviteCode,
+              usedAt: new Date(),
+              expiresAt: candidate.inviteExpires || new Date(new Date().setDate(new Date().getDate() + 7))
+            }
+          });
+          console.log(`Código anterior ${candidate.inviteCode} salvo no histórico`);
+        } catch (error) {
+          // Se o código já estiver no histórico, apenas ignorar o erro
+          console.log(`Código ${candidate.inviteCode} já existe no histórico ou erro ao salvar`);
+        }
+      }
+      
       // Gerar um novo código único
       inviteCode = await generateUniqueInviteCode();
       message = 'Novo código de convite gerado com sucesso!';
