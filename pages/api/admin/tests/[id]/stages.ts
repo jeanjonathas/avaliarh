@@ -125,32 +125,23 @@ export default async function handler(
   // Obter todos os estágios de um teste (GET)
   else if (req.method === 'GET') {
     try {
-      // Verificar se a tabela TestStage existe
-      let testStages = [];
+      // Buscar estágios diretamente da tabela Stage
+      const stages = await prisma.$queryRaw`
+        SELECT 
+          id,
+          title,
+          description,
+          "order",
+          "testId",
+          "createdAt",
+          "updatedAt"
+        FROM "Stage"
+        WHERE "testId" = ${id}
+        ORDER BY "order" ASC
+      `;
       
-      try {
-        testStages = await prisma.$queryRaw`
-          SELECT 
-            ts.id,
-            ts."testId",
-            ts."stageId",
-            ts."order",
-            s.id as "stage_id",
-            s.title as "stage_title",
-            s.description as "stage_description"
-          FROM "TestStage" ts
-          JOIN "Stage" s ON ts."stageId" = s.id
-          WHERE ts."testId" = ${id}
-          ORDER BY ts."order" ASC
-        `;
-        
-        console.log('Etapas encontradas para o teste:', id, testStages);
-      } catch (error) {
-        console.error('Erro ao buscar estágios do teste:', error);
-        // Se houver erro, continuar com array vazio
-      }
-
-      return res.status(200).json(testStages);
+      console.log('Etapas encontradas para o teste:', id, stages);
+      return res.status(200).json(stages);
     } catch (error) {
       console.error('Erro ao buscar estágios do teste:', error);
       return res.status(500).json({ error: 'Erro ao buscar estágios do teste' });

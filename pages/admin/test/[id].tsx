@@ -168,6 +168,50 @@ const TestDetail: NextPage = () => {
     }
   }, [id, status])
 
+  // Função para recarregar os dados do teste
+  const reloadTestData = async () => {
+    if (!id || typeof id !== 'string') return
+
+    try {
+      setLoading(true)
+      
+      // Buscar dados do teste
+      const testResponse = await fetch(`/api/admin/tests/${id}`)
+      if (!testResponse.ok) {
+        throw new Error('Erro ao carregar os dados do teste')
+      }
+      const testData = await testResponse.json()
+      
+      // Adaptar a estrutura de dados para o formato esperado pelo componente
+      const adaptedTest = {
+        ...testData,
+        testStages: testData.stages ? testData.stages.map(stage => ({
+          id: stage.id,
+          testId: testData.id,
+          stageId: stage.id,
+          order: stage.order || 0,
+          stage: {
+            ...stage,
+            questionStages: stage.questions ? stage.questions.map(question => ({
+              id: `${stage.id}_${question.id}`,
+              questionId: question.id,
+              stageId: stage.id,
+              order: 0,
+              question: question
+            })) : []
+          }
+        })) : []
+      }
+      
+      setTest(adaptedTest)
+    } catch (error) {
+      console.error('Erro ao recarregar dados:', error)
+      notify.showError('Não foi possível recarregar os dados do teste. Por favor, tente novamente.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const addStageToTest = async () => {
     if (!newStageName.trim()) {
       notify.showError('O nome da etapa é obrigatório')
@@ -192,10 +236,8 @@ const TestDetail: NextPage = () => {
         throw new Error(errorData.error || 'Erro ao adicionar etapa ao teste')
       }
 
-      // Atualizar o teste com os dados atualizados
-      const updatedTestResponse = await fetch(`/api/admin/tests/${id}`)
-      const updatedTest = await updatedTestResponse.json()
-      setTest(updatedTest)
+      // Recarregar os dados do teste
+      await reloadTestData()
 
       // Limpar campos e fechar modal
       setNewStageName('')
@@ -223,10 +265,8 @@ const TestDetail: NextPage = () => {
             throw new Error('Erro ao remover etapa do teste')
           }
 
-          // Atualizar o teste com os dados atualizados
-          const updatedTestResponse = await fetch(`/api/admin/tests/${id}`)
-          const updatedTest = await updatedTestResponse.json()
-          setTest(updatedTest)
+          // Recarregar os dados do teste
+          await reloadTestData()
 
           notify.showSuccess('Etapa removida com sucesso!')
         } catch (error) {
