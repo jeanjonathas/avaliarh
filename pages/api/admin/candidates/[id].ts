@@ -23,69 +23,34 @@ export default async function handler(
 
   if (req.method === 'GET') {
     try {
+      // Buscar apenas os dados básicos do candidato
       const candidate = await prisma.candidate.findUnique({
-        where: { id },
-        include: {
-          responses: {
-            include: {
-              question: {
-                include: {
-                  stage: true
-                }
-              },
-              option: true
-            }
-          }
-        }
-      })
-
+        where: { id }
+      });
+      
       if (!candidate) {
         return res.status(404).json({ error: 'Candidato não encontrado' })
       }
 
-      // Calcular pontuação geral
-      let score = 0
-      if (candidate.completed && candidate.responses.length > 0) {
-        const correctResponses = candidate.responses.filter(r => r.option.isCorrect).length
-        score = Math.round((correctResponses / candidate.responses.length) * 100)
-      }
-
-      // Calcular pontuação por etapa
-      const stageScores = {}
-      candidate.responses.forEach(response => {
-        const stageId = response.question.stageId
-        const stageName = response.question.stage.title
-        
-        if (!stageScores[stageId]) {
-          stageScores[stageId] = {
-            id: stageId,
-            name: stageName,
-            correct: 0,
-            total: 0,
-            percentage: 0
-          }
-        }
-        
-        stageScores[stageId].total += 1
-        if (response.option.isCorrect) {
-          stageScores[stageId].correct += 1
-        }
-      })
-      
-      // Calcular porcentagens por etapa
-      Object.keys(stageScores).forEach(stageId => {
-        const stage = stageScores[stageId]
-        stage.percentage = Math.round((stage.correct / stage.total) * 100)
-      })
+      // Formatar datas para evitar problemas de serialização
+      const formattedCandidate = {
+        ...candidate,
+        testDate: candidate.testDate ? candidate.testDate.toISOString() : null,
+        interviewDate: candidate.interviewDate ? candidate.interviewDate.toISOString() : null,
+        inviteExpires: candidate.inviteExpires ? candidate.inviteExpires.toISOString() : null,
+        createdAt: candidate.createdAt ? candidate.createdAt.toISOString() : null,
+        updatedAt: candidate.updatedAt ? candidate.updatedAt.toISOString() : null,
+      };
 
       return res.status(200).json({
-        ...candidate,
-        score,
-        stageScores: Object.values(stageScores)
-      })
+        ...formattedCandidate,
+        score: 0,
+        responses: [],
+        stageScores: []
+      });
     } catch (error) {
-      console.error('Erro ao buscar candidato:', error)
-      return res.status(500).json({ error: 'Erro ao buscar candidato' })
+      console.error('Erro ao buscar candidato:', error);
+      return res.status(500).json({ error: 'Erro ao buscar candidato' });
     }
   } else if (req.method === 'PUT') {
     try {
@@ -99,12 +64,16 @@ export default async function handler(
         observations,
         infoJobsLink,
         socialMediaUrl,
-        interviewDate
-      } = req.body
+        interviewDate,
+        linkedin,
+        github,
+        portfolio,
+        resumeUrl
+      } = req.body;
 
       // Validação básica
       if (!name || !email) {
-        return res.status(400).json({ error: 'Nome e email são obrigatórios' })
+        return res.status(400).json({ error: 'Nome e email são obrigatórios' });
       }
 
       // Atualizar o candidato
@@ -120,17 +89,21 @@ export default async function handler(
           observations,
           infoJobsLink,
           socialMediaUrl,
+          linkedin,
+          github,
+          portfolio,
+          resumeUrl,
           interviewDate: interviewDate ? new Date(interviewDate) : null
         }
-      })
+      });
 
-      return res.status(200).json(updatedCandidate)
+      return res.status(200).json(updatedCandidate);
     } catch (error) {
-      console.error('Erro ao atualizar candidato:', error)
-      return res.status(500).json({ error: 'Erro ao atualizar candidato' })
+      console.error('Erro ao atualizar candidato:', error);
+      return res.status(500).json({ error: 'Erro ao atualizar candidato' });
     }
   } else {
-    res.setHeader('Allow', ['GET', 'PUT'])
-    res.status(405).end(`Method ${req.method} Not Allowed`)
+    res.setHeader('Allow', ['GET', 'PUT']);
+    res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 }
