@@ -75,11 +75,12 @@ export default async function handler(
         })
       );
 
-      return res.status(200).json(testsWithCounts);
+      // Corrigir o formato da resposta para incluir a propriedade 'tests'
+      return res.status(200).json({ tests: testsWithCounts });
     } catch (error) {
       console.error('Erro ao buscar testes:', error);
       // Retornar array vazio em vez de erro para não quebrar a UI
-      return res.status(200).json([]);
+      return res.status(200).json({ tests: [] });
     }
   } else if (req.method === 'POST') {
     try {
