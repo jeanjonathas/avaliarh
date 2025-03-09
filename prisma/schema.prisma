@@ -60,16 +60,17 @@ model Candidate {
 }
 
 model Question {
-  id         String     @id @default(uuid())
-  text       String
-  stageId    String
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
-  categoryId String?
-  options    Option[]
-  Category   Category?  @relation(fields: [categoryId], references: [id])
-  Stage      Stage      @relation(fields: [stageId], references: [id], onDelete: Cascade)
-  responses  Response[]
+  id               String           @id @default(uuid())
+  text             String
+  stageId          String
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  categoryId       String?
+  options          Option[]
+  Category         Category?        @relation(fields: [categoryId], references: [id])
+  Stage            Stage            @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  responses        Response[]
+  stageQuestions   StageQuestion[]  // Nova relação com a tabela StageQuestion
 }
 
 model Option {
@@ -105,16 +106,17 @@ model UsedInviteCode {
 }
 
 model Stage {
-  id          String      @id
-  title       String
-  description String?
-  order       Int
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime
-  testId      String?
-  Question    Question[]
-  test        tests?      @relation(fields: [testId], references: [id])
-  TestStage   TestStage[]
+  id             String           @id
+  title          String
+  description    String?
+  order          Int
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime
+  testId         String?
+  Question       Question[]
+  test           tests?           @relation(fields: [testId], references: [id])
+  TestStage      TestStage[]
+  stageQuestions StageQuestion[]  // Nova relação com a tabela StageQuestion
 }
 
 model TestStage {
@@ -150,6 +152,21 @@ model Category {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   questions   Question[]
+}
+
+model StageQuestion {
+  id          String    @id @default(uuid())
+  stageId     String
+  questionId  String
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  stage       Stage     @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  question    Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([stageId, questionId])
+  @@index([stageId])
+  @@index([questionId])
 }
 
 enum Role {

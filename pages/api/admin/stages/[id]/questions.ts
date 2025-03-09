@@ -56,16 +56,16 @@ export default async function handler(
       }
 
       // Verificar quais questões já estão associadas a este estágio
-      const existingQuestions = await prisma.question.findMany({
+      const existingAssociations = await prisma.stageQuestion.findMany({
         where: {
-          id: {
+          stageId: id,
+          questionId: {
             in: questionIds
-          },
-          stageId: id
+          }
         }
       });
 
-      const existingQuestionIds = existingQuestions.map(q => q.id);
+      const existingQuestionIds = existingAssociations.map(assoc => assoc.questionId);
       
       // Filtrar apenas as questões que ainda não estão associadas
       const newQuestionIds = questionIds.filter(qId => !existingQuestionIds.includes(qId));
@@ -74,19 +74,37 @@ export default async function handler(
         return res.status(400).json({ error: 'Todas as questões selecionadas já estão associadas a este estágio' });
       }
 
-      // Atualizar as questões para associá-las ao estágio usando SQL raw para garantir compatibilidade
+      // Encontrar a maior ordem atual para adicionar as novas questões em sequência
+      const maxOrderResult = await prisma.stageQuestion.findFirst({
+        where: {
+          stageId: id
+        },
+        orderBy: {
+          order: 'desc'
+        }
+      });
+      
+      let nextOrder = maxOrderResult ? maxOrderResult.order + 1 : 0;
+
+      // Criar associações entre as questões e o estágio na tabela StageQuestion
+      const createdAssociations = [];
       for (const questionId of newQuestionIds) {
-        await prisma.$executeRaw`
-          UPDATE "Question" 
-          SET "stageId" = ${id} 
-          WHERE id = ${questionId}
-        `;
+        const association = await prisma.stageQuestion.create({
+          data: {
+            stageId: id,
+            questionId: questionId,
+            order: nextOrder++,
+            updatedAt: new Date()
+          }
+        });
+        createdAssociations.push(association);
       }
 
       return res.status(201).json({ 
         success: true,
         addedCount: newQuestionIds.length,
-        alreadyExistingCount: existingQuestionIds.length
+        alreadyExistingCount: existingQuestionIds.length,
+        associations: createdAssociations
       });
     } catch (error) {
       console.error('Erro ao adicionar questões ao estágio:', error);
@@ -96,39 +114,31 @@ export default async function handler(
   // Obter todas as questões de um estágio (GET)
   else if (req.method === 'GET') {
     try {
-      const questions = await prisma.$queryRaw`
-        SELECT 
-          q.id,
-          q.text,
-          q."stageId",
-          q."categoryId",
-          q."createdAt",
-          q."updatedAt"
-        FROM "Question" q
-        WHERE q."stageId" = ${id}
-      `;
+      // Buscar as associações entre o estágio e as questões, ordenadas pela ordem definida
+      const stageQuestions = await prisma.stageQuestion.findMany({
+        where: {
+          stageId: id
+        },
+        orderBy: {
+          order: 'asc'
+        },
+        include: {
+          question: {
+            include: {
+              options: true,
+              Category: true
+            }
+          }
+        }
+      });
 
-      // Para cada questão, buscar as opções
-      const questionsWithOptions = await Promise.all((Array.isArray(questions) ? questions : []).map(async (question) => {
-        const options = await prisma.$queryRaw`
-          SELECT 
-            id,
-            text,
-            "isCorrect",
-            "questionId",
-            "createdAt",
-            "updatedAt"
-          FROM "Option"
-          WHERE "questionId" = ${question.id}
-        `;
-
-        return {
-          ...question,
-          options: Array.isArray(options) ? options : []
-        };
+      // Transformar os resultados para manter a compatibilidade com o frontend
+      const questions = stageQuestions.map(sq => ({
+        ...sq.question,
+        order: sq.order // Adicionar a ordem da questão no resultado
       }));
 
-      return res.status(200).json(questionsWithOptions);
+      return res.status(200).json(questions);
     } catch (error) {
       console.error('Erro ao buscar questões do estágio:', error);
       return res.status(500).json({ error: 'Erro ao buscar questões do estágio' });

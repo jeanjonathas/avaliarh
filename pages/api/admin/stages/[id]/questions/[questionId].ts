@@ -2,7 +2,6 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../../../lib/auth'
 import { prisma } from '../../../../../../lib/prisma'
-import { v4 as uuidv4 } from 'uuid'
 
 export default async function handler(
   req: NextApiRequest,
@@ -34,17 +33,28 @@ export default async function handler(
     return res.status(500).json({ error: 'Erro ao verificar estágio' });
   }
 
-  // Verificar se a questão existe e está associada ao estágio
+  // Verificar se a questão existe
   try {
-    const question = await prisma.question.findFirst({
-      where: {
-        id: questionId,
-        stageId: id
-      }
+    const question = await prisma.question.findUnique({
+      where: { id: questionId }
     });
 
     if (!question) {
-      return res.status(404).json({ error: 'Questão não encontrada neste estágio' });
+      return res.status(404).json({ error: 'Questão não encontrada' });
+    }
+    
+    // Verificar se existe uma associação entre a questão e a etapa
+    const stageQuestion = await prisma.stageQuestion.findUnique({
+      where: {
+        stageId_questionId: {
+          stageId: id,
+          questionId: questionId
+        }
+      }
+    });
+    
+    if (req.method === 'DELETE' && !stageQuestion) {
+      return res.status(404).json({ error: 'Questão não está associada a esta etapa' });
     }
   } catch (error) {
     console.error('Erro ao verificar questão:', error);
@@ -54,70 +64,19 @@ export default async function handler(
   // Remover questão do estágio (DELETE)
   if (req.method === 'DELETE') {
     try {
-      // Buscar a etapa "Banco de Questões" ou criar se não existir
-      let bankStage = await prisma.stage.findFirst({
+      // Em vez de excluir a pergunta, apenas removemos a associação na tabela StageQuestion
+      await prisma.stageQuestion.delete({
         where: {
-          title: 'Banco de Questões'
-        }
-      });
-
-      if (!bankStage) {
-        // Criar a etapa "Banco de Questões" se não existir
-        // Usando UUID válido para o ID
-        const bankStageId = uuidv4();
-        
-        bankStage = await prisma.stage.create({
-          data: {
-            id: bankStageId,
-            title: 'Banco de Questões',
-            description: 'Repositório de questões não associadas a nenhuma etapa específica',
-            order: 0,
-            updatedAt: new Date()
+          stageId_questionId: {
+            stageId: id,
+            questionId: questionId
           }
-        });
-      }
-
-      // Obter a questão com suas opções
-      const questionWithOptions = await prisma.question.findUnique({
-        where: { id: questionId },
-        include: { options: true }
-      });
-
-      if (!questionWithOptions) {
-        return res.status(404).json({ error: 'Questão não encontrada' });
-      }
-
-      // Criar uma cópia da questão no banco de questões
-      const newQuestion = await prisma.question.create({
-        data: {
-          text: questionWithOptions.text,
-          stageId: bankStage.id,
-          updatedAt: new Date()
         }
-      });
-
-      // Copiar as opções para a nova questão
-      for (const option of questionWithOptions.options) {
-        await prisma.option.create({
-          data: {
-            text: option.text,
-            isCorrect: option.isCorrect,
-            questionId: newQuestion.id,
-            updatedAt: new Date()
-          }
-        });
-      }
-
-      // Excluir a questão original da etapa atual
-      // Isso é seguro porque já criamos uma cópia no banco de questões
-      await prisma.question.delete({
-        where: { id: questionId }
       });
 
       return res.status(200).json({ 
         success: true,
-        message: 'Questão removida da etapa e preservada no banco de questões',
-        newQuestionId: newQuestion.id
+        message: 'Questão removida da etapa com sucesso'
       });
     } catch (error) {
       console.error('Erro ao remover questão do estágio:', error);
@@ -133,14 +92,22 @@ export default async function handler(
         return res.status(400).json({ error: 'Ordem é obrigatória' });
       }
 
-      // Atualizar a ordem da questão
-      // Como não há um campo order no modelo Question, 
-      // este endpoint não realiza nenhuma operação real
-      // Mantido para compatibilidade com o frontend
+      // Atualizar a ordem da questão na tabela StageQuestion
+      await prisma.stageQuestion.update({
+        where: {
+          stageId_questionId: {
+            stageId: id,
+            questionId: questionId
+          }
+        },
+        data: {
+          order: order
+        }
+      });
 
       return res.status(200).json({ 
         success: true,
-        message: 'Operação processada com sucesso'
+        message: 'Ordem da questão atualizada com sucesso'
       });
     } catch (error) {
       console.error('Erro ao atualizar ordem da questão:', error);
