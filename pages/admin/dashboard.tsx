@@ -479,8 +479,8 @@ const Dashboard: NextPage = () => {
   }, [selectedCandidate, idealProfiles, idealProfileData]);
   
   const handleLogout = async () => {
-    await signOut({ redirect: false })
-    router.push('/admin/login')
+    await signOut({ callbackUrl: '/' })
+    router.push('/')
   }
   
   const handleViewCandidate = (candidate: Candidate) => {

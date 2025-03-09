@@ -1,7 +1,7 @@
 import { NextPage } from 'next'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { useSession } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Formik, Form, Field, ErrorMessage } from 'formik'
@@ -177,8 +177,14 @@ const AdminProfile: NextPage = () => {
                 </Link>
               </div>
             </div>
-            <div className="text-secondary-700">
-              {session?.user?.email}
+            <div className="text-secondary-700 flex items-center space-x-4">
+              <span>{session?.user?.email}</span>
+              <button
+                onClick={() => signOut({ callbackUrl: '/' })}
+                className="text-secondary-700 hover:text-primary-600"
+              >
+                Sair
+              </button>
             </div>
           </div>
         </div>

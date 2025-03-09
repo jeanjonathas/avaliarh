@@ -1,7 +1,7 @@
 import { NextPage } from 'next'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { useSession } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Formik, Form, Field, ErrorMessage } from 'formik'
@@ -178,15 +178,14 @@ const Stages: NextPage = () => {
                 </Link>
               </div>
             </div>
-            <div className="text-secondary-700">
-              <Link href="/admin/profile" className="text-secondary-700 hover:text-primary-600">
-                <div className="flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                  </svg>
-                  {session?.user?.email}
-                </div>
-              </Link>
+            <div className="text-secondary-700 flex items-center space-x-4">
+              <span>{session?.user?.email}</span>
+              <button
+                onClick={() => signOut({ callbackUrl: '/' })}
+                className="text-secondary-700 hover:text-primary-600"
+              >
+                Sair
+              </button>
             </div>
           </div>
         </div>

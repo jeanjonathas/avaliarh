@@ -1,7 +1,7 @@
 import type { NextPage } from 'next'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { useSession } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Rating } from '@mui/material'
@@ -275,6 +275,14 @@ const CandidatesPage: NextPage = () => {
                   />
                 </Link>
               </div>
+            </div>
+            <div className="flex items-center">
+              <button
+                onClick={() => signOut({ callbackUrl: '/' })}
+                className="text-secondary-700 hover:text-primary-600"
+              >
+                Sair
+              </button>
             </div>
           </div>
         </div>

@@ -454,7 +454,7 @@ const CandidateDetails = () => {
                 {session?.user?.email}
               </span>
               <button
-                onClick={() => signOut()}
+                onClick={() => signOut({ callbackUrl: '/' })}
                 className="text-secondary-700 hover:text-primary-600"
               >
                 Sair
