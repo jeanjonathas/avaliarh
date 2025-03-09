@@ -50,6 +50,14 @@ interface Candidate {
   infoJobsLink?: string
   socialMediaUrl?: string
   resumeFile?: string
+  linkedin?: string
+  github?: string
+  portfolio?: string
+  resumeUrl?: string
+  inviteCode?: string
+  inviteSent: boolean
+  inviteExpires?: string
+  inviteAttempts: number
   score?: number
   createdAt: string
   updatedAt: string
@@ -82,7 +90,8 @@ const CandidateDetails = () => {
     observations: '',
     rating: '0',
   })
-  
+  const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
+
   // Verificar autenticação
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -206,7 +215,50 @@ const CandidateDetails = () => {
       alert('Erro ao atualizar candidato')
     }
   }
-  
+
+  const generateNewInvite = async () => {
+    try {
+      setIsGeneratingInvite(true);
+      const response = await fetch(`/api/admin/candidates/generate-invite`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ candidateId: candidate.id }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao gerar novo convite');
+      }
+
+      const data = await response.json();
+      setFormData(prev => ({
+        ...prev,
+        inviteCode: data.inviteCode,
+        inviteExpires: data.inviteExpires,
+        inviteSent: false,
+        inviteAttempts: 0
+      }));
+
+      // Atualiza o candidato com o novo código
+      const updatedCandidate = {
+        ...candidate,
+        inviteCode: data.inviteCode,
+        inviteExpires: data.inviteExpires,
+        inviteSent: false,
+        inviteAttempts: 0
+      };
+      setCandidates(prev => 
+        prev.map(c => c.id === candidate.id ? updatedCandidate : c)
+      );
+    } catch (error) {
+      console.error('Erro ao gerar convite:', error);
+      alert('Erro ao gerar novo convite. Por favor, tente novamente.');
+    } finally {
+      setIsGeneratingInvite(false);
+    }
+  };
+
   // Dados para o gráfico de radar
   const radarData = {
     labels: [
@@ -770,9 +822,54 @@ const CandidateDetails = () => {
                     </div>
                     
                     <div className="md:w-1/3 space-y-6 mt-6 md:mt-0">
-                      <div className="bg-secondary-50 p-4 rounded-lg">
-                        <h3 className="text-lg font-semibold text-secondary-800 mb-3">Informações do Teste</h3>
+                      <div className="bg-white p-4 rounded-lg border border-secondary-200">
+                        <h3 className="text-lg font-semibold text-secondary-800 mb-3">Informações do Convite</h3>
                         <div className="space-y-3">
+                          <div className="bg-white p-3 rounded-md border border-secondary-200">
+                            <span className="text-sm text-secondary-600">Código do Convite:</span>
+                            <div className="flex items-center justify-between mt-1">
+                              <p className="font-medium text-lg text-primary-600">{candidate.inviteCode || 'Não gerado'}</p>
+                              <button
+                                onClick={() => generateNewInvite()}
+                                disabled={isGeneratingInvite}
+                                className={`px-3 py-1 text-sm ${
+                                  isGeneratingInvite 
+                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                                    : 'bg-primary-50 text-primary-600 hover:bg-primary-100'
+                                } rounded`}
+                              >
+                                {isGeneratingInvite 
+                                  ? 'Gerando...' 
+                                  : candidate.inviteCode 
+                                    ? 'Gerar Novo' 
+                                    : 'Gerar Código'
+                                }
+                              </button>
+                            </div>
+                            {candidate.inviteExpires && (
+                              <div className="mt-2 space-y-1">
+                                <p className="text-xs text-secondary-500 flex items-center">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  Expira em: {new Date(candidate.inviteExpires).toLocaleDateString('pt-BR')}
+                                </p>
+                                <p className="text-xs text-secondary-500 flex items-center">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  Status: {candidate.inviteSent ? 'Enviado' : 'Não enviado'}
+                                </p>
+                                <p className="text-xs text-secondary-500 flex items-center">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                  </svg>
+                                  Tentativas: {candidate.inviteAttempts} de 5
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                          
                           <div>
                             <span className="text-sm text-secondary-600">Data do Teste:</span>
                             <p className="font-medium">{new Date(candidate.testDate).toLocaleDateString('pt-BR')}</p>
