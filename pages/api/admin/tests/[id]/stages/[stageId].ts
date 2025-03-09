@@ -33,33 +33,24 @@ export default async function handler(
     return res.status(500).json({ error: 'Erro ao verificar teste' });
   }
 
-  // Verificar se a relação teste-estágio existe
-  try {
-    const testStageExists = await prisma.$queryRaw`
-      SELECT id FROM "TestStage" 
-      WHERE id = ${stageId} AND "testId" = ${id}
-    `;
-
-    if (!Array.isArray(testStageExists) || testStageExists.length === 0) {
-      return res.status(404).json({ error: 'Relação teste-estágio não encontrada' });
-    }
-  } catch (error) {
-    console.error('Erro ao verificar relação teste-estágio:', error);
-    return res.status(500).json({ error: 'Erro ao verificar relação teste-estágio' });
-  }
-
   // Remover estágio do teste (DELETE)
   if (req.method === 'DELETE') {
     try {
-      await prisma.$executeRawUnsafe(`
-        DELETE FROM "TestStage"
+      // Usar uma abordagem mais simples com string literal para evitar problemas de tipo
+      const result = await prisma.$executeRawUnsafe(`
+        UPDATE "Stage"
+        SET "testId" = NULL, "updatedAt" = NOW()
         WHERE id = '${stageId}' AND "testId" = '${id}'
       `);
 
+      if (result === 0) {
+        return res.status(404).json({ error: 'Etapa não encontrada neste teste' });
+      }
+
       return res.status(200).json({ success: true });
     } catch (error) {
-      console.error('Erro ao remover estágio do teste:', error);
-      return res.status(500).json({ error: 'Erro ao remover estágio do teste' });
+      console.error('Erro ao remover etapa do teste:', error);
+      return res.status(500).json({ error: 'Erro ao remover etapa do teste' });
     }
   } 
   // Atualizar ordem do estágio no teste (PATCH)
@@ -71,11 +62,15 @@ export default async function handler(
         return res.status(400).json({ error: 'Ordem é obrigatória' });
       }
 
-      await prisma.$executeRawUnsafe(`
-        UPDATE "TestStage"
+      const result = await prisma.$executeRawUnsafe(`
+        UPDATE "Stage"
         SET "order" = ${order}, "updatedAt" = NOW()
         WHERE id = '${stageId}' AND "testId" = '${id}'
       `);
+
+      if (result === 0) {
+        return res.status(404).json({ error: 'Etapa não encontrada neste teste' });
+      }
 
       return res.status(200).json({ success: true });
     } catch (error) {

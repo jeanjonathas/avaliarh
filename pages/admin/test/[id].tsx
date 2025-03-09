@@ -7,6 +7,7 @@ import { Formik, Form, Field, ErrorMessage, FieldArray } from 'formik'
 import * as Yup from 'yup'
 import Navbar from '../../../components/admin/Navbar'
 import QuestionForm from '../../../components/admin/QuestionForm'
+import { useNotificationSystem } from '../../../hooks/useNotificationSystem'
 
 interface Test {
   id: string
@@ -66,6 +67,7 @@ const TestDetail: NextPage = () => {
   const router = useRouter()
   const { id } = router.query
   const { data: session, status } = useSession()
+  const notify = useNotificationSystem()
   
   const [test, setTest] = useState<Test | null>(null)
   const [stages, setStages] = useState<any[]>([])
@@ -75,9 +77,6 @@ const TestDetail: NextPage = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all')
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [successMessage, setSuccessMessage] = useState('')
-  const [errorMessage, setErrorMessage] = useState('')
   
   // Modal states
   const [showAddStageModal, setShowAddStageModal] = useState(false)
@@ -100,7 +99,6 @@ const TestDetail: NextPage = () => {
 
       try {
         setLoading(true)
-        setError('')
         
         // Buscar dados do teste
         const testResponse = await fetch(`/api/admin/tests/${id}`)
@@ -159,7 +157,7 @@ const TestDetail: NextPage = () => {
         
       } catch (error) {
         console.error('Erro:', error)
-        setError('Não foi possível carregar os dados. Por favor, tente novamente.')
+        notify.showError('Não foi possível carregar os dados. Por favor, tente novamente.')
       } finally {
         setLoading(false)
       }
@@ -172,7 +170,7 @@ const TestDetail: NextPage = () => {
 
   const addStageToTest = async () => {
     if (!newStageName.trim()) {
-      setError('O nome da etapa é obrigatório')
+      notify.showError('O nome da etapa é obrigatório')
       return
     }
 
@@ -203,39 +201,45 @@ const TestDetail: NextPage = () => {
       setNewStageName('')
       setNewStageDescription('')
       setShowAddStageModal(false)
-      setSuccessMessage('Etapa adicionada com sucesso!')
-      setTimeout(() => setSuccessMessage(''), 3000)
+      notify.showSuccess('Etapa adicionada com sucesso!')
     } catch (error) {
       console.error('Erro:', error)
-      setError('Ocorreu um erro ao adicionar a etapa. Por favor, tente novamente.')
+      notify.showError('Ocorreu um erro ao adicionar a etapa. Por favor, tente novamente.')
     }
   }
 
   const removeStageFromTest = async (testStageId: string) => {
-    if (!confirm('Tem certeza que deseja remover esta etapa? Todas as perguntas associadas serão desvinculadas do teste.')) {
-      return
-    }
+    // Substituir o confirm pelo sistema de notificações
+    notify.confirm(
+      'Confirmar exclusão',
+      'Tem certeza que deseja remover esta etapa? Todas as perguntas associadas serão desvinculadas do teste.',
+      async () => {
+        try {
+          const response = await fetch(`/api/admin/tests/${id}/stages/${testStageId}`, {
+            method: 'DELETE',
+          })
 
-    try {
-      const response = await fetch(`/api/admin/tests/${id}/stages/${testStageId}`, {
-        method: 'DELETE',
-      })
+          if (!response.ok) {
+            throw new Error('Erro ao remover etapa do teste')
+          }
 
-      if (!response.ok) {
-        throw new Error('Erro ao remover etapa do teste')
+          // Atualizar o teste com os dados atualizados
+          const updatedTestResponse = await fetch(`/api/admin/tests/${id}`)
+          const updatedTest = await updatedTestResponse.json()
+          setTest(updatedTest)
+
+          notify.showSuccess('Etapa removida com sucesso!')
+        } catch (error) {
+          console.error('Erro:', error)
+          notify.showError('Ocorreu um erro ao remover a etapa. Por favor, tente novamente.')
+        }
+      },
+      {
+        type: 'warning',
+        confirmText: 'Remover',
+        cancelText: 'Cancelar'
       }
-
-      // Atualizar o teste com os dados atualizados
-      const updatedTestResponse = await fetch(`/api/admin/tests/${id}`)
-      const updatedTest = await updatedTestResponse.json()
-      setTest(updatedTest)
-
-      setSuccessMessage('Etapa removida com sucesso!')
-      setTimeout(() => setSuccessMessage(''), 3000)
-    } catch (error) {
-      console.error('Erro:', error)
-      setError('Ocorreu um erro ao remover a etapa. Por favor, tente novamente.')
-    }
+    );
   }
 
   const openAddQuestionsModal = (stageId: string) => {
@@ -270,7 +274,7 @@ const TestDetail: NextPage = () => {
 
   const addQuestionsToStage = async () => {
     if (!selectedStageId || selectedQuestions.length === 0) {
-      setError('Selecione pelo menos uma pergunta para adicionar à etapa')
+      notify.showError('Selecione pelo menos uma pergunta para adicionar à etapa')
       return
     }
 
@@ -289,7 +293,7 @@ const TestDetail: NextPage = () => {
         throw new Error('Erro ao adicionar perguntas à etapa')
       }
 
-      // Atualizar a interface
+      // Atualizar o teste com os dados atualizados
       const updatedTestResponse = await fetch(`/api/admin/tests/${id}`)
       const updatedTest = await updatedTestResponse.json()
       setTest(updatedTest)
@@ -297,62 +301,73 @@ const TestDetail: NextPage = () => {
       // Limpar seleção e fechar modal
       setSelectedQuestions([])
       setShowAddQuestionsModal(false)
-      setSuccessMessage('Perguntas adicionadas com sucesso!')
-      setTimeout(() => setSuccessMessage(''), 3000)
+      notify.showSuccess('Perguntas adicionadas com sucesso!')
     } catch (error) {
       console.error('Erro:', error)
-      setError('Ocorreu um erro ao adicionar as perguntas. Por favor, tente novamente.')
+      notify.showError('Ocorreu um erro ao adicionar as perguntas. Por favor, tente novamente.')
     }
   }
 
-  const removeQuestionFromStage = async (questionStageId: string, stageId: string) => {
-    if (!confirm('Tem certeza que deseja remover esta pergunta da etapa?')) {
-      return
-    }
+  const removeQuestionFromStage = async (stageId: string, questionId: string) => {
+    // Substituir o confirm pelo sistema de notificações
+    notify.confirm(
+      'Confirmar exclusão',
+      'Tem certeza que deseja remover esta pergunta da etapa?',
+      async () => {
+        try {
+          const response = await fetch(`/api/admin/stages/${stageId}/questions/${questionId}`, {
+            method: 'DELETE',
+          })
 
-    try {
-      const response = await fetch(`/api/admin/stages/${stageId}/questions/${questionStageId}`, {
-        method: 'DELETE',
-      })
-
-      if (!response.ok) {
-        throw new Error('Erro ao remover a pergunta da etapa')
-      }
-
-      // Atualizar a interface
-      const updatedTestStages = test!.testStages.map(ts => {
-        if (ts.stageId === stageId) {
-          return {
-            ...ts,
-            stage: {
-              ...ts.stage,
-              questionStages: ts.stage.questionStages.filter(qs => qs.id !== questionStageId)
-            }
+          if (!response.ok) {
+            throw new Error('Erro ao remover pergunta da etapa')
           }
+
+          // Atualizar localmente sem fazer nova requisição
+          if (test && test.testStages) {
+            const updatedTestStages = test.testStages.map(testStage => {
+              if (testStage.stageId === stageId) {
+                return {
+                  ...testStage,
+                  stage: {
+                    ...testStage.stage,
+                    questionStages: testStage.stage.questionStages?.filter(
+                      qs => qs.questionId !== questionId
+                    ) || []
+                  }
+                }
+              }
+              return testStage
+            })
+
+            setTest({
+              ...test,
+              testStages: updatedTestStages
+            })
+
+            notify.showSuccess('Pergunta removida com sucesso!')
+          }
+        } catch (error) {
+          console.error('Erro:', error)
+          notify.showError('Ocorreu um erro ao remover a pergunta. Por favor, tente novamente.')
         }
-        return ts
-      })
-
-      setTest({
-        ...test!,
-        testStages: updatedTestStages
-      })
-
-      setSuccessMessage('Pergunta removida com sucesso!')
-      setTimeout(() => setSuccessMessage(''), 3000)
-    } catch (error) {
-      console.error('Erro:', error)
-      setError('Ocorreu um erro ao remover a pergunta. Por favor, tente novamente.')
-    }
+      },
+      {
+        type: 'warning',
+        confirmText: 'Remover',
+        cancelText: 'Cancelar'
+      }
+    );
   }
 
   const handleCreateQuestion = async (values: any, formikHelpers?: any) => {
     try {
-      // Adicionar o stageId se não estiver presente (quando o campo está oculto)
-      if (!values.stageId && selectedStageId) {
+      // Adicionar o stageId se estiver selecionado
+      if (selectedStageId) {
         values.stageId = selectedStageId;
       }
-
+      
+      // Enviar a pergunta para a API
       const response = await fetch('/api/admin/questions', {
         method: 'POST',
         headers: {
@@ -360,31 +375,29 @@ const TestDetail: NextPage = () => {
         },
         body: JSON.stringify(values),
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Erro ao criar pergunta');
-      }
-
-      const newQuestion = await response.json();
       
-      // Atualizar a lista de perguntas
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erro ao criar pergunta');
+      }
+      
+      // Atualizar a lista de perguntas disponíveis
       const questionsResponse = await fetch('/api/admin/questions');
       const questionsData = await questionsResponse.json();
       setAvailableQuestions(questionsData);
+      
+      // Fechar o formulário
       setShowNewQuestionForm(false);
       
-      // Resetar o formulário se formikHelpers estiver disponível
-      if (formikHelpers && formikHelpers.resetForm) {
+      // Resetar o formulário se necessário
+      if (formikHelpers) {
         formikHelpers.resetForm();
       }
       
-      setSuccessMessage('Pergunta criada com sucesso!');
-      setTimeout(() => setSuccessMessage(''), 3000);
+      notify.showSuccess('Pergunta criada com sucesso!');
     } catch (error: any) {
       console.error('Erro ao criar pergunta:', error);
-      setErrorMessage(error.message || 'Erro ao criar pergunta');
-      setTimeout(() => setErrorMessage(''), 3000);
+      notify.showError(error.message || 'Erro ao criar pergunta');
     }
   };
 
@@ -461,24 +474,6 @@ const TestDetail: NextPage = () => {
             </Link>
           </div>
         </div>
-
-        {error && (
-          <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-md">
-            {error}
-          </div>
-        )}
-
-        {successMessage && (
-          <div className="fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50">
-            <span className="block sm:inline">{successMessage}</span>
-          </div>
-        )}
-        
-        {errorMessage && (
-          <div className="fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50">
-            <span className="block sm:inline">{errorMessage}</span>
-          </div>
-        )}
 
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
@@ -605,7 +600,7 @@ const TestDetail: NextPage = () => {
                                   
                                   <div>
                                     <button
-                                      onClick={() => removeQuestionFromStage(questionStage.id, testStage.stage.id)}
+                                      onClick={() => removeQuestionFromStage(questionStage.stageId, questionStage.questionId)}
                                       className="text-red-600 hover:text-red-800"
                                     >
                                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -825,8 +820,7 @@ const TestDetail: NextPage = () => {
               onSubmit={handleCreateQuestion}
               onCancel={() => setShowNewQuestionForm(false)}
               onSuccess={() => {
-                setSuccessMessage('Pergunta criada com sucesso!');
-                setTimeout(() => setSuccessMessage(''), 3000);
+                notify.showSuccess('Pergunta criada com sucesso!');
               }}
               hideStageField={true}
             />
