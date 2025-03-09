@@ -20,6 +20,7 @@ import {
 } from 'chart.js'
 import { Bar, Pie, Line, Radar, Doughnut } from 'react-chartjs-2'
 import { Rating } from '@mui/material'
+import Navbar from '../../components/admin/Navbar'
 
 // Registrar componentes do Chart.js
 ChartJS.register(
@@ -1243,72 +1244,8 @@ const Dashboard: NextPage = () => {
 // Renderização do componente principal
 return (
   <div className="min-h-screen bg-secondary-50">
-    <nav className="bg-white shadow-sm">
-      <div className="container mx-auto px-4 py-3">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center space-x-8">
-            <Link href="/admin/dashboard" className="text-xl font-bold text-primary-700" onClick={(e) => {
-              e.preventDefault();
-              window.location.href = '/admin/dashboard';
-            }}>
-              <Image 
-                src="/images/logo_horizontal.png"
-                alt="AvaliaRH Logo"
-                width={150}
-                height={45}
-                priority
-              />
-            </Link>
-            <div className="hidden md:flex space-x-4">
-              <Link href="/admin/dashboard" className="px-3 py-2 text-primary-600 border-b-2 border-primary-600 font-medium" onClick={(e) => {
-                e.preventDefault();
-                window.location.href = '/admin/dashboard';
-              }}>
-                Dashboard
-              </Link>
-              <Link href="/admin/questions" className="px-3 py-2 text-secondary-700 hover:text-primary-600 font-medium" onClick={(e) => {
-                e.preventDefault();
-                window.location.href = '/admin/questions';
-              }}>
-                Perguntas
-              </Link>
-              <Link href="/admin/stages" className="px-3 py-2 text-secondary-700 hover:text-primary-600 font-medium" onClick={(e) => {
-                e.preventDefault();
-                window.location.href = '/admin/stages';
-              }}>
-                Etapas
-              </Link>
-            </div>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Link href="/admin/profile" className="text-secondary-700 hover:text-primary-600" onClick={(e) => {
-              e.preventDefault();
-              window.location.href = '/admin/profile';
-            }}>
-              <div className="flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                </svg>
-                {session?.user?.email || 'admin@empresa.com'}
-              </div>
-            </Link>
-            <button
-              onClick={handleLogout}
-              className="text-secondary-700 hover:text-primary-600 font-medium"
-            >
-              Sair
-            </button>
-            <button
-              onClick={() => setShowProfileEditor(true)}
-              className="text-secondary-700 hover:text-primary-600 font-medium"
-            >
-              Gerenciar Perfis Ideais
-            </button>
-          </div>
-        </div>
-      </div>
-    </nav>
-
+    <Navbar />
+    
     <main className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold text-secondary-900">Dashboard de Avaliação</h1>

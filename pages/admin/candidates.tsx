@@ -3,10 +3,10 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { Rating } from '@mui/material'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import Navbar from '../../components/admin/Navbar'
 
 interface Candidate {
   id: string
@@ -260,33 +260,7 @@ const CandidatesPage: NextPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              <div className="flex-shrink-0 flex items-center">
-                <Link href="/admin/dashboard">
-                  <Image
-                    src="/images/logo_horizontal.png"
-                    alt="AvaliaRH"
-                    width={150}
-                    height={45}
-                    className="cursor-pointer"
-                  />
-                </Link>
-              </div>
-            </div>
-            <div className="flex items-center">
-              <button
-                onClick={() => signOut({ callbackUrl: '/' })}
-                className="text-secondary-700 hover:text-primary-600"
-              >
-                Sair
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-4 sm:px-0">

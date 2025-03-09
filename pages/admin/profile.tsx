@@ -3,9 +3,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { Formik, Form, Field, ErrorMessage } from 'formik'
 import * as Yup from 'yup'
+import Navbar from '../../components/admin/Navbar'
 
 interface AdminProfile {
   id: string
@@ -152,43 +152,7 @@ const AdminProfile: NextPage = () => {
   
   return (
     <div className="min-h-screen bg-secondary-50">
-      <nav className="bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-8">
-              <Link href="/admin/dashboard" className="text-xl font-bold text-primary-700">
-                <Image 
-                  src="/images/logo_horizontal.png"
-                  alt="AvaliaRH Logo"
-                  width={150}
-                  height={45}
-                  priority
-                />
-              </Link>
-              <div className="hidden md:flex space-x-4">
-                <Link href="/admin/dashboard" className="px-3 py-2 text-secondary-700 hover:text-primary-600 font-medium">
-                  Dashboard
-                </Link>
-                <Link href="/admin/questions" className="px-3 py-2 text-secondary-700 hover:text-primary-600 font-medium">
-                  Perguntas
-                </Link>
-                <Link href="/admin/stages" className="px-3 py-2 text-secondary-700 hover:text-primary-600 font-medium">
-                  Etapas
-                </Link>
-              </div>
-            </div>
-            <div className="text-secondary-700 flex items-center space-x-4">
-              <span>{session?.user?.email}</span>
-              <button
-                onClick={() => signOut({ callbackUrl: '/' })}
-                className="text-secondary-700 hover:text-primary-600"
-              >
-                Sair
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
       
       <main className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">

@@ -33,52 +33,101 @@ model Admin {
 }
 
 model Candidate {
-  id             String     @id @default(uuid())
+  id             String          @id @default(uuid())
   name           String
   email          String
   phone          String?
   position       String?
-  testDate       DateTime   @default(now())
+  testDate       DateTime        @default(now())
   interviewDate  DateTime?
-  completed      Boolean    @default(false)
+  completed      Boolean         @default(false)
   responses      Response[]
-  status         Status     @default(PENDING)
-  rating         Float?     // Avaliação de 0.5 a 5 estrelas, de 0.5 em 0.5
-  observations   String?    // Observações sobre o candidato
-  infoJobsLink   String?    // Link do perfil no InfoJobs
-  socialMediaUrl String?    // Link para rede social
-  resumeFile     String?    // Caminho do arquivo do currículo
-  linkedin       String?    // Link do perfil no LinkedIn
-  github         String?    // Link do perfil no GitHub
-  portfolio      String?    // Link do portfólio
-  resumeUrl      String?    // URL do currículo online
-  inviteCode     String?    @unique // Código de convite de 4 dígitos
-  inviteSent     Boolean    @default(false) // Indica se o convite foi enviado
-  inviteExpires  DateTime?  // Data de expiração do convite
-  inviteAttempts Int        @default(0) // Número de tentativas de validação do convite
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  testResults    TestResult[]
+  status         Status          @default(PENDING)
+  rating         Float?          // Avaliação de 0.5 a 5 estrelas, de 0.5 em 0.5
+  observations   String?         // Observações sobre o candidato
+  infoJobsLink   String?         // Link do perfil no InfoJobs
+  socialMediaUrl String?         // Link para rede social
+  resumeFile     String?         // Caminho do arquivo do currículo
+  linkedin       String?         // Link do perfil no LinkedIn
+  github         String?         // Link do perfil no GitHub
+  portfolio      String?         // Link do portfólio
+  resumeUrl      String?         // URL do currículo online
+  inviteCode     String?         @unique // Código de convite de 4 dígitos
+  inviteSent     Boolean         @default(false) // Indica se o convite foi enviado
+  inviteExpires  DateTime?       // Data de expiração do convite
+  inviteAttempts Int             @default(0) // Número de tentativas de validação do convite
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 }
 
-model Stage {
-  id          String     @id @default(uuid())
+model Test {
+  id           String       @id @default(uuid())
+  title        String
+  description  String?
+  timeLimit    Int?         // Tempo limite em minutos
+  active       Boolean      @default(true)
+  testSections TestSection[]
+  testResults  TestResult[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model TestSection {
+  id          String    @id @default(uuid())
+  testId      String
+  test        Test      @relation(fields: [testId], references: [id], onDelete: Cascade)
+  sectionId   String
+  section     Section   @relation(fields: [sectionId], references: [id])
+  order       Int       // Ordem da seção dentro do teste
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([testId, sectionId])
+}
+
+model Section {
+  id          String        @id @default(uuid())
   title       String
   description String?
-  order       Int
+  testSections TestSection[]
+  questions   QuestionSection[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Category {
+  id          String     @id @default(uuid())
+  name        String     @unique
+  description String?
   questions   Question[]
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 }
 
 model Question {
-  id          String     @id @default(uuid())
-  text        String
-  stageId     String
-  stage       Stage      @relation(fields: [stageId], references: [id], onDelete: Cascade)
-  options     Option[]
-  responses   Response[]
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id             String            @id @default(uuid())
+  text           String
+  difficulty     Difficulty        @default(MEDIUM)
+  options        Option[]
+  responses      Response[]
+  categories     Category[]
+  questionSections QuestionSection[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+}
+
+model QuestionSection {
+  id          String    @id @default(uuid())
+  questionId  String
+  question    Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  sectionId   String
+  section     Section   @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  order       Int       // Ordem da pergunta dentro da seção
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([questionId, sectionId])
 }
 
 model Option {
@@ -106,6 +155,23 @@ model Response {
   @@unique([candidateId, questionId])
 }
 
+model TestResult {
+  id          String    @id @default(uuid())
+  testId      String
+  test        Test      @relation(fields: [testId], references: [id])
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  score       Float     // Pontuação do candidato no teste
+  maxScore    Float     // Pontuação máxima possível
+  startTime   DateTime  @default(now()) // Quando o candidato começou o teste
+  endTime     DateTime? // Quando o candidato terminou o teste
+  completed   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([candidateId, testId])
+}
+
 model UsedInviteCode {
   id        String   @id @default(uuid())
   code      String   @unique
@@ -122,4 +188,10 @@ enum Status {
   PENDING
   APPROVED
   REJECTED
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
 }

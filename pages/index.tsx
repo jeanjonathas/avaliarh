@@ -47,7 +47,13 @@ const Home: NextPage = () => {
     <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white">
       <div className="container mx-auto px-4 py-12">
         <header className="flex justify-between items-center mb-16">
-          <Image src="/images/logo_horizontal.png" alt="AvaliaRH" width={250} height={75} />
+          <Image 
+            src="/images/logo_horizontal.png" 
+            alt="AvaliaRH" 
+            width={250} 
+            height={75} 
+            priority 
+          />
           <Link href="/admin/login" className="text-primary-600 hover:text-primary-800 font-medium">
             Área do Administrador
           </Link>
