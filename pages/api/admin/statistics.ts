@@ -21,8 +21,8 @@ export default async function handler(
           s.id,
           s.title as name,
           s.order,
-          COUNT(CASE WHEN o."isCorrect" = true THEN 1 ELSE NULL END) as "correctResponses",
-          COUNT(r.id) as "totalResponses",
+          COALESCE(COUNT(CASE WHEN o."isCorrect" = true THEN 1 ELSE NULL END), 0) as "correctResponses",
+          COALESCE(COUNT(r.id), 0) as "totalResponses",
           CASE 
             WHEN COUNT(r.id) > 0 THEN 
               (COUNT(CASE WHEN o."isCorrect" = true THEN 1 ELSE NULL END)::float / COUNT(r.id)::float * 100)
@@ -39,11 +39,11 @@ export default async function handler(
       // Buscar estatísticas de candidatos
       const candidateStats = await prisma.$queryRaw`
         SELECT 
-          COUNT(*) as total,
-          COUNT(CASE WHEN completed = true THEN 1 ELSE NULL END) as completed,
-          COUNT(CASE WHEN status = 'APPROVED' THEN 1 ELSE NULL END) as approved,
-          COUNT(CASE WHEN status = 'REJECTED' THEN 1 ELSE NULL END) as rejected,
-          COUNT(CASE WHEN status = 'PENDING' THEN 1 ELSE NULL END) as pending
+          COUNT(*)::int as total,
+          COUNT(CASE WHEN completed = true THEN 1 ELSE NULL END)::int as completed,
+          COUNT(CASE WHEN status = 'APPROVED' THEN 1 ELSE NULL END)::int as approved,
+          COUNT(CASE WHEN status = 'REJECTED' THEN 1 ELSE NULL END)::int as rejected,
+          COUNT(CASE WHEN status = 'PENDING' THEN 1 ELSE NULL END)::int as pending
         FROM "Candidate"
       `;
 

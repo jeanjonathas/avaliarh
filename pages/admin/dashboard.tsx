@@ -373,14 +373,16 @@ const Dashboard: NextPage = () => {
         const data = await response.json()
         setStatistics(data)
 
+        console.log('Estatísticas recebidas:', data);
+
         // Atualizar dados dos novos gráficos com os dados estatísticos
-        if (data && data.stageStats) {
+        if (data && data.stageStats && Array.isArray(data.stageStats)) {
           // Atualizar gráfico de taxa de sucesso por categoria
           setCategorySuccessData(prev => ({
             ...prev,
             datasets: [{
               ...prev.datasets[0],
-              data: data.stageStats.map(stage => stage.successRate)
+              data: data.stageStats.map(stage => parseFloat(stage.successRate) || 0)
             }]
           }));
 
@@ -390,11 +392,11 @@ const Dashboard: NextPage = () => {
             datasets: [
               {
                 ...prev.datasets[0],
-                data: data.stageStats.map(stage => stage.successRate)
+                data: data.stageStats.map(stage => parseFloat(stage.successRate) || 0)
               },
               {
                 ...prev.datasets[1],
-                data: Array(6).fill(data.expectedSuccessRate)
+                data: Array(6).fill(data.expectedSuccessRate || 70)
               }
             ]
           }));
@@ -407,9 +409,9 @@ const Dashboard: NextPage = () => {
             datasets: [{
               ...prev.datasets[0],
               data: [
-                data.candidateStats.approved,
-                data.candidateStats.rejected,
-                data.candidateStats.pending
+                parseInt(data.candidateStats.approved) || 0,
+                parseInt(data.candidateStats.rejected) || 0,
+                parseInt(data.candidateStats.pending) || 0
               ]
             }]
           }));
@@ -669,6 +671,13 @@ const Dashboard: NextPage = () => {
             return `${context.dataset.label}: ${context.raw}%`;
           }
         }
+      },
+      title: {
+        display: true,
+        text: 'Desempenho por Etapa',
+        font: {
+          size: 16
+        }
       }
     },
     maintainAspectRatio: false,
@@ -730,11 +739,18 @@ const Dashboard: NextPage = () => {
             return `${context.dataset.label}: ${context.raw}%`;
           }
         }
+      },
+      title: {
+        display: true,
+        text: 'Desempenho do Candidato vs. Média Geral',
+        font: {
+          size: 16
+        }
       }
     },
   };
   
-// Dados para o gráfico de distribuição de pontuação por etapa
+  // Dados para o gráfico de distribuição de pontuação por etapa
   const stageDistributionOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -756,6 +772,13 @@ const Dashboard: NextPage = () => {
           label: function(context: any) {
             return `${context.dataset.label}: ${context.raw} candidatos`;
           }
+        }
+      },
+      title: {
+        display: true,
+        text: 'Distribuição de Pontuação por Etapa',
+        font: {
+          size: 16
         }
       }
     },
