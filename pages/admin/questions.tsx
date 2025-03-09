@@ -284,6 +284,8 @@ const Questions: NextPage = () => {
 
   const handleSubmit = async (values: any, formikHelpers: any) => {
     try {
+      console.log('handleSubmit na página questions.tsx foi chamado com valores:', values);
+      console.log('formikHelpers disponíveis:', formikHelpers);
       setError('');
 
       // Se estiver editando, prosseguir normalmente
@@ -335,6 +337,7 @@ const Questions: NextPage = () => {
   // Função para salvar a pergunta após confirmação
   const saveQuestion = async (values: any, formikHelpers?: any) => {
     try {
+      console.log('saveQuestion na página questions.tsx foi chamado com valores:', values);
       const method = isEditing ? 'PUT' : 'POST';
       const url = isEditing ? `/api/admin/questions/${currentQuestion?.id}` : '/api/admin/questions';
 

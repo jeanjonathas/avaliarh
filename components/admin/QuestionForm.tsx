@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Formik, Form, Field, ErrorMessage, FieldArray, FormikConsumer } from 'formik';
+import { Formik, Form, Field, ErrorMessage, FieldArray, FormikConsumer, FormikHelpers } from 'formik';
 import * as Yup from 'yup';
 
 interface Stage {
@@ -145,11 +145,19 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
       }
     }
     
+    // Garantir que stageId tenha um valor válido quando o campo está oculto
+    let defaultStageId = '';
+    if (preSelectedStageId) {
+      defaultStageId = preSelectedStageId;
+    } else if (stages.length > 0) {
+      defaultStageId = stages[0].id;
+    }
+    
     // Se não houver opções, criar duas opções vazias por padrão
     if (!initialValues?.options || initialValues.options.length === 0) {
       return {
         text: initialValues?.text || '',
-        stageId: initialValues?.stageId || (preSelectedStageId || ''),
+        stageId: initialValues?.stageId || defaultStageId,
         categoryId: initialValues?.categoryId || (preSelectedCategoryId || ''),
         categoryUuid: initialValues?.categoryUuid || (preSelectedCategoryId || ''),
         options: [
@@ -162,7 +170,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
     // Retornar valores existentes
     return {
       text: initialValues?.text || '',
-      stageId: initialValues?.stageId || (preSelectedStageId || ''),
+      stageId: initialValues?.stageId || defaultStageId,
       categoryId: initialValues?.categoryId || (preSelectedCategoryId || ''),
       categoryUuid: initialValues?.categoryUuid || (preSelectedCategoryId || ''),
       options: initialValues?.options || [],
@@ -185,35 +193,52 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
         }),
     };
 
-    // Sempre incluir stageId na validação, mesmo se o campo estiver oculto
-    return Yup.object({
-      ...baseSchema,
-      stageId: Yup.string().required('Etapa é obrigatória'),
-    });
+    // Incluir stageId na validação apenas se o campo não estiver oculto
+    if (!hideStageField) {
+      return Yup.object({
+        ...baseSchema,
+        stageId: Yup.string().required('Etapa é obrigatória'),
+      });
+    }
+
+    // Se o campo estiver oculto, não validar stageId
+    return Yup.object(baseSchema);
   };
 
-  const handleSubmit = async (values: any, { resetForm }: any) => {
+  const handleSubmit = async (values: any, { resetForm, setSubmitting }: any) => {
     try {
       setError('');
-      await onSubmit(values);
+      
+      // Garantir que os valores da categoria estejam corretos
+      const formattedValues = {
+        ...values,
+        // Garantir que categoryUuid seja enviado corretamente
+        categoryUuid: values.categoryId || null,
+        // Remover categoryId para evitar conflitos
+        categoryId: undefined
+      };
+      
+      console.log('Enviando formulário com valores:', formattedValues);
+      
+      // Chamar a função onSubmit com os valores formatados
+      await onSubmit(formattedValues);
       
       // Apenas resetar o formulário se não estiver atualizando uma pergunta existente
       if (!isUpdating) {
         resetForm();
       }
       
-      if (onSuccess) {
-        onSuccess();
-      }
-    } catch (error: any) {
-      console.error('Erro no formulário:', error);
-      setError(error.message || 'Ocorreu um erro ao processar o formulário');
+    } catch (error) {
+      console.error('Erro ao enviar formulário:', error);
+      setError('Ocorreu um erro ao salvar a pergunta. Por favor, tente novamente.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-semibold text-secondary-800 mb-4">
+      <h2 className="text-xl font-semibold text-secondary-800 mb-6">
         {isEditing ? 'Editar Pergunta' : 'Nova Pergunta'}
       </h2>
 
@@ -227,18 +252,22 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
         initialValues={prepareInitialValues()}
         validationSchema={getValidationSchema()}
         enableReinitialize={true}  // Sempre permitir reinicialização para carregar valores iniciais
-        onSubmit={handleSubmit}
+        onSubmit={(values, formikHelpers: FormikHelpers<any>) => {
+          console.log('Formulário enviado com valores:', values);
+          console.log('FormikHelpers disponível:', formikHelpers);
+          handleSubmit(values, formikHelpers);
+        }}
       >
-        {({ values, isSubmitting, setFieldValue }) => (
-          <Form className="space-y-6">
-            <div>
+        {({ values, errors, touched, isSubmitting, setFieldValue, submitForm }) => (
+          <Form>
+            <div className="mb-4">
               <label htmlFor="text" className="block text-sm font-medium text-secondary-700 mb-1">
                 Pergunta
               </label>
               <Field
                 as="textarea"
-                name="text"
                 id="text"
+                name="text"
                 rows={3}
                 className="input-field"
                 placeholder="Digite o texto da pergunta"
@@ -255,7 +284,11 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
             
             {/* Campo oculto para stageId quando hideStageField é true */}
             {hideStageField && (
-              <Field type="hidden" name="stageId" />
+              <Field 
+                type="hidden" 
+                name="stageId" 
+                value={preSelectedStageId || (stages.length > 0 ? stages[0].id : '')} 
+              />
             )}
             
             {!hideStageField && (
@@ -465,6 +498,23 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                 type="submit"
                 disabled={isSubmitting}
                 className="btn-primary"
+                onClick={(e) => {
+                  e.preventDefault(); // Prevenir comportamento padrão
+                  console.log('Botão de adicionar pergunta clicado', { errors, values });
+                  console.log('Erros de validação no momento do clique:', errors);
+                  console.log('Campos tocados no momento do clique:', touched);
+                  
+                  // Verificar se há erros de validação
+                  const hasErrors = Object.keys(errors).length > 0;
+                  if (hasErrors) {
+                    console.log('Formulário tem erros de validação, não será enviado');
+                    return;
+                  }
+                  
+                  // Chamar submitForm manualmente
+                  console.log('Chamando submitForm manualmente');
+                  submitForm();
+                }}
               >
                 {isSubmitting 
                   ? 'Salvando...' 
