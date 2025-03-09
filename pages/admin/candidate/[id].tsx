@@ -488,7 +488,7 @@ const CandidateDetails = () => {
                 >
                   <div className="flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+                      <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1h-2a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1h-2a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
                     </svg>
                     Desempenho
                   </div>
@@ -515,148 +515,185 @@ const CandidateDetails = () => {
               {activeTab === 'performance' ? (
                 <div className="space-y-8">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Gráfico de Radar - Desempenho por Habilidade */}
-                    <div className="bg-white p-6 rounded-lg shadow-md">
-                      <h3 className="text-lg font-semibold text-secondary-800 mb-4">Desempenho por Habilidade</h3>
-                      <div className="h-80">
-                        <Radar data={radarData} options={radarOptions} />
+                    {!candidate.completed ? (
+                      // Mensagem quando o candidato ainda não realizou o teste
+                      <div className="bg-white p-6 rounded-lg shadow-md md:col-span-2">
+                        <div className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+                          <h4 className="font-medium text-blue-800">Avaliação Pendente</h4>
+                          <p className="mt-2 text-blue-700">
+                            O candidato ainda não realizou o teste. Os gráficos de desempenho estarão disponíveis após a conclusão.
+                          </p>
+                        </div>
                       </div>
-                      <div className="mt-4 text-sm text-gray-500">
-                        <p>Este gráfico mostra o desempenho do candidato em cada uma das seis etapas de avaliação.</p>
-                      </div>
-                    </div>
-                    
-                    {/* Gráfico de Barras - Desempenho por Etapa */}
-                    <div className="bg-white p-6 rounded-lg shadow-md">
-                      <h3 className="text-lg font-semibold text-secondary-800 mb-4">Desempenho por Etapa</h3>
-                      <div className="h-80">
-                        <Bar data={barData} options={barOptions} />
-                      </div>
-                      <div className="mt-4 text-sm text-gray-500">
-                        <p>Este gráfico mostra o número de respostas corretas e incorretas em cada etapa.</p>
-                      </div>
-                    </div>
+                    ) : (
+                      <>
+                        {/* Gráfico de Radar - Desempenho por Habilidade */}
+                        <div className="bg-white p-6 rounded-lg shadow-md">
+                          <h3 className="text-lg font-semibold text-secondary-800 mb-4">Desempenho por Habilidade</h3>
+                          <div className="h-80">
+                            <Radar data={radarData} options={radarOptions} />
+                          </div>
+                          <div className="mt-4 text-sm text-gray-500">
+                            <p>Este gráfico mostra o desempenho do candidato em cada uma das seis etapas de avaliação.</p>
+                          </div>
+                        </div>
+                        
+                        {/* Gráfico de Barras - Desempenho por Etapa */}
+                        <div className="bg-white p-6 rounded-lg shadow-md">
+                          <h3 className="text-lg font-semibold text-secondary-800 mb-4">Desempenho por Etapa</h3>
+                          <div className="h-80">
+                            <Bar data={barData} options={barOptions} />
+                          </div>
+                          <div className="mt-4 text-sm text-gray-500">
+                            <p>Este gráfico mostra o número de respostas corretas e incorretas em cada etapa.</p>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                   
                   {/* Tabela de Desempenho Detalhado */}
                   <div className="bg-white p-6 rounded-lg shadow-md">
                     <h3 className="text-lg font-semibold text-secondary-800 mb-4">Desempenho Detalhado</h3>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-secondary-200">
-                        <thead className="bg-secondary-50">
-                          <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
-                              Etapa
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
-                              Corretas
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
-                              Total
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
-                              Percentual
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
-                              Status
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-secondary-200">
-                          {candidate.stageScores?.map((stage, index) => (
-                            <tr key={stage.id} className={index % 2 === 0 ? 'bg-white' : 'bg-secondary-50'}>
+                    {!candidate.completed ? (
+                      <div className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+                        <p className="text-blue-700">
+                          O candidato ainda não realizou o teste. Os dados de desempenho estarão disponíveis após a conclusão.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-secondary-200">
+                          <thead className="bg-secondary-50">
+                            <tr>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
+                                Etapa
+                              </th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
+                                Corretas
+                              </th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
+                                Total
+                              </th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
+                                Percentual
+                              </th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
+                                Status
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-secondary-200">
+                            {candidate.stageScores?.map((stage, index) => (
+                              <tr key={stage.id} className={index % 2 === 0 ? 'bg-white' : 'bg-secondary-50'}>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-secondary-900">
+                                  {stage.name}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500">
+                                  {stage.correct}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500">
+                                  {stage.total}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500">
+                                  <div className="flex items-center">
+                                    <span className="mr-2">{stage.percentage}%</span>
+                                    <div className="w-24 bg-secondary-200 rounded-full h-2.5">
+                                      <div 
+                                        className={`h-2.5 rounded-full ${
+                                          stage.percentage >= 80 ? 'bg-green-500' : 
+                                          stage.percentage >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                                        }`}
+                                        style={{ width: `${stage.percentage}%` }}
+                                      ></div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  {!candidate.completed ? (
+                                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                      Aguardando Respostas
+                                    </span>
+                                  ) : stage.percentage >= 80 ? (
+                                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                      Excelente
+                                    </span>
+                                  ) : stage.percentage >= 60 ? (
+                                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                      Satisfatório
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                      Precisa Melhorar
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                            
+                            {/* Linha de pontuação geral */}
+                            <tr className="bg-secondary-100">
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-secondary-900">
-                                {stage.name}
+                                <strong>Pontuação Geral</strong>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500">
-                                {stage.correct}
+                                {candidate.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500">
-                                {stage.total}
+                                {candidate.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500">
                                 <div className="flex items-center">
-                                  <span className="mr-2">{stage.percentage}%</span>
+                                  <span className="mr-2">{candidate.score}%</span>
                                   <div className="w-24 bg-secondary-200 rounded-full h-2.5">
                                     <div 
                                       className={`h-2.5 rounded-full ${
-                                        stage.percentage >= 80 ? 'bg-green-500' : 
-                                        stage.percentage >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                                        candidate.score >= 80 ? 'bg-green-500' : 
+                                        candidate.score >= 60 ? 'bg-yellow-500' : 'bg-red-500'
                                       }`}
-                                      style={{ width: `${stage.percentage}%` }}
+                                      style={{ width: `${candidate.score}%` }}
                                     ></div>
                                   </div>
                                 </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                {stage.percentage >= 80 ? (
-                                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                    Excelente
+                                {!candidate.completed ? (
+                                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                    Aguardando Respostas
                                   </span>
-                                ) : stage.percentage >= 60 ? (
+                                ) : candidate.score >= 80 ? (
+                                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    Aprovado
+                                  </span>
+                                ) : candidate.score >= 60 ? (
                                   <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                    Satisfatório
+                                    Consideração
                                   </span>
                                 ) : (
                                   <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                                    Precisa Melhorar
+                                    Reprovado
                                   </span>
                                 )}
                               </td>
                             </tr>
-                          ))}
-                          
-                          {/* Linha de pontuação geral */}
-                          <tr className="bg-secondary-100">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-secondary-900">
-                              <strong>Pontuação Geral</strong>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500">
-                              {candidate.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500">
-                              {candidate.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500">
-                              <div className="flex items-center">
-                                <span className="mr-2">{candidate.score}%</span>
-                                <div className="w-24 bg-secondary-200 rounded-full h-2.5">
-                                  <div 
-                                    className={`h-2.5 rounded-full ${
-                                      candidate.score >= 80 ? 'bg-green-500' : 
-                                      candidate.score >= 60 ? 'bg-yellow-500' : 'bg-red-500'
-                                    }`}
-                                    style={{ width: `${candidate.score}%` }}
-                                  ></div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              {candidate.score >= 80 ? (
-                                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                  Aprovado
-                                </span>
-                              ) : candidate.score >= 60 ? (
-                                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                  Consideração
-                                </span>
-                              ) : (
-                                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                                  Reprovado
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                   
                   {/* Recomendações baseadas no desempenho */}
                   <div className="bg-white p-6 rounded-lg shadow-md">
                     <h3 className="text-lg font-semibold text-secondary-800 mb-4">Recomendações</h3>
                     <div className="space-y-4">
-                      {candidate.score >= 80 ? (
+                      {!candidate.completed ? (
+                        <div className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+                          <h4 className="font-medium text-blue-800">Aguardando Respostas</h4>
+                          <p className="mt-2 text-blue-700">
+                            Este candidato ainda não realizou o teste. As recomendações serão geradas após a conclusão da avaliação.
+                          </p>
+                        </div>
+                      ) : candidate.score >= 80 ? (
                         <div className="p-4 bg-green-50 border-l-4 border-green-500 rounded">
                           <h4 className="font-medium text-green-800">Candidato Recomendado</h4>
                           <p className="mt-2 text-green-700">
@@ -680,34 +717,38 @@ const CandidateDetails = () => {
                       )}
                       
                       {/* Áreas para desenvolvimento */}
-                      <div className="mt-4">
-                        <h4 className="font-medium text-secondary-800">Áreas para Desenvolvimento:</h4>
-                        <ul className="mt-2 space-y-1 list-disc list-inside text-secondary-600">
-                          {candidate.stageScores?.filter(stage => stage.percentage < 60).map(stage => (
-                            <li key={stage.id}>
-                              {stage.name} ({stage.percentage}%) - Necessita aprimoramento
-                            </li>
-                          ))}
-                          {candidate.stageScores?.filter(stage => stage.percentage < 60).length === 0 && (
-                            <li>Não foram identificadas áreas críticas para desenvolvimento.</li>
-                          )}
-                        </ul>
-                      </div>
+                      {candidate.completed && (
+                        <div className="mt-4">
+                          <h4 className="font-medium text-secondary-800">Áreas para Desenvolvimento:</h4>
+                          <ul className="mt-2 space-y-1 list-disc list-inside text-secondary-600">
+                            {candidate.stageScores?.filter(stage => stage.percentage < 60).map(stage => (
+                              <li key={stage.id}>
+                                {stage.name} ({stage.percentage}%) - Necessita aprimoramento
+                              </li>
+                            ))}
+                            {candidate.stageScores?.filter(stage => stage.percentage < 60).length === 0 && (
+                              <li>Não foram identificadas áreas críticas para desenvolvimento.</li>
+                            )}
+                          </ul>
+                        </div>
+                      )}
                       
                       {/* Pontos fortes */}
-                      <div className="mt-4">
-                        <h4 className="font-medium text-secondary-800">Pontos Fortes:</h4>
-                        <ul className="mt-2 space-y-1 list-disc list-inside text-secondary-600">
-                          {candidate.stageScores?.filter(stage => stage.percentage >= 80).map(stage => (
-                            <li key={stage.id}>
-                              {stage.name} ({stage.percentage}%) - Excelente desempenho
-                            </li>
-                          ))}
-                          {candidate.stageScores?.filter(stage => stage.percentage >= 80).length === 0 && (
-                            <li>Não foram identificados pontos de excelência.</li>
-                          )}
-                        </ul>
-                      </div>
+                      {candidate.completed && (
+                        <div className="mt-4">
+                          <h4 className="font-medium text-secondary-800">Pontos Fortes:</h4>
+                          <ul className="mt-2 space-y-1 list-disc list-inside text-secondary-600">
+                            {candidate.stageScores?.filter(stage => stage.percentage >= 80).map(stage => (
+                              <li key={stage.id}>
+                                {stage.name} ({stage.percentage}%) - Excelente desempenho
+                              </li>
+                            ))}
+                            {candidate.stageScores?.filter(stage => stage.percentage >= 80).length === 0 && (
+                              <li>Não foram identificados pontos de excelência.</li>
+                            )}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
