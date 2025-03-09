@@ -19,6 +19,7 @@ import {
 } from 'chart.js'
 import { Bar, Radar } from 'react-chartjs-2'
 import { Rating } from '@mui/material'
+import Navbar from '../../../components/admin/Navbar'
 
 // Registrar componentes do Chart.js
 ChartJS.register(
@@ -424,45 +425,7 @@ const CandidateDetails = () => {
   
   return (
     <div className="min-h-screen bg-secondary-50">
-      <nav className="bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-8">
-              <Link href="/admin/dashboard" className="flex items-center">
-                <Image 
-                  src="/images/logo_horizontal.png" 
-                  alt="AvaliaRH" 
-                  width={150} 
-                  height={40} 
-                  className="h-10 w-auto"
-                />
-              </Link>
-              <div className="hidden md:flex space-x-4">
-                <Link href="/admin/dashboard" className="px-3 py-2 text-secondary-700 hover:text-primary-600 font-medium">
-                  Dashboard
-                </Link>
-                <Link href="/admin/questions" className="px-3 py-2 text-secondary-700 hover:text-primary-600 font-medium">
-                  Perguntas
-                </Link>
-                <Link href="/admin/stages" className="px-3 py-2 text-secondary-700 hover:text-primary-600 font-medium">
-                  Etapas
-                </Link>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-secondary-700 hidden md:inline-block">
-                {session?.user?.email}
-              </span>
-              <button
-                onClick={() => signOut({ callbackUrl: '/' })}
-                className="text-secondary-700 hover:text-primary-600"
-              >
-                Sair
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
       
       <main className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
@@ -849,19 +812,19 @@ const CandidateDetails = () => {
                             {candidate.inviteExpires && (
                               <div className="mt-2 space-y-1">
                                 <p className="text-xs text-secondary-500 flex items-center">
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                   </svg>
                                   Expira em: {new Date(candidate.inviteExpires).toLocaleDateString('pt-BR')}
                                 </p>
                                 <p className="text-xs text-secondary-500 flex items-center">
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                   </svg>
                                   Status: {candidate.inviteSent ? 'Enviado' : 'Não enviado'}
                                 </p>
                                 <p className="text-xs text-secondary-500 flex items-center">
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                                   </svg>
                                   Tentativas: {candidate.inviteAttempts} de 5
@@ -934,7 +897,6 @@ const CandidateDetails = () => {
                             <span>Ver perfil</span>
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
                               <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
-                              <path d="M5 5a2 2 0 00-3 3v6a2 2 0 110 4v5a2 2 0 002 2h14a2 2 0 002-2v-5a2 2 0 110-4V5z" />
                             </svg>
                           </Link>
                         </div>
@@ -953,7 +915,7 @@ const CandidateDetails = () => {
                           >
                             <span>Ver currículo</span>
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2v-1H4v1a2 2 0 01-2 2H2a2 2 0 01-2-2V4h.586a1 1 0 01.707-.293l5.414 5.414a1 1 0 01.293.707V8a2 2 0 00-2-2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4v.586a1 1 0 01-.293.707l-5.414 5.414a1 1 0 01-.707-.293H2z" clipRule="evenodd" />
+                              <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2v-1H4v1a2 2 0 01-2 2H2a2 2 0 01-2-2V4h.586a1 1 0 01.707-.293l5.414 5.414a1 1 0 01.293.707V8a2 2 0 00-2-2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-5.414-5.414a1 1 0 01.293-.707H4z" clipRule="evenodd" />
                             </svg>
                           </Link>
                         </div>
