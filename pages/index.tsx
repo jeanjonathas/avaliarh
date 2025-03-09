@@ -1,7 +1,7 @@
 import type { NextPage } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/router'
 
 interface TestData {
@@ -18,7 +18,8 @@ const Home: NextPage = () => {
   const [showInviteInput, setShowInviteInput] = useState(false)
   const router = useRouter()
 
-  const handleInviteSubmit = async (e: React.FormEvent) => {
+  // Usando useCallback para memorizar a função e evitar recriações desnecessárias
+  const handleInviteSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError('')
@@ -53,7 +54,7 @@ const Home: NextPage = () => {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [inviteCode, router])
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white">
@@ -65,6 +66,7 @@ const Home: NextPage = () => {
             width={250} 
             height={75} 
             priority 
+            unoptimized={true}
           />
           <Link href="/admin/login" className="text-primary-600 hover:text-primary-800 font-medium">
             Área do Administrador
@@ -132,7 +134,7 @@ const Home: NextPage = () => {
               <div className="absolute inset-0 bg-primary-100 rounded-lg transform rotate-3"></div>
               <div className="absolute inset-0 bg-white rounded-lg shadow-lg flex items-center justify-center p-8">
                 <div className="text-center">
-                  <div className="text-5xl text-primary-500 mb-4">📝</div>
+                  <span className="text-5xl text-primary-500 mb-4 block">📝</span>
                   <h2 className="text-2xl font-bold text-secondary-800 mb-2">Processo Simplificado</h2>
                   <p className="text-secondary-600">
                     6 etapas com 10 questões cada, projetadas para avaliar diferentes aspectos de suas habilidades.
