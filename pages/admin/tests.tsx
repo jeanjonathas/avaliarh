@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Formik, Form, Field, ErrorMessage } from 'formik'
 import * as Yup from 'yup'
 import Navbar from '../../components/admin/Navbar'
+import { useNotificationSystem } from '../../hooks/useNotificationSystem';
 
 interface Test {
   id: string
@@ -28,6 +29,7 @@ const validationSchema = Yup.object({
 const Tests: NextPage = () => {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const notify = useNotificationSystem();
   const [tests, setTests] = useState<Test[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -49,10 +51,11 @@ const Tests: NextPage = () => {
           throw new Error('Erro ao carregar os testes')
         }
         const data = await response.json()
-        setTests(Array.isArray(data) ? data : [])
+        setTests(data)
       } catch (error) {
         console.error('Erro:', error)
         setError('Não foi possível carregar os testes. Por favor, tente novamente.')
+        notify.showError('Não foi possível carregar os testes. Por favor, tente novamente.')
       } finally {
         setLoading(false)
       }
@@ -65,11 +68,8 @@ const Tests: NextPage = () => {
   
   const handleSubmit = async (values: any, { resetForm }: any) => {
     try {
-      const url = isEditing 
-        ? `/api/admin/tests/${currentTest?.id}` 
-        : '/api/admin/tests'
-      
       const method = isEditing ? 'PUT' : 'POST'
+      const url = isEditing ? `/api/admin/tests/${currentTest?.id}` : '/api/admin/tests'
       
       const response = await fetch(url, {
         method,
@@ -80,23 +80,73 @@ const Tests: NextPage = () => {
       })
       
       if (!response.ok) {
-        throw new Error(`Erro ao ${isEditing ? 'atualizar' : 'criar'} o teste`)
+        const errorData = await response.json()
+        throw new Error(errorData.error || `Erro ao ${isEditing ? 'atualizar' : 'criar'} o teste`)
       }
       
-      // Recarregar testes
+      // Atualizar a lista de testes
       const testsResponse = await fetch('/api/admin/tests')
       const testsData = await testsResponse.json()
-      setTests(Array.isArray(testsData) ? testsData : [])
+      setTests(testsData)
       
-      // Limpar formulário e estado
+      // Limpar o formulário e o estado de edição
       resetForm()
       setIsEditing(false)
       setCurrentTest(null)
       
+      // Mostrar mensagem de sucesso
+      notify.showSuccess(isEditing ? 'Teste atualizado com sucesso!' : 'Teste criado com sucesso!')
     } catch (error) {
       console.error('Erro:', error)
-      setError(`Ocorreu um erro ao ${isEditing ? 'atualizar' : 'salvar'} o teste. Por favor, tente novamente.`)
+      notify.showError(`Ocorreu um erro ao ${isEditing ? 'atualizar' : 'criar'} o teste. Por favor, tente novamente.`)
     }
+  }
+  
+  const handleCancel = () => {
+    setIsEditing(false)
+    setCurrentTest(null)
+  }
+  
+  const handleDelete = async (id: string) => {
+    // Encontrar o teste para mostrar o título na confirmação
+    const testToDelete = tests.find(test => test.id === id);
+    
+    if (!testToDelete) {
+      notify.showError('Teste não encontrado');
+      return;
+    }
+    
+    // Usar o sistema de notificações para confirmar a exclusão
+    notify.confirm(
+      'Confirmar exclusão',
+      `Tem certeza que deseja excluir o teste "${testToDelete.title}"? Esta operação não poderá ser desfeita.`,
+      async () => {
+        try {
+          const response = await fetch(`/api/admin/tests/${id}`, {
+            method: 'DELETE',
+          })
+          
+          if (!response.ok) {
+            const errorData = await response.json()
+            throw new Error(errorData.error || 'Erro ao excluir o teste')
+          }
+          
+          // Atualizar a lista de testes
+          setTests(tests.filter(test => test.id !== id))
+          
+          // Mostrar mensagem de sucesso
+          notify.showSuccess('Teste excluído com sucesso!')
+        } catch (error) {
+          console.error('Erro:', error)
+          notify.showError('Ocorreu um erro ao excluir o teste. Por favor, tente novamente.')
+        }
+      },
+      {
+        type: 'warning',
+        confirmText: 'Excluir',
+        cancelText: 'Cancelar'
+      }
+    );
   }
   
   const handleEdit = (test: Test) => {
@@ -104,9 +154,9 @@ const Tests: NextPage = () => {
     setIsEditing(true)
   }
   
-  const toggleActive = async (testId: string, currentActive: boolean) => {
+  const handleToggleActive = async (id: string, currentActive: boolean) => {
     try {
-      const response = await fetch(`/api/admin/tests/${testId}`, {
+      const response = await fetch(`/api/admin/tests/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -115,46 +165,21 @@ const Tests: NextPage = () => {
       })
       
       if (!response.ok) {
-        throw new Error('Erro ao alterar o status do teste')
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Erro ao atualizar o status do teste')
       }
       
-      // Atualizar a lista de testes localmente
-      setTests(prevTests => prevTests.map(test => 
-        test.id === testId ? { ...test, active: !currentActive } : test
+      // Atualizar o teste na lista
+      setTests(tests.map(test => 
+        test.id === id ? { ...test, active: !currentActive } : test
       ))
       
+      // Mostrar mensagem de sucesso
+      notify.showSuccess(`Teste ${!currentActive ? 'ativado' : 'desativado'} com sucesso!`)
     } catch (error) {
       console.error('Erro:', error)
-      setError('Ocorreu um erro ao alterar o status do teste. Por favor, tente novamente.')
+      notify.showError('Ocorreu um erro ao atualizar o status do teste. Por favor, tente novamente.')
     }
-  }
-  
-  const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este teste? Esta ação não pode ser desfeita.')) {
-      return
-    }
-    
-    try {
-      const response = await fetch(`/api/admin/tests/${id}`, {
-        method: 'DELETE',
-      })
-      
-      if (!response.ok) {
-        throw new Error('Erro ao excluir o teste')
-      }
-      
-      // Atualizar a lista de testes
-      setTests(prevTests => prevTests.filter(t => t.id !== id))
-      
-    } catch (error) {
-      console.error('Erro:', error)
-      setError('Ocorreu um erro ao excluir o teste. Por favor, tente novamente.')
-    }
-  }
-  
-  const handleCancel = () => {
-    setIsEditing(false)
-    setCurrentTest(null)
   }
   
   if (status === 'loading' || loading) {
@@ -352,7 +377,7 @@ const Tests: NextPage = () => {
                                 Editar
                               </button>
                               <button
-                                onClick={() => toggleActive(test.id, test.active)}
+                                onClick={() => handleToggleActive(test.id, test.active)}
                                 className={`${
                                   test.active ? 'text-yellow-600 hover:text-yellow-900' : 'text-green-600 hover:text-green-900'
                                 }`}

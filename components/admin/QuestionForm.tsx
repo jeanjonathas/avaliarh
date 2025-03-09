@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Formik, Form, Field, ErrorMessage, FieldArray, FormikConsumer, FormikHelpers } from 'formik';
 import * as Yup from 'yup';
+import { useNotificationSystem } from '../../hooks/useNotificationSystem';
 
 interface Stage {
   id: string;
@@ -61,10 +62,13 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
   hideStageField = false,
   isUpdating = false
 }) => {
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
     preSelectedCategoryId || null
   );
+  const notify = useNotificationSystem();
 
   // Debug das props recebidas
   useEffect(() => {
@@ -207,32 +211,60 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
 
   const handleSubmit = async (values: any, { resetForm, setSubmitting }: any) => {
     try {
+      console.log('QuestionForm.handleSubmit chamado com valores:', values);
       setError('');
-      
-      // Garantir que os valores da categoria estejam corretos
-      const formattedValues = {
-        ...values,
-        // Garantir que categoryUuid seja enviado corretamente
-        categoryUuid: values.categoryId || null,
-        // Remover categoryId para evitar conflitos
-        categoryId: undefined
-      };
-      
-      console.log('Enviando formulário com valores:', formattedValues);
-      
-      // Chamar a função onSubmit com os valores formatados
-      await onSubmit(formattedValues);
-      
-      // Apenas resetar o formulário se não estiver atualizando uma pergunta existente
-      if (!isUpdating) {
-        resetForm();
+      setSuccess('');
+      setLoading(true);
+
+      // Verificar se há pelo menos uma opção correta
+      const hasCorrectOption = values.options.some((option: any) => option.isCorrect);
+      if (!hasCorrectOption) {
+        setError('Pelo menos uma opção deve ser marcada como correta');
+        notify.showError('Pelo menos uma opção deve ser marcada como correta');
+        setSubmitting(false);
+        setLoading(false);
+        return;
       }
-      
+
+      // Verificar se há texto em todas as opções
+      const hasEmptyOption = values.options.some((option: any) => !option.text.trim());
+      if (hasEmptyOption) {
+        setError('Todas as opções devem ter um texto');
+        notify.showError('Todas as opções devem ter um texto');
+        setSubmitting(false);
+        setLoading(false);
+        return;
+      }
+
+      // Verificar se a etapa foi selecionada (quando o campo não está oculto)
+      if (!hideStageField && !values.stageId) {
+        setError('Selecione uma etapa');
+        notify.showError('Selecione uma etapa');
+        setSubmitting(false);
+        setLoading(false);
+        return;
+      }
+
+      // Chamar a função onSubmit passada como prop
+      if (onSubmit) {
+        await onSubmit(values, { resetForm, setSubmitting });
+        
+        // Exibir mensagem de sucesso
+        if (onSuccess) {
+          onSuccess();
+        } else {
+          setSuccess(isEditing ? 'Pergunta atualizada com sucesso!' : 'Pergunta adicionada com sucesso!');
+          notify.showSuccess(isEditing ? 'Pergunta atualizada com sucesso!' : 'Pergunta adicionada com sucesso!');
+        }
+      }
     } catch (error) {
       console.error('Erro ao enviar formulário:', error);
-      setError('Ocorreu um erro ao salvar a pergunta. Por favor, tente novamente.');
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      setError(`Erro ao ${isEditing ? 'atualizar' : 'adicionar'} pergunta: ${errorMessage}`);
+      notify.showError(`Erro ao ${isEditing ? 'atualizar' : 'adicionar'} pergunta: ${errorMessage}`);
     } finally {
       setSubmitting(false);
+      setLoading(false);
     }
   };
 
@@ -245,6 +277,12 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-4">
         {error}
+      </div>
+      )}
+
+      {success && (
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md mb-4">
+        {success}
       </div>
       )}
 

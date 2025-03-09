@@ -13,6 +13,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import Button from '@mui/material/Button';
+import { useNotificationSystem } from '../../hooks/useNotificationSystem';
 
 interface Stage {
   id: string
@@ -54,6 +55,7 @@ const validationSchema = Yup.object({
 const Questions: NextPage = () => {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const notify = useNotificationSystem();
   const [stages, setStages] = useState<Stage[]>([])
   const [questions, setQuestions] = useState<Question[]>([])
   const [loading, setLoading] = useState(true)
@@ -366,43 +368,36 @@ const Questions: NextPage = () => {
         body: JSON.stringify(dataToSend),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Erro do servidor:', errorData);
-        if (errorData.error === 'UUID de categoria inválido') {
-          // Erro específico de UUID inválido
-          setError('UUID de categoria inválido. Por favor, selecione a categoria novamente.');
-        } else {
-          throw new Error(errorData.error || 'Erro ao salvar a pergunta');
+      if (response.ok) {
+        // Substituir o alert pelo novo sistema de notificações
+        notify.showSuccess(isEditing ? 'Pergunta atualizada com sucesso!' : 'Pergunta criada com sucesso!');
+        
+        // Limpar o formulário e o estado de edição apenas se não estiver editando
+        if (!isEditing && formikHelpers) {
+          formikHelpers.resetForm();
         }
+        
+        // Ao editar, manter o estado de edição e a pergunta atual
+        if (!isEditing) {
+          setIsEditing(false);
+          setCurrentQuestion(null);
+        } else if (response.ok) {
+          // Se a edição foi bem-sucedida, atualizar a pergunta atual com os novos dados
+          const updatedQuestion = await response.json();
+          setCurrentQuestion(updatedQuestion);
+        }
+        
+        // Recarregar as perguntas
+        fetchQuestions();
+      } else {
+        const errorData = await response.json();
+        // Substituir o alert pelo novo sistema de notificações
+        notify.showError(`Erro ao ${isEditing ? 'atualizar' : 'criar'} pergunta: ${errorData.message || 'Erro desconhecido'}`);
       }
-
-      // Atualizar a lista de perguntas
-      const questionsResponse = await fetch('/api/admin/questions');
-      const questionsData = await questionsResponse.json();
-      setQuestions(questionsData);
-
-      // Limpar o formulário e o estado de edição apenas se não estiver editando
-      if (!isEditing && formikHelpers) {
-        formikHelpers.resetForm();
-      }
-      
-      // Ao editar, manter o estado de edição e a pergunta atual
-      if (!isEditing) {
-        setIsEditing(false);
-        setCurrentQuestion(null);
-      } else if (response.ok) {
-        // Se a edição foi bem-sucedida, atualizar a pergunta atual com os novos dados
-        const updatedQuestion = await response.json();
-        setCurrentQuestion(updatedQuestion);
-      }
-
-      // Exibir mensagem de sucesso
-      setSuccessMessage(isEditing ? 'Pergunta atualizada com sucesso!' : 'Pergunta criada com sucesso!');
-      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (error) {
-      console.error('Erro:', error);
-      setError('Ocorreu um erro ao salvar a pergunta. Por favor, tente novamente.');
+      console.error('Erro ao salvar pergunta:', error);
+      // Substituir o alert pelo novo sistema de notificações
+      notify.showError(`Erro ao ${isEditing ? 'atualizar' : 'criar'} pergunta: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     }
   };
 
@@ -473,6 +468,38 @@ const Questions: NextPage = () => {
     setPendingFormValues(null);
   };
 
+  // Função para buscar as perguntas
+  const fetchQuestions = async () => {
+    try {
+      // Construir a URL com os parâmetros de filtro
+      let url = '/api/admin/questions';
+      const params = new URLSearchParams();
+      
+      if (selectedTestId !== 'all') {
+        params.append('testId', selectedTestId);
+      }
+      
+      if (selectedStageId !== 'all') {
+        params.append('stageId', selectedStageId);
+      }
+      
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+      
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        setQuestions(data);
+      } else {
+        notify.showError('Erro ao carregar perguntas');
+      }
+    } catch (error) {
+      console.error('Erro ao buscar perguntas:', error);
+      notify.showError('Erro ao carregar perguntas');
+    }
+  };
+
   const handleEditQuestion = async (question: Question) => {
     try {
       // Buscar os detalhes completos da pergunta
@@ -507,27 +534,51 @@ const Questions: NextPage = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta pergunta?')) {
-      return
-    }
+  // Função para confirmar a exclusão de uma pergunta
+  const confirmDeleteQuestion = (question: Question) => {
+    // Substituir o confirm pelo novo sistema de notificações
+    notify.confirm(
+      'Confirmar exclusão',
+      `Tem certeza que deseja excluir a pergunta "${question.text}"?`,
+      () => deleteQuestion(question.id),
+      {
+        type: 'warning',
+        confirmText: 'Excluir',
+        cancelText: 'Cancelar'
+      }
+    );
+  };
 
+  // Função para excluir uma pergunta
+  const deleteQuestion = async (id: string) => {
     try {
       const response = await fetch(`/api/admin/questions/${id}`, {
         method: 'DELETE',
-      })
+      });
 
-      if (!response.ok) {
-        throw new Error('Erro ao excluir a pergunta')
+      if (response.ok) {
+        // Substituir o alert pelo novo sistema de notificações
+        notify.showSuccess('Pergunta excluída com sucesso!');
+        
+        // Se a pergunta excluída for a atual, limpar o estado de edição
+        if (currentQuestion?.id === id) {
+          setIsEditing(false);
+          setCurrentQuestion(null);
+        }
+        
+        // Recarregar as perguntas
+        fetchQuestions();
+      } else {
+        const errorData = await response.json();
+        // Substituir o alert pelo novo sistema de notificações
+        notify.showError(`Erro ao excluir pergunta: ${errorData.message || 'Erro desconhecido'}`);
       }
-
-      // Atualizar a lista de perguntas
-      setQuestions(questions.filter((q) => q.id !== id))
     } catch (error) {
-      console.error('Erro:', error)
-      setError('Ocorreu um erro ao excluir a pergunta. Por favor, tente novamente.')
+      console.error('Erro ao excluir pergunta:', error);
+      // Substituir o alert pelo novo sistema de notificações
+      notify.showError(`Erro ao excluir pergunta: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     }
-  }
+  };
 
   const handleCancel = () => {
     setIsEditing(false)
@@ -705,7 +756,7 @@ const Questions: NextPage = () => {
                                 </svg>
                               </button>
                               <button
-                                onClick={() => handleDelete(question.id)}
+                                onClick={() => confirmDeleteQuestion(question)}
                                 className="text-red-500 hover:text-red-700"
                               >
                                 <svg

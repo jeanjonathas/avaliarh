@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Formik, Form, Field, ErrorMessage } from 'formik'
 import * as Yup from 'yup'
 import Navbar from '../../components/admin/Navbar'
+import { useNotificationSystem } from '../../hooks/useNotificationSystem';
 
 interface Category {
   id: string
@@ -22,6 +23,7 @@ const validationSchema = Yup.object({
 const Categories: NextPage = () => {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const notify = useNotificationSystem();
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -47,7 +49,7 @@ const Categories: NextPage = () => {
         setCategories(data)
       } catch (error) {
         console.error('Erro:', error)
-        setError('Não foi possível carregar as categorias. Por favor, tente novamente.')
+        notify.showError('Não foi possível carregar as categorias. Por favor, tente novamente.');
       } finally {
         setLoading(false)
       }
@@ -56,7 +58,7 @@ const Categories: NextPage = () => {
     if (status === 'authenticated') {
       fetchCategories()
     }
-  }, [status])
+  }, [status]) 
   
   const handleSubmit = async (values: any, { resetForm }: any) => {
     try {
@@ -88,9 +90,10 @@ const Categories: NextPage = () => {
       setIsEditing(false)
       setCurrentCategory(null)
       
+      notify.showSuccess(`Categoria ${isEditing ? 'atualizada' : 'criada'} com sucesso!`);
     } catch (error) {
       console.error('Erro:', error)
-      setError(`Ocorreu um erro ao ${isEditing ? 'atualizar' : 'salvar'} a categoria. Por favor, tente novamente.`)
+      notify.showError(`Ocorreu um erro ao ${isEditing ? 'atualizar' : 'salvar'} a categoria. Por favor, tente novamente.`);
     }
   }
   
@@ -100,50 +103,42 @@ const Categories: NextPage = () => {
   }
   
   const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta categoria? Esta operação não poderá ser desfeita.')) {
-      return
+    // Encontrar a categoria para mostrar o nome na confirmação
+    const categoryToDelete = categories.find(cat => cat.id === id);
+    
+    if (!categoryToDelete) {
+      notify.showError('Categoria não encontrada');
+      return;
     }
     
-    try {
-      console.log(`Tentando excluir categoria com ID: ${id}`)
-      
-      // Verificar se o ID é válido
-      if (!id || id.trim() === '') {
-        setError('ID da categoria inválido')
-        return
+    // Usar o sistema de notificações para confirmar a exclusão
+    notify.confirm(
+      'Confirmar exclusão',
+      `Tem certeza que deseja excluir a categoria "${categoryToDelete.name}"?`,
+      async () => {
+        try {
+          const response = await fetch(`/api/admin/categories/${id}`, {
+            method: 'DELETE',
+          });
+
+          if (response.ok) {
+            setCategories(categories.filter(category => category.id !== id));
+            notify.showSuccess('Categoria excluída com sucesso!');
+          } else {
+            const error = await response.json();
+            notify.showError(`Erro ao excluir categoria: ${error.message || 'Erro desconhecido'}`);
+          }
+        } catch (error) {
+          console.error('Erro ao excluir categoria:', error);
+          notify.showError(`Erro ao excluir categoria: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+        }
+      },
+      {
+        type: 'warning',
+        confirmText: 'Excluir',
+        cancelText: 'Cancelar'
       }
-      
-      const response = await fetch(`/api/admin/categories/${id}`, {
-        method: 'DELETE',
-      })
-      
-      let data
-      try {
-        data = await response.json()
-      } catch (e) {
-        console.error('Erro ao processar resposta JSON:', e)
-        data = { error: 'Erro ao processar resposta' }
-      }
-      
-      if (!response.ok) {
-        console.error('Erro na resposta:', data)
-        throw new Error(data.error || 'Erro ao excluir a categoria')
-      }
-      
-      console.log('Resposta da exclusão:', data)
-      
-      // Atualizar a lista de categorias
-      setCategories(categories.filter(c => c.id !== id))
-      
-      // Mostrar mensagem de sucesso
-      setSuccessMessage('Categoria excluída com sucesso')
-      setTimeout(() => setSuccessMessage(''), 3000)
-      
-    } catch (error) {
-      console.error('Erro:', error)
-      setError('Ocorreu um erro ao excluir a categoria. Por favor, tente novamente.')
-      setTimeout(() => setError(''), 5000)
-    }
+    );
   }
   
   const handleCancel = () => {
