@@ -588,7 +588,17 @@ const TestDetail: NextPage = () => {
     setShowAddQuestionsModal(true)
   }
 
+  // Identificar todas as perguntas que já estão sendo usadas no teste atual
+  const questionsAlreadyInTest = test?.testStages?.flatMap(testStage => 
+    testStage.stage.questionStages?.map(qs => qs.questionId) || []
+  ) || [];
+
   const filteredQuestions = availableQuestions.filter(question => {
+    // Excluir perguntas que já estão sendo usadas no teste
+    if (questionsAlreadyInTest.includes(question.id)) {
+      return false;
+    }
+    
     // Filtro por categoria
     if (selectedCategory !== 'all') {
       if (!question.categories.some(cat => cat.id === selectedCategory)) {
