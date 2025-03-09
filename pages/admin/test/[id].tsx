@@ -105,10 +105,10 @@ const TestDetail: NextPage = () => {
         const testData = await testResponse.json()
         setTest(testData)
         
-        // Buscar todas as seções disponíveis (que agora são estágios)
+        // Buscar todas as seções disponíveis (que agora são etapas)
         const stagesResponse = await fetch('/api/admin/stages')
         if (!stagesResponse.ok) {
-          throw new Error('Erro ao carregar os estágios')
+          throw new Error('Erro ao carregar as etapas')
         }
         const stagesData = await stagesResponse.json()
         setStages(stagesData)
@@ -144,67 +144,45 @@ const TestDetail: NextPage = () => {
 
   const addStageToTest = async () => {
     if (!newStageName.trim()) {
-      setError('Nome do estágio é obrigatório')
+      setError('O nome da etapa é obrigatório')
       return
     }
 
     try {
-      // Primeiro criar o estágio
-      const createStageResponse = await fetch('/api/admin/stages', {
+      const response = await fetch(`/api/admin/tests/${id}/stages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          title: newStageName.trim(),
-          description: newStageDescription.trim() || null,
+          title: newStageName,
+          description: newStageDescription || null,
         }),
       })
 
-      if (!createStageResponse.ok) {
-        throw new Error('Erro ao criar o estágio')
+      if (!response.ok) {
+        throw new Error('Erro ao adicionar etapa ao teste')
       }
 
-      const newStage = await createStageResponse.json()
-
-      // Depois adicionar o estágio ao teste
-      const order = test?.testStages?.length || 0
-      const addToTestResponse = await fetch(`/api/admin/tests/${id}/stages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          stageId: newStage.id,
-          order,
-        }),
-      })
-
-      if (!addToTestResponse.ok) {
-        throw new Error('Erro ao adicionar estágio ao teste')
-      }
-
-      // Atualizar a lista de estágios
+      // Atualizar o teste com os dados atualizados
       const updatedTestResponse = await fetch(`/api/admin/tests/${id}`)
       const updatedTest = await updatedTestResponse.json()
       setTest(updatedTest)
 
-      // Limpar o formulário e fechar o modal
+      // Limpar campos e fechar modal
       setNewStageName('')
       setNewStageDescription('')
       setShowAddStageModal(false)
-      setSuccessMessage('Estágio adicionado com sucesso!')
-
-      // Limpar mensagem de sucesso após 3 segundos
+      setSuccessMessage('Etapa adicionada com sucesso!')
       setTimeout(() => setSuccessMessage(''), 3000)
     } catch (error) {
       console.error('Erro:', error)
-      setError('Ocorreu um erro ao adicionar o estágio. Por favor, tente novamente.')
+      setError('Ocorreu um erro ao adicionar a etapa. Por favor, tente novamente.')
     }
   }
 
   const removeStageFromTest = async (testStageId: string) => {
-    if (!confirm('Tem certeza que deseja remover este estágio do teste?')) {
+    if (!confirm('Tem certeza que deseja remover esta etapa? Todas as perguntas associadas serão desvinculadas do teste.')) {
       return
     }
 
@@ -214,20 +192,19 @@ const TestDetail: NextPage = () => {
       })
 
       if (!response.ok) {
-        throw new Error('Erro ao remover o estágio do teste')
+        throw new Error('Erro ao remover etapa do teste')
       }
 
-      // Atualizar a interface removendo o estágio
-      setTest({
-        ...test!,
-        testStages: test!.testStages.filter(ts => ts.id !== testStageId)
-      })
+      // Atualizar o teste com os dados atualizados
+      const updatedTestResponse = await fetch(`/api/admin/tests/${id}`)
+      const updatedTest = await updatedTestResponse.json()
+      setTest(updatedTest)
 
-      setSuccessMessage('Estágio removido com sucesso!')
+      setSuccessMessage('Etapa removida com sucesso!')
       setTimeout(() => setSuccessMessage(''), 3000)
     } catch (error) {
       console.error('Erro:', error)
-      setError('Ocorreu um erro ao remover o estágio. Por favor, tente novamente.')
+      setError('Ocorreu um erro ao remover a etapa. Por favor, tente novamente.')
     }
   }
 
@@ -263,7 +240,7 @@ const TestDetail: NextPage = () => {
 
   const addQuestionsToStage = async () => {
     if (!selectedStageId || selectedQuestions.length === 0) {
-      setError('Selecione pelo menos uma pergunta para adicionar ao estágio')
+      setError('Selecione pelo menos uma pergunta para adicionar à etapa')
       return
     }
 
@@ -279,7 +256,7 @@ const TestDetail: NextPage = () => {
       })
 
       if (!response.ok) {
-        throw new Error('Erro ao adicionar perguntas ao estágio')
+        throw new Error('Erro ao adicionar perguntas à etapa')
       }
 
       // Atualizar a interface
@@ -299,7 +276,7 @@ const TestDetail: NextPage = () => {
   }
 
   const removeQuestionFromStage = async (questionStageId: string, stageId: string) => {
-    if (!confirm('Tem certeza que deseja remover esta pergunta do estágio?')) {
+    if (!confirm('Tem certeza que deseja remover esta pergunta da etapa?')) {
       return
     }
 
@@ -309,7 +286,7 @@ const TestDetail: NextPage = () => {
       })
 
       if (!response.ok) {
-        throw new Error('Erro ao remover a pergunta do estágio')
+        throw new Error('Erro ao remover a pergunta da etapa')
       }
 
       // Atualizar a interface
@@ -471,23 +448,23 @@ const TestDetail: NextPage = () => {
 
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-secondary-800">Estágios do Teste</h2>
+            <h2 className="text-xl font-semibold text-secondary-800">Etapas do Teste</h2>
             <button
               onClick={() => setShowAddStageModal(true)}
               className="px-4 py-2 text-sm text-white bg-primary-600 rounded-md hover:bg-primary-700"
             >
-              Adicionar Estágio
+              Adicionar Etapa
             </button>
           </div>
 
           {!test || !test.testStages || test.testStages.length === 0 ? (
             <div className="bg-white rounded-lg shadow-md p-6 text-center">
-              <p className="text-secondary-600">Este teste ainda não possui estágios.</p>
+              <p className="text-secondary-600">Este teste ainda não possui etapas.</p>
               <button
                 onClick={() => setShowAddStageModal(true)}
                 className="mt-4 px-4 py-2 text-sm text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50"
               >
-                Adicionar um estágio
+                Adicionar uma etapa
               </button>
             </div>
           ) : (
@@ -516,7 +493,7 @@ const TestDetail: NextPage = () => {
                           onClick={() => removeStageFromTest(testStage.id)}
                           className="px-3 py-1 text-xs text-red-600 border border-red-600 rounded-md hover:bg-red-50"
                         >
-                          Remover Estágio
+                          Remover Etapa
                         </button>
                       </div>
                     </div>
@@ -528,7 +505,7 @@ const TestDetail: NextPage = () => {
                       
                       {testStage.stage.questionStages.length === 0 ? (
                         <div className="text-center py-4 text-secondary-500">
-                          <p>Nenhuma pergunta neste estágio.</p>
+                          <p>Nenhuma pergunta nesta etapa.</p>
                           <button
                             onClick={() => openAddQuestionsModal(testStage.stage.id)}
                             className="mt-2 text-sm text-primary-600 hover:text-primary-800"
@@ -615,15 +592,15 @@ const TestDetail: NextPage = () => {
         </div>
       </div>
 
-      {/* Modal para adicionar estágio */}
+      {/* Modal para adicionar etapa */}
       {showAddStageModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-            <h2 className="text-xl font-semibold text-secondary-800 mb-4">Adicionar Estágio ao Teste</h2>
+            <h2 className="text-xl font-semibold text-secondary-800 mb-4">Adicionar Etapa ao Teste</h2>
             
             <div className="mb-4">
               <label htmlFor="stageName" className="block text-sm font-medium text-secondary-700 mb-1">
-                Nome do Estágio *
+                Nome da Etapa *
               </label>
               <input
                 type="text"
@@ -631,7 +608,7 @@ const TestDetail: NextPage = () => {
                 value={newStageName}
                 onChange={(e) => setNewStageName(e.target.value)}
                 className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                placeholder="Digite o nome do estágio"
+                placeholder="Digite o nome da etapa"
               />
             </div>
             
@@ -644,7 +621,7 @@ const TestDetail: NextPage = () => {
                 value={newStageDescription}
                 onChange={(e) => setNewStageDescription(e.target.value)}
                 className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                placeholder="Digite a descrição do estágio (opcional)"
+                placeholder="Digite a descrição da etapa (opcional)"
                 rows={3}
               />
             </div>
@@ -667,12 +644,12 @@ const TestDetail: NextPage = () => {
         </div>
       )}
 
-      {/* Modal para adicionar perguntas ao estágio */}
+      {/* Modal para adicionar perguntas à etapa */}
       {showAddQuestionsModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-auto">
             <h2 className="text-xl font-semibold text-secondary-800 mb-4">
-              Adicionar Perguntas ao Estágio
+              Adicionar Perguntas à Etapa
             </h2>
             
             <div className="flex justify-between mb-4">
