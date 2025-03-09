@@ -102,8 +102,29 @@ export default async function handler(
       console.error('Erro ao atualizar candidato:', error);
       return res.status(500).json({ error: 'Erro ao atualizar candidato' });
     }
+  } else if (req.method === 'DELETE') {
+    try {
+      // Verificar se o candidato existe
+      const candidate = await prisma.candidate.findUnique({
+        where: { id }
+      });
+      
+      if (!candidate) {
+        return res.status(404).json({ error: 'Candidato não encontrado' });
+      }
+
+      // Excluir o candidato
+      await prisma.candidate.delete({
+        where: { id }
+      });
+
+      return res.status(200).json({ success: true, message: 'Candidato excluído com sucesso' });
+    } catch (error) {
+      console.error('Erro ao excluir candidato:', error);
+      return res.status(500).json({ error: 'Erro ao excluir candidato' });
+    }
   } else {
-    res.setHeader('Allow', ['GET', 'PUT']);
+    res.setHeader('Allow', ['GET', 'PUT', 'DELETE']);
     res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 }

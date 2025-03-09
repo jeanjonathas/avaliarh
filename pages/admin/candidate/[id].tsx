@@ -107,6 +107,7 @@ const CandidateDetails = () => {
   const [availableTests, setAvailableTests] = useState([]);
   const [isLoadingTests, setIsLoadingTests] = useState(false);
   const [selectedTest, setSelectedTest] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // Verificar autenticação
   useEffect(() => {
@@ -426,6 +427,33 @@ const CandidateDetails = () => {
     }
   };
 
+  // Função para excluir o candidato
+  const handleDeleteCandidate = async () => {
+    try {
+      if (!candidate || !candidate.id) {
+        showToast('Erro: dados do candidato não disponíveis.', 'error');
+        return;
+      }
+
+      const response = await fetch(`/api/admin/candidates/${candidate.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao excluir candidato');
+      }
+
+      showToast('Candidato excluído com sucesso!', 'success');
+      setShowDeleteModal(false);
+      
+      // Redirecionar para a página de candidatos
+      router.push('/admin/candidates');
+    } catch (error) {
+      console.error('Erro ao excluir candidato:', error);
+      showToast('Erro ao excluir candidato. Por favor, tente novamente.', 'error');
+    }
+  };
+
   // Dados para o gráfico de radar
   const radarData = {
     labels: [
@@ -596,13 +624,22 @@ const CandidateDetails = () => {
       <main className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center space-x-4">
-            <Link href="/admin/dashboard" className="text-primary-600 hover:text-primary-700">
+            <Link href="/admin/candidates" className="text-primary-600 hover:text-primary-700">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
               </svg>
               Voltar
             </Link>
             <h1 className="text-2xl font-bold text-secondary-800">Detalhes do Candidato</h1>
+          </div>
+          
+          <div>
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+            >
+              Excluir Candidato
+            </button>
           </div>
           
           <div className="flex space-x-2">

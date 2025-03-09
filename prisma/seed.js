@@ -95,13 +95,14 @@ function main() {
                 case 11:
                     stageCount = _a.sent();
                     if (!(stageCount === 0)) return [3 /*break*/, 16];
+                    const now = new Date();
                     stages = [
-                        { title: 'Raciocínio Lógico', description: 'Testes de padrões, sequências e dedução lógica', order: 1 },
-                        { title: 'Matemática Básica e Resolução de Problemas', description: 'Cálculo mental, proporções e análise de dados', order: 2 },
-                        { title: 'Compreensão Verbal', description: 'Interpretação de texto, sinônimos, analogias', order: 3 },
-                        { title: 'Aptidão Espacial', description: 'Questões envolvendo rotação mental e padrões visuais', order: 4 },
-                        { title: 'Raciocínio Abstrato', description: 'Questões que exigem encontrar relações não óbvias', order: 5 },
-                        { title: 'Tomada de Decisão e Solução de Problemas', description: 'Situações hipotéticas e a melhor resposta', order: 6 },
+                        { id: 'stage-logic-01', title: 'Raciocínio Lógico', description: 'Testes de padrões, sequências e dedução lógica', order: 1, updatedAt: now },
+                        { id: 'stage-math-02', title: 'Matemática Básica e Resolução de Problemas', description: 'Cálculo mental, proporções e análise de dados', order: 2, updatedAt: now },
+                        { id: 'stage-verbal-03', title: 'Compreensão Verbal', description: 'Interpretação de texto, sinônimos, analogias', order: 3, updatedAt: now },
+                        { id: 'stage-spatial-04', title: 'Aptidão Espacial', description: 'Questões envolvendo rotação mental e padrões visuais', order: 4, updatedAt: now },
+                        { id: 'stage-abstract-05', title: 'Raciocínio Abstrato', description: 'Questões que exigem encontrar relações não óbvias', order: 5, updatedAt: now },
+                        { id: 'stage-decision-06', title: 'Tomada de Decisão e Solução de Problemas', description: 'Situações hipotéticas e a melhor resposta', order: 6, updatedAt: now },
                     ];
                     _i = 0, stages_1 = stages;
                     _a.label = 12;

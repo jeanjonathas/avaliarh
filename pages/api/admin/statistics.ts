@@ -3,6 +3,31 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../lib/auth'
 import { prisma } from '../../../lib/prisma'
 
+// Função auxiliar para converter BigInt para Number
+function convertBigIntToNumber(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  if (typeof obj === 'bigint') {
+    return Number(obj);
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(convertBigIntToNumber);
+  }
+
+  if (typeof obj === 'object') {
+    const result: any = {};
+    for (const key in obj) {
+      result[key] = convertBigIntToNumber(obj[key]);
+    }
+    return result;
+  }
+
+  return obj;
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -52,28 +77,28 @@ export default async function handler(
       
       // Calcular taxa de sucesso média real
       const totalCorrect = Array.isArray(stageStats) ? 
-        stageStats.reduce((sum: number, stage: any) => sum + parseInt(stage.correctResponses), 0) : 0;
+        stageStats.reduce((sum: number, stage: any) => sum + Number(stage.correctResponses), 0) : 0;
       
       const totalResponses = Array.isArray(stageStats) ? 
-        stageStats.reduce((sum: number, stage: any) => sum + parseInt(stage.totalResponses), 0) : 0;
+        stageStats.reduce((sum: number, stage: any) => sum + Number(stage.totalResponses), 0) : 0;
       
       const averageSuccessRate = totalResponses > 0 ? (totalCorrect / totalResponses) * 100 : 0;
       
       // Calcular pontuações médias por etapa
       const averageStageScores = Array.isArray(stageStats) ? 
-        stageStats.map((stage: any) => parseFloat(stage.successRate)) : [];
+        stageStats.map((stage: any) => Number(stage.successRate)) : [];
 
       // Formatar resposta
       const statistics = {
-        stageStats: Array.isArray(stageStats) ? stageStats : [],
+        stageStats: Array.isArray(stageStats) ? convertBigIntToNumber(stageStats) : [],
         expectedSuccessRate,
         averageSuccessRate,
         candidateStats: Array.isArray(candidateStats) && candidateStats.length > 0 ? {
-          total: parseInt(candidateStats[0].total),
-          completed: parseInt(candidateStats[0].completed),
-          approved: parseInt(candidateStats[0].approved),
-          rejected: parseInt(candidateStats[0].rejected),
-          pending: parseInt(candidateStats[0].pending)
+          total: Number(candidateStats[0].total),
+          completed: Number(candidateStats[0].completed),
+          approved: Number(candidateStats[0].approved),
+          rejected: Number(candidateStats[0].rejected),
+          pending: Number(candidateStats[0].pending)
         } : {
           total: 0,
           completed: 0,
