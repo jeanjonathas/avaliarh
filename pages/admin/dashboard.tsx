@@ -836,6 +836,7 @@ const Dashboard: NextPage = () => {
   const overallPerformanceOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    animation: false, // Removendo animação
     plugins: {
       legend: {
         position: 'right' as const,
