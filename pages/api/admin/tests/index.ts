@@ -15,7 +15,7 @@ export default async function handler(
 
   if (req.method === 'GET') {
     try {
-      // Buscar todos os testes usando SQL raw
+      // Buscar todos os testes de forma mais simples
       const tests = await prisma.$queryRaw`
         SELECT 
           id, 
@@ -29,7 +29,41 @@ export default async function handler(
         ORDER BY "createdAt" DESC
       `;
 
-      return res.status(200).json(Array.isArray(tests) ? tests : []);
+      // Converter para array se não for
+      const testsArray = Array.isArray(tests) ? tests : [];
+      
+      // Para cada teste, buscar a contagem de estágios e perguntas
+      const testsWithCounts = await Promise.all(
+        testsArray.map(async (test) => {
+          try {
+            // Contar estágios
+            const stagesCountResult = await prisma.$queryRaw`
+              SELECT COUNT(*) as count
+              FROM "TestStage"
+              WHERE "testId" = ${test.id}
+            `;
+            
+            const sectionsCount = Array.isArray(stagesCountResult) && stagesCountResult.length > 0
+              ? Number(stagesCountResult[0].count)
+              : 0;
+              
+            return {
+              ...test,
+              sectionsCount,
+              questionsCount: 0 // Por enquanto, definimos como 0
+            };
+          } catch (countError) {
+            console.error('Erro ao contar estágios para teste:', test.id, countError);
+            return {
+              ...test,
+              sectionsCount: 0,
+              questionsCount: 0
+            };
+          }
+        })
+      );
+
+      return res.status(200).json(testsWithCounts);
     } catch (error) {
       console.error('Erro ao buscar testes:', error);
       // Retornar array vazio em vez de erro para não quebrar a UI
