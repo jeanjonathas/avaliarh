@@ -49,7 +49,7 @@ const Tests: NextPage = () => {
           throw new Error('Erro ao carregar os testes')
         }
         const data = await response.json()
-        setTests(data)
+        setTests(Array.isArray(data) ? data : [])
       } catch (error) {
         console.error('Erro:', error)
         setError('Não foi possível carregar os testes. Por favor, tente novamente.')
@@ -86,7 +86,7 @@ const Tests: NextPage = () => {
       // Recarregar testes
       const testsResponse = await fetch('/api/admin/tests')
       const testsData = await testsResponse.json()
-      setTests(testsData)
+      setTests(Array.isArray(testsData) ? testsData : [])
       
       // Limpar formulário e estado
       resetForm()
@@ -119,7 +119,7 @@ const Tests: NextPage = () => {
       }
       
       // Atualizar a lista de testes localmente
-      setTests(tests.map(test => 
+      setTests(prevTests => prevTests.map(test => 
         test.id === testId ? { ...test, active: !currentActive } : test
       ))
       
@@ -144,7 +144,7 @@ const Tests: NextPage = () => {
       }
       
       // Atualizar a lista de testes
-      setTests(tests.filter(t => t.id !== id))
+      setTests(prevTests => prevTests.filter(t => t.id !== id))
       
     } catch (error) {
       console.error('Erro:', error)

@@ -20,6 +20,8 @@ import {
 import { Bar, Radar } from 'react-chartjs-2'
 import { Rating } from '@mui/material'
 import Navbar from '../../../components/admin/Navbar'
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 // Registrar componentes do Chart.js
 ChartJS.register(
@@ -57,8 +59,9 @@ interface Candidate {
   resumeUrl?: string
   inviteCode?: string
   inviteExpires?: string
-  inviteSent: boolean
-  inviteAttempts: number
+  inviteSent?: boolean
+  inviteAttempts?: number
+  testId?: string
   score?: number
   createdAt: string
   updatedAt: string
@@ -93,11 +96,15 @@ const CandidateDetails = () => {
     inviteCode: '',
     inviteExpires: null,
     inviteSent: false,
-    inviteAttempts: 0
+    inviteAttempts: 0,
+    testId: ''
   })
   const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isNewCodeGenerated, setIsNewCodeGenerated] = useState(false);
+  const [availableTests, setAvailableTests] = useState([]);
+  const [isLoadingTests, setIsLoadingTests] = useState(false);
+  const [selectedTest, setSelectedTest] = useState(null);
 
   // Verificar autenticação
   useEffect(() => {
@@ -111,6 +118,7 @@ const CandidateDetails = () => {
     if (id && status === 'authenticated') {
       fetchCandidate()
       fetchCandidates()
+      fetchTests()
     }
   }, [id, status])
   
@@ -125,37 +133,42 @@ const CandidateDetails = () => {
   // Buscar dados do candidato específico
   const fetchCandidate = async () => {
     try {
-      setLoading(true)
-      const response = await fetch(`/api/admin/candidates/${id}`)
+      setLoading(true);
+      const response = await fetch(`/api/admin/candidates/${id}`);
       
       if (!response.ok) {
-        throw new Error('Falha ao carregar dados do candidato')
+        throw new Error('Erro ao buscar dados do candidato');
       }
       
-      const data = await response.json()
-      setCandidate(data)
+      const data = await response.json();
+      setCandidate(data);
       
-      // Atualizar o formData com os dados do candidato
       setFormData({
         name: data.name || '',
         email: data.email || '',
         position: data.position || '',
         status: data.status || 'PENDING',
         observations: data.observations || '',
-        rating: data.rating?.toString() || '0',
+        rating: data.rating ? data.rating.toString() : '0',
         inviteCode: data.inviteCode || '',
         inviteExpires: data.inviteExpires || null,
         inviteSent: data.inviteSent || false,
-        inviteAttempts: data.inviteAttempts || 0
-      })
+        inviteAttempts: data.inviteAttempts || 0,
+        testId: data.testId || ''
+      });
       
-      setLoading(false)
-    } catch (err) {
-      setError('Erro ao carregar dados do candidato')
-      setLoading(false)
-      console.error(err)
+      if (data.testId) {
+        setSelectedTest(data.testId);
+      }
+      
+      setError(null);
+    } catch (error) {
+      console.error('Erro ao buscar candidato:', error);
+      setError('Erro ao carregar dados do candidato. Por favor, tente novamente.');
+    } finally {
+      setLoading(false);
     }
-  }
+  };
   
   // Buscar lista de todos os candidatos para navegação
   const fetchCandidates = async () => {
@@ -173,6 +186,25 @@ const CandidateDetails = () => {
     }
   }
   
+  // Buscar testes disponíveis
+  const fetchTests = async () => {
+    try {
+      setIsLoadingTests(true);
+      const response = await fetch('/api/admin/tests');
+      
+      if (!response.ok) {
+        throw new Error('Erro ao buscar testes');
+      }
+      
+      const data = await response.json();
+      setAvailableTests(data.tests || []);
+    } catch (error) {
+      console.error('Erro ao buscar testes:', error);
+    } finally {
+      setIsLoadingTests(false);
+    }
+  };
+
   // Navegar para o próximo candidato
   const goToNextCandidate = () => {
     if (currentIndex < candidates.length - 1) {
@@ -239,6 +271,12 @@ const CandidateDetails = () => {
         return;
       }
       
+      if (!formData.testId) {
+        alert('Por favor, selecione um teste para o candidato antes de gerar o convite.');
+        setIsGeneratingInvite(false);
+        return;
+      }
+      
       const response = await fetch(`/api/admin/candidates/generate-invite`, {
         method: 'POST',
         headers: {
@@ -246,7 +284,8 @@ const CandidateDetails = () => {
         },
         body: JSON.stringify({ 
           candidateId: candidate.id,
-          forceNew: true // Forçar a geração de um novo código
+          forceNew: true, // Forçar a geração de um novo código
+          testId: formData.testId // Incluir o ID do teste selecionado
         }),
       });
 
@@ -271,7 +310,8 @@ const CandidateDetails = () => {
         inviteCode: data.inviteCode,
         inviteExpires: data.inviteExpires,
         inviteSent: data.emailSent || false,
-        inviteAttempts: 0
+        inviteAttempts: 0,
+        testId: formData.testId
       };
       
       setCandidate(updatedCandidate);
@@ -292,7 +332,8 @@ const CandidateDetails = () => {
           inviteCode: data.inviteCode,
           inviteExpires: data.inviteExpires,
           inviteSent: data.emailSent || false,
-          inviteAttempts: 0
+          inviteAttempts: 0,
+          testId: formData.testId
         } : c)
       );
       
@@ -940,9 +981,51 @@ const CandidateDetails = () => {
                     </div>
                     
                     <div className="md:w-1/3 space-y-6 mt-6 md:mt-0">
-                      <div className="bg-white p-4 rounded-lg border border-secondary-200">
+                      <div className="bg-white border border-secondary-200 rounded-lg p-4 mb-4">
                         <h3 className="text-lg font-semibold text-secondary-800 mb-3">Informações do Convite</h3>
                         <div className="space-y-3">
+                          {/* Seleção de Teste */}
+                          <div className="bg-white p-3 rounded-md border border-secondary-200">
+                            <label className="block text-sm text-secondary-600 mb-1">
+                              Selecione o Teste:
+                            </label>
+                            <div className="relative">
+                              <select
+                                name="testId"
+                                value={formData.testId}
+                                onChange={handleChange}
+                                className="w-full px-3 py-2 border border-secondary-300 rounded-md appearance-none"
+                                disabled={isLoadingTests}
+                              >
+                                <option value="">Selecione um teste</option>
+                                {availableTests.map(test => (
+                                  <option key={test.id} value={test.id}>
+                                    {test.title}
+                                  </option>
+                                ))}
+                              </select>
+                              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                                {isLoadingTests ? (
+                                  <div className="animate-spin h-4 w-4 border-2 border-primary-500 rounded-full border-t-transparent"></div>
+                                ) : (
+                                  <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                                  </svg>
+                                )}
+                              </div>
+                            </div>
+                            {formData.testId && (
+                              <div className="mt-2 text-xs text-green-600">
+                                <div className="flex items-center">
+                                  <svg className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                  </svg>
+                                  Teste selecionado
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          
                           <div className="bg-white p-3 rounded-md border border-secondary-200">
                             <span className="text-sm text-secondary-600">Código do Convite:</span>
                             <div className="flex items-center justify-between mt-1">
@@ -983,7 +1066,7 @@ const CandidateDetails = () => {
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                   </svg>
-                                  Expira em: {new Date(candidate.inviteExpires).toLocaleDateString('pt-BR')}
+                                  Expira em: {format(new Date(candidate.inviteExpires), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                                 </p>
                                 <p className="text-xs text-secondary-500 flex items-center">
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="currentColor">
@@ -1003,13 +1086,13 @@ const CandidateDetails = () => {
                           
                           <div>
                             <span className="text-sm text-secondary-600">Data do Teste:</span>
-                            <p className="font-medium">{new Date(candidate.testDate).toLocaleDateString('pt-BR')}</p>
+                            <p className="font-medium">{format(new Date(candidate.testDate), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
                           </div>
                           
                           {candidate.interviewDate && (
                             <div>
                               <span className="text-sm text-secondary-600">Data da Entrevista:</span>
-                              <p className="font-medium">{new Date(candidate.interviewDate).toLocaleDateString('pt-BR')}</p>
+                              <p className="font-medium">{format(new Date(candidate.interviewDate), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
                             </div>
                           )}
                           
@@ -1083,7 +1166,7 @@ const CandidateDetails = () => {
                           >
                             <span>Ver currículo</span>
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2v-1H4v1a2 2 0 01-2 2H2a2 2 0 01-2-2V4h.586a1 1 0 01.707-.293l5.414 5.414a1 1 0 01.293.707V8a2 2 0 00-2-2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-5.414-5.414a1 1 0 01.293-.707H4z" />
+                              <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2H6z" />
                             </svg>
                           </Link>
                         </div>
@@ -1165,12 +1248,33 @@ const CandidateDetails = () => {
               </div>
             )}
             
-            <div className="bg-primary-50 p-4 rounded-lg mb-6">
-              <p className="text-center text-secondary-800 font-medium mb-2">Código do Convite</p>
-              <p className="text-center text-2xl font-bold text-primary-600">{candidate?.inviteCode}</p>
-              <p className="text-center text-sm text-secondary-600 mt-2">
-                Válido até: {candidate?.inviteExpires ? new Date(candidate.inviteExpires).toLocaleDateString('pt-BR') : 'N/A'}
-              </p>
+            <div className="mb-4">
+              <div className="bg-white border border-secondary-200 rounded-lg p-4 mb-4">
+                <div className="flex flex-col">
+                  <div className="mb-2">
+                    <span className="text-sm text-secondary-600">Código de Convite:</span>
+                    <p className="text-2xl font-bold text-primary-600">{candidate?.inviteCode}</p>
+                  </div>
+                  
+                  {candidate?.testId && (
+                    <div className="mb-2">
+                      <span className="text-sm text-secondary-600">Teste Selecionado:</span>
+                      <p className="text-md font-medium text-secondary-800">
+                        {availableTests.find(test => test.id === candidate.testId)?.title || 'Teste não encontrado'}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {candidate?.inviteExpires && (
+                    <div>
+                      <span className="text-sm text-secondary-600">Expira em:</span>
+                      <p className="text-md font-medium text-secondary-800">
+                        {format(new Date(candidate.inviteExpires), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
             
             <div className="space-y-4">

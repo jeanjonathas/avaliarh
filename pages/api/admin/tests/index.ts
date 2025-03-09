@@ -15,7 +15,7 @@ export default async function handler(
 
   if (req.method === 'GET') {
     try {
-      // Buscar todos os testes de forma mais simples
+      // Buscar todos os testes
       const tests = await prisma.$queryRaw`
         SELECT 
           id, 
@@ -32,28 +32,40 @@ export default async function handler(
       // Converter para array se não for
       const testsArray = Array.isArray(tests) ? tests : [];
       
-      // Para cada teste, buscar a contagem de estágios e perguntas
+      // Para cada teste, buscar a contagem de etapas e perguntas
       const testsWithCounts = await Promise.all(
         testsArray.map(async (test) => {
           try {
-            // Contar estágios
+            // Contar etapas (stages)
             const stagesCountResult = await prisma.$queryRaw`
               SELECT COUNT(*) as count
-              FROM "TestStage"
+              FROM "Stage"
               WHERE "testId" = ${test.id}
             `;
             
             const sectionsCount = Array.isArray(stagesCountResult) && stagesCountResult.length > 0
               ? Number(stagesCountResult[0].count)
               : 0;
+            
+            // Contar perguntas em todas as etapas do teste
+            const questionsCountResult = await prisma.$queryRaw`
+              SELECT COUNT(*) as count
+              FROM "Question" q
+              JOIN "Stage" s ON q."stageId" = s.id
+              WHERE s."testId" = ${test.id}
+            `;
+            
+            const questionsCount = Array.isArray(questionsCountResult) && questionsCountResult.length > 0
+              ? Number(questionsCountResult[0].count)
+              : 0;
               
             return {
               ...test,
               sectionsCount,
-              questionsCount: 0 // Por enquanto, definimos como 0
+              questionsCount
             };
           } catch (countError) {
-            console.error('Erro ao contar estágios para teste:', test.id, countError);
+            console.error('Erro ao contar etapas para teste:', test.id, countError);
             return {
               ...test,
               sectionsCount: 0,

@@ -51,10 +51,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
   
   try {
-    const { candidateId, expirationDays = 7, sendEmail = false, forceNew = false } = req.body;
+    const { candidateId, expirationDays = 7, sendEmail = false, forceNew = false, testId } = req.body;
     
     if (!candidateId) {
       return res.status(400).json({ error: 'ID do candidato é obrigatório' });
+    }
+    
+    if (!testId) {
+      return res.status(400).json({ error: 'ID do teste é obrigatório' });
     }
     
     // Buscar o candidato
@@ -101,13 +105,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     
     // Atualizar o candidato com o código de convite e data de expiração
-    const updatedCandidate = await prisma.candidate.update({
+    const updatedCandidate = await prisma.$executeRaw`
+      UPDATE "Candidate"
+      SET 
+        "inviteCode" = ${inviteCode},
+        "inviteExpires" = ${inviteExpires},
+        "inviteAttempts" = 0,
+        "testId" = ${testId}
+      WHERE id = ${candidateId}
+    `;
+    
+    // Buscar o candidato atualizado para retornar na resposta
+    const refreshedCandidate = await prisma.candidate.findUnique({
       where: { id: candidateId },
-      data: { 
-        inviteCode,
-        inviteExpires,
-        inviteAttempts: 0 // Resetar contagem de tentativas ao gerar novo convite
-      },
     });
     
     // Inicializar variáveis para o resultado do email
@@ -142,7 +152,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       inviteExpires,
       emailSent,
       emailPreviewUrl,
-      candidate: updatedCandidate
+      candidate: refreshedCandidate
     });
     
   } catch (error) {

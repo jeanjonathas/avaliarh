@@ -17,6 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     
     // Buscar o candidato pelo código de convite usando SQL raw
+    // Incluindo o testId na consulta
     const candidates = await prisma.$queryRaw`
       SELECT 
         id, 
@@ -26,7 +27,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         position, 
         completed, 
         "inviteExpires", 
-        "inviteAttempts"
+        "inviteAttempts",
+        "testId"
       FROM "Candidate"
       WHERE "inviteCode" = ${inviteCode}
     `;
@@ -64,6 +66,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Este candidato já completou a avaliação' });
     }
     
+    // Buscar informações do teste associado, se houver
+    let test = null;
+    if (candidate.testId) {
+      const tests = await prisma.$queryRaw`
+        SELECT id, title, description, "timeLimit"
+        FROM tests
+        WHERE id = ${candidate.testId}
+      `;
+      
+      test = Array.isArray(tests) && tests.length > 0 ? tests[0] : null;
+    }
+    
     // Resetar o contador de tentativas após um login bem-sucedido
     await prisma.$executeRaw`
       UPDATE "Candidate"
@@ -71,7 +85,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       WHERE id = ${candidate.id}
     `;
     
-    // Retornar os dados do candidato
+    // Retornar os dados do candidato e do teste associado
     return res.status(200).json({
       success: true,
       candidate: {
@@ -79,8 +93,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         name: candidate.name,
         email: candidate.email,
         phone: candidate.phone,
-        position: candidate.position || null
-      }
+        position: candidate.position || null,
+        testId: candidate.testId || null
+      },
+      test: test
     });
   } catch (error) {
     console.error('Erro ao validar convite:', error);

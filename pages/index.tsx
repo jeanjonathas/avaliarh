@@ -4,6 +4,13 @@ import Image from 'next/image'
 import { useState } from 'react'
 import { useRouter } from 'next/router'
 
+interface TestData {
+  id: string;
+  title: string;
+  description?: string;
+  timeLimit?: number;
+}
+
 const Home: NextPage = () => {
   const [inviteCode, setInviteCode] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -33,6 +40,11 @@ const Home: NextPage = () => {
 
       // Armazenar os dados do candidato na sessão
       sessionStorage.setItem('candidateData', JSON.stringify(data.candidate))
+      
+      // Armazenar os dados do teste na sessão, se disponíveis
+      if (data.test) {
+        sessionStorage.setItem('testData', JSON.stringify(data.test))
+      }
       
       // Redirecionar para a página de introdução do teste
       router.push('/teste/introducao')
@@ -152,13 +164,13 @@ const Home: NextPage = () => {
               <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl text-primary-600">3</span>
               </div>
-              <h3 className="text-xl font-semibold text-secondary-800 mb-2">Finalização</h3>
-              <p className="text-secondary-600">Após concluir todas as etapas, seus resultados serão analisados pela nossa equipe.</p>
+              <h3 className="text-xl font-semibold text-secondary-800 mb-2">Resultado</h3>
+              <p className="text-secondary-600">Após concluir, nossos recrutadores analisarão seu desempenho e entrarão em contato.</p>
             </div>
           </div>
         </section>
 
-        <footer className="text-center text-secondary-500 py-8">
+        <footer className="text-center text-secondary-500 text-sm mt-8">
           <p>&copy; {new Date().getFullYear()} AvaliaRH - Todos os direitos reservados</p>
         </footer>
       </div>

@@ -41,127 +41,69 @@ export default async function handler(
         return res.status(404).json({ error: 'Teste não encontrado' });
       }
 
-      // Formatar resposta - não tentamos buscar seções do teste
-      // já que a tabela TestSection não existe no banco de dados atual
+      // Buscar os estágios (etapas) associados ao teste
+      const stages = await prisma.$queryRaw`
+        SELECT 
+          id,
+          title,
+          description,
+          "order",
+          "createdAt",
+          "updatedAt"
+        FROM "Stage"
+        WHERE "testId" = ${id}
+        ORDER BY "order" ASC
+      `;
+
+      // Formatar resposta
       const formattedTest = {
         ...test,
-        testStages: [] // Array vazio para evitar erros no frontend
+        stages: Array.isArray(stages) ? stages : []
       };
 
-      // Tentar buscar os estágios do teste se a tabela TestStage existir
-      try {
-        const testStages = await prisma.$queryRaw`
-          SELECT 
-            ts.id,
-            ts."testId",
-            ts."stageId",
-            ts."order",
-            s.id as "stage_id",
-            s.title as "stage_title",
-            s.description as "stage_description"
-          FROM "TestStage" ts
-          JOIN "Stage" s ON ts."stageId" = s.id
-          WHERE ts."testId" = ${id}
-          ORDER BY ts."order" ASC
-        `;
+      // Para cada estágio, buscar as perguntas associadas
+      if (Array.isArray(stages) && stages.length > 0) {
+        const stagesWithQuestions = await Promise.all(stages.map(async (stage) => {
+          // Buscar as questões associadas a este estágio
+          const questions = await prisma.$queryRaw`
+            SELECT 
+              id,
+              text,
+              "stageId",
+              "categoryId",
+              "createdAt",
+              "updatedAt"
+            FROM "Question"
+            WHERE "stageId" = ${stage.id}
+          `;
 
-        if (Array.isArray(testStages) && testStages.length > 0) {
-          // Para cada estágio, buscar as perguntas associadas
-          const formattedStages = await Promise.all(testStages.map(async (ts) => {
-            // Buscar as questões associadas a este estágio
-            let questionStages = [];
-            try {
-              questionStages = await prisma.$queryRaw`
-                SELECT 
-                  qs.id,
-                  qs."questionId",
-                  qs."stageId",
-                  qs."order",
-                  q.id as "question_id",
-                  q.text as "question_text",
-                  q.difficulty as "question_difficulty"
-                FROM "QuestionStage" qs
-                JOIN "Question" q ON qs."questionId" = q.id
-                WHERE qs."stageId" = ${ts.stageId}
-                ORDER BY qs."order" ASC
-              `;
-            } catch (error) {
-              console.error('Erro ao buscar perguntas do estágio:', error);
-              // Se houver erro, continuar com array vazio
-            }
-
-            // Formatar as questões
-            const formattedQuestions = await Promise.all((Array.isArray(questionStages) ? questionStages : []).map(async (qs) => {
-              // Buscar opções e categorias para cada questão
-              let options = [];
-              let categories = [];
-              
-              try {
-                options = await prisma.$queryRaw`
-                  SELECT id, text, "isCorrect"
-                  FROM "Option"
-                  WHERE "questionId" = ${qs.questionId}
-                `;
-              } catch (error) {
-                console.error('Erro ao buscar opções da questão:', error);
-              }
-              
-              try {
-                categories = await prisma.$queryRaw`
-                  SELECT c.id, c.name
-                  FROM "Category" c
-                  JOIN "QuestionCategory" qc ON c.id = qc."categoryId"
-                  WHERE qc."questionId" = ${qs.questionId}
-                `;
-              } catch (error) {
-                console.error('Erro ao buscar categorias da questão:', error);
-                // Tentar formato alternativo se o anterior falhar
-                try {
-                  categories = await prisma.$queryRaw`
-                    SELECT c.id, c.name
-                    FROM "Category" c
-                    JOIN "CategoryQuestion" cq ON c.id = cq."categoryId"
-                    WHERE cq."questionId" = ${qs.questionId}
-                  `;
-                } catch (error2) {
-                  console.error('Erro ao buscar categorias da questão (formato alternativo):', error2);
-                }
-              }
-
-              return {
-                id: qs.id,
-                questionId: qs.questionId,
-                stageId: qs.stageId,
-                order: qs.order,
-                question: {
-                  id: qs.question_id,
-                  text: qs.question_text,
-                  difficulty: qs.question_difficulty,
-                  options: Array.isArray(options) ? options : [],
-                  categories: Array.isArray(categories) ? categories : []
-                }
-              };
-            }));
+          // Para cada questão, buscar as opções
+          const questionsWithOptions = await Promise.all((Array.isArray(questions) ? questions : []).map(async (question) => {
+            const options = await prisma.$queryRaw`
+              SELECT 
+                id,
+                text,
+                "isCorrect",
+                "questionId",
+                "createdAt",
+                "updatedAt"
+              FROM "Option"
+              WHERE "questionId" = ${question.id}
+            `;
 
             return {
-              id: ts.id,
-              testId: ts.testId,
-              stageId: ts.stageId,
-              order: ts.order,
-              stage: {
-                id: ts.stage_id,
-                title: ts.stage_title,
-                description: ts.stage_description,
-                questionStages: formattedQuestions
-              }
+              ...question,
+              options: Array.isArray(options) ? options : []
             };
           }));
 
-          formattedTest.testStages = formattedStages;
-        }
-      } catch (error) {
-        console.error('Erro ao buscar estágios do teste:', error);
-        // Se houver erro, continuar com array vazio para testStages
+          return {
+            ...stage,
+            questions: questionsWithOptions
+          };
+        }));
+
+        formattedTest.stages = stagesWithQuestions;
       }
 
       return res.status(200).json(formattedTest);
@@ -199,16 +141,16 @@ export default async function handler(
       
       updates.push(`"updatedAt" = NOW()`);
       
-      // Atualizar o teste usando SQL raw com string de atualização
-      const updateQuery = `
-        UPDATE "tests"
-        SET ${updates.join(', ')}
-        WHERE id = '${id}'
-      `;
-      
-      await prisma.$executeRawUnsafe(updateQuery);
+      updateFields = updates.join(', ');
 
-      // Buscar o teste atualizado
+      // Atualizar teste usando $executeRawUnsafe para evitar problemas com a interpolação de strings
+      await prisma.$executeRawUnsafe(`
+        UPDATE "tests"
+        SET ${updateFields}
+        WHERE id = '${id}'
+      `);
+
+      // Buscar teste atualizado
       const updatedTests = await prisma.$queryRaw`
         SELECT 
           id, 
@@ -222,9 +164,7 @@ export default async function handler(
         WHERE id = ${id}
       `;
 
-      const updatedTest = Array.isArray(updatedTests) && updatedTests.length > 0 
-        ? updatedTests[0] 
-        : null;
+      const updatedTest = Array.isArray(updatedTests) && updatedTests.length > 0 ? updatedTests[0] : null;
 
       if (!updatedTest) {
         return res.status(404).json({ error: 'Teste não encontrado após atualização' });
@@ -246,12 +186,12 @@ export default async function handler(
         return res.status(404).json({ error: 'Teste não encontrado' });
       }
 
-      // Excluir o teste
+      // Excluir teste
       await prisma.$executeRaw`
         DELETE FROM "tests" WHERE id = ${id}
       `;
 
-      return res.status(200).json({ success: true, message: 'Teste excluído com sucesso' });
+      return res.status(204).end();
     } catch (error) {
       console.error('Erro ao excluir teste:', error);
       return res.status(500).json({ error: 'Erro ao excluir teste' });

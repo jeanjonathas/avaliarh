@@ -19,22 +19,42 @@ interface CandidateData {
   email: string;
   phone?: string;
   position?: string;
+  testId?: string;
+}
+
+interface TestData {
+  id: string;
+  title: string;
+  description?: string;
+  timeLimit?: number;
 }
 
 const Introducao: NextPage = () => {
   const [step, setStep] = useState<'intro' | 'form'>('intro')
   const [candidateData, setCandidateData] = useState<CandidateData | null>(null)
+  const [testData, setTestData] = useState<TestData | null>(null)
   const router = useRouter()
 
   useEffect(() => {
     // Verificar se há dados do candidato na sessão
-    const storedData = sessionStorage.getItem('candidateData')
-    if (storedData) {
+    const storedCandidateData = sessionStorage.getItem('candidateData')
+    const storedTestData = sessionStorage.getItem('testData')
+    
+    if (storedCandidateData) {
       try {
-        const parsedData = JSON.parse(storedData)
+        const parsedData = JSON.parse(storedCandidateData)
         setCandidateData(parsedData)
       } catch (error) {
         console.error('Erro ao carregar dados do candidato:', error)
+      }
+    }
+    
+    if (storedTestData) {
+      try {
+        const parsedData = JSON.parse(storedTestData)
+        setTestData(parsedData)
+      } catch (error) {
+        console.error('Erro ao carregar dados do teste:', error)
       }
     }
   }, [])
@@ -108,6 +128,23 @@ const Introducao: NextPage = () => {
                   <p className="text-secondary-700">
                     Seus dados já foram carregados. Você pode continuar para o teste assim que estiver pronto.
                   </p>
+                </div>
+              )}
+              
+              {testData && (
+                <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
+                  <h2 className="text-xl font-semibold text-secondary-800 mb-2">Teste: {testData.title}</h2>
+                  {testData.description && (
+                    <p className="text-secondary-700 mb-2">{testData.description}</p>
+                  )}
+                  {testData.timeLimit && (
+                    <div className="flex items-center text-blue-700">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                      </svg>
+                      <span>Tempo limite: {testData.timeLimit} minutos</span>
+                    </div>
+                  )}
                 </div>
               )}
               
@@ -215,24 +252,26 @@ const Introducao: NextPage = () => {
                         name="position"
                         id="position"
                         className="input-field"
-                        placeholder="Digite o cargo para o qual está se candidatando"
+                        placeholder="Ex: Desenvolvedor Front-end"
                         disabled={!!candidateData}
                       />
                       <ErrorMessage name="position" component="div" className="text-red-500 text-sm mt-1" />
                     </div>
                     
-                    <div className="pt-4 flex items-center justify-between">
+                    <div className="flex justify-between">
                       <button
                         type="button"
                         onClick={() => setStep('intro')}
-                        className="btn-secondary"
+                        className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                       >
                         Voltar
                       </button>
                       <button
                         type="submit"
-                        disabled={isSubmitting}
-                        className="btn-primary"
+                        disabled={isSubmitting || !!candidateData}
+                        className={`px-4 py-2 bg-primary-600 text-white rounded-md ${
+                          isSubmitting || !!candidateData ? 'opacity-70 cursor-not-allowed' : 'hover:bg-primary-700'
+                        }`}
                       >
                         {isSubmitting ? 'Enviando...' : 'Iniciar Teste'}
                       </button>

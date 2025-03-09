@@ -54,6 +54,8 @@ model Candidate {
   linkedin       String?
   portfolio      String?
   resumeUrl      String?
+  testId         String?
+  test           tests?     @relation(fields: [testId], references: [id])
   responses      Response[]
 }
 
@@ -109,17 +111,21 @@ model Stage {
   order       Int
   createdAt   DateTime   @default(now())
   updatedAt   DateTime
+  testId      String?
+  test        tests?     @relation(fields: [testId], references: [id])
   Question    Question[]
 }
 
 model tests {
-  id          String   @id @default(uuid())
+  id          String      @id @default(uuid())
   title       String
   description String?
   timeLimit   Int?
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  active      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  candidates  Candidate[]
+  stages      Stage[]
 }
 
 model Category {
