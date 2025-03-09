@@ -45,8 +45,124 @@ export default async function handler(
       // já que a tabela TestSection não existe no banco de dados atual
       const formattedTest = {
         ...test,
-        testSections: [] // Array vazio para evitar erros no frontend
+        testStages: [] // Array vazio para evitar erros no frontend
       };
+
+      // Tentar buscar os estágios do teste se a tabela TestStage existir
+      try {
+        const testStages = await prisma.$queryRaw`
+          SELECT 
+            ts.id,
+            ts."testId",
+            ts."stageId",
+            ts."order",
+            s.id as "stage_id",
+            s.title as "stage_title",
+            s.description as "stage_description"
+          FROM "TestStage" ts
+          JOIN "Stage" s ON ts."stageId" = s.id
+          WHERE ts."testId" = ${id}
+          ORDER BY ts."order" ASC
+        `;
+
+        if (Array.isArray(testStages) && testStages.length > 0) {
+          // Para cada estágio, buscar as perguntas associadas
+          const formattedStages = await Promise.all(testStages.map(async (ts) => {
+            // Buscar as questões associadas a este estágio
+            let questionStages = [];
+            try {
+              questionStages = await prisma.$queryRaw`
+                SELECT 
+                  qs.id,
+                  qs."questionId",
+                  qs."stageId",
+                  qs."order",
+                  q.id as "question_id",
+                  q.text as "question_text",
+                  q.difficulty as "question_difficulty"
+                FROM "QuestionStage" qs
+                JOIN "Question" q ON qs."questionId" = q.id
+                WHERE qs."stageId" = ${ts.stageId}
+                ORDER BY qs."order" ASC
+              `;
+            } catch (error) {
+              console.error('Erro ao buscar perguntas do estágio:', error);
+              // Se houver erro, continuar com array vazio
+            }
+
+            // Formatar as questões
+            const formattedQuestions = await Promise.all((Array.isArray(questionStages) ? questionStages : []).map(async (qs) => {
+              // Buscar opções e categorias para cada questão
+              let options = [];
+              let categories = [];
+              
+              try {
+                options = await prisma.$queryRaw`
+                  SELECT id, text, "isCorrect"
+                  FROM "Option"
+                  WHERE "questionId" = ${qs.questionId}
+                `;
+              } catch (error) {
+                console.error('Erro ao buscar opções da questão:', error);
+              }
+              
+              try {
+                categories = await prisma.$queryRaw`
+                  SELECT c.id, c.name
+                  FROM "Category" c
+                  JOIN "QuestionCategory" qc ON c.id = qc."categoryId"
+                  WHERE qc."questionId" = ${qs.questionId}
+                `;
+              } catch (error) {
+                console.error('Erro ao buscar categorias da questão:', error);
+                // Tentar formato alternativo se o anterior falhar
+                try {
+                  categories = await prisma.$queryRaw`
+                    SELECT c.id, c.name
+                    FROM "Category" c
+                    JOIN "CategoryQuestion" cq ON c.id = cq."categoryId"
+                    WHERE cq."questionId" = ${qs.questionId}
+                  `;
+                } catch (error2) {
+                  console.error('Erro ao buscar categorias da questão (formato alternativo):', error2);
+                }
+              }
+
+              return {
+                id: qs.id,
+                questionId: qs.questionId,
+                stageId: qs.stageId,
+                order: qs.order,
+                question: {
+                  id: qs.question_id,
+                  text: qs.question_text,
+                  difficulty: qs.question_difficulty,
+                  options: Array.isArray(options) ? options : [],
+                  categories: Array.isArray(categories) ? categories : []
+                }
+              };
+            }));
+
+            return {
+              id: ts.id,
+              testId: ts.testId,
+              stageId: ts.stageId,
+              order: ts.order,
+              stage: {
+                id: ts.stage_id,
+                title: ts.stage_title,
+                description: ts.stage_description,
+                questionStages: formattedQuestions
+              }
+            };
+          }));
+
+          formattedTest.testStages = formattedStages;
+        }
+      } catch (error) {
+        console.error('Erro ao buscar estágios do teste:', error);
+        // Se houver erro, continuar com array vazio para testStages
+      }
 
       return res.status(200).json(formattedTest);
     } catch (error) {

@@ -13,28 +13,28 @@ interface Test {
   description: string | null
   timeLimit: number | null
   active: boolean
-  testSections: TestSection[]
+  testStages: TestStage[]
 }
 
-interface TestSection {
+interface TestStage {
   id: string
   testId: string
-  sectionId: string
+  stageId: string
   order: number
-  section: Section
+  stage: Stage
 }
 
-interface Section {
+interface Stage {
   id: string
   title: string
   description: string | null
-  questionSections: QuestionSection[]
+  questionStages: QuestionStage[]
 }
 
-interface QuestionSection {
+interface QuestionStage {
   id: string
   questionId: string
-  sectionId: string
+  stageId: string
   order: number
   question: Question
 }
@@ -64,7 +64,7 @@ const TestDetail: NextPage = () => {
   const { data: session, status } = useSession()
   
   const [test, setTest] = useState<Test | null>(null)
-  const [sections, setSections] = useState<Section[]>([])
+  const [stages, setStages] = useState<Stage[]>([])
   const [availableQuestions, setAvailableQuestions] = useState<Question[]>([])
   const [availableCategories, setAvailableCategories] = useState<Category[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
@@ -74,12 +74,12 @@ const TestDetail: NextPage = () => {
   const [successMessage, setSuccessMessage] = useState('')
   
   // Modal states
-  const [showAddSectionModal, setShowAddSectionModal] = useState(false)
+  const [showAddStageModal, setShowAddStageModal] = useState(false)
   const [showAddQuestionsModal, setShowAddQuestionsModal] = useState(false)
-  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null)
+  const [selectedStageId, setSelectedStageId] = useState<string | null>(null)
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([])
-  const [newSectionName, setNewSectionName] = useState('')
-  const [newSectionDescription, setNewSectionDescription] = useState('')
+  const [newStageName, setNewStageName] = useState('')
+  const [newStageDescription, setNewStageDescription] = useState('')
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -103,13 +103,13 @@ const TestDetail: NextPage = () => {
         const testData = await testResponse.json()
         setTest(testData)
         
-        // Buscar todas as seções disponíveis
-        const sectionsResponse = await fetch('/api/admin/sections')
-        if (!sectionsResponse.ok) {
-          throw new Error('Erro ao carregar as seções')
+        // Buscar todas as seções disponíveis (que agora são estágios)
+        const stagesResponse = await fetch('/api/admin/stages')
+        if (!stagesResponse.ok) {
+          throw new Error('Erro ao carregar os estágios')
         }
-        const sectionsData = await sectionsResponse.json()
-        setSections(sectionsData)
+        const stagesData = await stagesResponse.json()
+        setStages(stagesData)
         
         // Buscar todas as categorias
         const categoriesResponse = await fetch('/api/admin/categories')
@@ -140,97 +140,97 @@ const TestDetail: NextPage = () => {
     }
   }, [id, status])
 
-  const addSectionToTest = async () => {
-    if (!newSectionName.trim()) {
-      setError('Nome da seção é obrigatório')
+  const addStageToTest = async () => {
+    if (!newStageName.trim()) {
+      setError('Nome do estágio é obrigatório')
       return
     }
 
     try {
-      // Primeiro criar a seção
-      const createSectionResponse = await fetch('/api/admin/sections', {
+      // Primeiro criar o estágio
+      const createStageResponse = await fetch('/api/admin/stages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          title: newSectionName.trim(),
-          description: newSectionDescription.trim() || null,
+          title: newStageName.trim(),
+          description: newStageDescription.trim() || null,
         }),
       })
 
-      if (!createSectionResponse.ok) {
-        throw new Error('Erro ao criar a seção')
+      if (!createStageResponse.ok) {
+        throw new Error('Erro ao criar o estágio')
       }
 
-      const newSection = await createSectionResponse.json()
+      const newStage = await createStageResponse.json()
 
-      // Depois adicionar a seção ao teste
-      const order = test?.testSections?.length || 0
-      const addToTestResponse = await fetch(`/api/admin/tests/${id}/sections`, {
+      // Depois adicionar o estágio ao teste
+      const order = test?.testStages?.length || 0
+      const addToTestResponse = await fetch(`/api/admin/tests/${id}/stages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          sectionId: newSection.id,
+          stageId: newStage.id,
           order,
         }),
       })
 
       if (!addToTestResponse.ok) {
-        throw new Error('Erro ao adicionar seção ao teste')
+        throw new Error('Erro ao adicionar estágio ao teste')
       }
 
-      // Atualizar a lista de seções
+      // Atualizar a lista de estágios
       const updatedTestResponse = await fetch(`/api/admin/tests/${id}`)
       const updatedTest = await updatedTestResponse.json()
       setTest(updatedTest)
 
       // Limpar o formulário e fechar o modal
-      setNewSectionName('')
-      setNewSectionDescription('')
-      setShowAddSectionModal(false)
-      setSuccessMessage('Seção adicionada com sucesso!')
+      setNewStageName('')
+      setNewStageDescription('')
+      setShowAddStageModal(false)
+      setSuccessMessage('Estágio adicionado com sucesso!')
 
       // Limpar mensagem de sucesso após 3 segundos
       setTimeout(() => setSuccessMessage(''), 3000)
     } catch (error) {
       console.error('Erro:', error)
-      setError('Ocorreu um erro ao adicionar a seção. Por favor, tente novamente.')
+      setError('Ocorreu um erro ao adicionar o estágio. Por favor, tente novamente.')
     }
   }
 
-  const removeSectionFromTest = async (testSectionId: string) => {
-    if (!confirm('Tem certeza que deseja remover esta seção do teste?')) {
+  const removeStageFromTest = async (testStageId: string) => {
+    if (!confirm('Tem certeza que deseja remover este estágio do teste?')) {
       return
     }
 
     try {
-      const response = await fetch(`/api/admin/tests/${id}/sections/${testSectionId}`, {
+      const response = await fetch(`/api/admin/tests/${id}/stages/${testStageId}`, {
         method: 'DELETE',
       })
 
       if (!response.ok) {
-        throw new Error('Erro ao remover a seção do teste')
+        throw new Error('Erro ao remover o estágio do teste')
       }
 
-      // Atualizar a interface removendo a seção
+      // Atualizar a interface removendo o estágio
       setTest({
         ...test!,
-        testSections: test!.testSections.filter(ts => ts.id !== testSectionId)
+        testStages: test!.testStages.filter(ts => ts.id !== testStageId)
       })
 
-      setSuccessMessage('Seção removida com sucesso!')
+      setSuccessMessage('Estágio removido com sucesso!')
       setTimeout(() => setSuccessMessage(''), 3000)
     } catch (error) {
       console.error('Erro:', error)
-      setError('Ocorreu um erro ao remover a seção. Por favor, tente novamente.')
+      setError('Ocorreu um erro ao remover o estágio. Por favor, tente novamente.')
     }
   }
 
-  const openAddQuestionsModal = (sectionId: string) => {
-    setSelectedSectionId(sectionId)
+  const openAddQuestionsModal = (stageId: string) => {
+    setSelectedStageId(stageId)
     setSelectedQuestions([])
     setShowAddQuestionsModal(true)
   }
@@ -259,13 +259,13 @@ const TestDetail: NextPage = () => {
     }
   }
 
-  const addQuestionsToSection = async () => {
-    if (!selectedSectionId || selectedQuestions.length === 0) {
+  const addQuestionsToStage = async () => {
+    if (!selectedStageId || selectedQuestions.length === 0) {
       return
     }
 
     try {
-      const response = await fetch(`/api/admin/sections/${selectedSectionId}/questions`, {
+      const response = await fetch(`/api/admin/stages/${selectedStageId}/questions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -276,7 +276,7 @@ const TestDetail: NextPage = () => {
       })
 
       if (!response.ok) {
-        throw new Error('Erro ao adicionar perguntas à seção')
+        throw new Error('Erro ao adicionar perguntas ao estágio')
       }
 
       // Atualizar o teste com os dados atualizados
@@ -294,28 +294,28 @@ const TestDetail: NextPage = () => {
     }
   }
 
-  const removeQuestionFromSection = async (questionSectionId: string, sectionId: string) => {
-    if (!confirm('Tem certeza que deseja remover esta pergunta da seção?')) {
+  const removeQuestionFromStage = async (questionStageId: string, stageId: string) => {
+    if (!confirm('Tem certeza que deseja remover esta pergunta do estágio?')) {
       return
     }
 
     try {
-      const response = await fetch(`/api/admin/sections/${sectionId}/questions/${questionSectionId}`, {
+      const response = await fetch(`/api/admin/stages/${stageId}/questions/${questionStageId}`, {
         method: 'DELETE',
       })
 
       if (!response.ok) {
-        throw new Error('Erro ao remover a pergunta da seção')
+        throw new Error('Erro ao remover a pergunta do estágio')
       }
 
       // Atualizar a interface
-      const updatedTestSections = test!.testSections.map(ts => {
-        if (ts.sectionId === sectionId) {
+      const updatedTestStages = test!.testStages.map(ts => {
+        if (ts.stageId === stageId) {
           return {
             ...ts,
-            section: {
-              ...ts.section,
-              questionSections: ts.section.questionSections.filter(qs => qs.id !== questionSectionId)
+            stage: {
+              ...ts.stage,
+              questionStages: ts.stage.questionStages.filter(qs => qs.id !== questionStageId)
             }
           }
         }
@@ -324,7 +324,7 @@ const TestDetail: NextPage = () => {
 
       setTest({
         ...test!,
-        testSections: updatedTestSections
+        testStages: updatedTestStages
       })
 
       setSuccessMessage('Pergunta removida com sucesso!')
@@ -423,66 +423,66 @@ const TestDetail: NextPage = () => {
 
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-secondary-800">Seções do Teste</h2>
+            <h2 className="text-xl font-semibold text-secondary-800">Estágios do Teste</h2>
             <button
-              onClick={() => setShowAddSectionModal(true)}
+              onClick={() => setShowAddStageModal(true)}
               className="px-4 py-2 text-sm text-white bg-primary-600 rounded-md hover:bg-primary-700"
             >
-              Adicionar Seção
+              Adicionar Estágio
             </button>
           </div>
 
-          {test.testSections.length === 0 ? (
+          {!test || !test.testStages || test.testStages.length === 0 ? (
             <div className="bg-white rounded-lg shadow-md p-6 text-center">
-              <p className="text-secondary-600">Este teste ainda não possui seções.</p>
+              <p className="text-secondary-600">Este teste ainda não possui estágios.</p>
               <button
-                onClick={() => setShowAddSectionModal(true)}
+                onClick={() => setShowAddStageModal(true)}
                 className="mt-4 px-4 py-2 text-sm text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50"
               >
-                Adicionar uma seção
+                Adicionar um estágio
               </button>
             </div>
           ) : (
             <div className="space-y-6">
-              {test.testSections
+              {test.testStages
                 .sort((a, b) => a.order - b.order)
-                .map((testSection, index) => (
-                  <div key={testSection.id} className="bg-white rounded-lg shadow-md overflow-hidden">
+                .map((testStage, index) => (
+                  <div key={testStage.id} className="bg-white rounded-lg shadow-md overflow-hidden">
                     <div className="bg-secondary-50 px-6 py-4 flex justify-between items-center">
                       <div>
                         <h3 className="text-lg font-medium text-secondary-800">
-                          {index + 1}. {testSection.section.title}
+                          {index + 1}. {testStage.stage.title}
                         </h3>
-                        {testSection.section.description && (
-                          <p className="mt-1 text-sm text-secondary-600">{testSection.section.description}</p>
+                        {testStage.stage.description && (
+                          <p className="mt-1 text-sm text-secondary-600">{testStage.stage.description}</p>
                         )}
                       </div>
                       <div className="flex space-x-2">
                         <button
-                          onClick={() => openAddQuestionsModal(testSection.section.id)}
+                          onClick={() => openAddQuestionsModal(testStage.stage.id)}
                           className="px-3 py-1 text-xs text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50"
                         >
                           Adicionar Perguntas
                         </button>
                         <button
-                          onClick={() => removeSectionFromTest(testSection.id)}
+                          onClick={() => removeStageFromTest(testStage.id)}
                           className="px-3 py-1 text-xs text-red-600 border border-red-600 rounded-md hover:bg-red-50"
                         >
-                          Remover Seção
+                          Remover Estágio
                         </button>
                       </div>
                     </div>
                     
                     <div className="p-6">
                       <h4 className="text-sm font-medium text-secondary-500 mb-3">
-                        Perguntas ({testSection.section.questionSections.length})
+                        Perguntas ({testStage.stage.questionStages.length})
                       </h4>
                       
-                      {testSection.section.questionSections.length === 0 ? (
+                      {testStage.stage.questionStages.length === 0 ? (
                         <div className="text-center py-4 text-secondary-500">
-                          <p>Nenhuma pergunta nesta seção.</p>
+                          <p>Nenhuma pergunta neste estágio.</p>
                           <button
-                            onClick={() => openAddQuestionsModal(testSection.section.id)}
+                            onClick={() => openAddQuestionsModal(testStage.stage.id)}
                             className="mt-2 text-sm text-primary-600 hover:text-primary-800"
                           >
                             Adicionar perguntas
@@ -490,31 +490,31 @@ const TestDetail: NextPage = () => {
                         </div>
                       ) : (
                         <div className="space-y-4">
-                          {testSection.section.questionSections
+                          {testStage.stage.questionStages
                             .sort((a, b) => a.order - b.order)
-                            .map((questionSection, qIndex) => (
-                              <div key={questionSection.id} className="border border-secondary-200 rounded-md p-4">
+                            .map((questionStage, qIndex) => (
+                              <div key={questionStage.id} className="border border-secondary-200 rounded-md p-4">
                                 <div className="flex justify-between">
                                   <div className="flex-1">
                                     <div className="font-medium text-secondary-800">
-                                      {qIndex + 1}. {questionSection.question.text}
+                                      {qIndex + 1}. {questionStage.question.text}
                                     </div>
                                     <div className="mt-2 flex flex-wrap gap-2">
                                       <span className={`px-2 py-1 text-xs rounded-full ${
-                                        questionSection.question.difficulty === 'EASY' 
+                                        questionStage.question.difficulty === 'EASY' 
                                           ? 'bg-green-100 text-green-800' 
-                                          : questionSection.question.difficulty === 'MEDIUM'
+                                          : questionStage.question.difficulty === 'MEDIUM'
                                           ? 'bg-yellow-100 text-yellow-800'
                                           : 'bg-red-100 text-red-800'
                                       }`}>
-                                        {questionSection.question.difficulty === 'EASY' 
+                                        {questionStage.question.difficulty === 'EASY' 
                                           ? 'Fácil' 
-                                          : questionSection.question.difficulty === 'MEDIUM'
+                                          : questionStage.question.difficulty === 'MEDIUM'
                                           ? 'Médio'
                                           : 'Difícil'}
                                       </span>
                                       
-                                      {questionSection.question.categories.map(category => (
+                                      {questionStage.question.categories.map(category => (
                                         <span 
                                           key={category.id}
                                           className="px-2 py-1 text-xs bg-secondary-100 text-secondary-800 rounded-full"
@@ -526,7 +526,7 @@ const TestDetail: NextPage = () => {
                                     
                                     {/* Opções */}
                                     <div className="mt-3 space-y-2">
-                                      {questionSection.question.options.map(option => (
+                                      {questionStage.question.options.map(option => (
                                         <div 
                                           key={option.id}
                                           className={`text-sm pl-3 py-1 border-l-2 ${
@@ -546,7 +546,7 @@ const TestDetail: NextPage = () => {
                                   
                                   <div>
                                     <button
-                                      onClick={() => removeQuestionFromSection(questionSection.id, testSection.section.id)}
+                                      onClick={() => removeQuestionFromStage(questionStage.id, testStage.stage.id)}
                                       className="text-red-600 hover:text-red-800"
                                     >
                                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -567,59 +567,49 @@ const TestDetail: NextPage = () => {
         </div>
       </div>
 
-      {/* Modal para adicionar seção */}
-      {showAddSectionModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium text-secondary-800">Adicionar Seção</h3>
-              <button
-                onClick={() => setShowAddSectionModal(false)}
-                className="text-secondary-500 hover:text-secondary-700"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+      {/* Modal para adicionar estágio */}
+      {showAddStageModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h2 className="text-xl font-semibold text-secondary-800 mb-4">Adicionar Estágio ao Teste</h2>
             
             <div className="mb-4">
-              <label htmlFor="sectionName" className="block text-sm font-medium text-secondary-700 mb-1">
-                Nome da Seção *
+              <label htmlFor="stageName" className="block text-sm font-medium text-secondary-700 mb-1">
+                Nome do Estágio *
               </label>
               <input
-                id="sectionName"
                 type="text"
-                value={newSectionName}
-                onChange={(e) => setNewSectionName(e.target.value)}
+                id="stageName"
+                value={newStageName}
+                onChange={(e) => setNewStageName(e.target.value)}
                 className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                placeholder="Ex: Conhecimentos Técnicos"
+                placeholder="Digite o nome do estágio"
               />
             </div>
             
             <div className="mb-6">
-              <label htmlFor="sectionDescription" className="block text-sm font-medium text-secondary-700 mb-1">
+              <label htmlFor="stageDescription" className="block text-sm font-medium text-secondary-700 mb-1">
                 Descrição
               </label>
               <textarea
-                id="sectionDescription"
-                value={newSectionDescription}
-                onChange={(e) => setNewSectionDescription(e.target.value)}
-                rows={3}
+                id="stageDescription"
+                value={newStageDescription}
+                onChange={(e) => setNewStageDescription(e.target.value)}
                 className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                placeholder="Descrição opcional da seção"
+                placeholder="Digite a descrição do estágio (opcional)"
+                rows={3}
               />
             </div>
             
-            <div className="flex justify-end space-x-2">
+            <div className="flex justify-end space-x-3">
               <button
-                onClick={() => setShowAddSectionModal(false)}
-                className="px-4 py-2 text-sm text-secondary-700 border border-secondary-300 rounded-md hover:bg-secondary-50"
+                onClick={() => setShowAddStageModal(false)}
+                className="px-4 py-2 text-sm text-secondary-600 border border-secondary-300 rounded-md hover:bg-secondary-50"
               >
                 Cancelar
               </button>
               <button
-                onClick={addSectionToTest}
+                onClick={addStageToTest}
                 className="px-4 py-2 text-sm text-white bg-primary-600 rounded-md hover:bg-primary-700"
               >
                 Adicionar
@@ -629,23 +619,15 @@ const TestDetail: NextPage = () => {
         </div>
       )}
 
-      {/* Modal para adicionar perguntas */}
+      {/* Modal para adicionar perguntas ao estágio */}
       {showAddQuestionsModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium text-secondary-800">Adicionar Perguntas à Seção</h3>
-              <button
-                onClick={() => setShowAddQuestionsModal(false)}
-                className="text-secondary-500 hover:text-secondary-700"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-auto">
+            <h2 className="text-xl font-semibold text-secondary-800 mb-4">
+              Adicionar Perguntas ao Estágio
+            </h2>
             
-            <div className="mb-4 flex flex-wrap gap-4">
+            <div className="flex justify-between mb-4">
               <div className="w-64">
                 <label htmlFor="categoryFilter" className="block text-sm font-medium text-secondary-700 mb-1">
                   Filtrar por Categoria
@@ -747,29 +729,20 @@ const TestDetail: NextPage = () => {
               )}
             </div>
             
-            <div className="mt-4 flex items-center justify-between">
-              <div className="text-sm text-secondary-600">
-                {selectedQuestions.length} {selectedQuestions.length === 1 ? 'pergunta selecionada' : 'perguntas selecionadas'}
-              </div>
-              <div className="flex justify-end space-x-2">
-                <button
-                  onClick={() => setShowAddQuestionsModal(false)}
-                  className="px-4 py-2 text-sm text-secondary-700 border border-secondary-300 rounded-md hover:bg-secondary-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={addQuestionsToSection}
-                  disabled={selectedQuestions.length === 0}
-                  className={`px-4 py-2 text-sm text-white rounded-md ${
-                    selectedQuestions.length === 0 
-                      ? 'bg-primary-400 cursor-not-allowed' 
-                      : 'bg-primary-600 hover:bg-primary-700'
-                  }`}
-                >
-                  Adicionar
-                </button>
-              </div>
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => setShowAddQuestionsModal(false)}
+                className="px-4 py-2 text-sm text-secondary-600 border border-secondary-300 rounded-md hover:bg-secondary-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={addQuestionsToStage}
+                className="px-4 py-2 text-sm text-white bg-primary-600 rounded-md hover:bg-primary-700"
+                disabled={selectedQuestions.length === 0}
+              >
+                Adicionar {selectedQuestions.length} pergunta(s)
+              </button>
             </div>
           </div>
         </div>
