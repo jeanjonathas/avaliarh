@@ -36,23 +36,23 @@ export default async function handler(
       const testsWithCounts = await Promise.all(
         testsArray.map(async (test) => {
           try {
-            // Contar etapas (stages)
+            // Contar etapas (stages) - considerando tanto as diretamente associadas quanto via TestStage
             const stagesCountResult = await prisma.$queryRaw`
-              SELECT COUNT(*) as count
-              FROM "Stage"
-              WHERE "testId" = ${test.id}
+              SELECT COUNT(DISTINCT s.id) as count
+              FROM "Stage" s
+              LEFT JOIN "TestStage" ts ON s.id = ts."stageId"
+              WHERE s."testId" = ${test.id} OR ts."testId" = ${test.id}
             `;
             
             const sectionsCount = Array.isArray(stagesCountResult) && stagesCountResult.length > 0
               ? Number(stagesCountResult[0].count)
               : 0;
             
-            // Contar perguntas em todas as etapas do teste
+            // Contar perguntas em todas as etapas do teste usando TestQuestion
             const questionsCountResult = await prisma.$queryRaw`
-              SELECT COUNT(*) as count
-              FROM "Question" q
-              JOIN "Stage" s ON q."stageId" = s.id
-              WHERE s."testId" = ${test.id}
+              SELECT COUNT(DISTINCT "questionId") as count
+              FROM "TestQuestion"
+              WHERE "testId" = ${test.id}
             `;
             
             const questionsCount = Array.isArray(questionsCountResult) && questionsCountResult.length > 0
