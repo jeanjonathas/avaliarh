@@ -16,23 +16,62 @@ export default async function handler(
   if (req.method === 'GET') {
     try {
       let questions = [];
+      const { stageId, testId } = req.query;
       
       try {
-        // Buscar todas as perguntas com suas opções usando SQL raw
-        questions = await prisma.$queryRaw`
-          SELECT 
-            q.id, 
-            q.text, 
-            q."stageId", 
-            s.title as "stageTitle", 
-            s.order as "stageOrder",
-            q."createdAt", 
-            q."updatedAt",
-            'MEDIUM' as difficulty
-          FROM "Question" q
-          JOIN "Stage" s ON q."stageId" = s.id
-          ORDER BY s.order ASC, q."createdAt" DESC
-        `;
+        // Construir a consulta SQL com base nos parâmetros
+        if (stageId && stageId !== 'all') {
+          // Buscar perguntas de uma etapa específica
+          questions = await prisma.$queryRaw`
+            SELECT 
+              q.id, 
+              q.text, 
+              q."stageId", 
+              s.title as "stageTitle", 
+              s.order as "stageOrder",
+              q."createdAt", 
+              q."updatedAt",
+              'MEDIUM' as difficulty
+            FROM "Question" q
+            JOIN "Stage" s ON q."stageId" = s.id
+            WHERE q."stageId" = ${stageId}
+            ORDER BY s.order ASC, q."createdAt" DESC
+          `;
+        } else if (testId && testId !== 'all') {
+          // Buscar perguntas de um teste específico
+          questions = await prisma.$queryRaw`
+            SELECT 
+              q.id, 
+              q.text, 
+              q."stageId", 
+              s.title as "stageTitle", 
+              s.order as "stageOrder",
+              q."createdAt", 
+              q."updatedAt",
+              'MEDIUM' as difficulty
+            FROM "Question" q
+            JOIN "Stage" s ON q."stageId" = s.id
+            JOIN "TestStage" ts ON s.id = ts."stageId"
+            WHERE ts."testId" = ${testId}
+            ORDER BY s.order ASC, q."createdAt" DESC
+          `;
+        } else {
+          // Buscar todas as perguntas
+          questions = await prisma.$queryRaw`
+            SELECT 
+              q.id, 
+              q.text, 
+              q."stageId", 
+              s.title as "stageTitle", 
+              s.order as "stageOrder",
+              q."createdAt", 
+              q."updatedAt",
+              'MEDIUM' as difficulty
+            FROM "Question" q
+            JOIN "Stage" s ON q."stageId" = s.id
+            ORDER BY s.order ASC, q."createdAt" DESC
+          `;
+        }
       } catch (error) {
         console.error('Erro ao buscar perguntas (tabela pode não existir):', error);
         // Se a tabela não existir, retornar array vazio

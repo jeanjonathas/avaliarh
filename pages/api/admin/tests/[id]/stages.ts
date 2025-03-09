@@ -127,6 +127,8 @@ export default async function handler(
           WHERE ts."testId" = ${id}
           ORDER BY ts."order" ASC
         `;
+        
+        console.log('Etapas encontradas para o teste:', id, testStages);
       } catch (error) {
         console.error('Erro ao buscar estágios do teste:', error);
         // Se houver erro, continuar com array vazio

@@ -105,7 +105,7 @@ const TestDetail: NextPage = () => {
         const testData = await testResponse.json()
         setTest(testData)
         
-        // Buscar todas as seções disponíveis (que agora são etapas)
+        // Buscar todas as etapas disponíveis
         const stagesResponse = await fetch('/api/admin/stages')
         if (!stagesResponse.ok) {
           throw new Error('Erro ao carregar as etapas')
@@ -793,6 +793,7 @@ const TestDetail: NextPage = () => {
                 setSuccessMessage('Pergunta criada com sucesso!');
                 setTimeout(() => setSuccessMessage(''), 3000);
               }}
+              hideStageField={true}
             />
           </div>
         </div>

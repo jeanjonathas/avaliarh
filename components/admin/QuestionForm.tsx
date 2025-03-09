@@ -29,25 +29,8 @@ interface QuestionFormProps {
   isEditing?: boolean;
   preSelectedStageId?: string;
   onSuccess?: () => void;
+  hideStageField?: boolean;
 }
-
-const validationSchema = Yup.object({
-  text: Yup.string().required('Texto da pergunta é obrigatório'),
-  stageId: Yup.string().required('Etapa é obrigatória'),
-  options: Yup.array()
-    .of(
-      Yup.object({
-        text: Yup.string().required('Texto da opção é obrigatório'),
-        isCorrect: Yup.boolean(),
-      })
-    )
-    .min(2, 'Pelo menos 2 opções são necessárias')
-    .test(
-      'one-correct',
-      'Pelo menos uma opção deve ser marcada como correta',
-      (options) => options?.some((option) => option.isCorrect)
-    ),
-});
 
 const QuestionForm: React.FC<QuestionFormProps> = ({
   stages,
@@ -56,7 +39,8 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
   initialValues,
   isEditing = false,
   preSelectedStageId,
-  onSuccess
+  onSuccess,
+  hideStageField = false
 }) => {
   const [error, setError] = useState('');
 
@@ -69,6 +53,34 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
       { text: '', isCorrect: false },
       { text: '', isCorrect: false },
     ],
+  };
+
+  const getValidationSchema = () => {
+    const baseSchema = {
+      text: Yup.string().required('Texto da pergunta é obrigatório'),
+      options: Yup.array()
+        .of(
+          Yup.object({
+            text: Yup.string().required('Texto da opção é obrigatório'),
+            isCorrect: Yup.boolean(),
+          })
+        )
+        .min(2, 'Pelo menos 2 opções são necessárias')
+        .test(
+          'one-correct',
+          'Pelo menos uma opção deve ser marcada como correta',
+          (options) => options?.some((option) => option.isCorrect)
+        ),
+    };
+
+    if (!hideStageField) {
+      return Yup.object({
+        ...baseSchema,
+        stageId: Yup.string().required('Etapa é obrigatória'),
+      });
+    }
+
+    return Yup.object(baseSchema);
   };
 
   const handleSubmit = async (values: any, { resetForm }: any) => {
@@ -99,7 +111,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
 
       <Formik
         initialValues={initialValues || defaultValues}
-        validationSchema={validationSchema}
+        validationSchema={getValidationSchema()}
         onSubmit={handleSubmit}
         enableReinitialize
       >
@@ -120,31 +132,33 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
               <ErrorMessage name="text" component="div" className="text-red-500 text-sm mt-1" />
             </div>
             
-            <div>
-              <label htmlFor="stageId" className="block text-sm font-medium text-secondary-700 mb-1">
-                Etapa
-              </label>
-              <Field
-                as="select"
-                name="stageId"
-                id="stageId"
-                className="input-field"
-                disabled={!!preSelectedStageId}
-              >
-                {stages.length === 0 ? (
-                  <option value="">Nenhuma etapa disponível</option>
-                ) : (
-                  stages
-                    .sort((a, b) => (a.order || 0) - (b.order || 0))
-                    .map((stage) => (
-                      <option key={stage.id} value={stage.id}>
-                        {stage.title} {stage.order !== undefined && `(Etapa ${stage.order})`}
-                      </option>
-                    ))
-                )}
-              </Field>
-              <ErrorMessage name="stageId" component="div" className="text-red-500 text-sm mt-1" />
-            </div>
+            {!hideStageField && (
+              <div>
+                <label htmlFor="stageId" className="block text-sm font-medium text-secondary-700 mb-1">
+                  Etapa
+                </label>
+                <Field
+                  as="select"
+                  name="stageId"
+                  id="stageId"
+                  className="input-field"
+                  disabled={!!preSelectedStageId}
+                >
+                  {stages.length === 0 ? (
+                    <option value="">Nenhuma etapa disponível</option>
+                  ) : (
+                    stages
+                      .sort((a, b) => (a.order || 0) - (b.order || 0))
+                      .map((stage) => (
+                        <option key={stage.id} value={stage.id}>
+                          {stage.title} {stage.order !== undefined && `(Etapa ${stage.order})`}
+                        </option>
+                      ))
+                  )}
+                </Field>
+                <ErrorMessage name="stageId" component="div" className="text-red-500 text-sm mt-1" />
+              </div>
+            )}
             
             <div>
               <label className="block text-sm font-medium text-secondary-700 mb-3">
