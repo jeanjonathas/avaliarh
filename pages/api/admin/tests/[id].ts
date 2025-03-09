@@ -41,29 +41,148 @@ export default async function handler(
         return res.status(404).json({ error: 'Teste não encontrado' });
       }
 
-      // Buscar os estágios (etapas) associados ao teste
+      // Buscar os estágios (etapas) associados ao teste usando a tabela TestStage
+      console.log(`[API] Buscando etapas para o teste ${id}...`);
       const stages = await prisma.$queryRaw`
         SELECT 
-          id,
-          title,
-          description,
-          "order",
-          "createdAt",
-          "updatedAt"
-        FROM "Stage"
-        WHERE "testId" = ${id}
-        ORDER BY "order" ASC
+          s.id,
+          s.title,
+          s.description,
+          ts.order,
+          ts.id as "testStageId",
+          s."createdAt",
+          s."updatedAt"
+        FROM "Stage" s
+        JOIN "TestStage" ts ON s.id = ts."stageId"
+        WHERE ts."testId" = ${id}
+        ORDER BY ts.order ASC
       `;
+      
+      const typedStages = stages as any[];
+      console.log(`[API] ${typedStages.length} etapas encontradas para o teste ${id}`);
+      console.log("[API] Etapas ordenadas por ts.order ASC:", typedStages.map(s => ({
+        id: s.id,
+        testStageId: s.testStageId,
+        title: s.title,
+        order: s.order
+      })));
+      
+      // Verificar se há etapas com a mesma ordem
+      const orderCounts = typedStages.reduce((acc, stage) => {
+        acc[stage.order] = (acc[stage.order] || 0) + 1;
+        return acc;
+      }, {});
+      
+      const hasDuplicateOrders = Object.values(orderCounts).some(count => (count as number) > 1);
+      
+      if (hasDuplicateOrders) {
+        console.log("[API] Detectadas etapas com a mesma ordem. Corrigindo...");
+        
+        // Corrigir as ordens para garantir que sejam sequenciais (0, 1, 2, ...)
+        for (let i = 0; i < typedStages.length; i++) {
+          const stage = typedStages[i];
+          
+          // Atualizar a ordem no banco de dados
+          await prisma.$executeRaw`
+            UPDATE "TestStage"
+            SET "order" = ${i}
+            WHERE id = ${stage.testStageId}
+          `;
+          
+          // Atualizar a ordem no objeto para retornar ao cliente
+          stage.order = i;
+        }
+        
+        console.log("[API] Ordens corrigidas:", typedStages.map(s => ({
+          id: s.id,
+          testStageId: s.testStageId,
+          title: s.title,
+          order: s.order
+        })));
+      }
+      
+      console.log("Etapas obtidas da consulta SQL:", stages);
+
+      // Se não encontrar nenhum estágio usando a nova tabela, tente buscar pelo método antigo
+      let stagesData = Array.isArray(stages) && stages.length > 0 ? stages : [];
+      
+      if (stagesData.length === 0) {
+        const oldStages = await prisma.$queryRaw`
+          SELECT 
+            id,
+            title,
+            description,
+            "order",
+            "createdAt",
+            "updatedAt"
+          FROM "Stage"
+          WHERE "testId" = ${id}
+          ORDER BY "order" ASC
+        `;
+        
+        // Se encontrar estágios pelo método antigo, migre-os para a nova estrutura
+        if (Array.isArray(oldStages) && oldStages.length > 0) {
+          // Migrar estágios antigos para a nova estrutura
+          for (let i = 0; i < oldStages.length; i++) {
+            const stage = oldStages[i];
+            
+            // Verificar se já existe um registro na tabela TestStage
+            const existingTestStage = await prisma.$queryRaw`
+              SELECT id FROM "TestStage" 
+              WHERE "testId" = ${id} AND "stageId" = ${stage.id}
+            `;
+            
+            if (!Array.isArray(existingTestStage) || existingTestStage.length === 0) {
+              // Criar registro na tabela TestStage
+              await prisma.$executeRaw`
+                INSERT INTO "TestStage" (
+                  id,
+                  "testId",
+                  "stageId",
+                  "order",
+                  "createdAt",
+                  "updatedAt"
+                ) VALUES (
+                  gen_random_uuid(),
+                  ${id},
+                  ${stage.id},
+                  ${stage.order},
+                  NOW(),
+                  NOW()
+                )
+              `;
+            }
+          }
+          
+          // Buscar novamente os estágios usando a tabela TestStage após a migração
+          const migratedStages = await prisma.$queryRaw`
+            SELECT 
+              s.id,
+              s.title,
+              s.description,
+              ts.order,
+              ts.id as "testStageId",
+              s."createdAt",
+              s."updatedAt"
+            FROM "Stage" s
+            JOIN "TestStage" ts ON s.id = ts."stageId"
+            WHERE ts."testId" = ${id}
+            ORDER BY ts.order ASC
+          `;
+          
+          stagesData = Array.isArray(migratedStages) && migratedStages.length > 0 ? migratedStages : oldStages;
+        }
+      }
 
       // Formatar resposta
       const formattedTest = {
         ...test,
-        stages: Array.isArray(stages) ? stages : []
+        stages: stagesData
       };
 
       // Para cada estágio, buscar as perguntas associadas
-      if (Array.isArray(stages) && stages.length > 0) {
-        const stagesWithQuestions = await Promise.all(stages.map(async (stage) => {
+      if (Array.isArray(stagesData) && stagesData.length > 0) {
+        const stagesWithQuestions = await Promise.all(stagesData.map(async (stage) => {
           // Buscar as questões associadas a este estágio
           const questions = await prisma.$queryRaw`
             SELECT 

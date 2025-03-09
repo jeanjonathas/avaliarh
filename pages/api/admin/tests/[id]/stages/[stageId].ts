@@ -36,21 +36,31 @@ export default async function handler(
   // Remover estágio do teste (DELETE)
   if (req.method === 'DELETE') {
     try {
-      // Verificar se a etapa existe e pertence ao teste
-      const stageExists = await prisma.$queryRaw`
-        SELECT id FROM "Stage" WHERE id = ${stageId}::uuid AND "testId" = ${id}::uuid
+      console.log(`[API] Tentando remover etapa ${stageId} do teste ${id}`);
+      
+      // Verificar se a relação TestStage existe
+      const testStageExists = await prisma.$queryRaw`
+        SELECT ts.id 
+        FROM "TestStage" ts
+        WHERE ts."testId" = ${id}
+        AND ts."stageId" = ${stageId}
       `;
 
-      if (!Array.isArray(stageExists) || stageExists.length === 0) {
+      if (!Array.isArray(testStageExists) || testStageExists.length === 0) {
+        console.log(`[API] Relação TestStage não encontrada para testId=${id} e stageId=${stageId}`);
         return res.status(404).json({ error: 'Etapa não encontrada neste teste' });
       }
-
-      // Usar conversão explícita de UUID para evitar problemas de tipo
+      
+      console.log(`[API] Relação TestStage encontrada:`, testStageExists);
+      
+      // Remover a relação TestStage (não a etapa em si)
       const result = await prisma.$executeRaw`
-        UPDATE "Stage"
-        SET "testId" = NULL, "updatedAt" = NOW()
-        WHERE id = ${stageId}::uuid AND "testId" = ${id}::uuid
+        DELETE FROM "TestStage"
+        WHERE "testId" = ${id}
+        AND "stageId" = ${stageId}
       `;
+      
+      console.log(`[API] Resultado da remoção:`, result);
 
       if (result === 0) {
         return res.status(404).json({ error: 'Etapa não encontrada neste teste' });
@@ -59,33 +69,43 @@ export default async function handler(
       return res.status(200).json({ success: true });
     } catch (error) {
       console.error('Erro ao remover etapa do teste:', error);
-      return res.status(500).json({ error: 'Erro ao remover etapa do teste' });
+      return res.status(500).json({ error: 'Erro ao remover etapa do teste: ' + (error.message || 'Erro desconhecido') });
     }
   } 
   // Atualizar ordem do estágio no teste (PATCH)
   else if (req.method === 'PATCH') {
     try {
       const { order } = req.body;
+      console.log(`[API] Tentando atualizar ordem da etapa ${stageId} do teste ${id} para ${order}`);
 
       if (order === undefined) {
         return res.status(400).json({ error: 'Ordem é obrigatória' });
       }
 
-      // Verificar se a etapa existe e pertence ao teste
-      const stageExists = await prisma.$queryRaw`
-        SELECT id FROM "Stage" WHERE id = ${stageId}::uuid AND "testId" = ${id}::uuid
+      // Verificar se a relação TestStage existe
+      const testStageExists = await prisma.$queryRaw`
+        SELECT ts.id 
+        FROM "TestStage" ts
+        WHERE ts."testId" = ${id}
+        AND ts."stageId" = ${stageId}
       `;
 
-      if (!Array.isArray(stageExists) || stageExists.length === 0) {
+      if (!Array.isArray(testStageExists) || testStageExists.length === 0) {
+        console.log(`[API] Relação TestStage não encontrada para testId=${id} e stageId=${stageId}`);
         return res.status(404).json({ error: 'Etapa não encontrada neste teste' });
       }
+      
+      console.log(`[API] Relação TestStage encontrada:`, testStageExists);
 
-      // Atualizar a ordem da etapa com conversão explícita de UUID
+      // Atualizar a ordem na tabela TestStage
       const result = await prisma.$executeRaw`
-        UPDATE "Stage"
-        SET "order" = ${order}, "updatedAt" = NOW()
-        WHERE id = ${stageId}::uuid AND "testId" = ${id}::uuid
+        UPDATE "TestStage"
+        SET "order" = ${order}
+        WHERE "testId" = ${id}
+        AND "stageId" = ${stageId}
       `;
+      
+      console.log(`[API] Resultado da atualização:`, result);
 
       if (result === 0) {
         return res.status(404).json({ error: 'Etapa não encontrada neste teste' });
@@ -94,7 +114,7 @@ export default async function handler(
       return res.status(200).json({ success: true });
     } catch (error) {
       console.error('Erro ao atualizar ordem do estágio:', error);
-      return res.status(500).json({ error: 'Erro ao atualizar ordem do estágio' });
+      return res.status(500).json({ error: 'Erro ao atualizar ordem do estágio: ' + (error.message || 'Erro desconhecido') });
     }
   }
   // Método não permitido

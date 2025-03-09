@@ -7,6 +7,7 @@ import { Formik, Form, Field, ErrorMessage, FieldArray } from 'formik'
 import * as Yup from 'yup'
 import Navbar from '../../../components/admin/Navbar'
 import QuestionForm from '../../../components/admin/QuestionForm'
+import { useNotification } from '../../../contexts/NotificationContext'
 import { useNotificationSystem } from '../../../hooks/useNotificationSystem'
 
 interface Test {
@@ -67,6 +68,7 @@ const TestDetail: NextPage = () => {
   const router = useRouter()
   const { id } = router.query
   const { data: session, status } = useSession()
+  const notifyContext = useNotification()
   const notify = useNotificationSystem()
   
   const [test, setTest] = useState<Test | null>(null)
@@ -78,6 +80,14 @@ const TestDetail: NextPage = () => {
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all')
   const [loading, setLoading] = useState(true)
   
+  // Estado para armazenar logs de depuração
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+  
+  // Função para adicionar logs de depuração
+  const addDebugLog = (message: string) => {
+    setDebugLogs(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
+  };
+  
   // Modal states
   const [showAddStageModal, setShowAddStageModal] = useState(false)
   const [showAddQuestionsModal, setShowAddQuestionsModal] = useState(false)
@@ -86,7 +96,11 @@ const TestDetail: NextPage = () => {
   const [newStageName, setNewStageName] = useState('')
   const [newStageDescription, setNewStageDescription] = useState('')
   const [showNewQuestionForm, setShowNewQuestionForm] = useState(false)
-
+  
+  // Estado para edição de nome de etapa
+  const [editingStageId, setEditingStageId] = useState<string | null>(null)
+  const [editingStageName, setEditingStageName] = useState('')
+  
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/admin/login')
@@ -98,23 +112,61 @@ const TestDetail: NextPage = () => {
       if (!id || typeof id !== 'string') return
 
       try {
+        console.log(`[TestDetail] Iniciando carregamento de dados para o teste ID: ${id}`)
+        addDebugLog(`Iniciando carregamento de dados para o teste ID: ${id}`)
         setLoading(true)
         
         // Buscar dados do teste
+        console.log(`[TestDetail] Fazendo requisição para /api/admin/tests/${id}`)
+        addDebugLog(`Fazendo requisição para /api/admin/tests/${id}`)
         const testResponse = await fetch(`/api/admin/tests/${id}`)
         if (!testResponse.ok) {
           throw new Error('Erro ao carregar os dados do teste')
         }
+        
         const testData = await testResponse.json()
+        console.log(`[TestDetail] Dados do teste recebidos:`, testData)
+        addDebugLog(`Dados do teste recebidos: ${testData.title}`)
+        
+        if (testData.stages && testData.stages.length > 0) {
+          console.log('[TestDetail] Ordens das etapas ANTES de ordenar:', testData.stages.map(s => ({
+            id: s.id,
+            testStageId: s.testStageId,
+            title: s.title,
+            order: s.order
+          })))
+          
+          addDebugLog(`Etapas encontradas: ${testData.stages.length}`)
+          testData.stages.forEach((stage, index) => {
+            addDebugLog(`Etapa ${index+1}: "${stage.title}" (ordem: ${stage.order})`)
+          })
+        }
+        
+        // Garantir que as etapas estejam ordenadas corretamente
+        const orderedStages = testData.stages ? [...testData.stages].sort((a, b) => a.order - b.order) : []
+        
+        if (orderedStages.length > 0) {
+          console.log('[TestDetail] Ordens das etapas DEPOIS de ordenar:', orderedStages.map(s => ({
+            id: s.id,
+            testStageId: s.testStageId,
+            title: s.title,
+            order: s.order
+          })))
+          
+          addDebugLog(`Etapas após ordenação:`)
+          orderedStages.forEach((stage, index) => {
+            addDebugLog(`Etapa ${index+1}: "${stage.title}" (ordem: ${stage.order})`)
+          })
+        }
         
         // Adaptar a estrutura de dados para o formato esperado pelo componente
         const adaptedTest = {
           ...testData,
-          testStages: testData.stages ? testData.stages.map(stage => ({
-            id: stage.id,
+          testStages: orderedStages.map(stage => ({
+            id: stage.testStageId, // Usar o ID da relação TestStage em vez de criar um ID
             testId: testData.id,
             stageId: stage.id,
-            order: stage.order || 0,
+            order: typeof stage.order === 'number' ? stage.order : 0,
             stage: {
               ...stage,
               questionStages: stage.questions ? stage.questions.map(question => ({
@@ -125,8 +177,19 @@ const TestDetail: NextPage = () => {
                 question: question
               })) : []
             }
-          })) : []
+          }))
         }
+        
+        console.log('[TestDetail] Estrutura de dados adaptada com sucesso:', {
+          testId: adaptedTest.id,
+          totalStages: adaptedTest.testStages?.length || 0,
+          stagesOrder: adaptedTest.testStages?.map(ts => ({ 
+            stageId: ts.stageId, 
+            testStageId: ts.id,
+            order: ts.order,
+            title: ts.stage.title
+          }))
+        })
         
         setTest(adaptedTest)
         
@@ -156,8 +219,8 @@ const TestDetail: NextPage = () => {
         setAvailableQuestions(questionsData)
         
       } catch (error) {
-        console.error('Erro:', error)
-        notify.showError('Não foi possível carregar os dados. Por favor, tente novamente.')
+        console.error('Erro ao carregar dados:', error)
+        notify.showError('Não foi possível carregar os dados do teste. Por favor, tente novamente.')
       } finally {
         setLoading(false)
       }
@@ -173,23 +236,37 @@ const TestDetail: NextPage = () => {
     if (!id || typeof id !== 'string') return
 
     try {
+      console.log('Iniciando recarregamento de dados...');
       setLoading(true)
       
       // Buscar dados do teste
+      console.log('Fazendo requisição para:', `/api/admin/tests/${id}`);
       const testResponse = await fetch(`/api/admin/tests/${id}`)
       if (!testResponse.ok) {
         throw new Error('Erro ao carregar os dados do teste')
       }
       const testData = await testResponse.json()
+      console.log('Dados recebidos da API:', testData);
+      
+      if (testData.stages && testData.stages.length > 0) {
+        console.log('Ordens das etapas ANTES de ordenar:', testData.stages.map(s => ({ id: s.id, title: s.title, order: s.order })));
+      }
+      
+      // Garantir que as etapas estejam ordenadas corretamente
+      const orderedStages = testData.stages ? [...testData.stages].sort((a, b) => a.order - b.order) : [];
+      
+      if (orderedStages.length > 0) {
+        console.log('Ordens das etapas DEPOIS de ordenar:', orderedStages.map(s => ({ id: s.id, title: s.title, order: s.order })));
+      }
       
       // Adaptar a estrutura de dados para o formato esperado pelo componente
       const adaptedTest = {
         ...testData,
-        testStages: testData.stages ? testData.stages.map(stage => ({
-          id: stage.id,
+        testStages: orderedStages.map(stage => ({
+          id: stage.testStageId, // Usar o ID da relação TestStage em vez de criar um ID
           testId: testData.id,
           stageId: stage.id,
-          order: stage.order || 0,
+          order: typeof stage.order === 'number' ? stage.order : 0,
           stage: {
             ...stage,
             questionStages: stage.questions ? stage.questions.map(question => ({
@@ -200,10 +277,12 @@ const TestDetail: NextPage = () => {
               question: question
             })) : []
           }
-        })) : []
+        }))
       }
       
+      console.log('Adaptação concluída, atualizando estado...');
       setTest(adaptedTest)
+      console.log('Estado atualizado com sucesso');
     } catch (error) {
       console.error('Erro ao recarregar dados:', error)
       notify.showError('Não foi possível recarregar os dados do teste. Por favor, tente novamente.')
@@ -299,72 +378,189 @@ const TestDetail: NextPage = () => {
     await Promise.all(updates)
   }
 
-  const addStageToTest = async () => {
-    if (!newStageName.trim()) {
-      notify.showError('O nome da etapa é obrigatório')
-      return
+  // Função para atualizar o nome da etapa
+  const updateStageName = async (testStageId: string, newName: string) => {
+    if (!newName.trim()) {
+      notify.showWarning('O nome da etapa não pode estar vazio');
+      return;
     }
 
     try {
-      // Enviar diretamente os dados da nova etapa para o endpoint
-      const response = await fetch(`/api/admin/tests/${id}/stages`, {
+      console.log('Iniciando atualização do nome da etapa:', testStageId, newName);
+      
+      // Encontrar a etapa atual usando o testStageId
+      const currentTestStage = test?.testStages?.find(ts => ts.id === testStageId);
+      if (!currentTestStage) {
+        throw new Error('Etapa não encontrada');
+      }
+      
+      console.log('Etapa encontrada:', currentTestStage);
+      console.log('Enviando PATCH para:', `/api/admin/stages/${currentTestStage.stageId}`);
+
+      // Atualizar apenas o título da etapa (stageId é o ID da tabela Stage)
+      const response = await fetch(`/api/admin/stages/${currentTestStage.stageId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          title: newName
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao atualizar o nome da etapa');
+      }
+
+      // Resultado da API contém o testStageId
+      const updatedStage = await response.json();
+      console.log('Resposta da API:', updatedStage);
+      
+      // Em vez de recarregar todos os dados, apenas atualizamos localmente
+      // o nome da etapa no estado, mantendo a ordem existente
+      const updatedTestStages = test?.testStages?.map(ts => {
+        if (ts.id === testStageId) {
+          return {
+            ...ts,
+            stage: {
+              ...ts.stage,
+              title: newName
+            }
+          };
+        }
+        return ts;
+      });
+      
+      if (test && updatedTestStages) {
+        setTest({
+          ...test,
+          testStages: updatedTestStages
+        });
+      }
+      
+      console.log('Dados atualizados localmente');
+      notify.showSuccess('Nome da etapa atualizado com sucesso!');
+      
+      // Limpar estado de edição
+      setEditingStageId(null);
+      setEditingStageName('');
+    } catch (error) {
+      console.error('Erro:', error);
+      notify.showError('Ocorreu um erro ao atualizar o nome da etapa. Por favor, tente novamente.');
+    }
+  };
+
+  // Função para iniciar a edição do nome da etapa
+  const startEditingStageName = (testStageId: string, currentName: string) => {
+    setEditingStageId(testStageId)
+    setEditingStageName(currentName)
+  }
+
+  // Função para cancelar a edição do nome da etapa
+  const cancelEditingStageName = () => {
+    setEditingStageId(null)
+    setEditingStageName('')
+  }
+
+  // Função para adicionar uma nova etapa ao teste
+  const addStage = async (stageData: { title: string; description?: string; testId: string }) => {
+    if (!stageData.testId || typeof stageData.testId !== 'string') return;
+    if (!stageData.title.trim()) {
+      notify.showWarning('O nome da etapa não pode estar vazio');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      console.log('[TestDetail] Adicionando nova etapa:', stageData.title);
+      
+      // Não vamos mais calcular a ordem aqui, deixaremos a API fazer isso
+      // A API vai determinar a próxima ordem disponível com base nas etapas existentes
+      console.log('[TestDetail] Solicitando à API para determinar a próxima ordem disponível');
+
+      // Criar a nova etapa
+      const response = await fetch('/api/admin/stages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          title: newStageName,
-          description: newStageDescription || null,
-        }),
-      })
+        body: JSON.stringify(stageData),
+      });
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Erro ao adicionar etapa ao teste')
+        const errorData = await response.json();
+        console.error('[TestDetail] Erro da API:', errorData);
+        throw new Error(errorData.error || 'Erro ao adicionar nova etapa');
       }
 
-      // Recarregar os dados do teste
-      await reloadTestData()
-
-      // Limpar campos e fechar modal
-      setNewStageName('')
-      setNewStageDescription('')
-      setShowAddStageModal(false)
-      notify.showSuccess('Etapa adicionada com sucesso!')
+      // Recarregar os dados do teste após adicionar a etapa
+      await reloadTestData();
+      
+      notify.showSuccess('Etapa adicionada com sucesso!');
     } catch (error) {
-      console.error('Erro:', error)
-      notify.showError('Ocorreu um erro ao adicionar a etapa. Por favor, tente novamente.')
+      console.error('Erro ao adicionar etapa:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Função para adicionar uma etapa ao teste
+  const addStageToTest = async () => {
+    if (!newStageName.trim()) {
+      notify.showError('O nome da etapa é obrigatório');
+      return;
+    }
+
+    try {
+      await addStage({
+        title: newStageName,
+        description: newStageDescription,
+        testId: id as string,
+      });
+
+      // Limpar os campos
+      setNewStageName('');
+      setNewStageDescription('');
+      setShowAddStageModal(false);
+
+      // Recarregar os dados do teste
+      await reloadTestData();
+      
+      notify.showSuccess('Etapa adicionada com sucesso!');
+    } catch (error) {
+      console.error('Erro ao adicionar etapa:', error);
+      notify.showError(error instanceof Error ? error.message : 'Erro ao adicionar nova etapa');
     }
   }
 
-  const removeStageFromTest = async (testStageId: string) => {
-    // Substituir o confirm pelo sistema de notificações
+  const handleDeleteStage = (stageId: string) => {
     notify.confirm(
-      'Confirmar exclusão',
-      'Tem certeza que deseja remover esta etapa? Todas as perguntas associadas serão desvinculadas do teste.',
+      'Excluir Etapa',
+      'Tem certeza que deseja excluir esta etapa? Esta ação não pode ser desfeita.',
       async () => {
         try {
-          const response = await fetch(`/api/admin/tests/${id}/stages/${testStageId}`, {
+          const response = await fetch(`/api/admin/stages/${stageId}`, {
             method: 'DELETE',
-          })
+          });
 
           if (!response.ok) {
-            throw new Error('Erro ao remover etapa do teste')
+            throw new Error('Erro ao excluir etapa');
           }
 
           // Recarregar os dados do teste
-          await reloadTestData()
-
-          notify.showSuccess('Etapa removida com sucesso!')
+          await reloadTestData();
+          
+          notify.showSuccess('Etapa excluída com sucesso!');
         } catch (error) {
-          console.error('Erro:', error)
-          notify.showError('Ocorreu um erro ao remover a etapa. Por favor, tente novamente.')
+          console.error('Erro:', error);
+          notify.showError(error instanceof Error ? error.message : 'Ocorreu um erro ao excluir a etapa');
         }
       },
       {
         type: 'warning',
-        confirmText: 'Remover',
-        cancelText: 'Cancelar'
+        confirmText: 'Excluir',
+        cancelText: 'Cancelar',
       }
     );
   }
@@ -421,10 +617,10 @@ const TestDetail: NextPage = () => {
         throw new Error(errorData.error || 'Erro ao adicionar perguntas à etapa')
       }
 
-      // Limpar seleção e fechar modal
+      // Limpar a seleção
       setSelectedQuestions([])
-      setShowAddQuestionsModal(false)
-      
+      setSelectedStageId('')
+
       // Recarregar os dados do teste após um pequeno delay para garantir que o banco de dados foi atualizado
       setTimeout(async () => {
         await reloadTestData()
@@ -436,11 +632,10 @@ const TestDetail: NextPage = () => {
     }
   }
 
-  const removeQuestionFromStage = async (stageId: string, questionId: string) => {
-    // Usar o sistema de notificação para confirmar a ação
+  const removeQuestionFromStage = (stageId: string, questionId: string) => {
     notify.confirm(
-      'Confirmar remoção',
-      'Tem certeza que deseja remover esta pergunta da etapa? A pergunta será preservada no banco de questões para uso futuro.',
+      'Remover Pergunta',
+      'Tem certeza que deseja remover esta pergunta da etapa? Esta ação não pode ser desfeita.',
       async () => {
         try {
           const response = await fetch(`/api/admin/stages/${stageId}/questions/${questionId}`, {
@@ -448,8 +643,7 @@ const TestDetail: NextPage = () => {
           })
 
           if (!response.ok) {
-            const errorData = await response.json()
-            throw new Error(errorData.error || 'Erro ao remover pergunta da etapa')
+            throw new Error('Erro ao remover pergunta da etapa')
           }
 
           const result = await response.json()
@@ -467,32 +661,29 @@ const TestDetail: NextPage = () => {
       {
         type: 'warning',
         confirmText: 'Remover',
-        cancelText: 'Cancelar'
+        cancelText: 'Cancelar',
       }
-    );
+    )
   }
 
   const handleCreateQuestion = async (values: any, formikHelpers?: any) => {
     try {
-      // Adicionar o stageId se estiver selecionado
-      if (selectedStageId) {
-        values.stageId = selectedStageId;
-      }
-      
-      // Enviar a pergunta para a API
       const response = await fetch('/api/admin/questions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(values),
+        body: JSON.stringify({
+          ...values,
+          stageId: selectedStageId || null,
+        }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Erro ao criar pergunta');
+        throw new Error(errorData.error || 'Erro ao criar pergunta');
       }
-      
+
       // Atualizar a lista de perguntas disponíveis
       const questionsResponse = await fetch('/api/admin/questions');
       const questionsData = await questionsResponse.json();
@@ -511,6 +702,39 @@ const TestDetail: NextPage = () => {
       console.error('Erro ao criar pergunta:', error);
       notify.showError(error.message || 'Erro ao criar pergunta');
     }
+  };
+
+  const handleDeleteQuestion = (questionId: string) => {
+    notify.confirm(
+      'Excluir Pergunta',
+      'Tem certeza que deseja excluir esta pergunta? Esta ação não pode ser desfeita.',
+      async () => {
+        try {
+          const response = await fetch(`/api/admin/questions/${questionId}`, {
+            method: 'DELETE',
+          });
+
+          if (!response.ok) {
+            throw new Error('Erro ao excluir pergunta');
+          }
+
+          // Recarregar as perguntas
+          const questionsResponse = await fetch('/api/admin/questions');
+          const questionsData = await questionsResponse.json();
+          setAvailableQuestions(questionsData);
+
+          notify.showSuccess('Pergunta excluída com sucesso!');
+        } catch (error) {
+          console.error('Erro:', error);
+          notify.showError(error instanceof Error ? error.message : 'Ocorreu um erro ao excluir a pergunta');
+        }
+      },
+      {
+        type: 'warning',
+        confirmText: 'Excluir',
+        cancelText: 'Cancelar',
+      }
+    );
   };
 
   if (status === 'loading' || loading) {
@@ -618,25 +842,73 @@ const TestDetail: NextPage = () => {
                       <div className="bg-secondary-50 px-6 py-4 flex justify-between items-center">
                         <div>
                           <h3 className="text-lg font-medium text-secondary-800">
-                            {index + 1}. {testStage.stage.title}
+                            {index + 1}. {editingStageId === testStage.id ? (
+                              <input
+                                type="text"
+                                value={editingStageName}
+                                onChange={(e) => setEditingStageName(e.target.value)}
+                                className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                placeholder="Digite o nome da etapa"
+                                autoFocus
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    updateStageName(testStage.id, editingStageName);
+                                  } else if (e.key === 'Escape') {
+                                    cancelEditingStageName();
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <div className="flex items-center">
+                                <span>{testStage.stage.title}</span>
+                                <button 
+                                  onClick={() => startEditingStageName(testStage.id, testStage.stage.title)}
+                                  className="ml-2 text-primary-600 hover:text-primary-800 focus:outline-none"
+                                  title="Editar nome da etapa"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                  </svg>
+                                </button>
+                              </div>
+                            )}
                           </h3>
                           {testStage.stage.description && (
                             <p className="mt-1 text-sm text-secondary-600">{testStage.stage.description}</p>
                           )}
                         </div>
                         <div>
-                          <button
-                            onClick={() => openAddQuestionsModal(testStage.stage.id)}
-                            className="px-3 py-1 text-xs text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50 mb-2 block w-full"
-                          >
-                            Adicionar Perguntas
-                          </button>
-                          <button
-                            onClick={() => removeStageFromTest(testStage.id)}
-                            className="px-3 py-1 text-xs text-red-600 border border-red-600 rounded-md hover:bg-red-50 block w-full"
-                          >
-                            Remover Etapa
-                          </button>
+                          {editingStageId === testStage.id ? (
+                            <div className="flex space-x-2">
+                              <button
+                                onClick={() => updateStageName(testStage.id, editingStageName)}
+                                className="px-3 py-1 text-xs text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50"
+                              >
+                                Salvar
+                              </button>
+                              <button
+                                onClick={cancelEditingStageName}
+                                className="px-3 py-1 text-xs text-secondary-600 border border-secondary-300 rounded-md hover:bg-secondary-50"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          ) : (
+                            <div>
+                              <button
+                                onClick={() => openAddQuestionsModal(testStage.stage.id)}
+                                className="px-3 py-1 text-xs text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50 mb-2 block w-full"
+                              >
+                                Adicionar Perguntas
+                              </button>
+                              <button
+                                onClick={() => handleDeleteStage(testStage.id)}
+                                className="px-3 py-1 text-xs text-red-600 border border-red-600 rounded-md hover:bg-red-50 block w-full"
+                              >
+                                Remover Etapa
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                       
@@ -897,7 +1169,7 @@ const TestDetail: NextPage = () => {
                           {question.categories && question.categories.map(category => (
                             <span 
                               key={category.id}
-                              className="px-2 py-1 text-xs bg-secondary-100 text-secondary-800 rounded-full"
+                              className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full"
                             >
                               {category.name}
                             </span>
@@ -961,7 +1233,7 @@ const TestDetail: NextPage = () => {
               onSubmit={handleCreateQuestion}
               onCancel={() => setShowNewQuestionForm(false)}
               onSuccess={() => {
-                notify.showSuccess('Pergunta criada com sucesso!');
+                notify.showToast('Pergunta criada com sucesso!', 'success');
               }}
               hideStageField={true}
             />

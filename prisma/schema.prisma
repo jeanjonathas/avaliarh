@@ -63,12 +63,12 @@ model Question {
   id         String     @id @default(uuid())
   text       String
   stageId    String
-  categoryId String?
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
+  categoryId String?
   options    Option[]
-  Stage      Stage      @relation(fields: [stageId], references: [id], onDelete: Cascade)
   Category   Category?  @relation(fields: [categoryId], references: [id])
+  Stage      Stage      @relation(fields: [stageId], references: [id], onDelete: Cascade)
   responses  Response[]
 }
 
@@ -105,15 +105,29 @@ model UsedInviteCode {
 }
 
 model Stage {
-  id          String     @id
+  id          String      @id
   title       String
   description String?
   order       Int
-  createdAt   DateTime   @default(now())
+  createdAt   DateTime    @default(now())
   updatedAt   DateTime
   testId      String?
-  test        tests?     @relation(fields: [testId], references: [id])
   Question    Question[]
+  test        tests?      @relation(fields: [testId], references: [id])
+  TestStage   TestStage[]
+}
+
+model TestStage {
+  id        String   @id @default(uuid())
+  testId    String
+  stageId   String
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  stage     Stage    @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  test      tests    @relation(fields: [testId], references: [id], onDelete: Cascade)
+
+  @@unique([testId, stageId])
 }
 
 model tests {
@@ -126,6 +140,7 @@ model tests {
   updatedAt   DateTime    @updatedAt
   candidates  Candidate[]
   stages      Stage[]
+  TestStage   TestStage[]
 }
 
 model Category {

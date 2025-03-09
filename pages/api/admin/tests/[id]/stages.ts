@@ -58,22 +58,34 @@ export default async function handler(
           return res.status(404).json({ error: 'Estágio não encontrado' });
         }
 
-        // Verificar se o estágio já está associado ao teste
+        // Verificar se o estágio já está associado ao teste na tabela TestStage
         const stageAlreadyAssociated = await prisma.$queryRaw`
-          SELECT id FROM "Stage" 
-          WHERE id = ${stageId} AND "testId" = ${id}::uuid
+          SELECT id FROM "TestStage" 
+          WHERE "stageId" = ${stageId} AND "testId" = ${id}::uuid
         `;
 
         if (Array.isArray(stageAlreadyAssociated) && stageAlreadyAssociated.length > 0) {
           return res.status(400).json({ error: 'Este estágio já está associado a este teste' });
         }
 
-        // Associar o estágio ao teste atualizando o testId
+        // Associar o estágio ao teste na tabela TestStage
         try {
           await prisma.$queryRaw`
-            UPDATE "Stage"
-            SET "testId" = ${id}::uuid, "order" = ${order || 0}
-            WHERE id = ${stageId}
+            INSERT INTO "TestStage" (
+              id,
+              "testId",
+              "stageId",
+              "order",
+              "createdAt",
+              "updatedAt"
+            ) VALUES (
+              gen_random_uuid(),
+              ${id}::uuid,
+              ${stageId},
+              ${order || 0},
+              NOW(),
+              NOW()
+            )
           `;
           
           console.log('Estágio associado ao teste com sucesso');
@@ -85,15 +97,15 @@ export default async function handler(
       } 
       // Se não recebemos um stageId, é porque queremos criar um novo estágio
       else if (title) {
-        // Criar um novo estágio já associado ao teste
+        // Criar um novo estágio
         try {
+          // 1. Criar o estágio primeiro
           const newStageId = await prisma.$queryRaw`
             INSERT INTO "Stage" (
               id,
               title,
               description,
               "order",
-              "testId",
               "createdAt",
               "updatedAt"
             ) VALUES (
@@ -101,15 +113,39 @@ export default async function handler(
               ${title},
               ${description || null},
               0,
-              ${id}::uuid,
               NOW(),
               NOW()
             )
             RETURNING id
           `;
           
-          console.log('Novo estágio criado e associado ao teste:', newStageId);
-          return res.status(201).json({ success: true, stageId: newStageId });
+          if (!Array.isArray(newStageId) || newStageId.length === 0) {
+            throw new Error('Falha ao criar novo estágio');
+          }
+          
+          const stageId = newStageId[0].id;
+          
+          // 2. Associar o estágio ao teste na tabela TestStage
+          await prisma.$queryRaw`
+            INSERT INTO "TestStage" (
+              id,
+              "testId",
+              "stageId",
+              "order",
+              "createdAt",
+              "updatedAt"
+            ) VALUES (
+              gen_random_uuid(),
+              ${id}::uuid,
+              ${stageId},
+              0,
+              NOW(),
+              NOW()
+            )
+          `;
+          
+          console.log('Novo estágio criado e associado ao teste:', stageId);
+          return res.status(201).json({ success: true, stageId: stageId });
         } catch (insertError) {
           console.error('Erro ao criar novo estágio:', insertError);
           return res.status(500).json({ error: 'Erro ao criar novo estágio: ' + insertError.message });
@@ -125,20 +161,75 @@ export default async function handler(
   // Obter todos os estágios de um teste (GET)
   else if (req.method === 'GET') {
     try {
-      // Buscar estágios diretamente da tabela Stage
+      // Buscar estágios usando a tabela de junção TestStage
       const stages = await prisma.$queryRaw`
         SELECT 
-          id,
-          title,
-          description,
-          "order",
-          "testId",
-          "createdAt",
-          "updatedAt"
-        FROM "Stage"
-        WHERE "testId" = ${id}
-        ORDER BY "order" ASC
+          s.id,
+          s.title,
+          s.description,
+          ts.order,
+          s."testId",
+          s."createdAt",
+          s."updatedAt"
+        FROM "Stage" s
+        JOIN "TestStage" ts ON s.id = ts."stageId"
+        WHERE ts."testId" = ${id}
+        ORDER BY ts.order ASC
       `;
+      
+      // Se não encontrar nenhum estágio usando a nova tabela, tente buscar pelo método antigo
+      if (!Array.isArray(stages) || stages.length === 0) {
+        const oldStages = await prisma.$queryRaw`
+          SELECT 
+            id,
+            title,
+            description,
+            "order",
+            "testId",
+            "createdAt",
+            "updatedAt"
+          FROM "Stage"
+          WHERE "testId" = ${id}
+          ORDER BY "order" ASC
+        `;
+        
+        // Se encontrar estágios pelo método antigo, migre-os para a nova estrutura
+        if (Array.isArray(oldStages) && oldStages.length > 0) {
+          // Migrar estágios antigos para a nova estrutura
+          for (let i = 0; i < oldStages.length; i++) {
+            const stage = oldStages[i];
+            
+            // Verificar se já existe um registro na tabela TestStage
+            const existingTestStage = await prisma.$queryRaw`
+              SELECT id FROM "TestStage" 
+              WHERE "testId" = ${id} AND "stageId" = ${stage.id}
+            `;
+            
+            if (!Array.isArray(existingTestStage) || existingTestStage.length === 0) {
+              // Criar registro na tabela TestStage
+              await prisma.$executeRaw`
+                INSERT INTO "TestStage" (
+                  id,
+                  "testId",
+                  "stageId",
+                  "order",
+                  "createdAt",
+                  "updatedAt"
+                ) VALUES (
+                  gen_random_uuid(),
+                  ${id},
+                  ${stage.id},
+                  ${stage.order},
+                  NOW(),
+                  NOW()
+                )
+              `;
+            }
+          }
+          
+          return res.status(200).json(oldStages);
+        }
+      }
       
       console.log('Etapas encontradas para o teste:', id, stages);
       return res.status(200).json(stages);
