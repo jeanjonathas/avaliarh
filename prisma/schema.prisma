@@ -48,6 +48,14 @@ model Candidate {
   infoJobsLink   String?    // Link do perfil no InfoJobs
   socialMediaUrl String?    // Link para rede social
   resumeFile     String?    // Caminho do arquivo do currículo
+  linkedin       String?    // Link do perfil no LinkedIn
+  github         String?    // Link do perfil no GitHub
+  portfolio      String?    // Link do portfólio
+  resumeUrl      String?    // URL do currículo online
+  inviteCode     String?    @unique // Código de convite de 4 dígitos
+  inviteSent     Boolean    @default(false) // Indica se o convite foi enviado
+  inviteExpires  DateTime?  // Data de expiração do convite
+  inviteAttempts Int        @default(0) // Número de tentativas de validação do convite
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 }
@@ -96,6 +104,13 @@ model Response {
   updatedAt   DateTime   @updatedAt
 
   @@unique([candidateId, questionId])
+}
+
+model UsedInviteCode {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  usedAt    DateTime @default(now())
+  expiresAt DateTime
 }
 
 enum Role {

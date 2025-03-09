@@ -1,8 +1,48 @@
 import type { NextPage } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useState } from 'react'
+import { useRouter } from 'next/router'
 
 const Home: NextPage = () => {
+  const [inviteCode, setInviteCode] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [showInviteInput, setShowInviteInput] = useState(false)
+  const router = useRouter()
+
+  const handleInviteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError('')
+
+    try {
+      const response = await fetch('/api/candidates/validate-invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ inviteCode }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao validar código de convite')
+      }
+
+      // Armazenar os dados do candidato na sessão
+      sessionStorage.setItem('candidateData', JSON.stringify(data.candidate))
+      
+      // Redirecionar para a página de introdução do teste
+      router.push('/teste/introducao')
+    } catch (error: any) {
+      setError(error.message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white">
       <div className="container mx-auto px-4 py-12">
@@ -21,9 +61,53 @@ const Home: NextPage = () => {
             <p className="text-lg text-secondary-600 mb-8">
               Estamos felizes em tê-lo como candidato. Este sistema foi desenvolvido para avaliar suas habilidades e competências de forma eficiente e transparente.
             </p>
-            <Link href="/teste/introducao" className="btn-primary inline-block text-lg">
-              Iniciar Processo de Avaliação
-            </Link>
+            
+            {!showInviteInput ? (
+              <button 
+                onClick={() => setShowInviteInput(true)}
+                className="btn-primary inline-block text-lg"
+              >
+                Iniciar Processo de Avaliação
+              </button>
+            ) : (
+              <div className="bg-white p-6 rounded-lg shadow-md border border-primary-100 max-w-md">
+                <h3 className="text-xl font-semibold text-secondary-800 mb-4">Digite seu código de convite</h3>
+                <form onSubmit={handleInviteSubmit}>
+                  <div className="mb-4">
+                    <input
+                      type="text"
+                      value={inviteCode}
+                      onChange={(e) => setInviteCode(e.target.value)}
+                      placeholder="Digite o código de 4 dígitos"
+                      className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-center text-2xl tracking-widest"
+                      maxLength={4}
+                      required
+                    />
+                  </div>
+                  {error && (
+                    <div className="mb-4 p-2 bg-red-50 text-red-600 rounded-md text-sm">
+                      {error}
+                    </div>
+                  )}
+                  <div className="flex space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowInviteInput(false)}
+                      className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 flex-1"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? 'Verificando...' : 'Continuar'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
           </div>
           <div className="md:w-1/2 flex justify-center">
             <div className="relative w-full max-w-md h-80">
@@ -48,8 +132,8 @@ const Home: NextPage = () => {
               <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl text-primary-600">1</span>
               </div>
-              <h3 className="text-xl font-semibold text-secondary-800 mb-2">Cadastro</h3>
-              <p className="text-secondary-600">Preencha seus dados básicos para iniciar o processo de avaliação.</p>
+              <h3 className="text-xl font-semibold text-secondary-800 mb-2">Convite</h3>
+              <p className="text-secondary-600">Receba seu código de convite e insira-o para iniciar o processo de avaliação.</p>
             </div>
             <div className="card text-center">
               <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">

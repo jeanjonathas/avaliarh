@@ -1,5 +1,5 @@
 import { NextPage } from 'next'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -13,13 +13,42 @@ const validationSchema = Yup.object({
   position: Yup.string().required('Cargo desejado é obrigatório'),
 })
 
+interface CandidateData {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  position?: string;
+}
+
 const Introducao: NextPage = () => {
   const [step, setStep] = useState<'intro' | 'form'>('intro')
+  const [candidateData, setCandidateData] = useState<CandidateData | null>(null)
   const router = useRouter()
+
+  useEffect(() => {
+    // Verificar se há dados do candidato na sessão
+    const storedData = sessionStorage.getItem('candidateData')
+    if (storedData) {
+      try {
+        const parsedData = JSON.parse(storedData)
+        setCandidateData(parsedData)
+      } catch (error) {
+        console.error('Erro ao carregar dados do candidato:', error)
+      }
+    }
+  }, [])
 
   const handleSubmit = async (values: any) => {
     try {
-      // Salvar os dados do candidato no banco de dados
+      // Se já temos o ID do candidato, não precisamos criar um novo
+      if (candidateData?.id) {
+        // Redirecionar para a primeira etapa do teste com o ID do candidato
+        router.push(`/teste/etapa/1?candidateId=${candidateData.id}`)
+        return
+      }
+
+      // Caso contrário, salvar os dados do candidato no banco de dados
       const response = await fetch('/api/candidates', {
         method: 'POST',
         headers: {
@@ -41,6 +70,18 @@ const Introducao: NextPage = () => {
     }
   }
 
+  // Se temos os dados do candidato e estamos na etapa de formulário, vamos para a primeira etapa
+  useEffect(() => {
+    if (candidateData && step === 'form') {
+      handleSubmit({
+        name: candidateData.name,
+        email: candidateData.email,
+        phone: candidateData.phone || '',
+        position: candidateData.position || '',
+      })
+    }
+  }, [step, candidateData])
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white">
       <div className="container mx-auto px-4 py-12">
@@ -60,6 +101,15 @@ const Introducao: NextPage = () => {
           {step === 'intro' ? (
             <div className="card">
               <h1 className="text-3xl font-bold text-secondary-900 mb-6">Sobre o Processo de Avaliação</h1>
+              
+              {candidateData && (
+                <div className="bg-primary-50 p-4 rounded-lg mb-6 border border-primary-200">
+                  <h2 className="text-xl font-semibold text-secondary-800 mb-2">Bem-vindo(a), {candidateData.name}!</h2>
+                  <p className="text-secondary-700">
+                    Seus dados já foram carregados. Você pode continuar para o teste assim que estiver pronto.
+                  </p>
+                </div>
+              )}
               
               <div className="space-y-6 text-secondary-700">
                 <p>
@@ -89,7 +139,7 @@ const Introducao: NextPage = () => {
                     onClick={() => setStep('form')} 
                     className="btn-primary"
                   >
-                    Continuar para o Cadastro
+                    {candidateData ? 'Iniciar Teste' : 'Continuar para o Cadastro'}
                   </button>
                 </div>
               </div>
@@ -99,9 +149,15 @@ const Introducao: NextPage = () => {
               <h1 className="text-3xl font-bold text-secondary-900 mb-6">Dados do Candidato</h1>
               
               <Formik
-                initialValues={{ name: '', email: '', phone: '', position: '' }}
+                initialValues={{ 
+                  name: candidateData?.name || '', 
+                  email: candidateData?.email || '', 
+                  phone: candidateData?.phone || '', 
+                  position: candidateData?.position || '' 
+                }}
                 validationSchema={validationSchema}
                 onSubmit={handleSubmit}
+                enableReinitialize
               >
                 {({ isSubmitting }) => (
                   <Form className="space-y-6">
@@ -115,6 +171,7 @@ const Introducao: NextPage = () => {
                         id="name"
                         className="input-field"
                         placeholder="Digite seu nome completo"
+                        disabled={!!candidateData}
                       />
                       <ErrorMessage name="name" component="div" className="text-red-500 text-sm mt-1" />
                     </div>
@@ -129,6 +186,7 @@ const Introducao: NextPage = () => {
                         id="email"
                         className="input-field"
                         placeholder="seu.email@exemplo.com"
+                        disabled={!!candidateData}
                       />
                       <ErrorMessage name="email" component="div" className="text-red-500 text-sm mt-1" />
                     </div>
@@ -143,6 +201,7 @@ const Introducao: NextPage = () => {
                         id="phone"
                         className="input-field"
                         placeholder="(00) 00000-0000"
+                        disabled={!!candidateData}
                       />
                       <ErrorMessage name="phone" component="div" className="text-red-500 text-sm mt-1" />
                     </div>
@@ -157,6 +216,7 @@ const Introducao: NextPage = () => {
                         id="position"
                         className="input-field"
                         placeholder="Digite o cargo para o qual está se candidatando"
+                        disabled={!!candidateData}
                       />
                       <ErrorMessage name="position" component="div" className="text-red-500 text-sm mt-1" />
                     </div>
