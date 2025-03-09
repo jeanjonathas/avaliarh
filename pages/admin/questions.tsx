@@ -298,7 +298,12 @@ const Questions: NextPage = () => {
         
         if (selectedTest) {
           // Guardar os valores do formulário
-          setPendingFormValues({ ...values, formikHelpers });
+          setPendingFormValues({ 
+            ...values, 
+            formikHelpers: {
+              resetForm: formikHelpers.resetForm
+            }
+          });
           setSelectedTestName(selectedTest.title);
           
           // Verificar se também há uma etapa selecionada
@@ -328,21 +333,31 @@ const Questions: NextPage = () => {
   };
 
   // Função para salvar a pergunta após confirmação
-  const saveQuestion = async (values: any, { resetForm }: any) => {
+  const saveQuestion = async (values: any, formikHelpers?: any) => {
     try {
       const method = isEditing ? 'PUT' : 'POST';
       const url = isEditing ? `/api/admin/questions/${currentQuestion?.id}` : '/api/admin/questions';
+
+      console.log('Enviando dados para o servidor:', values);
+
+      // Garantir que stageId seja null se for uma string vazia
+      const dataToSend = {
+        ...values,
+        stageId: values.stageId || null
+      };
 
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(values),
+        body: JSON.stringify(dataToSend),
       });
 
       if (!response.ok) {
-        throw new Error('Erro ao salvar a pergunta');
+        const errorData = await response.json();
+        console.error('Erro do servidor:', errorData);
+        throw new Error(errorData.error || 'Erro ao salvar a pergunta');
       }
 
       // Atualizar a lista de perguntas
@@ -351,7 +366,9 @@ const Questions: NextPage = () => {
       setQuestions(questionsData);
 
       // Limpar o formulário e o estado de edição
-      resetForm();
+      if (formikHelpers) {
+        formikHelpers.resetForm();
+      }
       setIsEditing(false);
       setCurrentQuestion(null);
 
@@ -502,7 +519,7 @@ const Questions: NextPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Formulário de Pergunta */}
           <QuestionForm
-            stages={filteredStages}
+            stages={filteredStages.length > 0 ? filteredStages : []}
             categories={categories}
             onSubmit={handleSubmit}
             onCancel={isEditing ? handleCancel : undefined}
@@ -511,13 +528,14 @@ const Questions: NextPage = () => {
                 ? {
                     text: currentQuestion.text,
                     stageId: currentQuestion.stageId,
-                    categoryId: currentQuestion.categoryId || (categories.length > 0 ? categories[0].id : ''),
+                    categoryId: currentQuestion.categoryId || '',
                     options: currentQuestion.options,
                   }
                 : undefined
             }
             isEditing={isEditing}
-            hideStageField={true}
+            hideStageField={selectedTestId === 'all'}
+            preSelectedStageId={selectedStageId !== 'all' ? selectedStageId : ''}
           />
 
           {/* Lista de Perguntas */}

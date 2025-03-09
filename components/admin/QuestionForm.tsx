@@ -57,7 +57,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
 
   const defaultValues = {
     text: '',
-    stageId: preSelectedStageId || (stages.length > 0 ? stages[0].id : ''),
+    stageId: preSelectedStageId || (stages.length > 0 ? stages[0].id : null),
     categoryId: preSelectedCategoryId || '',
     options: [
       { text: '', isCorrect: false },
@@ -83,14 +83,11 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
         }),
     };
 
-    if (!hideStageField) {
-      return Yup.object({
-        ...baseSchema,
-        stageId: Yup.string().required('Etapa é obrigatória'),
-      });
-    }
-
-    return Yup.object(baseSchema);
+    // Sempre incluir stageId na validação, mesmo se o campo estiver oculto
+    return Yup.object({
+      ...baseSchema,
+      stageId: Yup.string().required('Etapa é obrigatória'),
+    });
   };
 
   const handleSubmit = async (values: any, { resetForm }: any) => {
@@ -115,8 +112,8 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-4">
-          {error}
-        </div>
+        {error}
+      </div>
       )}
 
       <Formik
@@ -139,8 +136,20 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                 className="input-field"
                 placeholder="Digite o texto da pergunta"
               />
-              <ErrorMessage name="text" component="div" className="text-red-500 text-sm mt-1" />
+              <ErrorMessage
+                name="text"
+                render={msg => {
+                  return typeof msg === 'string' 
+                    ? <div className="text-red-500 text-sm mt-1">{msg}</div>
+                    : <div className="text-red-500 text-sm mt-1">Erro de validação na pergunta</div>
+                }}
+              />
             </div>
+            
+            {/* Campo oculto para stageId quando hideStageField é true */}
+            {hideStageField && (
+              <Field type="hidden" name="stageId" />
+            )}
             
             {!hideStageField && (
               <div>
@@ -166,7 +175,14 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                       ))
                   )}
                 </Field>
-                <ErrorMessage name="stageId" component="div" className="text-red-500 text-sm mt-1" />
+                <ErrorMessage
+                  name="stageId"
+                  render={msg => {
+                    return typeof msg === 'string' 
+                      ? <div className="text-red-500 text-sm mt-1">{msg}</div>
+                      : <div className="text-red-500 text-sm mt-1">Erro de validação na etapa</div>
+                  }}
+                />
               </div>
             )}
             
@@ -188,7 +204,14 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                   </option>
                 ))}
               </Field>
-              <ErrorMessage name="categoryId" component="div" className="text-red-500 text-sm mt-1" />
+              <ErrorMessage
+                name="categoryId"
+                render={msg => {
+                  return typeof msg === 'string' 
+                    ? <div className="text-red-500 text-sm mt-1">{msg}</div>
+                    : <div className="text-red-500 text-sm mt-1">Erro de validação na categoria</div>
+                }}
+              />
             </div>
             
             <div>
@@ -227,8 +250,11 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                           />
                           <ErrorMessage
                             name={`options.${index}.text`}
-                            component="div"
-                            className="text-red-500 text-sm mt-1"
+                            render={msg => {
+                              return typeof msg === 'string' 
+                                ? <div className="text-red-500 text-sm mt-1">{msg}</div>
+                                : <div className="text-red-500 text-sm mt-1">Erro de validação na opção</div>
+                            }}
                           />
                         </div>
                         {values.options.length > 2 && (
@@ -260,8 +286,11 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                     
                     <ErrorMessage
                       name="options"
-                      component="div"
-                      className="text-red-500 text-sm mt-1"
+                      render={msg => {
+                        return typeof msg === 'string' 
+                          ? <div className="text-red-500 text-sm mt-1">{msg}</div>
+                          : <div className="text-red-500 text-sm mt-1">Erro de validação nas opções</div>
+                      }}
                     />
                   </div>
                 )}

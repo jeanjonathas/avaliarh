@@ -39,14 +39,22 @@ export default async function handler(
           s.title, 
           s.description, 
           s.order,
-          COUNT(q.id) as "questionCount"
+          CAST(COUNT(q.id) AS INTEGER) as "questionCount"
         FROM "Stage" s
         LEFT JOIN "Question" q ON q."stageId" = s.id
         GROUP BY s.id, s.title, s.description, s.order
         ORDER BY s.order ASC
       `;
 
-      return res.status(200).json(Array.isArray(stages) ? stages : []);
+      // Converter BigInt para Number antes de serializar para JSON
+      const serializedStages = Array.isArray(stages) 
+        ? stages.map(stage => ({
+            ...stage,
+            questionCount: Number(stage.questionCount)
+          }))
+        : [];
+
+      return res.status(200).json(serializedStages);
     } catch (error) {
       console.error('Erro ao buscar etapas:', error);
       // Retornar array vazio em vez de erro para não quebrar a UI
