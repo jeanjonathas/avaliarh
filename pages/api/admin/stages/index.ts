@@ -15,6 +15,23 @@ export default async function handler(
 
   if (req.method === 'GET') {
     try {
+      // Verificar se a tabela Stage existe
+      try {
+        await prisma.$executeRawUnsafe(`
+          CREATE TABLE IF NOT EXISTS "Stage" (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            title VARCHAR(255) NOT NULL,
+            description TEXT,
+            "order" INTEGER,
+            "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+            "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+          )
+        `);
+      } catch (tableError) {
+        console.error('Erro ao verificar tabela Stage:', tableError);
+        // Continuar mesmo se houver erro, pois a tabela pode já existir
+      }
+
       // Buscar todas as etapas com contagem de perguntas usando SQL raw
       const stages = await prisma.$queryRaw`
         SELECT 
@@ -39,59 +56,85 @@ export default async function handler(
     try {
       const { title, description, order } = req.body;
 
-      if (!title || !order) {
-        return res.status(400).json({ error: 'Título e ordem são obrigatórios' });
+      if (!title) {
+        return res.status(400).json({ error: 'Título é obrigatório' });
       }
 
-      // Verificar se já existe uma etapa com a mesma ordem
-      const existingStages = await prisma.$queryRaw`
-        SELECT id FROM "Stage" WHERE "order" = ${Number(order)}
-      `;
+      console.log('Recebido para criar estágio:', { title, description, order });
 
-      if (Array.isArray(existingStages) && existingStages.length > 0) {
-        return res.status(400).json({ error: 'Já existe uma etapa com esta ordem' });
+      // Verificar se a tabela Stage existe
+      try {
+        await prisma.$executeRawUnsafe(`
+          CREATE TABLE IF NOT EXISTS "Stage" (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            title VARCHAR(255) NOT NULL,
+            description TEXT,
+            "order" INTEGER,
+            "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+            "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+          )
+        `);
+      } catch (tableError) {
+        console.error('Erro ao verificar tabela Stage:', tableError);
+        // Continuar mesmo se houver erro, pois a tabela pode já existir
       }
 
-      // Criar nova etapa
-      await prisma.$executeRaw`
-        INSERT INTO "Stage" (
-          id,
-          title,
-          description,
-          "order",
-          "createdAt",
-          "updatedAt"
-        ) VALUES (
-          gen_random_uuid(),
-          ${title},
-          ${description || null},
-          ${Number(order)},
-          NOW(),
-          NOW()
-        )
-      `;
-
-      // Buscar a etapa recém-criada
-      const newStages = await prisma.$queryRaw`
-        SELECT 
-          id, 
-          title, 
-          description, 
-          "order"
-        FROM "Stage"
-        WHERE title = ${title} AND "order" = ${Number(order)}
-        ORDER BY "createdAt" DESC
-        LIMIT 1
-      `;
-
-      const newStage = Array.isArray(newStages) && newStages.length > 0
-        ? { ...newStages[0], questionCount: 0 }
-        : { title, description, order: Number(order), questionCount: 0 };
-
-      return res.status(201).json(newStage);
+      // Criar nova etapa usando executeRawUnsafe para maior controle
+      let newStageId = '';
+      try {
+        const insertResult = await prisma.$executeRawUnsafe(`
+          INSERT INTO "Stage" (
+            id,
+            title,
+            description,
+            "order",
+            "createdAt",
+            "updatedAt"
+          ) VALUES (
+            gen_random_uuid(),
+            '${title.replace(/'/g, "''")}',
+            ${description ? `'${description.replace(/'/g, "''")}'` : 'NULL'},
+            ${order !== undefined ? Number(order) : 0},
+            NOW(),
+            NOW()
+          )
+          RETURNING id
+        `);
+        
+        console.log('Resultado da inserção:', insertResult);
+        
+        // Buscar o estágio recém-criado
+        const newStages = await prisma.$queryRaw`
+          SELECT 
+            id, 
+            title, 
+            description, 
+            "order",
+            "createdAt",
+            "updatedAt"
+          FROM "Stage"
+          WHERE title = ${title}
+          ORDER BY "createdAt" DESC
+          LIMIT 1
+        `;
+        
+        console.log('Estágio encontrado após inserção:', newStages);
+        
+        if (Array.isArray(newStages) && newStages.length > 0) {
+          return res.status(201).json({
+            ...newStages[0],
+            questionCount: 0
+          });
+        } else {
+          throw new Error('Não foi possível encontrar o estágio criado');
+        }
+      } catch (insertError) {
+        console.error('Erro específico ao inserir estágio:', insertError);
+        throw insertError;
+      }
     } catch (error) {
-      console.error('Erro ao criar etapa:', error);
-      return res.status(500).json({ error: 'Erro ao criar etapa' });
+      console.error('Erro ao criar estágio:', error);
+      return res.status(500).json({ error: 'Erro ao criar estágio: ' + (error.message || 'Erro desconhecido') });
     }
   } else {
     res.setHeader('Allow', ['GET', 'POST']);

@@ -59,36 +59,48 @@ export default async function handler(
         await prisma.$executeRawUnsafe(`
           CREATE TABLE IF NOT EXISTS "TestStage" (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            "testId" UUID NOT NULL REFERENCES "tests"(id) ON DELETE CASCADE,
-            "stageId" VARCHAR(255) NOT NULL,
+            "testId" UUID NOT NULL,
+            "stageId" UUID NOT NULL,
             "order" INTEGER NOT NULL DEFAULT 0,
             "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
             "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-            UNIQUE("testId", "stageId")
+            UNIQUE("testId", "stageId"),
+            FOREIGN KEY ("testId") REFERENCES "tests"(id) ON DELETE CASCADE
           )
         `);
+        console.log('Tabela TestStage verificada ou criada com sucesso');
       } catch (tableError) {
         console.error('Erro ao criar tabela TestStage:', tableError);
-        // Continuar mesmo se houver erro, pois a tabela pode já existir
+        return res.status(500).json({ error: 'Erro ao criar tabela TestStage: ' + tableError.message });
       }
 
       // Verificar se a relação já existe
-      const existingRelation = await prisma.$queryRaw`
-        SELECT * FROM "TestStage" 
-        WHERE "testId" = ${id} AND "stageId" = ${stageId}
-      `;
+      try {
+        const existingRelation = await prisma.$queryRaw`
+          SELECT * FROM "TestStage" 
+          WHERE "testId" = ${id} AND "stageId" = ${stageId}
+        `;
 
-      if (Array.isArray(existingRelation) && existingRelation.length > 0) {
-        return res.status(400).json({ error: 'Este estágio já está associado a este teste' });
+        if (Array.isArray(existingRelation) && existingRelation.length > 0) {
+          return res.status(400).json({ error: 'Este estágio já está associado a este teste' });
+        }
+      } catch (error) {
+        console.error('Erro ao verificar relação existente:', error);
+        // Se der erro aqui, provavelmente a tabela não existe ainda
       }
 
       // Adicionar o estágio ao teste
-      await prisma.$executeRawUnsafe(`
-        INSERT INTO "TestStage" ("testId", "stageId", "order", "createdAt", "updatedAt")
-        VALUES ('${id}', '${stageId}', ${order || 0}, NOW(), NOW())
-      `);
-
-      return res.status(201).json({ success: true });
+      try {
+        await prisma.$executeRawUnsafe(`
+          INSERT INTO "TestStage" ("testId", "stageId", "order", "createdAt", "updatedAt")
+          VALUES ('${id}', '${stageId}', ${order || 0}, NOW(), NOW())
+        `);
+        console.log('Estágio adicionado ao teste com sucesso');
+        return res.status(201).json({ success: true });
+      } catch (insertError) {
+        console.error('Erro ao inserir na tabela TestStage:', insertError);
+        return res.status(500).json({ error: 'Erro ao adicionar estágio ao teste: ' + insertError.message });
+      }
     } catch (error) {
       console.error('Erro ao adicionar estágio ao teste:', error);
       return res.status(500).json({ error: 'Erro ao adicionar estágio ao teste' });

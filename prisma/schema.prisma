@@ -111,13 +111,13 @@ model Stage {
 }
 
 model tests {
-  id           String   @id @default(uuid())
-  title        String
-  description  String?
-  timeLimit    Int?
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  timeLimit   Int?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 enum Role {
