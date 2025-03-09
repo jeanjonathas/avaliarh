@@ -7,6 +7,12 @@ import Navbar from '../../components/admin/Navbar'
 import QuestionForm from '../../components/admin/QuestionForm'
 import { Formik, Form, Field, ErrorMessage, FieldArray } from 'formik'
 import * as Yup from 'yup'
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogTitle from '@mui/material/DialogTitle';
+import Button from '@mui/material/Button';
 
 interface Stage {
   id: string
@@ -18,6 +24,8 @@ interface Question {
   id: string
   text: string
   stageId: string
+  categoryId?: string
+  categoryName?: string
   options: {
     id: string
     text: string
@@ -57,6 +65,12 @@ const Questions: NextPage = () => {
   const [tests, setTests] = useState<any[]>([])
   const [selectedTestId, setSelectedTestId] = useState<string>('all')
   const [filteredStages, setFilteredStages] = useState<Stage[]>([])
+  const [showAssociateDialog, setShowAssociateDialog] = useState(false)
+  const [pendingFormValues, setPendingFormValues] = useState<any>(null)
+  const [selectedTestName, setSelectedTestName] = useState('')
+  const [selectedStageName, setSelectedStageName] = useState('')
+  const [associationMode, setAssociationMode] = useState<'test' | 'test-and-stage' | 'none'>('none')
+  const [categories, setCategories] = useState<any[]>([])
 
   useEffect(() => {
     // Verificar se o usuário está autenticado
@@ -66,44 +80,92 @@ const Questions: NextPage = () => {
   }, [status, router])
 
   useEffect(() => {
-    // Carregar etapas e perguntas
-    const fetchData = async () => {
-      try {
-        setLoading(true)
-
-        // Carregar etapas
-        const stagesResponse = await fetch('/api/admin/stages')
-        if (!stagesResponse.ok) {
-          throw new Error('Erro ao carregar as etapas')
-        }
-        const stagesData = await stagesResponse.json()
-        setStages(stagesData)
-
-        // Carregar testes
-        const testsResponse = await fetch('/api/admin/tests')
-        if (!testsResponse.ok) {
-          throw new Error('Erro ao carregar os testes')
-        }
-        const testsData = await testsResponse.json()
-        setTests(testsData)
-
-        // Carregar perguntas
-        const questionsResponse = await fetch('/api/admin/questions')
-        if (!questionsResponse.ok) {
-          throw new Error('Erro ao carregar as perguntas')
-        }
-        const questionsData = await questionsResponse.json()
-        setQuestions(questionsData)
-      } catch (error) {
-        console.error('Erro:', error)
-        setError('Não foi possível carregar os dados. Por favor, tente novamente.')
-      } finally {
-        setLoading(false)
-      }
+    if (status === 'authenticated') {
+      loadData()
     }
+  }, [status])
 
-    fetchData()
-  }, [])
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      await Promise.all([
+        loadTests(),
+        loadStages(),
+        loadQuestions(),
+        loadCategories()
+      ])
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error)
+      setError('Ocorreu um erro ao carregar os dados. Por favor, tente novamente.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Função para carregar testes
+  const loadTests = async () => {
+    try {
+      const response = await fetch('/api/admin/tests')
+      if (!response.ok) {
+        throw new Error('Erro ao carregar os testes')
+      }
+      const data = await response.json()
+      setTests(data)
+    } catch (error) {
+      console.error('Erro ao buscar testes:', error)
+      setError('Ocorreu um erro ao carregar os testes. Por favor, tente novamente.')
+    }
+  }
+
+  // Função para carregar etapas
+  const loadStages = async () => {
+    try {
+      const response = await fetch('/api/admin/stages')
+      if (!response.ok) {
+        throw new Error('Erro ao carregar as etapas')
+      }
+      const data = await response.json()
+      setStages(data)
+    } catch (error) {
+      console.error('Erro ao buscar etapas:', error)
+      setError('Ocorreu um erro ao carregar as etapas. Por favor, tente novamente.')
+    }
+  }
+
+  // Função para carregar perguntas
+  const loadQuestions = async () => {
+    setLoading(true);
+    try {
+      console.log('Carregando perguntas...');
+      const response = await fetch('/api/admin/questions')
+      if (!response.ok) {
+        throw new Error('Erro ao carregar as perguntas')
+      }
+      const data = await response.json()
+      console.log('Perguntas carregadas:', data.length);
+      setQuestions(data)
+    } catch (error) {
+      console.error('Erro ao buscar perguntas:', error)
+      setError('Ocorreu um erro ao carregar as perguntas. Por favor, tente novamente.')
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Função para carregar categorias
+  const loadCategories = async () => {
+    try {
+      const response = await fetch('/api/admin/categories')
+      if (!response.ok) {
+        throw new Error('Erro ao carregar as categorias')
+      }
+      const data = await response.json()
+      setCategories(data)
+    } catch (error) {
+      console.error('Erro ao buscar categorias:', error)
+      setError('Ocorreu um erro ao carregar as categorias. Por favor, tente novamente.')
+    }
+  }
 
   useEffect(() => {
     // Efeito para filtrar as etapas com base no teste selecionado
@@ -220,12 +282,56 @@ const Questions: NextPage = () => {
     fetchQuestionsForStage()
   }, [selectedStageId, selectedTestId])
 
-  const handleSubmit = async (values: any, { resetForm }: any) => {
+  const handleSubmit = async (values: any, formikHelpers: any) => {
     try {
-      setError('')
+      setError('');
 
-      const method = isEditing ? 'PUT' : 'POST'
-      const url = isEditing ? `/api/admin/questions/${currentQuestion?.id}` : '/api/admin/questions'
+      // Se estiver editando, prosseguir normalmente
+      if (isEditing) {
+        await saveQuestion(values, formikHelpers);
+        return;
+      }
+
+      // Verificar se há teste e/ou etapa selecionados
+      if (selectedTestId !== 'all') {
+        const selectedTest = tests.find(test => test.id === selectedTestId);
+        
+        if (selectedTest) {
+          // Guardar os valores do formulário
+          setPendingFormValues({ ...values, formikHelpers });
+          setSelectedTestName(selectedTest.title);
+          
+          // Verificar se também há uma etapa selecionada
+          if (selectedStageId !== 'all') {
+            const selectedStage = filteredStages.find(stage => stage.id === selectedStageId);
+            if (selectedStage) {
+              setSelectedStageName(selectedStage.title);
+              setAssociationMode('test-and-stage');
+            } else {
+              setAssociationMode('test');
+            }
+          } else {
+            setAssociationMode('test');
+          }
+          
+          setShowAssociateDialog(true);
+          return;
+        }
+      }
+
+      // Caso contrário, prosseguir normalmente
+      await saveQuestion(values, formikHelpers);
+    } catch (error) {
+      console.error('Erro:', error);
+      setError('Ocorreu um erro ao salvar a pergunta. Por favor, tente novamente.');
+    }
+  };
+
+  // Função para salvar a pergunta após confirmação
+  const saveQuestion = async (values: any, { resetForm }: any) => {
+    try {
+      const method = isEditing ? 'PUT' : 'POST';
+      const url = isEditing ? `/api/admin/questions/${currentQuestion?.id}` : '/api/admin/questions';
 
       const response = await fetch(url, {
         method,
@@ -233,30 +339,97 @@ const Questions: NextPage = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(values),
-      })
+      });
 
       if (!response.ok) {
-        throw new Error('Erro ao salvar a pergunta')
+        throw new Error('Erro ao salvar a pergunta');
       }
 
       // Atualizar a lista de perguntas
-      const questionsResponse = await fetch('/api/admin/questions')
-      const questionsData = await questionsResponse.json()
-      setQuestions(questionsData)
+      const questionsResponse = await fetch('/api/admin/questions');
+      const questionsData = await questionsResponse.json();
+      setQuestions(questionsData);
 
       // Limpar o formulário e o estado de edição
-      resetForm()
-      setIsEditing(false)
-      setCurrentQuestion(null)
+      resetForm();
+      setIsEditing(false);
+      setCurrentQuestion(null);
 
       // Exibir mensagem de sucesso
-      setSuccessMessage(isEditing ? 'Pergunta atualizada com sucesso!' : 'Pergunta criada com sucesso!')
-      setTimeout(() => setSuccessMessage(''), 3000)
+      setSuccessMessage(isEditing ? 'Pergunta atualizada com sucesso!' : 'Pergunta criada com sucesso!');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (error) {
-      console.error('Erro:', error)
-      setError('Ocorreu um erro ao salvar a pergunta. Por favor, tente novamente.')
+      console.error('Erro:', error);
+      setError('Ocorreu um erro ao salvar a pergunta. Por favor, tente novamente.');
     }
-  }
+  };
+
+  // Função para associar a pergunta ao teste selecionado
+  const handleAssociateWithTest = async () => {
+    if (!pendingFormValues) return;
+    
+    try {
+      // Buscar as etapas do teste selecionado
+      const response = await fetch(`/api/admin/tests/${selectedTestId}/stages`);
+      if (!response.ok) {
+        throw new Error('Erro ao carregar as etapas do teste');
+      }
+      const testStages = await response.json();
+      
+      // Se o teste tiver etapas, usar a primeira etapa
+      if (testStages && testStages.length > 0) {
+        const firstStageId = testStages[0].stageId;
+        const updatedValues = {
+          ...pendingFormValues,
+          stageId: firstStageId
+        };
+        
+        await saveQuestion(updatedValues, pendingFormValues.formikHelpers);
+      } else {
+        // Se o teste não tiver etapas, salvar a pergunta normalmente
+        await saveQuestion(pendingFormValues, pendingFormValues.formikHelpers);
+      }
+      
+      // Fechar o diálogo
+      setShowAssociateDialog(false);
+      setPendingFormValues(null);
+    } catch (error) {
+      console.error('Erro ao associar pergunta ao teste:', error);
+      setError('Ocorreu um erro ao associar a pergunta ao teste. Por favor, tente novamente.');
+      setShowAssociateDialog(false);
+    }
+  };
+
+  // Função para associar a pergunta ao teste e à etapa selecionados
+  const handleAssociateWithTestAndStage = async () => {
+    if (!pendingFormValues) return;
+    
+    try {
+      const updatedValues = {
+        ...pendingFormValues,
+        stageId: selectedStageId
+      };
+      
+      await saveQuestion(updatedValues, pendingFormValues.formikHelpers);
+      
+      // Fechar o diálogo
+      setShowAssociateDialog(false);
+      setPendingFormValues(null);
+    } catch (error) {
+      console.error('Erro ao associar pergunta ao teste e etapa:', error);
+      setError('Ocorreu um erro ao associar a pergunta. Por favor, tente novamente.');
+      setShowAssociateDialog(false);
+    }
+  };
+
+  // Função para continuar sem associar ao teste
+  const handleContinueWithoutAssociation = async () => {
+    if (!pendingFormValues) return;
+    
+    await saveQuestion(pendingFormValues, pendingFormValues.formikHelpers);
+    setShowAssociateDialog(false);
+    setPendingFormValues(null);
+  };
 
   const handleEdit = (question: Question) => {
     setCurrentQuestion(question)
@@ -330,6 +503,7 @@ const Questions: NextPage = () => {
           {/* Formulário de Pergunta */}
           <QuestionForm
             stages={filteredStages}
+            categories={categories}
             onSubmit={handleSubmit}
             onCancel={isEditing ? handleCancel : undefined}
             initialValues={
@@ -337,6 +511,7 @@ const Questions: NextPage = () => {
                 ? {
                     text: currentQuestion.text,
                     stageId: currentQuestion.stageId,
+                    categoryId: currentQuestion.categoryId || (categories.length > 0 ? categories[0].id : ''),
                     options: currentQuestion.options,
                   }
                 : undefined
@@ -440,7 +615,7 @@ const Questions: NextPage = () => {
                         <div key={question.id} className="border border-secondary-200 rounded-md p-4 hover:bg-secondary-50">
                           <div className="flex justify-between">
                             <span className="text-xs font-medium text-primary-600 bg-primary-50 px-2 py-1 rounded-full">
-                              {stage ? `${stage.title} (Etapa ${stage.order})` : 'Etapa não encontrada'}
+                              {question.categoryName || 'Sem categoria'}
                             </span>
                             <div className="flex space-x-2">
                               <button
@@ -476,17 +651,24 @@ const Questions: NextPage = () => {
                             </div>
                           </div>
                           <p className="text-secondary-800 font-medium mt-2">{question.text}</p>
+                          <div className="text-sm text-secondary-600 mb-2">
+                            <span className="font-medium">Etapa:</span> {stage ? stage.title : 'Sem etapa'}
+                          </div>
                           <div className="mt-3 space-y-1">
-                            {question.options.map((option, index) => (
-                              <div key={option.id || index} className="flex items-center">
-                                <span
-                                  className={`w-4 h-4 rounded-full mr-2 ${
-                                    option.isCorrect ? 'bg-green-500' : 'bg-secondary-200'
-                                  }`}
-                                ></span>
-                                <span className={option.isCorrect ? 'font-medium' : ''}>{option.text}</span>
-                              </div>
-                            ))}
+                            {question.options && question.options.length > 0 ? (
+                              question.options.map((option, index) => (
+                                <div key={option.id || index} className="flex items-center">
+                                  <span
+                                    className={`w-4 h-4 rounded-full mr-2 ${
+                                      option.isCorrect ? 'bg-green-500' : 'bg-secondary-200'
+                                    }`}
+                                  ></span>
+                                  <span className={option.isCorrect ? 'font-medium' : ''}>{option.text}</span>
+                                </div>
+                              ))
+                            ) : (
+                              <p className="text-sm text-secondary-500 italic">Sem opções</p>
+                            )}
                           </div>
                         </div>
                       )
@@ -497,6 +679,99 @@ const Questions: NextPage = () => {
           </div>
         </div>
       </main>
+
+      {/* Diálogo de confirmação para associar a pergunta ao teste */}
+      <Dialog
+        open={showAssociateDialog}
+        onClose={() => setShowAssociateDialog(false)}
+        aria-labelledby="alert-dialog-title"
+        aria-describedby="alert-dialog-description"
+        PaperProps={{
+          style: {
+            borderRadius: '12px',
+            padding: '8px',
+            maxWidth: '500px'
+          }
+        }}
+      >
+        <DialogTitle id="alert-dialog-title" style={{ color: '#4F46E5', fontWeight: 'bold' }}>
+          Associar pergunta
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="alert-dialog-description">
+            {associationMode === 'test-and-stage' ? (
+              <>
+                Você deseja associar esta pergunta ao teste <strong>{selectedTestName}</strong> e à etapa <strong>{selectedStageName}</strong> que estão selecionados no filtro?
+              </>
+            ) : (
+              <>
+                Você deseja associar esta pergunta ao teste <strong>{selectedTestName}</strong> que está selecionado no filtro?
+              </>
+            )}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={handleContinueWithoutAssociation} 
+            style={{ 
+              color: '#6B7280', 
+              fontWeight: 'medium',
+              textTransform: 'none',
+              borderRadius: '6px'
+            }}
+          >
+            Não associar
+          </Button>
+          {associationMode === 'test-and-stage' && (
+            <Button 
+              onClick={handleAssociateWithTest} 
+              style={{ 
+                color: '#4F46E5', 
+                fontWeight: 'medium',
+                textTransform: 'none',
+                borderRadius: '6px',
+                border: '1px solid #4F46E5'
+              }}
+              variant="outlined"
+            >
+              Associar somente ao teste
+            </Button>
+          )}
+          {associationMode === 'test' ? (
+            <Button 
+              onClick={handleAssociateWithTest} 
+              style={{ 
+                backgroundColor: '#4F46E5', 
+                color: 'white',
+                fontWeight: 'medium',
+                textTransform: 'none',
+                borderRadius: '6px',
+                padding: '8px 16px'
+              }} 
+              variant="contained"
+              autoFocus
+            >
+              Associar ao teste
+            </Button>
+          ) : (
+            <Button 
+              onClick={handleAssociateWithTestAndStage} 
+              style={{ 
+                backgroundColor: '#4F46E5', 
+                color: 'white',
+                fontWeight: 'medium',
+                textTransform: 'none',
+                borderRadius: '6px',
+                padding: '8px 16px'
+              }} 
+              variant="contained"
+              autoFocus
+            >
+              Associar ao teste e etapa
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
     </div>
   )
 }

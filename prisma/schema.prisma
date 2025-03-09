@@ -58,14 +58,16 @@ model Candidate {
 }
 
 model Question {
-  id        String     @id @default(uuid())
-  text      String
-  stageId   String
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  options   Option[]
-  Stage     Stage      @relation(fields: [stageId], references: [id], onDelete: Cascade)
-  responses Response[]
+  id         String     @id @default(uuid())
+  text       String
+  stageId    String
+  categoryId String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  options    Option[]
+  Stage      Stage      @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  Category   Category?  @relation(fields: [categoryId], references: [id])
+  responses  Response[]
 }
 
 model Option {
@@ -118,6 +120,15 @@ model tests {
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model Category {
+  id          String     @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  questions   Question[]
 }
 
 enum Role {

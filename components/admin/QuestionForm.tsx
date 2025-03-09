@@ -8,6 +8,12 @@ interface Stage {
   order?: number;
 }
 
+interface Category {
+  id: string;
+  name: string;
+  description?: string;
+}
+
 interface Option {
   id?: string;
   text: string;
@@ -18,27 +24,32 @@ interface Question {
   id?: string;
   text: string;
   stageId: string;
+  categoryId?: string;
   options: Option[];
 }
 
 interface QuestionFormProps {
   stages: Stage[];
+  categories: Category[];
   onSubmit: (values: any, formikHelpers?: any) => Promise<void>;
   onCancel?: () => void;
   initialValues?: Question;
   isEditing?: boolean;
   preSelectedStageId?: string;
+  preSelectedCategoryId?: string;
   onSuccess?: () => void;
   hideStageField?: boolean;
 }
 
 const QuestionForm: React.FC<QuestionFormProps> = ({
   stages,
+  categories,
   onSubmit,
   onCancel,
   initialValues,
   isEditing = false,
   preSelectedStageId,
+  preSelectedCategoryId,
   onSuccess,
   hideStageField = false
 }) => {
@@ -47,6 +58,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
   const defaultValues = {
     text: '',
     stageId: preSelectedStageId || (stages.length > 0 ? stages[0].id : ''),
+    categoryId: preSelectedCategoryId || '',
     options: [
       { text: '', isCorrect: false },
       { text: '', isCorrect: false },
@@ -60,17 +72,15 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
       text: Yup.string().required('Texto da pergunta é obrigatório'),
       options: Yup.array()
         .of(
-          Yup.object({
+          Yup.object().shape({
             text: Yup.string().required('Texto da opção é obrigatório'),
             isCorrect: Yup.boolean(),
           })
         )
-        .min(2, 'Pelo menos 2 opções são necessárias')
-        .test(
-          'one-correct',
-          'Pelo menos uma opção deve ser marcada como correta',
-          (options) => options?.some((option) => option.isCorrect)
-        ),
+        .min(2, 'Pelo menos duas opções são necessárias')
+        .test('one-correct', 'Pelo menos uma opção deve ser marcada como correta', (options) => {
+          return options.some((option) => option.isCorrect);
+        }),
     };
 
     if (!hideStageField) {
@@ -159,6 +169,27 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                 <ErrorMessage name="stageId" component="div" className="text-red-500 text-sm mt-1" />
               </div>
             )}
+            
+            <div>
+              <label htmlFor="categoryId" className="block text-sm font-medium text-secondary-700 mb-1">
+                Categoria
+              </label>
+              <Field
+                as="select"
+                name="categoryId"
+                id="categoryId"
+                className="input-field"
+                disabled={!!preSelectedCategoryId}
+              >
+                <option value="">Sem categoria</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </Field>
+              <ErrorMessage name="categoryId" component="div" className="text-red-500 text-sm mt-1" />
+            </div>
             
             <div>
               <label className="block text-sm font-medium text-secondary-700 mb-3">

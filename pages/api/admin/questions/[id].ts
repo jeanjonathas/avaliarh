@@ -22,7 +22,7 @@ export default async function handler(
 
   if (req.method === 'PUT') {
     try {
-      const { text, stageId, options } = req.body
+      const { text, stageId, categoryId, options } = req.body
 
       if (!text || !stageId || !options || !Array.isArray(options) || options.length < 2) {
         return res.status(400).json({ error: 'Dados inválidos' })
@@ -39,24 +39,49 @@ export default async function handler(
         return res.status(404).json({ error: 'Etapa não encontrada' })
       }
 
+      // Verificar se a categoria existe (se fornecida)
+      if (categoryId) {
+        try {
+          const categories = await prisma.$queryRaw`
+            SELECT id FROM "Category" WHERE id = ${categoryId}
+          `;
+
+          if (!Array.isArray(categories) || categories.length === 0) {
+            return res.status(404).json({ error: 'Categoria não encontrada' });
+          }
+        } catch (error) {
+          console.error('Erro ao verificar categoria:', error);
+          // Continuar mesmo se a categoria não for encontrada
+        }
+      }
+
       // Verificar se pelo menos uma opção está marcada como correta
       const hasCorrectOption = options.some(option => option.isCorrect)
       if (!hasCorrectOption) {
         return res.status(400).json({ error: 'Pelo menos uma opção deve ser marcada como correta' })
       }
 
-      // Atualizar a pergunta
+      // Atualizar a pergunta usando SQL raw para suportar o campo categoryId
+      await prisma.$executeRaw`
+        UPDATE "Question"
+        SET 
+          text = ${text},
+          "stageId" = ${stageId},
+          "categoryId" = ${categoryId === '' ? null : categoryId},
+          "updatedAt" = NOW()
+        WHERE id = ${id}
+      `;
+
+      // Continuar com a atualização das opções
       const updatedQuestion = await prisma.$transaction(async (prisma) => {
-        // Primeiro, atualizar a pergunta
-        const question = await prisma.question.update({
-          where: {
-            id,
-          },
-          data: {
-            text,
-            stageId,
-          },
+        // Buscar a pergunta atualizada
+        const question = await prisma.question.findUnique({
+          where: { id: id as string },
         })
+
+        if (!question) {
+          throw new Error('Pergunta não encontrada após atualização')
+        }
 
         // Excluir todas as opções existentes
         await prisma.option.deleteMany({

@@ -65,14 +65,16 @@ const TestDetail: NextPage = () => {
   const { data: session, status } = useSession()
   
   const [test, setTest] = useState<Test | null>(null)
-  const [stages, setStages] = useState<Stage[]>([])
+  const [stages, setStages] = useState<any[]>([])
   const [availableQuestions, setAvailableQuestions] = useState<Question[]>([])
   const [availableCategories, setAvailableCategories] = useState<Category[]>([])
+  const [categories, setCategories] = useState<any[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
   
   // Modal states
   const [showAddStageModal, setShowAddStageModal] = useState(false)
@@ -120,6 +122,7 @@ const TestDetail: NextPage = () => {
         }
         const categoriesData = await categoriesResponse.json()
         setAvailableCategories(categoriesData)
+        setCategories(categoriesData)
         
         // Buscar todas as perguntas
         const questionsResponse = await fetch('/api/admin/questions')
@@ -316,14 +319,13 @@ const TestDetail: NextPage = () => {
     }
   }
 
-  const handleCreateQuestion = async (values: any, { resetForm }: any) => {
+  const handleCreateQuestion = async (values: any, formikHelpers?: any) => {
     try {
-      // Garantir que stageId esteja definido
+      // Adicionar o stageId se não estiver presente (quando o campo está oculto)
       if (!values.stageId && selectedStageId) {
         values.stageId = selectedStageId;
       }
-      
-      // Criar a pergunta
+
       const response = await fetch('/api/admin/questions', {
         method: 'POST',
         headers: {
@@ -333,30 +335,29 @@ const TestDetail: NextPage = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Erro ao criar a pergunta');
+        const error = await response.json();
+        throw new Error(error.error || 'Erro ao criar pergunta');
       }
 
       const newQuestion = await response.json();
-
-      // Atualizar a lista de perguntas disponíveis
+      
+      // Atualizar a lista de perguntas
       const questionsResponse = await fetch('/api/admin/questions');
       const questionsData = await questionsResponse.json();
       setAvailableQuestions(questionsData);
-
-      // Selecionar automaticamente a nova pergunta
-      setSelectedQuestions([...selectedQuestions, newQuestion.id]);
-
-      // Esconder o formulário de nova pergunta
       setShowNewQuestionForm(false);
       
-      // Resetar o formulário
-      resetForm();
+      // Resetar o formulário se formikHelpers estiver disponível
+      if (formikHelpers && formikHelpers.resetForm) {
+        formikHelpers.resetForm();
+      }
       
       setSuccessMessage('Pergunta criada com sucesso!');
       setTimeout(() => setSuccessMessage(''), 3000);
-    } catch (error) {
-      console.error('Erro:', error);
-      setError('Ocorreu um erro ao criar a pergunta. Por favor, tente novamente.');
+    } catch (error: any) {
+      console.error('Erro ao criar pergunta:', error);
+      setErrorMessage(error.message || 'Erro ao criar pergunta');
+      setTimeout(() => setErrorMessage(''), 3000);
     }
   };
 
@@ -441,8 +442,14 @@ const TestDetail: NextPage = () => {
         )}
 
         {successMessage && (
-          <div className="mb-6 p-4 bg-green-100 border border-green-400 text-green-700 rounded-md">
-            {successMessage}
+          <div className="fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50">
+            <span className="block sm:inline">{successMessage}</span>
+          </div>
+        )}
+        
+        {errorMessage && (
+          <div className="fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50">
+            <span className="block sm:inline">{errorMessage}</span>
           </div>
         )}
 
@@ -786,6 +793,7 @@ const TestDetail: NextPage = () => {
             
             <QuestionForm
               stages={stages}
+              categories={categories}
               preSelectedStageId={selectedStageId || undefined}
               onSubmit={handleCreateQuestion}
               onCancel={() => setShowNewQuestionForm(false)}

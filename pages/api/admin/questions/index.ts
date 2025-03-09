@@ -15,99 +15,121 @@ export default async function handler(
 
   if (req.method === 'GET') {
     try {
+      console.log('Iniciando busca de perguntas');
       let questions = [];
       const { stageId, testId } = req.query;
       
+      console.log('Parâmetros de busca:', { stageId, testId });
+      
       try {
-        // Construir a consulta SQL com base nos parâmetros
+        // Consulta simplificada sem o JOIN com Category
         if (stageId && stageId !== 'all') {
-          // Buscar perguntas de uma etapa específica
+          console.log('Buscando perguntas por etapa:', stageId);
           questions = await prisma.$queryRaw`
             SELECT 
               q.id, 
               q.text, 
-              q."stageId", 
+              q."stageId",
               s.title as "stageTitle", 
               s.order as "stageOrder",
               q."createdAt", 
               q."updatedAt",
               'MEDIUM' as difficulty
             FROM "Question" q
-            JOIN "Stage" s ON q."stageId" = s.id
+            LEFT JOIN "Stage" s ON q."stageId" = s.id
             WHERE q."stageId" = ${stageId}
-            ORDER BY s.order ASC, q."createdAt" DESC
+            ORDER BY COALESCE(s.order, 0) ASC, q."createdAt" DESC
           `;
         } else if (testId && testId !== 'all') {
-          // Buscar perguntas de um teste específico
+          console.log('Buscando perguntas por teste:', testId);
           questions = await prisma.$queryRaw`
             SELECT 
               q.id, 
               q.text, 
-              q."stageId", 
+              q."stageId",
               s.title as "stageTitle", 
               s.order as "stageOrder",
               q."createdAt", 
               q."updatedAt",
               'MEDIUM' as difficulty
             FROM "Question" q
-            JOIN "Stage" s ON q."stageId" = s.id
-            JOIN "TestStage" ts ON s.id = ts."stageId"
+            LEFT JOIN "Stage" s ON q."stageId" = s.id
+            LEFT JOIN "TestStage" ts ON s.id = ts."stageId"
             WHERE ts."testId" = ${testId}
-            ORDER BY s.order ASC, q."createdAt" DESC
+            ORDER BY COALESCE(s.order, 0) ASC, q."createdAt" DESC
           `;
         } else {
-          // Buscar todas as perguntas
+          console.log('Buscando todas as perguntas');
           questions = await prisma.$queryRaw`
             SELECT 
               q.id, 
               q.text, 
-              q."stageId", 
+              q."stageId",
               s.title as "stageTitle", 
               s.order as "stageOrder",
               q."createdAt", 
               q."updatedAt",
               'MEDIUM' as difficulty
             FROM "Question" q
-            JOIN "Stage" s ON q."stageId" = s.id
-            ORDER BY s.order ASC, q."createdAt" DESC
+            LEFT JOIN "Stage" s ON q."stageId" = s.id
+            ORDER BY COALESCE(s.order, 0) ASC, q."createdAt" DESC
           `;
         }
+        console.log(`Encontradas ${Array.isArray(questions) ? questions.length : 0} perguntas`);
       } catch (error) {
         console.error('Erro ao buscar perguntas (tabela pode não existir):', error);
         // Se a tabela não existir, retornar array vazio
         return res.status(200).json([]);
       }
 
-      // Para cada pergunta, buscar suas opções
-      const questionsWithOptions = Array.isArray(questions) 
-        ? await Promise.all(questions.map(async (question: any) => {
-            let options = [];
-            
-            try {
-              options = await prisma.$queryRaw`
-                SELECT id, text, "isCorrect"
-                FROM "Option"
-                WHERE "questionId" = ${question.id}
-                ORDER BY id
-              `;
-            } catch (optionError) {
-              console.error('Erro ao buscar opções (tabela pode não existir):', optionError);
-              // Se a tabela não existir, usar array vazio
-            }
-            
-            return {
-              ...question,
-              options: Array.isArray(options) ? options : [],
-              categories: [], 
-              stage: {
-                title: question.stageTitle,
-                order: question.stageOrder
-              }
-            };
-          }))
-        : [];
+      // Formatar os resultados
+      console.log('Formatando resultados das perguntas');
+      const formattedQuestions = await Promise.all(
+        questions.map(async (question: any) => {
+          // Buscar opções para a pergunta
+          let options = [];
+          try {
+            options = await prisma.$queryRaw`
+              SELECT id, text, "isCorrect" FROM "Option" WHERE "questionId" = ${question.id}
+            `;
+            console.log(`Encontradas ${Array.isArray(options) ? options.length : 0} opções para a pergunta ${question.id}`);
+          } catch (error) {
+            console.error(`Erro ao buscar opções para a pergunta ${question.id}:`, error);
+            // Se houver erro, continuar com array vazio
+          }
 
-      return res.status(200).json(questionsWithOptions);
+          // Buscar categoria da pergunta (se existir)
+          let categoryName = 'Sem categoria';
+          try {
+            const category = await prisma.$queryRaw`
+              SELECT c.name FROM "Category" c
+              JOIN "Question" q ON q."categoryId" = c.id
+              WHERE q.id = ${question.id}
+            `;
+            if (Array.isArray(category) && category.length > 0) {
+              categoryName = category[0].name;
+            }
+          } catch (error) {
+            console.error(`Erro ao buscar categoria para a pergunta ${question.id}:`, error);
+            // Se houver erro, continuar com o valor padrão
+          }
+
+          return {
+            ...question,
+            options: Array.isArray(options) ? options : [],
+            categoryName: categoryName,
+            stage: {
+              title: question.stageTitle || 'Sem etapa',
+              order: question.stageOrder || 0
+            },
+            createdAt: question.createdAt,
+            updatedAt: question.updatedAt
+          };
+        })
+      );
+
+      console.log(`Retornando ${formattedQuestions.length} perguntas formatadas`);
+      return res.status(200).json(formattedQuestions);
     } catch (error) {
       console.error('Erro ao buscar perguntas:', error);
       // Retornar array vazio em vez de erro para não quebrar a UI
@@ -115,7 +137,7 @@ export default async function handler(
     }
   } else if (req.method === 'POST') {
     try {
-      const { text, stageId, options } = req.body;
+      const { text, stageId, categoryId, options } = req.body;
 
       if (!text || !stageId || !options || !Array.isArray(options) || options.length < 2) {
         return res.status(400).json({ error: 'Dados inválidos' });
@@ -135,6 +157,22 @@ export default async function handler(
         return res.status(404).json({ error: 'Etapa não encontrada' });
       }
 
+      // Verificar se a categoria existe (se fornecida)
+      if (categoryId) {
+        try {
+          const categories = await prisma.$queryRaw`
+            SELECT id FROM "Category" WHERE id = ${categoryId}
+          `;
+
+          if (!Array.isArray(categories) || categories.length === 0) {
+            return res.status(404).json({ error: 'Categoria não encontrada' });
+          }
+        } catch (error) {
+          console.error('Erro ao verificar categoria (tabela pode não existir):', error);
+          // Continuar mesmo se a categoria não for encontrada
+        }
+      }
+
       // Verificar se pelo menos uma opção está marcada como correta
       const hasCorrectOption = options.some((option: any) => option.isCorrect);
       if (!hasCorrectOption) {
@@ -146,8 +184,8 @@ export default async function handler(
       try {
         // Criar a pergunta
         await prisma.$executeRaw`
-          INSERT INTO "Question" (id, text, "stageId", "createdAt", "updatedAt")
-          VALUES (gen_random_uuid(), ${text}, ${stageId}, NOW(), NOW())
+          INSERT INTO "Question" (id, text, "stageId", "categoryId", "createdAt", "updatedAt")
+          VALUES (gen_random_uuid(), ${text}, ${stageId}, ${categoryId === undefined ? null : categoryId}, NOW(), NOW())
         `;
 
         // Buscar o ID da pergunta recém-criada
@@ -195,51 +233,63 @@ export default async function handler(
         return res.status(500).json({ error: 'Erro ao criar opções' });
       }
 
-      // Buscar a pergunta completa com suas opções
+      // Buscar a pergunta criada com detalhes
+      const createdQuestionResult = await prisma.$queryRaw`
+        SELECT 
+          q.id, 
+          q.text, 
+          q."stageId",
+          s.title as "stageTitle", 
+          s.order as "stageOrder",
+          q."createdAt", 
+          q."updatedAt",
+          'MEDIUM' as difficulty
+        FROM "Question" q
+        LEFT JOIN "Stage" s ON q."stageId" = s.id
+        WHERE q.id = ${questionId}
+      `;
+
+      // Verificar se a pergunta foi encontrada
+      if (!Array.isArray(createdQuestionResult) || createdQuestionResult.length === 0) {
+        return res.status(500).json({ error: 'Erro ao buscar pergunta criada' });
+      }
+
+      const createdQuestion = createdQuestionResult[0];
+
+      // Buscar opções para a pergunta
+      const createdOptions = await prisma.$queryRaw`
+        SELECT id, text, "isCorrect" FROM "Option" WHERE "questionId" = ${questionId}
+      `;
+
+      // Buscar categoria da pergunta (se existir)
+      let categoryName = 'Sem categoria';
       try {
-        const createdQuestions = await prisma.$queryRaw`
-          SELECT 
-            q.id, 
-            q.text, 
-            q."stageId", 
-            s.title as "stageTitle", 
-            s.order as "stageOrder",
-            q."createdAt", 
-            q."updatedAt",
-            'MEDIUM' as difficulty
-          FROM "Question" q
-          JOIN "Stage" s ON q."stageId" = s.id
+        const category = await prisma.$queryRaw`
+          SELECT c.name FROM "Category" c
+          JOIN "Question" q ON q."categoryId" = c.id
           WHERE q.id = ${questionId}
         `;
-
-        if (!Array.isArray(createdQuestions) || createdQuestions.length === 0) {
-          return res.status(500).json({ error: 'Erro ao buscar pergunta criada' });
+        if (Array.isArray(category) && category.length > 0) {
+          categoryName = category[0].name;
         }
-
-        const createdQuestion = createdQuestions[0];
-        
-        const options = await prisma.$queryRaw`
-          SELECT id, text, "isCorrect"
-          FROM "Option"
-          WHERE "questionId" = ${questionId}
-          ORDER BY id
-        `;
-
-        const questionWithOptions = {
-          ...createdQuestion,
-          options: Array.isArray(options) ? options : [],
-          categories: [], 
-          stage: {
-            title: createdQuestion.stageTitle,
-            order: createdQuestion.stageOrder
-          }
-        };
-
-        return res.status(201).json(questionWithOptions);
       } catch (error) {
-        console.error('Erro ao buscar pergunta criada:', error);
-        return res.status(201).json({ id: questionId, text, stageId, options });
+        console.error(`Erro ao buscar categoria para a pergunta ${questionId}:`, error);
+        // Se houver erro, continuar com o valor padrão
       }
+
+      const questionWithOptions = {
+        ...createdQuestion,
+        options: Array.isArray(createdOptions) ? createdOptions : [],
+        categoryName: categoryName,
+        stage: {
+          title: createdQuestion.stageTitle,
+          order: createdQuestion.stageOrder
+        },
+        createdAt: createdQuestion.createdAt,
+        updatedAt: createdQuestion.updatedAt
+      };
+
+      return res.status(201).json(questionWithOptions);
     } catch (error) {
       console.error('Erro ao criar pergunta:', error);
       return res.status(500).json({ error: 'Erro ao criar pergunta' });
