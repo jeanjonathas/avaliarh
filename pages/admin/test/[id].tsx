@@ -514,7 +514,7 @@ const TestDetail: NextPage = () => {
                                           : 'Difícil'}
                                       </span>
                                       
-                                      {questionStage.question.categories.map(category => (
+                                      {questionStage.question.categories && questionStage.question.categories.map(category => (
                                         <span 
                                           key={category.id}
                                           className="px-2 py-1 text-xs bg-secondary-100 text-secondary-800 rounded-full"
@@ -699,7 +699,7 @@ const TestDetail: NextPage = () => {
                               : 'Difícil'}
                           </span>
                           
-                          {question.categories.map(category => (
+                          {question.categories && question.categories.map(category => (
                             <span 
                               key={category.id}
                               className="px-2 py-1 text-xs bg-secondary-100 text-secondary-800 rounded-full"

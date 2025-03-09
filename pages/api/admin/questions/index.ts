@@ -27,7 +27,8 @@ export default async function handler(
             s.title as "stageTitle", 
             s.order as "stageOrder",
             q."createdAt", 
-            q."updatedAt"
+            q."updatedAt",
+            'MEDIUM' as difficulty
           FROM "Question" q
           JOIN "Stage" s ON q."stageId" = s.id
           ORDER BY s.order ASC, q."createdAt" DESC
@@ -58,6 +59,7 @@ export default async function handler(
             return {
               ...question,
               options: Array.isArray(options) ? options : [],
+              categories: [], 
               stage: {
                 title: question.stageTitle,
                 order: question.stageOrder
@@ -164,7 +166,8 @@ export default async function handler(
             s.title as "stageTitle", 
             s.order as "stageOrder",
             q."createdAt", 
-            q."updatedAt"
+            q."updatedAt",
+            'MEDIUM' as difficulty
           FROM "Question" q
           JOIN "Stage" s ON q."stageId" = s.id
           WHERE q.id = ${questionId}
@@ -186,6 +189,7 @@ export default async function handler(
         const questionWithOptions = {
           ...createdQuestion,
           options: Array.isArray(options) ? options : [],
+          categories: [], 
           stage: {
             title: createdQuestion.stageTitle,
             order: createdQuestion.stageOrder
