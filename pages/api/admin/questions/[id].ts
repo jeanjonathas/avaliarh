@@ -226,8 +226,10 @@ export default async function handler(
     }
   } else if (req.method === 'DELETE') {
     try {
-      // Excluir a pergunta usando SQL puro
-      await prisma.$executeRaw`DELETE FROM "Question" WHERE id = ${id}::uuid`;
+      // Excluir a pergunta usando SQL puro com conversão explícita
+      await prisma.$executeRaw`
+        DELETE FROM "Question" WHERE id::text = ${id}::text
+      `;
 
       return res.status(204).end()
     } catch (error) {
