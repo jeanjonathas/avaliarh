@@ -92,6 +92,7 @@ const CandidateDetails = () => {
     rating: '0',
   })
   const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   // Verificar autenticação
   useEffect(() => {
@@ -258,6 +259,52 @@ const CandidateDetails = () => {
     } finally {
       setIsGeneratingInvite(false);
     }
+  };
+
+  const handleShare = () => {
+    if (candidate && candidate.inviteCode) {
+      setIsShareModalOpen(true);
+    } else {
+      alert('Não há código de convite para compartilhar. Gere um código primeiro.');
+    }
+  };
+
+  const shareByEmail = async () => {
+    try {
+      const response = await fetch('/api/admin/candidates/send-invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ candidateId: candidate.id }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao enviar convite por email');
+      }
+
+      const data = await response.json();
+      
+      // Atualiza o candidato com o status de envio
+      const updatedCandidate = {
+        ...candidate,
+        inviteSent: true
+      };
+      setCandidate(updatedCandidate);
+      
+      alert('Convite enviado com sucesso para o email do candidato!');
+      setIsShareModalOpen(false);
+    } catch (error) {
+      console.error('Erro ao enviar convite:', error);
+      alert('Erro ao enviar convite por email. Por favor, tente novamente.');
+    }
+  };
+
+  const shareByWhatsApp = () => {
+    const message = `Olá ${candidate.name}, seu código de convite para o teste é: ${candidate.inviteCode}. Acesse http://localhost:3000 para realizar o teste.`;
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+    setIsShareModalOpen(false);
   };
 
   // Dados para o gráfico de radar
@@ -550,7 +597,7 @@ const CandidateDetails = () => {
                     {!candidate.completed ? (
                       <div className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
                         <p className="text-blue-700">
-                          O candidato ainda não realizou o teste. Os dados de desempenho estarão disponíveis após a conclusão.
+                          O candidato ainda não realizou o teste. Os dados de desempenho estarão disponíveis após a conclusão da avaliação.
                         </p>
                       </div>
                     ) : (
@@ -824,7 +871,7 @@ const CandidateDetails = () => {
                           <div className="bg-white p-3 rounded-md border border-secondary-200">
                             <span className="text-sm text-secondary-600">Código do Convite:</span>
                             <div className="flex items-center justify-between mt-1">
-                              <p className="font-medium text-lg text-primary-600">{candidate.inviteCode || 'Não gerado'}</p>
+                              <p className="font-medium text-lg text-primary-600">{candidate?.inviteCode || 'Não gerado'}</p>
                               <button
                                 onClick={() => generateNewInvite()}
                                 disabled={isGeneratingInvite}
@@ -842,6 +889,19 @@ const CandidateDetails = () => {
                                 }
                               </button>
                             </div>
+                            {candidate.inviteCode && (
+                              <div className="mt-2">
+                                <button
+                                  onClick={handleShare}
+                                  className="w-full px-3 py-1 text-sm bg-green-50 text-green-600 hover:bg-green-100 rounded flex items-center justify-center"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
+                                  </svg>
+                                  Compartilhar
+                                </button>
+                              </div>
+                            )}
                             {candidate.inviteExpires && (
                               <div className="mt-2 space-y-1">
                                 <p className="text-xs text-secondary-500 flex items-center">
@@ -963,6 +1023,12 @@ const CandidateDetails = () => {
                     >
                       Salvar Alterações
                     </button>
+                    <button
+                      onClick={handleShare}
+                      className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+                    >
+                      Compartilhar Convite
+                    </button>
                   </div>
                 </div>
               )}
@@ -983,6 +1049,64 @@ const CandidateDetails = () => {
           </div>
         )}
       </main>
+      
+      {isShareModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-secondary-800">Compartilhar Convite</h2>
+              <button 
+                onClick={() => setIsShareModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="bg-primary-50 p-4 rounded-lg mb-6">
+              <p className="text-center text-secondary-800 font-medium mb-2">Código do Convite</p>
+              <p className="text-center text-2xl font-bold text-primary-600">{candidate?.inviteCode}</p>
+              <p className="text-center text-sm text-secondary-600 mt-2">
+                Válido até: {candidate?.inviteExpires ? new Date(candidate.inviteExpires).toLocaleDateString('pt-BR') : 'N/A'}
+              </p>
+            </div>
+            
+            <div className="space-y-4">
+              <button
+                onClick={shareByEmail}
+                className="w-full px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center justify-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                  <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                </svg>
+                Enviar por Email
+              </button>
+              
+              <button
+                onClick={shareByWhatsApp}
+                className="w-full px-4 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center justify-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                </svg>
+                Compartilhar no WhatsApp
+              </button>
+              
+              <div className="pt-4 mt-4 border-t border-gray-200">
+                <button
+                  onClick={() => setIsShareModalOpen(false)}
+                  className="w-full px-4 py-2 bg-gray-200 text-gray-600 rounded-md hover:bg-gray-300"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
