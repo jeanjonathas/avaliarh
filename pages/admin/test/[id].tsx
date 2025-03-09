@@ -417,29 +417,30 @@ const TestDetail: NextPage = () => {
       })
 
       if (!response.ok) {
-        throw new Error('Erro ao adicionar perguntas à etapa')
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Erro ao adicionar perguntas à etapa')
       }
-
-      // Atualizar o teste com os dados atualizados
-      const updatedTestResponse = await fetch(`/api/admin/tests/${id}`)
-      const updatedTest = await updatedTestResponse.json()
-      setTest(updatedTest)
 
       // Limpar seleção e fechar modal
       setSelectedQuestions([])
       setShowAddQuestionsModal(false)
-      notify.showSuccess('Perguntas adicionadas com sucesso!')
+      
+      // Recarregar os dados do teste após um pequeno delay para garantir que o banco de dados foi atualizado
+      setTimeout(async () => {
+        await reloadTestData()
+        notify.showSuccess('Perguntas adicionadas com sucesso!')
+      }, 500)
     } catch (error) {
       console.error('Erro:', error)
-      notify.showError('Ocorreu um erro ao adicionar as perguntas. Por favor, tente novamente.')
+      notify.showError(error instanceof Error ? error.message : 'Ocorreu um erro ao adicionar as perguntas. Por favor, tente novamente.')
     }
   }
 
   const removeQuestionFromStage = async (stageId: string, questionId: string) => {
-    // Substituir o confirm pelo sistema de notificações
+    // Usar o sistema de notificação para confirmar a ação
     notify.confirm(
-      'Confirmar exclusão',
-      'Tem certeza que deseja remover esta pergunta da etapa?',
+      'Confirmar remoção',
+      'Tem certeza que deseja remover esta pergunta da etapa? A pergunta será preservada no banco de questões para uso futuro.',
       async () => {
         try {
           const response = await fetch(`/api/admin/stages/${stageId}/questions/${questionId}`, {
@@ -447,36 +448,20 @@ const TestDetail: NextPage = () => {
           })
 
           if (!response.ok) {
-            throw new Error('Erro ao remover pergunta da etapa')
+            const errorData = await response.json()
+            throw new Error(errorData.error || 'Erro ao remover pergunta da etapa')
           }
 
-          // Atualizar localmente sem fazer nova requisição
-          if (test && test.testStages) {
-            const updatedTestStages = test.testStages.map(testStage => {
-              if (testStage.stageId === stageId) {
-                return {
-                  ...testStage,
-                  stage: {
-                    ...testStage.stage,
-                    questionStages: testStage.stage.questionStages?.filter(
-                      qs => qs.questionId !== questionId
-                    ) || []
-                  }
-                }
-              }
-              return testStage
-            })
+          const result = await response.json()
 
-            setTest({
-              ...test,
-              testStages: updatedTestStages
-            })
-
-            notify.showSuccess('Pergunta removida com sucesso!')
-          }
+          // Recarregar os dados do teste após um pequeno delay para garantir que o banco de dados foi atualizado
+          setTimeout(async () => {
+            await reloadTestData()
+            notify.showSuccess(result.message || 'Pergunta removida da etapa com sucesso!')
+          }, 500)
         } catch (error) {
           console.error('Erro:', error)
-          notify.showError('Ocorreu um erro ao remover a pergunta. Por favor, tente novamente.')
+          notify.showError(error instanceof Error ? error.message : 'Ocorreu um erro ao remover a pergunta. Por favor, tente novamente.')
         }
       },
       {
@@ -712,7 +697,7 @@ const TestDetail: NextPage = () => {
                                       onClick={() => removeQuestionFromStage(questionStage.stageId, questionStage.questionId)}
                                       className="text-red-600 hover:text-red-800"
                                     >
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                       </svg>
                                     </button>

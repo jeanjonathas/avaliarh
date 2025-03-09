@@ -21,11 +21,11 @@ export default async function handler(
 
   // Verificar se o estágio existe
   try {
-    const stageExists = await prisma.$queryRaw`
-      SELECT id FROM "Stage" WHERE id = ${id}
-    `;
+    const stage = await prisma.stage.findUnique({
+      where: { id }
+    });
 
-    if (!Array.isArray(stageExists) || stageExists.length === 0) {
+    if (!stage) {
       return res.status(404).json({ error: 'Estágio não encontrado' });
     }
   } catch (error) {
@@ -33,91 +33,102 @@ export default async function handler(
     return res.status(500).json({ error: 'Erro ao verificar estágio' });
   }
 
-  // Adicionar questão ao estágio (POST)
+  // Adicionar questões ao estágio (POST)
   if (req.method === 'POST') {
     try {
-      const { questionId, order } = req.body;
+      const { questionIds } = req.body;
 
-      if (!questionId) {
-        return res.status(400).json({ error: 'ID da questão é obrigatório' });
+      if (!questionIds || !Array.isArray(questionIds) || questionIds.length === 0) {
+        return res.status(400).json({ error: 'Lista de IDs de questões é obrigatória' });
       }
 
-      // Verificar se a questão existe
-      const questionExists = await prisma.$queryRaw`
-        SELECT id FROM "Question" WHERE id = ${questionId}
-      `;
+      // Verificar se todas as questões existem
+      const questions = await prisma.question.findMany({
+        where: {
+          id: {
+            in: questionIds
+          }
+        }
+      });
 
-      if (!Array.isArray(questionExists) || questionExists.length === 0) {
-        return res.status(404).json({ error: 'Questão não encontrada' });
+      if (questions.length !== questionIds.length) {
+        return res.status(404).json({ error: 'Uma ou mais questões não foram encontradas' });
       }
 
-      // Criar a tabela QuestionStage se não existir
-      try {
-        await prisma.$executeRawUnsafe(`
-          CREATE TABLE IF NOT EXISTS "QuestionStage" (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            "stageId" VARCHAR(255) NOT NULL,
-            "questionId" VARCHAR(255) NOT NULL,
-            "order" INTEGER NOT NULL DEFAULT 0,
-            "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-            "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-            UNIQUE("stageId", "questionId")
-          )
-        `);
-      } catch (tableError) {
-        console.error('Erro ao criar tabela QuestionStage:', tableError);
-        // Continuar mesmo se houver erro, pois a tabela pode já existir
+      // Verificar quais questões já estão associadas a este estágio
+      const existingQuestions = await prisma.question.findMany({
+        where: {
+          id: {
+            in: questionIds
+          },
+          stageId: id
+        }
+      });
+
+      const existingQuestionIds = existingQuestions.map(q => q.id);
+      
+      // Filtrar apenas as questões que ainda não estão associadas
+      const newQuestionIds = questionIds.filter(qId => !existingQuestionIds.includes(qId));
+
+      if (newQuestionIds.length === 0) {
+        return res.status(400).json({ error: 'Todas as questões selecionadas já estão associadas a este estágio' });
       }
 
-      // Verificar se a relação já existe
-      const existingRelation = await prisma.$queryRaw`
-        SELECT * FROM "QuestionStage" 
-        WHERE "stageId" = ${id} AND "questionId" = ${questionId}
-      `;
-
-      if (Array.isArray(existingRelation) && existingRelation.length > 0) {
-        return res.status(400).json({ error: 'Esta questão já está associada a este estágio' });
+      // Atualizar as questões para associá-las ao estágio usando SQL raw para garantir compatibilidade
+      for (const questionId of newQuestionIds) {
+        await prisma.$executeRaw`
+          UPDATE "Question" 
+          SET "stageId" = ${id} 
+          WHERE id = ${questionId}
+        `;
       }
 
-      // Adicionar a questão ao estágio
-      await prisma.$executeRawUnsafe(`
-        INSERT INTO "QuestionStage" ("stageId", "questionId", "order", "createdAt", "updatedAt")
-        VALUES ('${id}', '${questionId}', ${order || 0}, NOW(), NOW())
-      `);
-
-      return res.status(201).json({ success: true });
+      return res.status(201).json({ 
+        success: true,
+        addedCount: newQuestionIds.length,
+        alreadyExistingCount: existingQuestionIds.length
+      });
     } catch (error) {
-      console.error('Erro ao adicionar questão ao estágio:', error);
-      return res.status(500).json({ error: 'Erro ao adicionar questão ao estágio' });
+      console.error('Erro ao adicionar questões ao estágio:', error);
+      return res.status(500).json({ error: 'Erro ao adicionar questões ao estágio' });
     }
   } 
   // Obter todas as questões de um estágio (GET)
   else if (req.method === 'GET') {
     try {
-      // Verificar se a tabela QuestionStage existe
-      let questionStages = [];
-      
-      try {
-        questionStages = await prisma.$queryRaw`
-          SELECT 
-            qs.id,
-            qs."stageId",
-            qs."questionId",
-            qs."order",
-            q.id as "question_id",
-            q.text as "question_text",
-            q.difficulty as "question_difficulty"
-          FROM "QuestionStage" qs
-          JOIN "Question" q ON qs."questionId" = q.id
-          WHERE qs."stageId" = ${id}
-          ORDER BY qs."order" ASC
-        `;
-      } catch (error) {
-        console.error('Erro ao buscar questões do estágio:', error);
-        // Se houver erro, continuar com array vazio
-      }
+      const questions = await prisma.$queryRaw`
+        SELECT 
+          q.id,
+          q.text,
+          q."stageId",
+          q."categoryId",
+          q."createdAt",
+          q."updatedAt"
+        FROM "Question" q
+        WHERE q."stageId" = ${id}
+      `;
 
-      return res.status(200).json(questionStages);
+      // Para cada questão, buscar as opções
+      const questionsWithOptions = await Promise.all((Array.isArray(questions) ? questions : []).map(async (question) => {
+        const options = await prisma.$queryRaw`
+          SELECT 
+            id,
+            text,
+            "isCorrect",
+            "questionId",
+            "createdAt",
+            "updatedAt"
+          FROM "Option"
+          WHERE "questionId" = ${question.id}
+        `;
+
+        return {
+          ...question,
+          options: Array.isArray(options) ? options : []
+        };
+      }));
+
+      return res.status(200).json(questionsWithOptions);
     } catch (error) {
       console.error('Erro ao buscar questões do estágio:', error);
       return res.status(500).json({ error: 'Erro ao buscar questões do estágio' });

@@ -24,7 +24,7 @@ export default async function handler(
 
   if (req.method === 'PUT') {
     // Validação das entradas
-    const { text, stageId, categoryUuid, options } = req.body
+    const { text, stageId, categoryId, options } = req.body
     
     if (!text || text.trim() === '') {
       return res.status(400).json({ error: 'Texto da pergunta é obrigatório' })
@@ -46,8 +46,8 @@ export default async function handler(
     console.log('ID:', id);
     console.log('Text:', text);
     console.log('StageId:', stageId);
-    console.log('CategoryUuid:', categoryUuid);
-    console.log('CategoryUuid é nulo ou vazio?', !categoryUuid || categoryUuid.trim() === '');
+    console.log('CategoryId:', categoryId);
+    console.log('CategoryId é nulo ou vazio?', !categoryId || categoryId.trim() === '');
 
     try {
       // Verificações básicas
@@ -78,47 +78,47 @@ export default async function handler(
       `;
       await prisma.$executeRawUnsafe(textQuery);
       
-      // 2. Atualizar a etapa
-      const stageQuery = `
+      // 2. Atualizar a etapa da pergunta
+      await prisma.$executeRaw`
         UPDATE "Question"
-        SET "stageId" = '${stageId}'::uuid
-        WHERE id::text = '${id}'
+        SET "stageId" = ${stageId}
+        WHERE id = ${id}
       `;
-      await prisma.$executeRawUnsafe(stageQuery);
       
       // 3. Atualizar a categoria
-      let categoryQuery;
-      if (!categoryUuid || categoryUuid.trim() === '') {
-        categoryQuery = `
+      if (categoryId) {
+        await prisma.$executeRaw`
           UPDATE "Question"
-          SET "categoryId" = NULL
-          WHERE id::text = '${id}'
+          SET "categoryId" = ${categoryId}
+          WHERE id = ${id}
         `;
       } else {
-        categoryQuery = `
+        // Se não houver categoria, definir como NULL
+        await prisma.$executeRaw`
           UPDATE "Question"
-          SET "categoryId" = '${categoryUuid}'::uuid
-          WHERE id::text = '${id}'
+          SET "categoryId" = NULL
+          WHERE id = ${id}
         `;
       }
-      await prisma.$executeRawUnsafe(categoryQuery);
       
       // 4. Excluir opções existentes
-      const deleteOptionsQuery = `
+      await prisma.$executeRaw`
         DELETE FROM "Option"
-        WHERE "questionId"::text = '${id}'
+        WHERE "questionId" = ${id}
       `;
-      await prisma.$executeRawUnsafe(deleteOptionsQuery);
       
-      // 5. Inserir novas opções usando Prisma ORM
-      for (const option of options) {
-        await prisma.option.create({
-          data: {
-            questionId: id,
-            text: option.text,
-            isCorrect: option.isCorrect
-          }
-        });
+      // 5. Inserir novas opções
+      if (Array.isArray(options) && options.length > 0) {
+        for (const option of options) {
+          await prisma.option.create({
+            data: {
+              text: option.text,
+              isCorrect: option.isCorrect,
+              questionId: id,
+              updatedAt: new Date()
+            }
+          });
+        }
       }
       
       // Buscar a pergunta atualizada com suas relações

@@ -36,8 +36,8 @@ export default async function handler(
               q."updatedAt",
               'MEDIUM' as difficulty
             FROM "Question" q
-            LEFT JOIN "Stage" s ON q."stageId"::uuid = s.id::uuid
-            WHERE q."stageId"::uuid = ${stageId}::uuid
+            LEFT JOIN "Stage" s ON q."stageId" = s.id
+            WHERE q."stageId" = ${stageId}
             ORDER BY COALESCE(s.order, 0) ASC, q."createdAt" DESC
           `;
         } else if (testId && testId !== 'all') {
@@ -55,9 +55,9 @@ export default async function handler(
               s.order as "stageOrder",
               'MEDIUM' as difficulty
             FROM "Question" q
-            LEFT JOIN "Stage" s ON q."stageId"::uuid = s.id::uuid
-            LEFT JOIN "TestStage" ts ON s.id::uuid = ts."stageId"::uuid
-            WHERE ts."testId"::uuid = ${testId}::uuid
+            LEFT JOIN "Stage" s ON q."stageId" = s.id
+            LEFT JOIN "TestStage" ts ON s.id = ts."stageId"
+            WHERE ts."testId" = ${testId}
             ORDER BY COALESCE(s.order, 0) ASC, q."createdAt" DESC
           `;
         } else {
@@ -78,8 +78,8 @@ export default async function handler(
               c.description as "categoryDescription",
               'MEDIUM' as difficulty
             FROM "Question" q
-            LEFT JOIN "Stage" s ON q."stageId"::uuid = s.id::uuid
-            LEFT JOIN "Category" c ON q."categoryId"::uuid = c.id::uuid
+            LEFT JOIN "Stage" s ON q."stageId" = s.id
+            LEFT JOIN "Category" c ON q."categoryId" = c.id
             ORDER BY COALESCE(s.order, 0) ASC, q."createdAt" DESC
           `;
         }
@@ -98,7 +98,7 @@ export default async function handler(
           let options = [];
           try {
             options = await prisma.$queryRaw`
-              SELECT id, text, "isCorrect" FROM "Option" WHERE "questionId"::uuid = ${question.id}::uuid
+              SELECT id, text, "isCorrect" FROM "Option" WHERE "questionId" = ${question.id}
             `;
             console.log(`Encontradas ${Array.isArray(options) ? options.length : 0} opções para a pergunta ${question.id}`);
           } catch (error) {
@@ -124,8 +124,8 @@ export default async function handler(
                   c.description,
                   COUNT(q.id) as "questionCount"
                 FROM "Category" c
-                LEFT JOIN "Question" q ON q."categoryId"::uuid = c.id::uuid
-                WHERE c.id::uuid = ${question.categoryId}::uuid
+                LEFT JOIN "Question" q ON q."categoryId" = c.id
+                WHERE c.id = ${question.categoryId}
                 GROUP BY c.id, c.name, c.description
               `;
               if (Array.isArray(category) && category.length > 0) {

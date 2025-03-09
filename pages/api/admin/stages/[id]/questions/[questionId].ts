@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../../../lib/auth'
 import { prisma } from '../../../../../../lib/prisma'
+import { v4 as uuidv4 } from 'uuid'
 
 export default async function handler(
   req: NextApiRequest,
@@ -53,14 +54,71 @@ export default async function handler(
   // Remover questão do estágio (DELETE)
   if (req.method === 'DELETE') {
     try {
-      // Deletar a questão (a relação com o estágio é automática)
-      await prisma.question.delete({
+      // Buscar a etapa "Banco de Questões" ou criar se não existir
+      let bankStage = await prisma.stage.findFirst({
         where: {
-          id: questionId
+          title: 'Banco de Questões'
         }
       });
 
-      return res.status(200).json({ success: true });
+      if (!bankStage) {
+        // Criar a etapa "Banco de Questões" se não existir
+        // Usando UUID válido para o ID
+        const bankStageId = uuidv4();
+        
+        bankStage = await prisma.stage.create({
+          data: {
+            id: bankStageId,
+            title: 'Banco de Questões',
+            description: 'Repositório de questões não associadas a nenhuma etapa específica',
+            order: 0,
+            updatedAt: new Date()
+          }
+        });
+      }
+
+      // Obter a questão com suas opções
+      const questionWithOptions = await prisma.question.findUnique({
+        where: { id: questionId },
+        include: { options: true }
+      });
+
+      if (!questionWithOptions) {
+        return res.status(404).json({ error: 'Questão não encontrada' });
+      }
+
+      // Criar uma cópia da questão no banco de questões
+      const newQuestion = await prisma.question.create({
+        data: {
+          text: questionWithOptions.text,
+          stageId: bankStage.id,
+          updatedAt: new Date()
+        }
+      });
+
+      // Copiar as opções para a nova questão
+      for (const option of questionWithOptions.options) {
+        await prisma.option.create({
+          data: {
+            text: option.text,
+            isCorrect: option.isCorrect,
+            questionId: newQuestion.id,
+            updatedAt: new Date()
+          }
+        });
+      }
+
+      // Excluir a questão original da etapa atual
+      // Isso é seguro porque já criamos uma cópia no banco de questões
+      await prisma.question.delete({
+        where: { id: questionId }
+      });
+
+      return res.status(200).json({ 
+        success: true,
+        message: 'Questão removida da etapa e preservada no banco de questões',
+        newQuestionId: newQuestion.id
+      });
     } catch (error) {
       console.error('Erro ao remover questão do estágio:', error);
       return res.status(500).json({ error: 'Erro ao remover questão do estágio' });
@@ -76,18 +134,14 @@ export default async function handler(
       }
 
       // Atualizar a ordem da questão
-      await prisma.question.update({
-        where: {
-          id: questionId
-        },
-        data: {
-          // Como não há um campo order no modelo Question, 
-          // podemos adicionar um comentário explicando isso
-          // order: order
-        }
-      });
+      // Como não há um campo order no modelo Question, 
+      // este endpoint não realiza nenhuma operação real
+      // Mantido para compatibilidade com o frontend
 
-      return res.status(200).json({ success: true });
+      return res.status(200).json({ 
+        success: true,
+        message: 'Operação processada com sucesso'
+      });
     } catch (error) {
       console.error('Erro ao atualizar ordem da questão:', error);
       return res.status(500).json({ error: 'Erro ao atualizar ordem da questão' });
