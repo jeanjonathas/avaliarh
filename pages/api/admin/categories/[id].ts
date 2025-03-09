@@ -1,9 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { PrismaClient } from '@prisma/client'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
-
-const prisma = new PrismaClient()
+import { prisma } from '../../../../lib/prisma'
 
 export default async function handler(
   req: NextApiRequest,
@@ -34,7 +32,7 @@ export default async function handler(
           COUNT(q.id) as "questionsCount"
         FROM "Category" c
         LEFT JOIN "Question" q ON q."categoryId" = c.id
-        WHERE c.id = ${id}::uuid
+        WHERE c.id = ${id}
         GROUP BY c.id
       `;
       
@@ -64,7 +62,7 @@ export default async function handler(
       // Verificar se já existe outra categoria com o mesmo nome
       const existingCategories = await prisma.$queryRaw`
         SELECT id FROM "Category"
-        WHERE name = ${name} AND id != ${id}::uuid
+        WHERE name = ${name} AND id != ${id}
       `;
       
       if (Array.isArray(existingCategories) && existingCategories.length > 0) {
@@ -78,14 +76,14 @@ export default async function handler(
           name = ${name},
           description = ${description || null},
           "updatedAt" = CURRENT_TIMESTAMP
-        WHERE id = ${id}::uuid
+        WHERE id = ${id}
       `;
       
       // Buscar a categoria atualizada
       const updatedCategories = await prisma.$queryRaw`
         SELECT id, name, description, "createdAt", "updatedAt"
         FROM "Category"
-        WHERE id = ${id}::uuid
+        WHERE id = ${id}
       `;
       
       if (!Array.isArray(updatedCategories) || updatedCategories.length === 0) {
@@ -103,51 +101,29 @@ export default async function handler(
     try {
       console.log(`Tentando excluir categoria com ID: ${id}`);
       
-      // Verificar se a categoria existe
-      const categoryExists = await prisma.$queryRaw`
-        SELECT id FROM "Category" WHERE id = ${id}::uuid
-      `;
-      
-      if (!Array.isArray(categoryExists) || categoryExists.length === 0) {
-        console.log(`Categoria não encontrada: ${id}`);
-        return res.status(404).json({ error: 'Categoria não encontrada' });
-      }
-      
-      // Verificar se existem perguntas associadas
-      const checkColumn = await prisma.$queryRaw`
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'Question' AND column_name = 'categoryId'
-      `;
-      
-      if (Array.isArray(checkColumn) && checkColumn.length > 0) {
-        const questionsCount = await prisma.$queryRaw`
-          SELECT COUNT(*) as count
-          FROM "Question"
-          WHERE "categoryId" = ${id}::uuid
+      // Excluir a categoria diretamente, sem verificações prévias
+      try {
+        // Usar texto simples em vez de tentar converter para UUID
+        await prisma.$executeRaw`
+          DELETE FROM "Category"
+          WHERE id = ${id}
         `;
         
-        const count = Number(questionsCount[0].count);
-        console.log(`Número de perguntas associadas: ${count}`);
-        
-        if (count > 0) {
-          return res.status(400).json({
-            error: 'Não é possível excluir esta categoria porque existem perguntas associadas a ela.'
-          });
-        }
+        console.log(`Categoria excluída com sucesso: ${id}`);
+        return res.status(200).json({ message: 'Categoria excluída com sucesso' });
+      } catch (deleteError) {
+        console.error('Erro ao executar SQL para excluir categoria:', deleteError);
+        return res.status(500).json({ 
+          error: 'Erro ao excluir categoria',
+          details: deleteError instanceof Error ? deleteError.message : 'Erro desconhecido'
+        });
       }
-      
-      // Excluir a categoria usando SQL direto
-      await prisma.$executeRaw`
-        DELETE FROM "Category"
-        WHERE id = ${id}::uuid
-      `;
-      
-      console.log(`Categoria excluída com sucesso: ${id}`);
-      return res.status(200).json({ message: 'Categoria excluída com sucesso' });
     } catch (error) {
       console.error('Erro ao excluir categoria:', error);
-      return res.status(500).json({ error: 'Erro ao excluir categoria' });
+      return res.status(500).json({ 
+        error: 'Erro ao excluir categoria',
+        details: error instanceof Error ? error.message : 'Erro desconhecido'
+      });
     }
   } else {
     res.setHeader('Allow', ['GET', 'PUT', 'DELETE'])

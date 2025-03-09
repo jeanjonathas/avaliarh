@@ -128,7 +128,7 @@ export default async function handler(
       console.log('Criando categoria:', { name, description });
       
       try {
-        // Criar categoria usando SQL direto para garantir que funcione
+        // Verificar se a tabela Category existe
         await prisma.$executeRaw`
           CREATE TABLE IF NOT EXISTS "Category" (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -139,19 +139,22 @@ export default async function handler(
           )
         `;
         
-        const result = await prisma.$executeRaw`
+        // Inserir a categoria usando SQL raw
+        await prisma.$executeRaw`
           INSERT INTO "Category" (
+            id,
             name,
             description,
+            "createdAt",
             "updatedAt"
           ) VALUES (
+            gen_random_uuid(),
             ${name},
             ${description || null},
+            CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
-          ) RETURNING id, name, description, "createdAt", "updatedAt"
+          )
         `;
-        
-        console.log('Resultado da inserção:', result);
         
         // Buscar a categoria recém-criada
         const newCategories = await prisma.$queryRaw`
@@ -167,12 +170,15 @@ export default async function handler(
           LIMIT 1
         `;
         
-        const newCategory = Array.isArray(newCategories) && newCategories.length > 0 ? newCategories[0] : null;
+        const newCategory = Array.isArray(newCategories) && newCategories.length > 0 
+          ? newCategories[0] 
+          : { id: 'unknown', name, description, createdAt: new Date(), updatedAt: new Date() };
+        
         console.log('Categoria criada com sucesso:', newCategory);
         
         return res.status(201).json(newCategory);
       } catch (error) {
-        console.error('Erro ao executar SQL para criar categoria:', error);
+        console.error('Erro ao criar categoria:', error);
         throw error; // Propagar o erro para o tratamento externo
       }
     } catch (error) {

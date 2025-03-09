@@ -25,6 +25,7 @@ const Categories: NextPage = () => {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
   const [isEditing, setIsEditing] = useState(false)
   const [currentCategory, setCurrentCategory] = useState<Category | null>(null)
   
@@ -104,20 +105,44 @@ const Categories: NextPage = () => {
     }
     
     try {
+      console.log(`Tentando excluir categoria com ID: ${id}`)
+      
+      // Verificar se o ID é válido
+      if (!id || id.trim() === '') {
+        setError('ID da categoria inválido')
+        return
+      }
+      
       const response = await fetch(`/api/admin/categories/${id}`, {
         method: 'DELETE',
       })
       
-      if (!response.ok) {
-        throw new Error('Erro ao excluir a categoria')
+      let data
+      try {
+        data = await response.json()
+      } catch (e) {
+        console.error('Erro ao processar resposta JSON:', e)
+        data = { error: 'Erro ao processar resposta' }
       }
+      
+      if (!response.ok) {
+        console.error('Erro na resposta:', data)
+        throw new Error(data.error || 'Erro ao excluir a categoria')
+      }
+      
+      console.log('Resposta da exclusão:', data)
       
       // Atualizar a lista de categorias
       setCategories(categories.filter(c => c.id !== id))
       
+      // Mostrar mensagem de sucesso
+      setSuccessMessage('Categoria excluída com sucesso')
+      setTimeout(() => setSuccessMessage(''), 3000)
+      
     } catch (error) {
       console.error('Erro:', error)
       setError('Ocorreu um erro ao excluir a categoria. Por favor, tente novamente.')
+      setTimeout(() => setError(''), 5000)
     }
   }
   
@@ -153,6 +178,12 @@ const Categories: NextPage = () => {
         {error && (
           <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-md">
             {error}
+          </div>
+        )}
+        
+        {successMessage && (
+          <div className="mb-6 p-4 bg-green-100 border border-green-400 text-green-700 rounded-md">
+            {successMessage}
           </div>
         )}
 
