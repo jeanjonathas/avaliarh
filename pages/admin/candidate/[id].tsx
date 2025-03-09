@@ -22,6 +22,7 @@ import { Rating } from '@mui/material'
 import Navbar from '../../../components/admin/Navbar'
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useNotification } from '../../../contexts/NotificationContext';
 
 // Registrar componentes do Chart.js
 ChartJS.register(
@@ -79,6 +80,7 @@ const CandidateDetails = () => {
   const { data: session, status } = useSession()
   const router = useRouter()
   const { id } = router.query
+  const { showToast } = useNotification();
   
   const [candidate, setCandidate] = useState<Candidate | null>(null)
   const [loading, setLoading] = useState(true)
@@ -252,10 +254,10 @@ const CandidateDetails = () => {
       
       // Recarregar dados do candidato
       fetchCandidate()
-      alert('Candidato atualizado com sucesso!')
+      showToast('Candidato atualizado com sucesso!', 'success');
     } catch (err) {
       console.error(err)
-      alert('Erro ao atualizar candidato')
+      showToast('Erro ao atualizar candidato', 'error');
     }
   }
 
@@ -266,13 +268,13 @@ const CandidateDetails = () => {
       
       if (!candidate || !candidate.id) {
         console.error('Erro: candidato não definido ou sem ID');
-        alert('Erro: dados do candidato não disponíveis. Recarregue a página e tente novamente.');
+        showToast('Erro: dados do candidato não disponíveis. Recarregue a página e tente novamente.', 'error');
         setIsGeneratingInvite(false);
         return;
       }
       
       if (!formData.testId) {
-        alert('Por favor, selecione um teste para o candidato antes de gerar o convite.');
+        showToast('Por favor, selecione um teste para o candidato antes de gerar o convite.', 'warning');
         setIsGeneratingInvite(false);
         return;
       }
@@ -340,9 +342,10 @@ const CandidateDetails = () => {
       // Abrir o modal de compartilhamento em vez de mostrar um alert
       setIsShareModalOpen(true);
       setIsNewCodeGenerated(true);
+      showToast('Código de convite gerado com sucesso!', 'success');
     } catch (error) {
       console.error('Erro ao gerar convite:', error);
-      alert('Erro ao gerar novo convite. Por favor, tente novamente.');
+      showToast('Erro ao gerar novo convite. Por favor, tente novamente.', 'error');
     } finally {
       setIsGeneratingInvite(false);
     }
@@ -352,7 +355,7 @@ const CandidateDetails = () => {
     if (candidate?.inviteCode) {
       setIsShareModalOpen(true);
     } else {
-      alert('Não há código de convite para compartilhar. Gere um código primeiro.');
+      showToast('Não há código de convite para compartilhar. Gere um código primeiro.', 'warning');
     }
   };
 
@@ -360,7 +363,7 @@ const CandidateDetails = () => {
     try {
       if (!candidate || !candidate.id) {
         console.error('Erro: candidato não definido ou sem ID');
-        alert('Erro: dados do candidato não disponíveis. Recarregue a página e tente novamente.');
+        showToast('Erro: dados do candidato não disponíveis. Recarregue a página e tente novamente.', 'error');
         return;
       }
       
@@ -392,18 +395,18 @@ const CandidateDetails = () => {
         };
       });
       
-      alert('Convite enviado com sucesso para o email do candidato!');
+      showToast('Convite enviado com sucesso para o email do candidato!', 'success');
       setIsShareModalOpen(false);
     } catch (error) {
       console.error('Erro ao enviar convite:', error);
-      alert('Erro ao enviar convite por email. Por favor, tente novamente.');
+      showToast('Erro ao enviar convite por email. Por favor, tente novamente.', 'error');
     }
   };
 
   const shareByWhatsApp = () => {
     try {
       if (!candidate?.inviteCode) {
-        alert('Não há código de convite para compartilhar. Gere um código primeiro.');
+        showToast('Não há código de convite para compartilhar. Gere um código primeiro.', 'warning');
         return;
       }
       
@@ -419,7 +422,7 @@ const CandidateDetails = () => {
       window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
     } catch (error) {
       console.error('Erro ao compartilhar via WhatsApp:', error);
-      alert('Erro ao compartilhar via WhatsApp. Por favor, tente novamente.');
+      showToast('Erro ao compartilhar via WhatsApp. Por favor, tente novamente.', 'error');
     }
   };
 
