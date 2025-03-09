@@ -1,7 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../../../lib/prisma';
 
 // Número máximo de tentativas permitidas
 const MAX_ATTEMPTS = 5;
@@ -18,22 +16,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Código de convite é obrigatório' });
     }
     
-    // Buscar o candidato pelo código de convite
-    const candidate = await prisma.candidate.findUnique({
-      where: { inviteCode },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        position: true,
-        completed: true,
-        inviteExpires: true,
-        inviteAttempts: true
-      }
-    });
+    // Buscar o candidato pelo código de convite usando SQL raw
+    const candidates = await prisma.$queryRaw`
+      SELECT 
+        id, 
+        name, 
+        email, 
+        phone, 
+        position, 
+        completed, 
+        "inviteExpires", 
+        "inviteAttempts"
+      FROM "Candidate"
+      WHERE "inviteCode" = ${inviteCode}
+    `;
     
-    // Se o candidato não for encontrado, incrementar tentativas para todos os candidatos com esse IP
+    const candidate = Array.isArray(candidates) && candidates.length > 0 ? candidates[0] : null;
+    
+    // Se o candidato não for encontrado, retornar erro
     if (!candidate) {
       // Em um ambiente de produção, você poderia rastrear tentativas por IP
       // para evitar ataques de força bruta
@@ -41,13 +41,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     
     // Incrementar o contador de tentativas
-    await prisma.candidate.update({
-      where: { id: candidate.id },
-      data: { inviteAttempts: candidate.inviteAttempts + 1 }
-    });
+    await prisma.$executeRaw`
+      UPDATE "Candidate"
+      SET "inviteAttempts" = "inviteAttempts" + 1
+      WHERE id = ${candidate.id}
+    `;
     
     // Verificar se o convite expirou
-    if (candidate.inviteExpires && new Date() > candidate.inviteExpires) {
+    if (candidate.inviteExpires && new Date() > new Date(candidate.inviteExpires)) {
       return res.status(400).json({ error: 'O código de convite expirou' });
     }
     
@@ -64,22 +65,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     
     // Resetar o contador de tentativas após um login bem-sucedido
-    await prisma.candidate.update({
-      where: { id: candidate.id },
-      data: { inviteAttempts: 0 }
-    });
+    await prisma.$executeRaw`
+      UPDATE "Candidate"
+      SET "inviteAttempts" = 0
+      WHERE id = ${candidate.id}
+    `;
     
-    return res.status(200).json({ 
-      success: true, 
+    // Retornar os dados do candidato
+    return res.status(200).json({
+      success: true,
       candidate: {
         id: candidate.id,
         name: candidate.name,
         email: candidate.email,
         phone: candidate.phone,
-        position: candidate.position
+        position: candidate.position || null
       }
     });
-    
   } catch (error) {
     console.error('Erro ao validar convite:', error);
     return res.status(500).json({ error: 'Erro ao validar convite' });

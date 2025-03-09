@@ -54,12 +54,9 @@ const Navbar: React.FC = () => {
             </div>
           </div>
           <div>
-            <button
-              onClick={() => router.push('/api/auth/signout')}
-              className="px-4 py-2 text-sm text-white bg-secondary-600 rounded-md hover:bg-secondary-700"
-            >
+            <Link href="/api/auth/signout" className="px-4 py-2 text-sm text-white bg-secondary-600 rounded-md hover:bg-secondary-700">
               Sair
-            </button>
+            </Link>
           </div>
         </div>
       </div>
