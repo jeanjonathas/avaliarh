@@ -354,8 +354,8 @@ const Questions: NextPage = () => {
       const dataToSend = {
         ...values,
         stageId: values.stageId || null,
+        categoryId: values.categoryId || null, // Enviar categoryId também para compatibilidade
         categoryUuid: values.categoryUuid || null,
-        categoryId: undefined // Não enviar categoryId para evitar conflitos
       };
 
       console.log('Dados formatados para envio:', dataToSend);
@@ -384,6 +384,7 @@ const Questions: NextPage = () => {
         } else if (response.ok) {
           // Se a edição foi bem-sucedida, atualizar a pergunta atual com os novos dados
           const updatedQuestion = await response.json();
+          console.log('Pergunta atualizada recebida do servidor:', updatedQuestion);
           setCurrentQuestion(updatedQuestion);
         }
         
@@ -775,9 +776,6 @@ const Questions: NextPage = () => {
                             </div>
                           </div>
                           <p className="text-secondary-800 font-medium mt-2">{question.text}</p>
-                          <div className="text-sm text-secondary-600 mb-2">
-                            <span className="font-medium">Etapa:</span> {stage ? stage.title : 'Sem etapa'}
-                          </div>
                           <div className="mt-3 space-y-1">
                             {question.options && question.options.length > 0 ? (
                               question.options.map((option, index) => (

@@ -167,7 +167,7 @@ const Categories: NextPage = () => {
 
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-secondary-800">Gerenciar Categorias</h1>
+          <h1 className="text-2xl font-bold text-secondary-800">Gerenciar Categorias de Perguntas</h1>
         </div>
 
         {error && (

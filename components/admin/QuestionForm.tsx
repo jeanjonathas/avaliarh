@@ -412,23 +412,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
               </Field>
               
               {/* Campo oculto para armazenar o UUID da categoria */}
-              <Field type="hidden" name="categoryUuid" />
-              
-              <FormikConsumer>
-                {({ values }) => {
-                  // Encontrar o nome da categoria a partir do UUID
-                  const categoryName = values.categoryId ? 
-                    categories.find(c => c.id === values.categoryId)?.name || 'não encontrada' : 
-                    'nenhuma';
-                  
-                  return (
-                    <div className="mt-1 text-xs text-gray-500">
-                      {categoryName !== 'nenhuma' && <p>Categoria: {categoryName}</p>}
-                    </div>
-                  );
-                }}
-              </FormikConsumer>
-              
+              <Field type="hidden" name="categoryUuid" />              
               <ErrorMessage
                 name="categoryId"
                 render={msg => {
