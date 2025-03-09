@@ -434,17 +434,9 @@ const CandidateDetails = () => {
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
               </svg>
+              Voltar
             </Link>
-            <div className="flex items-center">
-              <Image 
-                src="/images/logo quadrado.png" 
-                alt="AvaliaRH" 
-                width={40} 
-                height={40} 
-                className="mr-3"
-              />
-              <h1 className="text-2xl font-bold text-secondary-800">Detalhes do Candidato</h1>
-            </div>
+            <h1 className="text-2xl font-bold text-secondary-800">Detalhes do Candidato</h1>
           </div>
           
           <div className="flex space-x-2">
