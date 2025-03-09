@@ -71,7 +71,8 @@ model Question {
   Category         Category?        @relation(fields: [categoryId], references: [id])
   Stage            Stage            @relation(fields: [stageId], references: [id], onDelete: Cascade)
   responses        Response[]
-  stageQuestions   StageQuestion[]  // Nova relação com a tabela StageQuestion
+  stageQuestions   StageQuestion[]  // Relação com a tabela StageQuestion
+  testQuestions    TestQuestion[]   // Nova relação com a tabela TestQuestion
 }
 
 model Option {
@@ -117,7 +118,8 @@ model Stage {
   Question       Question[]
   test           tests?           @relation(fields: [testId], references: [id])
   TestStage      TestStage[]
-  stageQuestions StageQuestion[]  // Nova relação com a tabela StageQuestion
+  stageQuestions StageQuestion[]  // Relação com a tabela StageQuestion
+  testQuestions  TestQuestion[]   // Nova relação com a tabela TestQuestion
 }
 
 model TestStage {
@@ -134,16 +136,17 @@ model TestStage {
 }
 
 model tests {
-  id          String      @id @default(uuid())
+  id          String        @id @default(uuid())
   title       String
   description String?
   timeLimit   Int?
-  active      Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  active      Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
   candidates  Candidate[]
   stages      Stage[]
   TestStage   TestStage[]
+  testQuestions TestQuestion[]
 }
 
 model Category {
@@ -168,6 +171,24 @@ model StageQuestion {
   @@unique([stageId, questionId])
   @@index([stageId])
   @@index([questionId])
+}
+
+model TestQuestion {
+  id          String    @id @default(uuid())
+  testId      String
+  questionId  String
+  stageId     String
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  test        tests     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  question    Question  @relation(fields: [questionId], references: [id])
+  stage       Stage     @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  @@unique([testId, stageId, questionId])
+  @@index([testId])
+  @@index([questionId])
+  @@index([stageId])
 }
 
 enum Role {

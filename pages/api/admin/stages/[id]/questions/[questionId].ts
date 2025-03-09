@@ -22,11 +22,19 @@ export default async function handler(
   // Verificar se o estágio existe
   try {
     const stage = await prisma.stage.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        test: true // Incluir o teste associado à etapa
+      }
     });
 
     if (!stage) {
       return res.status(404).json({ error: 'Estágio não encontrado' });
+    }
+    
+    // Verificar se o estágio está associado a um teste
+    if (!stage.testId) {
+      return res.status(400).json({ error: 'Estágio não está associado a um teste' });
     }
   } catch (error) {
     console.error('Erro ao verificar estágio:', error);
@@ -43,6 +51,31 @@ export default async function handler(
       return res.status(404).json({ error: 'Questão não encontrada' });
     }
     
+    // Obter o estágio com o teste associado
+    const stage = await prisma.stage.findUnique({
+      where: { id },
+      include: {
+        test: true,
+        TestStage: {
+          include: {
+            test: true
+          }
+        }
+      }
+    });
+
+    if (!stage) {
+      return res.status(404).json({ error: 'Estágio não encontrado' });
+    }
+    
+    // Verificar se o estágio está associado a um teste diretamente ou via TestStage
+    let testId = stage.testId;
+    
+    // Se não houver testId direto, tentar obter do TestStage
+    if (!testId && stage.TestStage && stage.TestStage.length > 0) {
+      testId = stage.TestStage[0].testId;
+    }
+    
     // Verificar se existe uma associação entre a questão e a etapa
     const stageQuestion = await prisma.stageQuestion.findUnique({
       where: {
@@ -54,7 +87,7 @@ export default async function handler(
     });
     
     if (req.method === 'DELETE' && !stageQuestion) {
-      return res.status(404).json({ error: 'Questão não está associada a esta etapa' });
+      return res.status(404).json({ error: 'Questão não está associada a esta etapa neste teste' });
     }
   } catch (error) {
     console.error('Erro ao verificar questão:', error);
@@ -64,7 +97,37 @@ export default async function handler(
   // Remover questão do estágio (DELETE)
   if (req.method === 'DELETE') {
     try {
-      // Em vez de excluir a pergunta, apenas removemos a associação na tabela StageQuestion
+      // Obter o estágio com o teste associado
+      const stage = await prisma.stage.findUnique({
+        where: { id },
+        include: {
+          test: true,
+          TestStage: {
+            include: {
+              test: true
+            }
+          }
+        }
+      });
+
+      if (!stage) {
+        return res.status(404).json({ error: 'Estágio não encontrado' });
+      }
+      
+      // Verificar se o estágio está associado a um teste diretamente ou via TestStage
+      let testId = stage.testId;
+      
+      // Se não houver testId direto, tentar obter do TestStage
+      if (!testId && stage.TestStage && stage.TestStage.length > 0) {
+        testId = stage.TestStage[0].testId;
+      }
+      
+      if (!testId) {
+        return res.status(404).json({ error: 'Estágio não está associado a nenhum teste' });
+      }
+      
+      // Remover a associação na tabela StageQuestion
+      // Importante: Não estamos excluindo a questão, apenas removendo a associação com a etapa
       await prisma.stageQuestion.delete({
         where: {
           stageId_questionId: {
@@ -73,6 +136,17 @@ export default async function handler(
           }
         }
       });
+      
+      // Remover a associação na tabela TestQuestion usando SQL raw para evitar problemas com o cliente Prisma
+      try {
+        // Usar SQL raw para remover a associação na tabela TestQuestion
+        await prisma.$executeRaw`DELETE FROM "TestQuestion" WHERE "stageId" = ${id} AND "questionId" = ${questionId} AND "testId" = ${testId}`;
+      } catch (error) {
+        console.error('Erro ao remover associação da tabela TestQuestion:', error);
+        // Continuar mesmo se houver erro
+      }
+      
+      // Nota: Não estamos excluindo a questão do banco de dados, apenas removendo a associação com o teste e a etapa
 
       return res.status(200).json({ 
         success: true,

@@ -32,7 +32,6 @@ interface Stage {
 interface Question {
   id: string
   text: string
-  difficulty: string
   options: Option[]
   categories: Category[]
 }
@@ -606,10 +605,10 @@ const TestDetail: NextPage = () => {
       }
     }
     
-    // Filtro por dificuldade
-    if (selectedDifficulty !== 'all' && question.difficulty !== selectedDifficulty) {
-      return false
-    }
+    // Filtro por dificuldade (temporariamente desativado)
+    // if (selectedDifficulty !== 'all' && question.difficulty !== selectedDifficulty) {
+    //   return false
+    // }
     
     return true
   })
@@ -966,19 +965,9 @@ const TestDetail: NextPage = () => {
                                         {qIndex + 1}. {questionStage.question.text}
                                       </div>
                                       <div className="mt-2 flex flex-wrap gap-2">
-                                        <span className={`px-2 py-1 text-xs rounded-full ${
-                                          questionStage.question.difficulty === 'EASY' 
-                                            ? 'bg-green-100 text-green-800' 
-                                            : questionStage.question.difficulty === 'MEDIUM'
-                                            ? 'bg-yellow-100 text-yellow-800'
-                                            : 'bg-red-100 text-red-800'
-                                        }`}>
-                                          {questionStage.question.difficulty === 'EASY' 
-                                            ? 'Fácil' 
-                                            : questionStage.question.difficulty === 'MEDIUM'
-                                            ? 'Médio'
-                                            : 'Difícil'
-                                          }
+                                        {/* Dificuldade temporariamente desativada */}
+                                        <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
+                                          Sem dificuldade
                                         </span>
                                         {questionStage.question.categories && questionStage.question.categories.length > 0 && 
                                           questionStage.question.categories.map(category => (
@@ -1178,19 +1167,9 @@ const TestDetail: NextPage = () => {
                           {question.text}
                         </div>
                         <div className="mt-2 flex flex-wrap gap-2">
-                          <span className={`px-2 py-1 text-xs rounded-full ${
-                            question.difficulty === 'EASY' 
-                              ? 'bg-green-100 text-green-800' 
-                              : question.difficulty === 'MEDIUM'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            {question.difficulty === 'EASY' 
-                              ? 'Fácil' 
-                              : question.difficulty === 'MEDIUM'
-                              ? 'Médio'
-                              : 'Difícil'
-                            }
+                          {/* Dificuldade temporariamente desativada */}
+                          <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
+                            Sem dificuldade
                           </span>
                           
                           {question.categories && question.categories.map(category => (
@@ -1260,7 +1239,7 @@ const TestDetail: NextPage = () => {
               onSubmit={handleCreateQuestion}
               onCancel={() => setShowNewQuestionForm(false)}
               onSuccess={() => {
-                notify.showToast('Pergunta criada com sucesso!', 'success');
+                notify.showSuccess('Pergunta criada com sucesso!');
               }}
               hideStageField={true}
             />

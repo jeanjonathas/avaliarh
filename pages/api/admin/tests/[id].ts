@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
 import { prisma } from '../../../../lib/prisma'
+import { Prisma } from '@prisma/client'
 
 export default async function handler(
   req: NextApiRequest,
@@ -183,21 +184,60 @@ export default async function handler(
       // Para cada estágio, buscar as perguntas associadas
       if (Array.isArray(stagesData) && stagesData.length > 0) {
         const stagesWithQuestions = await Promise.all(stagesData.map(async (stage) => {
-          // Buscar as questões associadas a este estágio
-          const questions = await prisma.$queryRaw`
+          // Buscar as questões associadas a este estágio usando a tabela TestQuestion
+          console.log(`[API] Buscando questões para o estágio ${stage.id} do teste ${id}...`);
+          
+          // Primeiro, buscar as associações na tabela TestQuestion
+          const testQuestions = await prisma.$queryRaw`
             SELECT 
-              id,
-              text,
-              "stageId",
-              "categoryId",
-              "createdAt",
-              "updatedAt"
-            FROM "Question"
-            WHERE "stageId" = ${stage.id}
+              tq."id" as "testQuestionId",
+              tq."questionId",
+              tq."order"
+            FROM "TestQuestion" tq
+            WHERE tq."testId" = ${id} AND tq."stageId" = ${stage.id}
+            ORDER BY tq."order" ASC
           `;
+          
+          console.log(`[API] ${Array.isArray(testQuestions) ? testQuestions.length : 0} questões encontradas na tabela TestQuestion para o estágio ${stage.id}`);
+          
+          // Se não encontrar questões na tabela TestQuestion, tentar buscar na tabela StageQuestion (compatibilidade)
+          let questionIds = [];
+          if (Array.isArray(testQuestions) && testQuestions.length > 0) {
+            questionIds = testQuestions.map(tq => tq.questionId);
+          } else {
+            // Buscar na tabela StageQuestion como fallback
+            const stageQuestions = await prisma.$queryRaw`
+              SELECT "questionId"
+              FROM "StageQuestion"
+              WHERE "stageId" = ${stage.id}
+            `;
+            
+            if (Array.isArray(stageQuestions) && stageQuestions.length > 0) {
+              questionIds = stageQuestions.map(sq => sq.questionId);
+            }
+          }
+          
+          // Buscar os detalhes das questões
+          let questions = [];
+          if (questionIds.length > 0) {
+            questions = await prisma.$queryRaw`
+              SELECT 
+                q.id,
+                q.text,
+                q."stageId",
+                q."categoryId",
+                q."createdAt",
+                q."updatedAt"
+              FROM "Question" q
+              WHERE q.id IN (${Prisma.join(questionIds)})
+            `;
+          }
 
-          // Para cada questão, buscar as opções
+          // Para cada questão, buscar as opções e categorias
           const questionsWithOptions = await Promise.all((Array.isArray(questions) ? questions : []).map(async (question) => {
+            console.log(`[API] Buscando opções e categorias para a questão ${question.id}...`);
+            
+            // Buscar opções
             const options = await prisma.$queryRaw`
               SELECT 
                 id,
@@ -209,10 +249,25 @@ export default async function handler(
               FROM "Option"
               WHERE "questionId" = ${question.id}
             `;
+            
+            // Buscar categorias associadas à questão
+            const questionCategories = await prisma.$queryRaw`
+              SELECT 
+                c.id,
+                c.name
+              FROM "Category" c
+              WHERE c.id = (
+                SELECT "categoryId" FROM "Question" WHERE id = ${question.id} AND "categoryId" IS NOT NULL
+              )
+            `;
+            
+            console.log(`[API] Questão ${question.id}: ${Array.isArray(options) ? options.length : 0} opções, ${Array.isArray(questionCategories) ? questionCategories.length : 0} categorias`);
 
             return {
               ...question,
-              options: Array.isArray(options) ? options : []
+              options: Array.isArray(options) ? options : [],
+              categories: Array.isArray(questionCategories) ? questionCategories : [],
+              difficulty: 'medium' // Adicionar um valor padrão para a propriedade difficulty
             };
           }));
 
