@@ -379,12 +379,20 @@ const Questions: NextPage = () => {
       const questionsData = await questionsResponse.json();
       setQuestions(questionsData);
 
-      // Limpar o formulário e o estado de edição
-      if (formikHelpers) {
+      // Limpar o formulário e o estado de edição apenas se não estiver editando
+      if (!isEditing && formikHelpers) {
         formikHelpers.resetForm();
       }
-      setIsEditing(false);
-      setCurrentQuestion(null);
+      
+      // Ao editar, manter o estado de edição e a pergunta atual
+      if (!isEditing) {
+        setIsEditing(false);
+        setCurrentQuestion(null);
+      } else if (response.ok) {
+        // Se a edição foi bem-sucedida, atualizar a pergunta atual com os novos dados
+        const updatedQuestion = await response.json();
+        setCurrentQuestion(updatedQuestion);
+      }
 
       // Exibir mensagem de sucesso
       setSuccessMessage(isEditing ? 'Pergunta atualizada com sucesso!' : 'Pergunta criada com sucesso!');
@@ -579,6 +587,7 @@ const Questions: NextPage = () => {
             isEditing={isEditing}
             hideStageField={selectedTestId === 'all'}
             preSelectedStageId={selectedStageId !== 'all' ? selectedStageId : ''}
+            isUpdating={isEditing} // Definir isUpdating como true quando estiver editando uma pergunta
           />
 
           {/* Lista de Perguntas */}

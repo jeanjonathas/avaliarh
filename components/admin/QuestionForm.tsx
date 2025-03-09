@@ -45,6 +45,7 @@ interface QuestionFormProps {
   preSelectedCategoryId?: string;
   onSuccess?: () => void;
   hideStageField?: boolean;
+  isUpdating?: boolean;
 }
 
 const QuestionForm: React.FC<QuestionFormProps> = ({
@@ -57,7 +58,8 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
   preSelectedStageId,
   preSelectedCategoryId,
   onSuccess,
-  hideStageField = false
+  hideStageField = false,
+  isUpdating = false
 }) => {
   const [error, setError] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
@@ -194,7 +196,12 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
     try {
       setError('');
       await onSubmit(values);
-      resetForm();
+      
+      // Apenas resetar o formulário se não estiver atualizando uma pergunta existente
+      if (!isUpdating) {
+        resetForm();
+      }
+      
       if (onSuccess) {
         onSuccess();
       }
@@ -219,7 +226,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
       <Formik
         initialValues={prepareInitialValues()}
         validationSchema={getValidationSchema()}
-        enableReinitialize={true}
+        enableReinitialize={true}  // Sempre permitir reinicialização para carregar valores iniciais
         onSubmit={handleSubmit}
       >
         {({ values, isSubmitting, setFieldValue }) => (
@@ -345,9 +352,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                   
                   return (
                     <div className="mt-1 text-xs text-gray-500">
-                      <p>CategoryId: {values.categoryId || 'não definido'}</p>
-                      <p>CategoryUuid: {values.categoryUuid || 'não definido'}</p>
-                      <p>Categoria: {categoryName}</p>
+                      {categoryName !== 'nenhuma' && <p>Categoria: {categoryName}</p>}
                     </div>
                   );
                 }}
