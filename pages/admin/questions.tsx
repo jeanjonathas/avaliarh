@@ -73,6 +73,8 @@ const Questions: NextPage = () => {
   const [selectedStageName, setSelectedStageName] = useState('')
   const [associationMode, setAssociationMode] = useState<'test' | 'test-and-stage' | 'none'>('none')
   const [categories, setCategories] = useState<any[]>([])
+  const [filterType, setFilterType] = useState<'test' | 'category'>('test')
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all')
 
   useEffect(() => {
     // Verificar se o usuário está autenticado
@@ -138,7 +140,7 @@ const Questions: NextPage = () => {
   const loadQuestions = async () => {
     setLoading(true);
     try {
-      console.log('Carregando perguntas...');
+      console.log('Carregando todas as perguntas...');
       const response = await fetch('/api/admin/questions')
       if (!response.ok) {
         throw new Error('Erro ao carregar as perguntas')
@@ -260,14 +262,14 @@ const Questions: NextPage = () => {
 
   useEffect(() => {
     // Efeito para carregar perguntas quando a etapa selecionada mudar
-    if (selectedStageId === 'all' || !selectedTestId || selectedTestId === 'all') {
+    if (filterType !== 'test' || selectedStageId === 'all' || !selectedTestId || selectedTestId === 'all') {
       return
     }
 
     const fetchQuestionsForStage = async () => {
       try {
         setLoading(true)
-        const response = await fetch(`/api/admin/questions?stageId=${selectedStageId}`)
+        const response = await fetch(`/api/admin/questions?testId=${selectedTestId}&stageId=${selectedStageId}`)
         if (!response.ok) {
           throw new Error('Erro ao carregar as perguntas da etapa')
         }
@@ -282,7 +284,16 @@ const Questions: NextPage = () => {
     }
 
     fetchQuestionsForStage()
-  }, [selectedStageId, selectedTestId])
+  }, [filterType, selectedStageId, selectedTestId])
+  
+  // Efeito para carregar perguntas quando a categoria selecionada mudar
+  useEffect(() => {
+    if (filterType !== 'category' || !selectedCategoryId) {
+      return
+    }
+    
+    fetchQuestions()
+  }, [filterType, selectedCategoryId])
 
   const handleSubmit = async (values: any, formikHelpers: any) => {
     try {
@@ -472,25 +483,39 @@ const Questions: NextPage = () => {
   // Função para buscar as perguntas
   const fetchQuestions = async () => {
     try {
+      setLoading(true);
       // Construir a URL com os parâmetros de filtro
       let url = '/api/admin/questions';
       const params = new URLSearchParams();
       
-      if (selectedTestId !== 'all') {
-        params.append('testId', selectedTestId);
-      }
-      
-      if (selectedStageId !== 'all') {
-        params.append('stageId', selectedStageId);
+      if (filterType === 'test') {
+        if (selectedTestId !== 'all') {
+          params.append('testId', selectedTestId);
+          
+          if (selectedStageId !== 'all') {
+            params.append('stageId', selectedStageId);
+          }
+        }
+      } else if (filterType === 'category') {
+        console.log('Filtrando por categoria:', selectedCategoryId);
+        if (selectedCategoryId !== 'all') {
+          params.append('categoryId', selectedCategoryId);
+        } else {
+          // Se "Todas as Categorias" estiver selecionado, não adicionar parâmetro
+          // e buscar todas as perguntas
+          console.log('Buscando todas as perguntas (todas as categorias)');
+        }
       }
       
       if (params.toString()) {
         url += `?${params.toString()}`;
       }
       
+      console.log('Buscando perguntas com URL:', url);
       const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
+        console.log(`Encontradas ${data.length} perguntas`);
         setQuestions(data);
       } else {
         notify.showError('Erro ao carregar perguntas');
@@ -498,6 +523,8 @@ const Questions: NextPage = () => {
     } catch (error) {
       console.error('Erro ao buscar perguntas:', error);
       notify.showError('Erro ao carregar perguntas');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -652,30 +679,55 @@ const Questions: NextPage = () => {
             </h2>
 
             <div className="mb-4">
-              <label htmlFor="testFilter" className="block text-sm font-medium text-secondary-700 mb-1">
-                Filtrar por Teste
+              <label htmlFor="filterType" className="block text-sm font-medium text-secondary-700 mb-1">
+                Tipo de Filtro
               </label>
               <select
-                id="testFilter"
-                value={selectedTestId}
-                onChange={(e) => setSelectedTestId(e.target.value)}
+                id="filterType"
+                value={filterType}
+                onChange={(e) => {
+                  const newFilterType = e.target.value as 'test' | 'category';
+                  setFilterType(newFilterType);
+                  setSelectedTestId('all');
+                  setSelectedStageId('all');
+                  setSelectedCategoryId('all');
+                  // Recarregar todas as perguntas quando mudar o tipo de filtro
+                  loadQuestions();
+                }}
                 className="input-field"
               >
-                <option value="all">Todos os Testes</option>
-                {tests.map((test) => (
-                  <option key={test.id} value={test.id}>
-                    {test.title}
-                  </option>
-                ))}
+                <option value="test">Filtrar por Teste</option>
+                <option value="category">Filtrar por Categoria</option>
               </select>
             </div>
 
-            {selectedTestId !== 'all' && (
+            {filterType === 'test' && (
+              <div className="mb-4">
+                <label htmlFor="testFilter" className="block text-sm font-medium text-secondary-700 mb-1">
+                  Selecionar Teste
+                </label>
+                <select
+                  id="testFilter"
+                  value={selectedTestId}
+                  onChange={(e) => setSelectedTestId(e.target.value)}
+                  className="input-field"
+                >
+                  <option value="all">Todos os Testes</option>
+                  {tests.map((test) => (
+                    <option key={test.id} value={test.id}>
+                      {test.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {filterType === 'test' && selectedTestId !== 'all' && (
               <div className="mb-4">
                 {filteredStages.length > 0 && (
                   <>
                     <label htmlFor="stageFilter" className="block text-sm font-medium text-secondary-700 mb-1">
-                      Filtrar por Etapa
+                      Selecionar Etapa
                     </label>
                     <select
                       id="stageFilter"
@@ -697,6 +749,32 @@ const Questions: NextPage = () => {
               </div>
             )}
 
+            {filterType === 'category' && (
+              <div className="mb-4">
+                <label htmlFor="categoryFilter" className="block text-sm font-medium text-secondary-700 mb-1">
+                  Selecionar Categoria
+                </label>
+                <select
+                  id="categoryFilter"
+                  value={selectedCategoryId}
+                  onChange={(e) => {
+                    const newCategoryId = e.target.value;
+                    console.log('Categoria selecionada:', newCategoryId);
+                    setSelectedCategoryId(newCategoryId);
+                    // Não chamamos fetchQuestions() aqui, pois o useEffect cuidará disso
+                  }}
+                  className="input-field"
+                >
+                  <option value="all">Todas as Categorias</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {questions.length === 0 ? (
               <div className="text-center py-8 text-secondary-500">
                 Nenhuma pergunta cadastrada
@@ -704,35 +782,26 @@ const Questions: NextPage = () => {
             ) : (
               <>
                 <div className="mb-3 text-sm text-secondary-600">
-                  {selectedTestId === 'all' && selectedStageId === 'all'
-                    ? `Exibindo todas as ${questions.length} perguntas`
-                    : selectedTestId !== 'all' && selectedStageId === 'all' && filteredStages.length > 0
-                    ? `Exibindo perguntas do teste "${tests.find((t) => t.id === selectedTestId)?.title || ''}"`
-                    : selectedTestId !== 'all' && selectedStageId === 'all' && filteredStages.length === 0
-                    ? `O teste "${tests.find((t) => t.id === selectedTestId)?.title || ''}" não possui etapas cadastradas. Por favor, cadastre etapas para este teste antes de criar perguntas.`
-                    : `Exibindo perguntas da etapa "${filteredStages.find((s) => s.id === selectedStageId)?.title || ''}"`}
+                  {filterType === 'test' ? (
+                    selectedTestId === 'all' && selectedStageId === 'all'
+                      ? `Exibindo todas as ${questions.length} perguntas`
+                      : selectedTestId !== 'all' && selectedStageId === 'all' && filteredStages.length > 0
+                      ? `Exibindo perguntas do teste "${tests.find((t) => t.id === selectedTestId)?.title || ''}"`
+                      : selectedTestId !== 'all' && selectedStageId === 'all' && filteredStages.length === 0
+                      ? `O teste "${tests.find((t) => t.id === selectedTestId)?.title || ''}" não possui etapas cadastradas. Por favor, cadastre etapas para este teste antes de criar perguntas.`
+                      : `Exibindo perguntas da etapa "${filteredStages.find((s) => s.id === selectedStageId)?.title || ''}" do teste "${tests.find((t) => t.id === selectedTestId)?.title || ''}"`
+                  ) : (
+                    selectedCategoryId === 'all'
+                      ? `Exibindo todas as ${questions.length} perguntas`
+                      : `Exibindo perguntas da categoria "${categories.find((c) => c.id === selectedCategoryId)?.name || ''}"`
+                  )}
                 </div>
                 <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
                   {questions
                     .filter((question) => {
-                      // Se nenhum filtro estiver ativo, mostrar todas as perguntas
-                      if (selectedTestId === 'all' && selectedStageId === 'all') {
-                        return true
-                      }
-
-                      // Se apenas o filtro de teste estiver ativo
-                      if (selectedTestId !== 'all' && selectedStageId === 'all') {
-                        // Verificar se a etapa da pergunta pertence ao teste selecionado
-                        const stageIds = filteredStages.map((stage) => stage.id)
-                        // Se não houver etapas no teste, não mostrar nenhuma pergunta
-                        if (stageIds.length === 0) {
-                          return false
-                        }
-                        return stageIds.includes(question.stageId)
-                      }
-
-                      // Se o filtro de etapa estiver ativo
-                      return question.stageId === selectedStageId
+                      // Não é necessário filtrar aqui, pois a filtragem já é feita na API
+                      // Mantemos apenas para compatibilidade com o código existente
+                      return true;
                     })
                     .map((question) => {
                       const stage = filteredStages.find((s) => s.id === question.stageId)

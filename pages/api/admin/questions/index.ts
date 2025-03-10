@@ -17,26 +17,74 @@ export default async function handler(
     try {
       console.log('Iniciando busca de perguntas');
       let questions = [];
-      const { stageId, testId } = req.query;
+      const { stageId, testId, categoryId } = req.query;
       
-      console.log('Parâmetros de busca:', { stageId, testId });
+      console.log('Parâmetros de busca:', { stageId, testId, categoryId });
       
       try {
         // Consulta simplificada sem o JOIN com Category
-        if (stageId && stageId !== 'all') {
+        if (categoryId && categoryId !== 'all') {
+          console.log('Buscando perguntas por categoria:', categoryId);
+          questions = await prisma.$queryRaw`
+            SELECT 
+              q.id, 
+              q.text, 
+              q."stageId",
+              q."categoryId",
+              q."createdAt", 
+              q."updatedAt",
+              s.title as "stageTitle", 
+              s.description as "stageDescription",
+              s.order as "stageOrder",
+              c.name as "categoryName",
+              c.description as "categoryDescription",
+              'MEDIUM' as difficulty
+            FROM "Question" q
+            LEFT JOIN "Stage" s ON q."stageId" = s.id
+            LEFT JOIN "Category" c ON q."categoryId" = c.id
+            WHERE q."categoryId" = ${categoryId}
+            ORDER BY COALESCE(s.order, 0) ASC, q."createdAt" DESC
+          `;
+        } else if (stageId && stageId !== 'all' && testId && testId !== 'all') {
+          console.log('Buscando perguntas por teste e etapa:', { testId, stageId });
+          questions = await prisma.$queryRaw`
+            SELECT 
+              q.id, 
+              q.text, 
+              q."stageId",
+              q."categoryId",
+              q."createdAt", 
+              q."updatedAt",
+              s.title as "stageTitle", 
+              s.order as "stageOrder",
+              c.name as "categoryName",
+              c.description as "categoryDescription",
+              'MEDIUM' as difficulty
+            FROM "Question" q
+            LEFT JOIN "Stage" s ON q."stageId" = s.id
+            LEFT JOIN "TestStage" ts ON s.id = ts."stageId"
+            LEFT JOIN "Category" c ON q."categoryId" = c.id
+            WHERE q."stageId" = ${stageId} AND ts."testId" = ${testId}
+            ORDER BY COALESCE(s.order, 0) ASC, q."createdAt" DESC
+          `;
+        } else if (stageId && stageId !== 'all') {
           console.log('Buscando perguntas por etapa:', stageId);
           questions = await prisma.$queryRaw`
             SELECT 
               q.id, 
               q.text, 
               q."stageId",
+              q."categoryId",
               s.title as "stageTitle", 
               s.order as "stageOrder",
               q."createdAt", 
               q."updatedAt",
+              c.name as "categoryName",
+              c.description as "categoryDescription",
               'MEDIUM' as difficulty
             FROM "Question" q
             LEFT JOIN "Stage" s ON q."stageId" = s.id
+            LEFT JOIN "Category" c ON q."categoryId" = c.id
             WHERE q."stageId" = ${stageId}
             ORDER BY COALESCE(s.order, 0) ASC, q."createdAt" DESC
           `;
@@ -53,10 +101,13 @@ export default async function handler(
               s.title as "stageTitle",
               s.description as "stageDescription",
               s.order as "stageOrder",
+              c.name as "categoryName",
+              c.description as "categoryDescription",
               'MEDIUM' as difficulty
             FROM "Question" q
             LEFT JOIN "Stage" s ON q."stageId" = s.id
             LEFT JOIN "TestStage" ts ON s.id = ts."stageId"
+            LEFT JOIN "Category" c ON q."categoryId" = c.id
             WHERE ts."testId" = ${testId}
             ORDER BY COALESCE(s.order, 0) ASC, q."createdAt" DESC
           `;
