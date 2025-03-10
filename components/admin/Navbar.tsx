@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession, signOut } from 'next-auth/react';
 
@@ -20,28 +21,26 @@ const Navbar: React.FC = () => {
     const isActive = currentPath === href || 
                     (href !== '/admin/dashboard' && currentPath.startsWith(href));
     
-    const handleClick = (e: React.MouseEvent) => {
-      e.preventDefault();
-      console.log('Navegando para:', href);
-      router.push(href);
-    };
-    
     return (
-      <button 
-        onClick={handleClick}
-        className={`px-3 py-2 font-medium cursor-pointer ${
+      <Link 
+        href={href}
+        className={`px-3 py-2 font-medium cursor-pointer inline-block transition-colors duration-200 ${
           isActive
             ? "text-primary-600 border-b-2 border-primary-600"
             : "text-secondary-700 hover:text-primary-600"
         }`}
       >
         {children}
-      </button>
+      </Link>
     );
   };
   
   const handleLogout = async (e: React.MouseEvent) => {
     e.preventDefault();
+    // Adicionar um estado de carregamento para feedback visual
+    const logoutButton = e.currentTarget as HTMLButtonElement;
+    logoutButton.disabled = true;
+    logoutButton.innerText = 'Saindo...';
     await signOut({ callbackUrl: '/' });
   };
   
@@ -50,8 +49,8 @@ const Navbar: React.FC = () => {
       <div className="container mx-auto px-4 py-3">
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-8">
-            <button 
-              onClick={() => router.push('/admin/dashboard')}
+            <Link 
+              href="/admin/dashboard"
               className="text-xl font-bold text-primary-700"
             >
               <Image 
@@ -61,7 +60,7 @@ const Navbar: React.FC = () => {
                 height={45}
                 priority
               />
-            </button>
+            </Link>
             <div className="hidden md:flex space-x-4">
               <NavLink href="/admin/dashboard">Dashboard</NavLink>
               <NavLink href="/admin/candidates">Candidatos</NavLink>
@@ -100,23 +99,21 @@ const Navbar: React.FC = () => {
         </div>
         
         {/* Menu mobile */}
-        {isMenuOpen && (
-          <div className="md:hidden mt-4 pb-2 border-t border-gray-200">
-            <div className="flex flex-col pt-2 space-y-1">
-              <NavLink href="/admin/dashboard">Dashboard</NavLink>
-              <NavLink href="/admin/candidates">Candidatos</NavLink>
-              <NavLink href="/admin/tests">Testes</NavLink>
-              <NavLink href="/admin/questions">Perguntas</NavLink>
-              <NavLink href="/admin/categories">Categorias</NavLink>
-              <button 
-                onClick={handleLogout}
-                className="mt-2 px-3 py-2 text-sm text-left text-white bg-secondary-600 rounded-md hover:bg-secondary-700 cursor-pointer"
-              >
-                Sair
-              </button>
-            </div>
+        <div className={`md:hidden mt-4 pb-2 border-t border-gray-200 transition-all duration-300 ${isMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}>
+          <div className="flex flex-col pt-2 space-y-1">
+            <NavLink href="/admin/dashboard">Dashboard</NavLink>
+            <NavLink href="/admin/candidates">Candidatos</NavLink>
+            <NavLink href="/admin/tests">Testes</NavLink>
+            <NavLink href="/admin/questions">Perguntas</NavLink>
+            <NavLink href="/admin/categories">Categorias</NavLink>
+            <button 
+              onClick={handleLogout}
+              className="mt-2 px-3 py-2 text-sm text-left text-white bg-secondary-600 rounded-md hover:bg-secondary-700 cursor-pointer transition-colors duration-200"
+            >
+              Sair
+            </button>
           </div>
-        )}
+        </div>
       </div>
     </nav>
   );

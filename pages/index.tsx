@@ -1,7 +1,7 @@
 import type { NextPage } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/router'
 
 interface TestData {
@@ -16,7 +16,21 @@ const Home: NextPage = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [showInviteInput, setShowInviteInput] = useState(false)
+  const [validationSuccess, setValidationSuccess] = useState(false)
+  const [candidate, setCandidate] = useState<any>(null)
   const router = useRouter()
+
+  // Efeito para redirecionar após a validação bem-sucedida
+  useEffect(() => {
+    if (validationSuccess && candidate) {
+      // Pequeno atraso para permitir a transição visual
+      const redirectTimer = setTimeout(() => {
+        router.push('/teste/introducao')
+      }, 300)
+      
+      return () => clearTimeout(redirectTimer)
+    }
+  }, [validationSuccess, candidate, router])
 
   // Usando useCallback para memorizar a função e evitar recriações desnecessárias
   const handleInviteSubmit = useCallback(async (e: React.FormEvent) => {
@@ -47,14 +61,15 @@ const Home: NextPage = () => {
         sessionStorage.setItem('testData', JSON.stringify(data.test))
       }
       
-      // Redirecionar para a página de introdução do teste
-      router.push('/teste/introducao')
+      // Definir o estado de sucesso e os dados do candidato
+      setCandidate(data.candidate)
+      setValidationSuccess(true)
     } catch (error: any) {
       setError(error.message)
     } finally {
       setIsLoading(false)
     }
-  }, [inviteCode, router])
+  }, [inviteCode])
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white">
@@ -96,7 +111,7 @@ const Home: NextPage = () => {
                   Iniciar Processo de Avaliação
                 </button>
               </div>
-            ) : (
+            ) : !validationSuccess ? (
               <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md border border-primary-100 max-w-md w-full mx-auto md:mx-0">
                 <h3 className="text-lg sm:text-xl font-semibold text-secondary-800 mb-4 text-center md:text-left">Digite seu código de convite</h3>
                 <form onSubmit={handleInviteSubmit}>
@@ -133,6 +148,18 @@ const Home: NextPage = () => {
                     </button>
                   </div>
                 </form>
+              </div>
+            ) : (
+              <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md border border-primary-100 max-w-md w-full mx-auto md:mx-0 transition-all duration-300 opacity-100">
+                <div className="text-center">
+                  <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-semibold text-secondary-800 mb-2">Código Validado!</h3>
+                  <p className="text-secondary-600 mb-4">Redirecionando para o teste...</p>
+                </div>
               </div>
             )}
           </div>

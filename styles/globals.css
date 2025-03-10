@@ -42,3 +42,22 @@ a {
     @apply text-2xl font-bold text-secondary-800 mb-4;
   }
 }
+
+/* Animação para a barra de carregamento */
+@keyframes loading-bar-animation {
+  0% {
+    width: 0%;
+  }
+  50% {
+    width: 70%;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+@layer utilities {
+  .animate-loading-bar {
+    animation: loading-bar-animation 1.5s ease-in-out forwards;
+  }
+}
