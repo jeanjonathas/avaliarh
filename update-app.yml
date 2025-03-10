@@ -1,0 +1,48 @@
+version: "3.7"
+services:
+  update:
+    image: bitnami/git
+    entrypoint: ["/bin/bash", "-c"]
+    command: [
+      "rm -rf /app/* && git clone https://github.com/jeanjonathas/avaliarh.git /app && chmod -R 777 /app && touch /app/.update_complete"
+    ]
+    volumes:
+      - app_data:/app
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+
+  rebuild:
+    image: node:18
+    entrypoint: ["/bin/bash", "-c"]
+    command: [
+      "while [ ! -f /app/.update_complete ]; do echo 'Waiting for update to complete...' && sleep 5; done && cd /app && npm install --no-fund --no-audit --legacy-peer-deps && npx prisma generate && npm run build && touch /app/.rebuild_complete && echo 'Rebuild completed. You can now restart the app service.'"
+    ]
+    volumes:
+      - app_data:/app
+      - npm_cache:/root/.npm
+    environment:
+      - DATABASE_URL=postgresql://postgres:02e821629ceff274c853f24327a36132@postgres:5432/avaliacao_candidatos
+      - NODE_ENV=production
+    networks:
+      - avaliarh_network
+    depends_on:
+      - update
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+
+volumes:
+  app_data:
+    external: true
+    name: avaliarh_app_data
+  npm_cache:
+    external: true
+    name: avaliarh_npm_cache
+
+networks:
+  avaliarh_network:
+    external: true
+    name: ralliugaNet
