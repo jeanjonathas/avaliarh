@@ -56,12 +56,12 @@ async function main() {
   if (stageCount === 0) {
     // Criar as 6 etapas do sistema de avaliação
     const stages = [
-      { title: 'Raciocínio Lógico', description: 'Testes de padrões, sequências e dedução lógica', order: 1 },
-      { title: 'Matemática Básica e Resolução de Problemas', description: 'Cálculo mental, proporções e análise de dados', order: 2 },
-      { title: 'Compreensão Verbal', description: 'Interpretação de texto, sinônimos, analogias', order: 3 },
-      { title: 'Aptidão Espacial', description: 'Questões envolvendo rotação mental e padrões visuais', order: 4 },
-      { title: 'Raciocínio Abstrato', description: 'Questões que exigem encontrar relações não óbvias', order: 5 },
-      { title: 'Tomada de Decisão e Solução de Problemas', description: 'Situações hipotéticas e a melhor resposta', order: 6 },
+      { id: '1', title: 'Raciocínio Lógico', description: 'Testes de padrões, sequências e dedução lógica', order: 1, updatedAt: new Date() },
+      { id: '2', title: 'Matemática Básica e Resolução de Problemas', description: 'Cálculo mental, proporções e análise de dados', order: 2, updatedAt: new Date() },
+      { id: '3', title: 'Compreensão Verbal', description: 'Interpretação de texto, sinônimos, analogias', order: 3, updatedAt: new Date() },
+      { id: '4', title: 'Aptidão Espacial', description: 'Questões envolvendo rotação mental e padrões visuais', order: 4, updatedAt: new Date() },
+      { id: '5', title: 'Raciocínio Abstrato', description: 'Questões que exigem encontrar relações não óbvias', order: 5, updatedAt: new Date() },
+      { id: '6', title: 'Tomada de Decisão e Solução de Problemas', description: 'Situações hipotéticas e a melhor resposta', order: 6, updatedAt: new Date() },
     ]
     
     for (const stage of stages) {
