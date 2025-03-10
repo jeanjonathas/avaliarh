@@ -1,5 +1,15 @@
 version: "3.7"
 services:
+  init:
+    image: alpine/git
+    command: sh -c "git clone https://github.com/jeanjonathas/avaliarh.git /app"
+    volumes:
+      - app_data:/app
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 1
+
   app:
     image: node:18-alpine
     command: sh -c "cd /app && npm install && npx prisma generate && npm run build && npm run start"
@@ -8,12 +18,13 @@ services:
     networks:
       - avaliarh_network
     environment:
-      - DATABASE_URL=postgresql://postgres:02e821629ceff274c853f24327a36132@postgres:5432/avaliacao_candidatos
+      - DATABASE_URL=postgresql://postgres:02e821629ceff274c853f24327a36132@avaliarh_postgres:5432/avaliacao_candidatos
       - NEXTAUTH_SECRET=1cb8ab490649f272b366a6343f0e223c
       - NEXTAUTH_URL=https://selecao.doutoranimal.com.br
       - NODE_ENV=production
     depends_on:
       - postgres
+      - init
     deploy:
       mode: replicated
       replicas: 1
@@ -23,7 +34,12 @@ services:
       resources:
         limits:
           cpus: "1"
-          memory: 1024M
+          memory: 2048M
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+        window: 120s
       labels:
         - traefik.enable=true
         - traefik.http.routers.avaliarh.rule=Host(`selecao.doutoranimal.com.br`)
@@ -33,9 +49,12 @@ services:
         - traefik.http.services.avaliarh.loadbalancer.server.port=3000
         - traefik.http.services.avaliarh.loadbalancer.passHostHeader=true
         - traefik.http.routers.avaliarh.service=avaliarh
+        - traefik.http.middlewares.avaliarh-compress.compress=true
+        - traefik.http.routers.avaliarh.middlewares=avaliarh-compress
 
   postgres:
     image: postgres:14
+    container_name: avaliarh_postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -53,7 +72,17 @@ services:
       resources:
         limits:
           cpus: "0.5"
-          memory: 512M
+          memory: 1024M
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   setup:
     image: node:18-alpine
@@ -61,32 +90,22 @@ services:
     volumes:
       - app_data:/app
     environment:
-      - DATABASE_URL=postgresql://postgres:02e821629ceff274c853f24327a36132@postgres:5432/avaliacao_candidatos
+      - DATABASE_URL=postgresql://postgres:02e821629ceff274c853f24327a36132@avaliarh_postgres:5432/avaliacao_candidatos
+      - NODE_ENV=production
     networks:
       - avaliarh_network
     depends_on:
       - postgres
+      - init
     deploy:
       restart_policy:
         condition: on-failure
         max_attempts: 3
 
-  init:
-    image: alpine/git
-    command: sh -c "git clone https://github.com/jeanjonathas/avaliarh.git /app"
-    volumes:
-      - app_data:/app
-    deploy:
-      restart_policy:
-        condition: on-failure
-        max_attempts: 1
-
 volumes:
   postgres_data:
-    external: false
     name: avaliarh_postgres_data
   app_data:
-    external: false
     name: avaliarh_app_data
 
 networks:
