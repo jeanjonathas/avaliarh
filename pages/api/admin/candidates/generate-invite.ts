@@ -54,11 +54,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { candidateId, expirationDays = 7, sendEmail = false, forceNew = false, testId } = req.body;
     
     if (!candidateId) {
-      return res.status(400).json({ error: 'ID do candidato é obrigatório' });
+      return res.status(400).json({ 
+        success: false,
+        error: 'ID do candidato é obrigatório' 
+      });
     }
     
     if (!testId) {
-      return res.status(400).json({ error: 'ID do teste é obrigatório' });
+      return res.status(400).json({ 
+        success: false,
+        error: 'ID do teste é obrigatório. Selecione um teste para gerar o convite.' 
+      });
+    }
+    
+    // Verificar se o teste existe
+    const testExists = await prisma.tests.findUnique({
+      where: { id: testId }
+    });
+    
+    if (!testExists) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'O teste selecionado não existe. Por favor, selecione um teste válido.' 
+      });
     }
     
     // Buscar o candidato

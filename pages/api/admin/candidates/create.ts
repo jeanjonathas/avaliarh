@@ -5,11 +5,6 @@ import { authOptions } from '../../../../lib/auth';
 
 const prisma = new PrismaClient();
 
-// Função para gerar código de convite único de 4 dígitos
-function generateInviteCode(): string {
-  return Math.floor(1000 + Math.random() * 9000).toString();
-}
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Verificar se o usuário está autenticado como administrador
   const session = await getServerSession(req, res, authOptions);
@@ -29,28 +24,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Nome e email são obrigatórios' });
     }
     
-    // Gerar código de convite único
-    let inviteCode;
-    let isUnique = false;
-    
-    while (!isUnique) {
-      inviteCode = generateInviteCode();
-      
-      // Verificar se o código já existe
-      const existingCandidate = await prisma.candidate.findUnique({
-        where: { inviteCode },
-      });
-      
-      if (!existingCandidate) {
-        isUnique = true;
-      }
-    }
-    
-    // Definir data de expiração (7 dias a partir de agora)
-    const inviteExpires = new Date();
-    inviteExpires.setDate(inviteExpires.getDate() + 7);
-    
-    // Criar o candidato com o código de convite
+    // Criar o candidato sem código de convite
+    // O código de convite será gerado posteriormente quando o usuário solicitar
     const candidate = await prisma.candidate.create({
       data: {
         name,
@@ -59,8 +34,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         position: position || null,
         status: 'PENDING',
         completed: false,
-        inviteCode,
-        inviteExpires,
         inviteAttempts: 0,
         inviteSent: false,
         linkedin: linkedin || null,
