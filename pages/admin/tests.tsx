@@ -344,9 +344,16 @@ const Tests: NextPage = () => {
                     ) : (
                       tests.map((test) => (
                         <tr key={test.id}>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-6 py-4">
                             <div className="text-sm font-medium text-secondary-900">{test.title}</div>
-                            <div className="text-sm text-secondary-500">{test.description}</div>
+                            <div className="text-sm text-secondary-500 mt-1 max-w-md break-words">
+                              {test.description && test.description.split('\n').map((line, i) => (
+                                <span key={i}>
+                                  {line}
+                                  {i < test.description.split('\n').length - 1 && <br />}
+                                </span>
+                              ))}
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-secondary-900">
