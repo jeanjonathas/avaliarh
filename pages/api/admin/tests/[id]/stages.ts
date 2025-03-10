@@ -162,11 +162,14 @@ export default async function handler(
   else if (req.method === 'GET') {
     try {
       // Buscar estágios usando a tabela de junção TestStage
+      // Adicionando logs para debug
+      console.log('Buscando estágios para o teste:', id);
+      
       const stages = await prisma.$queryRaw`
         SELECT 
-          s.id,
-          s.title,
-          s.description,
+          s.id as "stageId",
+          s.title as "stage_title",
+          s.description as "stage_description",
           ts.order,
           s."testId",
           s."createdAt",
@@ -177,13 +180,17 @@ export default async function handler(
         ORDER BY ts.order ASC
       `;
       
+      console.log('Resultado da busca de estágios:', stages);
+      
       // Se não encontrar nenhum estágio usando a nova tabela, tente buscar pelo método antigo
       if (!Array.isArray(stages) || stages.length === 0) {
+        console.log('Nenhum estágio encontrado na tabela TestStage, tentando método antigo');
+        
         const oldStages = await prisma.$queryRaw`
           SELECT 
-            id,
-            title,
-            description,
+            id as "stageId",
+            title as "stage_title",
+            description as "stage_description",
             "order",
             "testId",
             "createdAt",
@@ -193,8 +200,11 @@ export default async function handler(
           ORDER BY "order" ASC
         `;
         
+        console.log('Estágios encontrados pelo método antigo:', oldStages);
+        
         // Se encontrar estágios pelo método antigo, migre-os para a nova estrutura
         if (Array.isArray(oldStages) && oldStages.length > 0) {
+          console.log('Migrando estágios antigos para a nova estrutura');
           // Migrar estágios antigos para a nova estrutura
           for (let i = 0; i < oldStages.length; i++) {
             const stage = oldStages[i];
@@ -202,10 +212,11 @@ export default async function handler(
             // Verificar se já existe um registro na tabela TestStage
             const existingTestStage = await prisma.$queryRaw`
               SELECT id FROM "TestStage" 
-              WHERE "testId" = ${id} AND "stageId" = ${stage.id}
+              WHERE "testId" = ${id} AND "stageId" = ${stage.stageId}
             `;
             
             if (!Array.isArray(existingTestStage) || existingTestStage.length === 0) {
+              console.log('Criando registro na tabela TestStage para o estágio:', stage.stageId);
               // Criar registro na tabela TestStage
               await prisma.$executeRaw`
                 INSERT INTO "TestStage" (
@@ -218,8 +229,8 @@ export default async function handler(
                 ) VALUES (
                   gen_random_uuid(),
                   ${id},
-                  ${stage.id},
-                  ${stage.order},
+                  ${stage.stageId},
+                  ${stage.order || 0},
                   NOW(),
                   NOW()
                 )

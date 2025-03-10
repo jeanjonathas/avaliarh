@@ -205,44 +205,34 @@ const Questions: NextPage = () => {
           setLoading(true);
           
           // Buscar as etapas do teste
+          console.log('Buscando etapas para o teste:', selectedTestId);
           const response = await fetch(`/api/admin/tests/${selectedTestId}/stages`);
           if (!response.ok) {
             throw new Error('Erro ao carregar as etapas do teste');
           }
           const testStagesData = await response.json();
+          console.log('Etapas recebidas:', testStagesData);
           
-          if (testStagesData.length === 0) {
-            // Se o teste não tiver etapas, definir a lista como vazia
-            setFilteredStages([]);
-
-            // Também buscar perguntas do teste selecionado sem filtrar por etapa
-            const questionsResponse = await fetch(`/api/admin/questions?testId=${selectedTestId}`);
-            if (!questionsResponse.ok) {
-              throw new Error('Erro ao carregar as perguntas do teste');
-            }
-            const questionsData = await questionsResponse.json();
-            setQuestions(questionsData);
-          } else {
-            // Criar objetos de etapa diretamente a partir dos dados retornados
-            const mappedStages = testStagesData.map((ts: any) => ({
-              id: ts.stageId,
-              title: ts.stage_title || 'Etapa sem título',
-              order: ts.order || 0,
-              description: ts.stage_description || ''
-            }));
-            
-            // Filtrar etapas inválidas
-            const validStages = mappedStages.filter((stage: any) => stage.id);
-            setFilteredStages(validStages);
-            
-            // Buscar perguntas para todas as etapas do teste
-            const questionsResponse = await fetch(`/api/admin/questions?testId=${selectedTestId}`);
-            if (!questionsResponse.ok) {
-              throw new Error('Erro ao carregar as perguntas do teste');
-            }
-            const questionsData = await questionsResponse.json();
-            setQuestions(questionsData);
+          // Criar objetos de etapa diretamente a partir dos dados retornados
+          const mappedStages = testStagesData.map((ts: any) => ({
+            id: ts.stageId,
+            title: ts.stage_title || 'Etapa sem título',
+            order: ts.order || 0,
+            description: ts.stage_description || ''
+          }));
+          
+          // Filtrar etapas inválidas
+          const validStages = mappedStages.filter((stage: any) => stage.id);
+          console.log('Etapas válidas:', validStages);
+          setFilteredStages(validStages);
+          
+          // Buscar perguntas para todas as etapas do teste
+          const questionsResponse = await fetch(`/api/admin/questions?testId=${selectedTestId}`);
+          if (!questionsResponse.ok) {
+            throw new Error('Erro ao carregar as perguntas do teste');
           }
+          const questionsData = await questionsResponse.json();
+          setQuestions(questionsData);
           
           // Resetar o filtro de etapa para "Todas as etapas"
           setSelectedStageId('all');
@@ -785,10 +775,8 @@ const Questions: NextPage = () => {
                   {filterType === 'test' ? (
                     selectedTestId === 'all' && selectedStageId === 'all'
                       ? `Exibindo todas as ${questions.length} perguntas`
-                      : selectedTestId !== 'all' && selectedStageId === 'all' && filteredStages.length > 0
+                      : selectedTestId !== 'all' && selectedStageId === 'all'
                       ? `Exibindo perguntas do teste "${tests.find((t) => t.id === selectedTestId)?.title || ''}"`
-                      : selectedTestId !== 'all' && selectedStageId === 'all' && filteredStages.length === 0
-                      ? `O teste "${tests.find((t) => t.id === selectedTestId)?.title || ''}" não possui etapas cadastradas. Por favor, cadastre etapas para este teste antes de criar perguntas.`
                       : `Exibindo perguntas da etapa "${filteredStages.find((s) => s.id === selectedStageId)?.title || ''}" do teste "${tests.find((t) => t.id === selectedTestId)?.title || ''}"`
                   ) : (
                     selectedCategoryId === 'all'
