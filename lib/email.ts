@@ -18,7 +18,7 @@ interface EmailConfig {
 interface EmailResult {
   success: boolean;
   error?: string;
-  previewUrl?: string; // URL para visualizar o email (apenas em desenvolvimento)
+  previewUrl?: string | false; // URL para visualizar o email (apenas em desenvolvimento)
 }
 
 // Obter configurações de email do ambiente

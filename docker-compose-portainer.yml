@@ -23,10 +23,8 @@ services:
       - NEXTAUTH_URL=https://selecao.doutoranimal.com.br
       - NODE_ENV=production
     depends_on:
-      postgres:
-        condition: service_healthy
-      init:
-        condition: service_completed_successfully
+      - postgres
+      - init
     deploy:
       mode: replicated
       replicas: 1
@@ -96,10 +94,8 @@ services:
     networks:
       - avaliarh_network
     depends_on:
-      postgres:
-        condition: service_healthy
-      init:
-        condition: service_completed_successfully
+      - postgres
+      - init
     deploy:
       restart_policy:
         condition: on-failure
