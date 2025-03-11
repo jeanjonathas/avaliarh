@@ -3,3 +3,16 @@ temos um problema, na tela http://localhost:3000/admin/test/e292c916-8dd0-4bac-8
 é possível escolher perguntas para adicionar a uma etapa, ou remover dessa etapa, o problema é que para remover dessa etapa o sistema exclui a pergunta e recria ela, mas isso gera problemas graves para os outros testes, ja´que a pergunta original deixa de existir. 
 precisamos estruturar o banco de dados de uma forma diferente em que não seja necessário excluir uma pergunta e recriala sendo que o que queremos é apenas remover a pergunta da listagem desse teste em específico.
 talvez adicionar uma coluna na tabela de testes constando o id das perguntas que estão sendo utilizadas e em que ordem a pergunta aparece na etapa do teste
+
+
+docker stack rm avaliarh
+sleep 15
+docker volume rm -f avaliarh_app_data avaliarh_npm_cache
+docker stack deploy -c docker-compose-portainer.yml avaliarh
+
+
+
+docker service ls | grep avaliarh
+docker service logs avaliarh_init
+docker service logs avaliarh_app
+docker service logs avaliarh_setup

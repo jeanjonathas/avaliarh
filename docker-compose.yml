@@ -1,11 +1,49 @@
 version: "3.7"
 services:
+  init:
+    image: bitnami/git
+    entrypoint: ["/bin/bash", "-c"]
+    command: [
+      "rm -rf /app/* && git clone https://github.com/jeanjonathas/avaliarh.git /app && chmod -R 777 /app && touch /app/.init_complete"
+    ]
+    volumes:
+      - app_data:/app
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+
+  setup:
+    image: node:18
+    entrypoint: ["/bin/bash", "-c"]
+    command: [
+      "while [ ! -f /app/.init_complete ]; do echo 'Waiting for init to complete...' && sleep 5; done && cd /app && npm install --no-fund --no-audit --legacy-peer-deps && npx prisma generate && npx prisma migrate deploy && node prisma/seed.js && touch /app/.setup_complete"
+    ]
+    volumes:
+      - app_data:/app
+      - npm_cache:/root/.npm
+    environment:
+      - DATABASE_URL=postgresql://postgres:02e821629ceff274c853f24327a36132@postgres:5432/avaliacao_candidatos
+      - NODE_ENV=production
+    networks:
+      - avaliarh_network
+    depends_on:
+      - postgres
+      - init
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
+    image: node:18
+    entrypoint: ["/bin/bash", "-c"]
+    command: [
+      "while [ ! -f /app/.setup_complete ]; do echo 'Waiting for setup to complete...' && sleep 5; done && cd /app && npm install --no-fund --no-audit --legacy-peer-deps && npx prisma generate && npm run build || (echo 'Build failed, applying hotfix...' && node /app/hotfix.js && npm run build) && npm run start"
+    ]
+    volumes:
+      - app_data:/app
+      - npm_cache:/root/.npm
     networks:
       - avaliarh_network
     environment:
@@ -15,7 +53,34 @@ services:
       - NODE_ENV=production
     depends_on:
       - postgres
-    restart: always
+      - init
+      - setup
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "1"
+          memory: 2048M
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.avaliarh.rule=Host(`selecao.doutoranimal.com.br`)
+        - traefik.http.routers.avaliarh.entrypoints=websecure
+        - traefik.http.routers.avaliarh.tls=true
+        - traefik.http.routers.avaliarh.tls.certresolver=letsencryptresolver
+        - traefik.http.services.avaliarh.loadbalancer.server.port=3000
+        - traefik.http.services.avaliarh.loadbalancer.passHostHeader=true
+        - traefik.http.routers.avaliarh.service=avaliarh
+        - traefik.http.middlewares.avaliarh-compress.compress=true
+        - traefik.http.routers.avaliarh.middlewares=avaliarh-compress
 
   postgres:
     image: postgres:14
@@ -27,24 +92,36 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=02e821629ceff274c853f24327a36132
       - POSTGRES_DB=avaliacao_candidatos
-    restart: always
-
-  setup:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: sh -c "npx prisma migrate deploy && node prisma/seed.js"
-    environment:
-      - DATABASE_URL=postgresql://postgres:02e821629ceff274c853f24327a36132@postgres:5432/avaliacao_candidatos
-    networks:
-      - avaliarh_network
-    depends_on:
-      - postgres
-    restart: on-failure
-
-networks:
-  avaliarh_network:
-    external: false
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 1024M
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:
+    name: avaliarh_postgres_data
+  app_data:
+    name: avaliarh_app_data
+  npm_cache:
+    name: avaliarh_npm_cache
+
+networks:
+  avaliarh_network:
+    external: true
+    name: ralliugaNet
