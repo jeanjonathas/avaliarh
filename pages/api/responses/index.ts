@@ -1,7 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { PrismaClient, Prisma } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '../auth/[...nextauth]'
+import { prisma } from '../../../lib/prisma'
+import { Prisma } from '@prisma/client'
+import { v4 as uuidv4 } from 'uuid'
 
 export default async function handler(
   req: NextApiRequest,
@@ -134,16 +136,65 @@ export default async function handler(
               // Tentar criar sem os campos adicionais em caso de erro
               if (error instanceof Prisma.PrismaClientValidationError) {
                 console.log('Tentando criar resposta apenas com campos básicos...');
-                // Verificamos o schema.prisma e sabemos que estes campos existem no modelo
-                return prisma.response.create({
-                  data: {
-                    candidateId,
-                    questionId: response.questionId,
-                    optionId: response.optionId,
-                    // Nota: Removidos campos que não existem no modelo Response
-                    // Apenas usar os campos básicos que sabemos que existem
-                  },
-                });
+                
+                // Buscar a questão e a opção para obter os dados necessários
+                try {
+                  const question = await prisma.question.findUnique({
+                    where: { id: response.questionId },
+                    include: { 
+                      Category: true,
+                      Stage: true,
+                      options: true
+                    }
+                  });
+                  
+                  const option = await prisma.option.findUnique({
+                    where: { id: response.optionId }
+                  });
+                  
+                  if (!question || !option) {
+                    console.error('Questão ou opção não encontrada');
+                    return null;
+                  }
+                  
+                  // Usar o Prisma.sql para criar a resposta diretamente no banco de dados
+                  // Isso contorna problemas de tipagem do Prisma Client
+                  const result = await prisma.$queryRaw`
+                    INSERT INTO "Response" (
+                      "id", 
+                      "candidateId", 
+                      "questionId", 
+                      "optionId", 
+                      "questionText", 
+                      "optionText", 
+                      "isCorrectOption", 
+                      "stageName", 
+                      "categoryName", 
+                      "createdAt", 
+                      "updatedAt"
+                    ) 
+                    VALUES (
+                      ${uuidv4()}, 
+                      ${candidateId}, 
+                      ${response.questionId}, 
+                      ${response.optionId}, 
+                      ${question.text}, 
+                      ${option.text}, 
+                      ${option.isCorrect}, 
+                      ${question.Stage?.title || null}, 
+                      ${question.Category?.name || null}, 
+                      NOW(), 
+                      NOW()
+                    )
+                    RETURNING *;
+                  `;
+                  
+                  console.log('Resposta criada com SQL raw:', result);
+                  return result[0];
+                } catch (innerError) {
+                  console.error('Erro ao buscar dados para criar resposta:', innerError);
+                  throw innerError;
+                }
               }
               throw error;
             }
