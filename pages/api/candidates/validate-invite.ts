@@ -69,10 +69,117 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     if (candidate.completed || candidate.status === 'APPROVED') {
       console.log(`Candidato ${candidate.id} (${candidate.name}) já completou a avaliação`);
-      return res.status(400).json({ 
-        error: 'Este candidato já completou a avaliação',
-        completed: true
+      
+      console.log(`Buscando respostas para o candidato ${candidate.id}`);
+      
+      // Buscar as respostas do candidato para exibição
+      const responses = await prisma.response.findMany({
+        where: { candidateId: candidate.id },
+        include: {
+          question: {
+            include: { Stage: true }
+          },
+          option: true
+        }
       });
+      
+      console.log(`Encontradas ${responses.length} respostas para o candidato ${candidate.id}`);
+      
+      try {
+        // Buscar snapshots separadamente para evitar problemas de tipo
+        const responsesWithSnapshots = await prisma.$queryRaw`
+          SELECT id, "questionSnapshot", "allOptionsSnapshot"
+          FROM "Response"
+          WHERE "candidateId" = ${candidate.id}
+        ` as any[];
+        
+        console.log(`Encontrados ${responsesWithSnapshots.length} snapshots para o candidato ${candidate.id}`);
+        
+        // Combinar os resultados
+        const combinedResponses = responses.map(response => {
+          const snapshot = responsesWithSnapshots.find(r => r.id === response.id);
+          return {
+            ...response,
+            questionSnapshot: snapshot?.questionSnapshot,
+            allOptionsSnapshot: snapshot?.allOptionsSnapshot
+          };
+        });
+        
+        // Formatar as respostas para exibição
+        const formattedResponses = combinedResponses.map(response => {
+          // Tentar obter o texto da questão e opção de várias fontes possíveis
+          let questionText = '';
+          let optionText = '';
+          let stageName = response.question.Stage?.title || 'Sem Etapa';
+          
+          // Processar o snapshot da questão se existir
+          if (response.questionSnapshot) {
+            try {
+              const questionSnapshot = typeof response.questionSnapshot === 'string' 
+                ? JSON.parse(response.questionSnapshot) 
+                : response.questionSnapshot;
+              
+              questionText = questionSnapshot.text || '';
+            } catch (error) {
+              console.error('Erro ao processar questionSnapshot:', error);
+              questionText = response.question.text || '';
+            }
+          } else {
+            questionText = response.question.text || '';
+          }
+          
+          // Buscar o texto da opção diretamente do banco de dados
+          // O modelo Response já tem o texto da opção armazenado na coluna optionText
+          try {
+            // Tentar acessar a propriedade optionText diretamente
+            const typedResponse = response as any;
+            if (typedResponse.optionText) {
+              optionText = typedResponse.optionText;
+              console.log(`Usando optionText do banco: ${optionText}`);
+            } else {
+              // Fallback para o texto da opção relacionada
+              optionText = response.option.text || '';
+              console.log(`Usando option.text: ${optionText}`);
+            }
+          } catch (error) {
+            console.error('Erro ao acessar optionText:', error);
+            // Fallback para o texto da opção relacionada
+            optionText = response.option.text || '';
+          }
+          
+          return {
+            id: response.id,
+            questionText,
+            optionText,
+            stageName
+          };
+        });
+        
+        // Agrupar respostas por etapa
+        const responsesByStage: { [key: string]: any[] } = {};
+        
+        formattedResponses.forEach(response => {
+          if (!responsesByStage[response.stageName]) {
+            responsesByStage[response.stageName] = [];
+          }
+          
+          responsesByStage[response.stageName].push(response);
+        });
+        
+        return res.status(400).json({ 
+          error: 'Este candidato já completou a avaliação',
+          completed: true,
+          candidateName: candidate.name,
+          responsesByStage
+        });
+      } catch (error) {
+        console.error('Erro ao processar respostas do candidato:', error);
+        return res.status(400).json({ 
+          error: 'Este candidato já completou a avaliação, mas não foi possível recuperar suas respostas',
+          completed: true,
+          candidateName: candidate.name
+        });
+      }
     }
     
     // Buscar informações do teste associado, se houver
