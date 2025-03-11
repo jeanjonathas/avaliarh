@@ -64,9 +64,9 @@ const Introducao: NextPage = () => {
     try {
       // Se já temos o ID do candidato, não precisamos criar um novo
       if (candidateData?.id) {
-        // Redirecionar para a primeira etapa do teste com o ID do candidato
-        router.push(`/teste/etapa/1?candidateId=${candidateData.id}`)
-        return
+        // Buscar a primeira etapa do teste associado ao candidato
+        await fetchFirstStageAndRedirect(candidateData.id);
+        return;
       }
 
       // Caso contrário, salvar os dados do candidato no banco de dados
@@ -76,20 +76,85 @@ const Introducao: NextPage = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(values),
-      })
+      });
 
       if (response.ok) {
-        const data = await response.json()
-        // Redirecionar para a primeira etapa do teste com o ID do candidato
-        router.push(`/teste/etapa/1?candidateId=${data.id}`)
+        const data = await response.json();
+        // Buscar a primeira etapa do teste e redirecionar
+        await fetchFirstStageAndRedirect(data.id);
       } else {
-        throw new Error('Erro ao salvar os dados')
+        throw new Error('Erro ao salvar os dados');
       }
     } catch (error) {
-      console.error('Erro:', error)
-      alert('Ocorreu um erro ao salvar seus dados. Por favor, tente novamente.')
+      console.error('Erro:', error);
+      alert('Ocorreu um erro ao salvar seus dados. Por favor, tente novamente.');
     }
-  }
+  };
+
+  // Função para buscar a primeira etapa do teste e redirecionar
+  const fetchFirstStageAndRedirect = async (candidateId: string) => {
+    try {
+      console.log(`Buscando a primeira etapa do teste para o candidato ${candidateId}...`);
+      
+      // Buscar todas as etapas do teste associado ao candidato
+      const stagesResponse = await fetch(`/api/stages?candidateId=${candidateId}`);
+      
+      if (stagesResponse.ok) {
+        const stagesData = await stagesResponse.json();
+        console.log('Etapas do teste:', stagesData);
+        
+        if (stagesData.stages && stagesData.stages.length > 0) {
+          // Pegar a primeira etapa (com menor ordem)
+          const firstStage = stagesData.stages[0];
+          console.log(`Primeira etapa encontrada: ${firstStage.id}, ordem: ${firstStage.order}`);
+          
+          // Verificar se o ID da etapa é um UUID válido
+          const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(firstStage.id);
+          
+          if (isValidUUID) {
+            console.log(`ID da etapa é um UUID válido: ${firstStage.id}`);
+            // Redirecionar para a primeira etapa usando o UUID
+            router.push(`/teste/etapa/${firstStage.id}?candidateId=${candidateId}`);
+          } else {
+            console.error(`ID da etapa não é um UUID válido: ${firstStage.id}. Buscando UUID correspondente...`);
+            
+            // Tentar buscar o UUID correspondente ao ID não-UUID
+            const uuidResponse = await fetch(`/api/stages/uuid?stageId=${firstStage.id}&candidateId=${candidateId}`);
+            
+            if (uuidResponse.ok) {
+              const uuidData = await uuidResponse.json();
+              
+              if (uuidData && uuidData.uuid) {
+                console.log(`UUID correspondente encontrado: ${uuidData.uuid}`);
+                router.push(`/teste/etapa/${uuidData.uuid}?candidateId=${candidateId}`);
+              } else {
+                console.error('Nenhum UUID correspondente encontrado. Usando fallback...');
+                // Fallback para o comportamento anterior
+                router.push(`/teste/etapa/${firstStage.id}?candidateId=${candidateId}`);
+              }
+            } else {
+              console.error('Erro ao buscar UUID correspondente. Usando fallback...');
+              // Fallback para o comportamento anterior
+              router.push(`/teste/etapa/${firstStage.id}?candidateId=${candidateId}`);
+            }
+          }
+        } else {
+          console.error('Nenhuma etapa encontrada para o teste');
+          alert('Erro ao iniciar o teste: nenhuma etapa encontrada. Por favor, entre em contato com o suporte.');
+        }
+      } else {
+        console.error('Erro ao buscar etapas do teste:', await stagesResponse.text());
+        // Fallback para o comportamento anterior
+        console.log('Usando fallback: redirecionando para etapa com ID 1');
+        router.push(`/teste/etapa/1?candidateId=${candidateId}`);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar a primeira etapa:', error);
+      // Fallback para o comportamento anterior
+      console.log('Usando fallback após erro: redirecionando para etapa com ID 1');
+      router.push(`/teste/etapa/1?candidateId=${candidateId}`);
+    }
+  };
 
   // Se temos os dados do candidato e estamos na etapa de formulário, vamos para a primeira etapa
   useEffect(() => {

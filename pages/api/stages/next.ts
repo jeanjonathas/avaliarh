@@ -90,8 +90,8 @@ export default async function handler(
       
       return res.status(200).json({
         hasNextStage: true,
-        nextStageId: nextStage.order.toString(), // Usar a ordem como ID para a URL
-        nextStageUuid: nextStage.stageId,
+        nextStageId: nextStage.stageId, // Usar o UUID da etapa como ID para a URL
+        nextStageOrder: nextStage.order.toString(), // Também enviar a ordem como informação adicional
         currentStageIndex,
         totalStages: testStages.length
       });
