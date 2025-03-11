@@ -39,6 +39,8 @@ const TestStage: NextPage = () => {
   const [isLastStage, setIsLastStage] = useState(false)
   const [currentStageIndex, setCurrentStageIndex] = useState<number | null>(null)
   const [totalStages, setTotalStages] = useState<number | null>(null)
+  const [stageCompleted, setStageCompleted] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { showToast } = useNotification()
 
   // Função para salvar respostas no localStorage
@@ -223,45 +225,43 @@ const TestStage: NextPage = () => {
     fetchQuestions()
   }, [stageId, candidateId])
 
-  // Validação para verificar se todas as perguntas foram respondidas
+  // Função para validar as respostas
   const validateResponses = (values: Record<string, string>) => {
-    // Esta função será chamada apenas no momento do envio do formulário,
-    // não durante a seleção de alternativas
-    return {};
+    const errors: Record<string, string> = {};
+    
+    questions.forEach((question) => {
+      if (!values[question.id]) {
+        errors[question.id] = 'Esta questão é obrigatória';
+      }
+    });
+    
+    return errors;
   };
-
-  // Função para verificar se todas as perguntas foram respondidas antes de enviar
-  const checkAllQuestionsAnswered = (values: Record<string, string>): boolean => {
-    const unansweredQuestions = questions.filter(question => !values[question.id]);
-    
-    if (unansweredQuestions.length > 0) {
-      showToast(
-        `Por favor, responda todas as perguntas antes de continuar. Faltam ${unansweredQuestions.length} resposta(s).`,
-        'warning',
-        5000
-      );
-      return false;
+  
+  // Função para verificar se todas as questões foram respondidas
+  const checkAllQuestionsAnswered = (values: Record<string, string>) => {
+    for (const question of questions) {
+      if (!values[question.id]) {
+        showToast('Por favor, responda todas as questões antes de prosseguir.', 'error');
+        return false;
+      }
     }
-    
     return true;
   };
 
+  // Função para enviar as respostas
   const handleSubmit = async (values: Record<string, string>) => {
-    // Validar se todas as perguntas foram respondidas
-    if (!checkAllQuestionsAnswered(values)) {
-      return; // Impedir o envio se houver perguntas não respondidas
-    }
-    
     try {
-      if (isOffline) {
-        // Se estiver offline, apenas salvar localmente
-        saveResponsesToLocalStorage(values)
-        showToast('Você está offline. Suas respostas foram salvas localmente e serão enviadas quando a conexão for restaurada.', 'info')
-        return
-      }
-
-      // Enviar respostas para a API
-      console.log('Enviando respostas para a API...');
+      console.log('Enviando respostas:', values);
+      
+      // Converter o objeto de valores para o formato de array esperado pela API
+      const formattedResponses = Object.entries(values).map(([questionId, optionId]) => ({
+        questionId,
+        optionId
+      }));
+      
+      console.log('Respostas formatadas:', formattedResponses);
+      
       const response = await fetch('/api/responses', {
         method: 'POST',
         headers: {
@@ -270,269 +270,135 @@ const TestStage: NextPage = () => {
         body: JSON.stringify({
           candidateId,
           stageId,
-          responses: Object.entries(values).map(([questionId, optionId]) => ({
-            questionId,
-            optionId,
-          })),
+          responses: formattedResponses,
         }),
-      })
-
+      });
+      
       if (!response.ok) {
-        throw new Error('Erro ao enviar respostas')
+        const errorText = await response.text();
+        console.error('Erro ao enviar respostas:', errorText);
+        showToast('Erro ao enviar respostas. Por favor, tente novamente.', 'error');
+        return false;
       }
-
-      console.log('Respostas enviadas com sucesso!');
-
-      // Limpar respostas salvas localmente após envio bem-sucedido
+      
+      // Limpar respostas do localStorage após envio bem-sucedido
       if (typeof window !== 'undefined' && candidateId) {
-        localStorage.removeItem(`candidate_${candidateId}_stage_${stageId}`)
+        localStorage.removeItem(`candidate_${candidateId}_stage_${stageId}`);
       }
+      
+      console.log('Respostas enviadas com sucesso!');
+      return true;
     } catch (error) {
-      console.error('Erro ao processar envio de respostas:', error);
-      // Se ocorrer um erro, salvar localmente
-      saveResponsesToLocalStorage(values);
-      setError('Erro ao enviar respostas. Suas respostas foram salvas localmente. Por favor, tente novamente mais tarde.');
+      console.error('Erro ao enviar respostas:', error);
+      showToast('Erro ao enviar respostas. Por favor, tente novamente.', 'error');
+      return false;
     }
   }
 
   // Função para avançar para a próxima etapa
-  const goToNextStage = async () => {
-    console.log(`Buscando próxima etapa após etapa ${stageId} para candidato ${candidateId}...`);
-    console.log(`Dados atuais: currentStageIndex=${currentStageIndex}, totalStages=${totalStages}`);
+  const goToNextStage = async (values?: Record<string, string>) => {
+    setIsSubmitting(true);
     
     try {
-      setLoading(true);
-      const nextStageResponse = await fetch(`/api/stages/next?currentStage=${stageId}&candidateId=${candidateId}`);
+      console.log(`Buscando próxima etapa para stageId=${stageId} e candidateId=${candidateId}...`);
       
-      if (nextStageResponse.ok) {
-        const nextStageData = await nextStageResponse.json();
-        console.log('Resposta completa da próxima etapa:', nextStageData);
-        
-        if (nextStageData.hasNextStage && nextStageData.nextStageId) {
-          // Verificar se o ID da próxima etapa é um UUID válido
-          const nextStageId = nextStageData.nextStageId;
-          const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(nextStageId);
-          
-          if (isValidUUID) {
-            console.log(`Redirecionando para a próxima etapa com UUID: ${nextStageId}`);
-            router.push(`/teste/etapa/${nextStageId}?candidateId=${candidateId}`);
-          } else {
-            console.error(`ID da próxima etapa não é um UUID válido: ${nextStageId}. Buscando UUID correspondente...`);
-            
-            // Tentar buscar o UUID correspondente ao ID não-UUID
-            const uuidResponse = await fetch(`/api/stages/uuid?stageId=${nextStageId}&candidateId=${candidateId}`);
-            
-            if (uuidResponse.ok) {
-              const uuidData = await uuidResponse.json();
-              
-              if (uuidData && uuidData.uuid) {
-                console.log(`UUID correspondente encontrado: ${uuidData.uuid}`);
-                router.push(`/teste/etapa/${uuidData.uuid}?candidateId=${candidateId}`);
-              } else {
-                console.error('Nenhum UUID correspondente encontrado. Usando fallback...');
-                router.push(`/teste/etapa/${nextStageId}?candidateId=${candidateId}`);
-              }
-            } else {
-              console.error('Erro ao buscar UUID correspondente. Usando fallback...');
-              router.push(`/teste/etapa/${nextStageId}?candidateId=${candidateId}`);
-            }
-          }
-        } else {
-          // Verificação especial para testes com 2 etapas
-          if (totalStages === 2 && currentStageIndex === 0) {
-            console.error('API não retornou nextStageId para teste com 2 etapas. Buscando todas as etapas...');
-            
-            // Buscar todas as etapas do teste para encontrar a próxima
-            try {
-              const allStagesResponse = await fetch(`/api/stages?candidateId=${candidateId}`);
-              if (allStagesResponse.ok) {
-                const allStagesData = await allStagesResponse.json();
-                console.log('Todas as etapas do teste:', allStagesData);
-                
-                if (allStagesData.stages && allStagesData.stages.length > 1) {
-                  // Encontrar a etapa atual e a próxima
-                  const currentStageIndex = allStagesData.stages.findIndex(
-                    (s: any) => s.id === stageId
-                  );
-                  
-                  if (currentStageIndex !== -1 && currentStageIndex < allStagesData.stages.length - 1) {
-                    const nextStage = allStagesData.stages[currentStageIndex + 1];
-                    
-                    // Verificar se o ID da próxima etapa é um UUID válido
-                    const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(nextStage.id);
-                    
-                    if (isValidUUID) {
-                      console.log(`Próxima etapa encontrada com UUID válido: ${nextStage.id}`);
-                      router.push(`/teste/etapa/${nextStage.id}?candidateId=${candidateId}`);
-                    } else {
-                      console.error(`ID da próxima etapa não é um UUID válido: ${nextStage.id}. Buscando UUID correspondente...`);
-                      
-                      // Tentar buscar o UUID correspondente ao ID não-UUID
-                      const uuidResponse = await fetch(`/api/stages/uuid?stageId=${nextStage.id}&candidateId=${candidateId}`);
-                      
-                      if (uuidResponse.ok) {
-                        const uuidData = await uuidResponse.json();
-                        
-                        if (uuidData && uuidData.uuid) {
-                          console.log(`UUID correspondente encontrado: ${uuidData.uuid}`);
-                          router.push(`/teste/etapa/${uuidData.uuid}?candidateId=${candidateId}`);
-                        } else {
-                          console.error('Nenhum UUID correspondente encontrado. Usando fallback...');
-                          router.push(`/teste/etapa/${nextStage.id}?candidateId=${candidateId}`);
-                        }
-                      } else {
-                        console.error('Erro ao buscar UUID correspondente. Usando fallback...');
-                        router.push(`/teste/etapa/${nextStage.id}?candidateId=${candidateId}`);
-                      }
-                    }
-                    return;
-                  }
-                }
-              }
-            } catch (error) {
-              console.error('Erro ao buscar todas as etapas:', error);
-            }
-            
-            // Se tudo falhar, mostrar mensagem de erro
-            showToast('Não foi possível encontrar a próxima etapa. Por favor, entre em contato com o suporte.', 'error');
-          } else {
-            console.error('Não há próxima etapa ou dados incompletos:', nextStageData);
-            showToast('Não foi possível encontrar a próxima etapa. Por favor, entre em contato com o suporte.', 'error');
-          }
-        }
-      } else {
-        console.error('Erro ao buscar próxima etapa:', await nextStageResponse.text());
-        showToast('Erro ao avançar para a próxima etapa. Por favor, tente novamente.', 'error');
-      }
-    } catch (error) {
-      console.error('Erro ao navegar para a próxima etapa:', error);
-      showToast('Erro ao avançar para a próxima etapa. Por favor, tente novamente.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Função para finalizar o teste
-  const finalizeTest = async () => {
-    console.log(`Finalizando teste para candidato ${candidateId}...`);
-    console.log(`Dados atuais: currentStageIndex=${currentStageIndex}, totalStages=${totalStages}, isLastStage=${isLastStage}`);
-    
-    // Verificação especial para testes com 2 etapas
-    if (totalStages === 2 && currentStageIndex === 0) {
-      console.log('Tentativa de finalizar teste na primeira etapa de um teste com 2 etapas. Redirecionando para a próxima etapa...');
-      await goToNextStage();
-      return;
-    }
-    
-    try {
-      // Verificar se há respostas pendentes para enviar
-      if (Object.keys(savedResponses).length > 0) {
-        console.log('Enviando respostas pendentes antes de finalizar o teste...');
-        
-        const response = await fetch('/api/responses', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            candidateId,
-            stageId,
-            responses: savedResponses,
-          }),
-        });
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Erro ao enviar respostas pendentes:', errorText);
-          showToast('Erro ao enviar respostas. Por favor, tente novamente.', 'error');
+      // Se temos valores e não estamos em uma etapa já concluída, salvar as respostas
+      if (values && !stageCompleted) {
+        const submitSuccess = await handleSubmit(values);
+        if (!submitSuccess) {
+          setIsSubmitting(false);
           return;
         }
       }
       
-      // Marcar o teste como concluído
-      console.log(`Marcando teste como concluído para o candidato ${candidateId}...`);
+      // Verificar se o ID da etapa atual é um UUID válido
+      const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(stageId as string);
       
-      const completeResponse = await fetch('/api/candidates/complete-test', {
+      let currentStageId = stageId as string;
+      
+      // Se não for um UUID válido, buscar o UUID correspondente
+      if (!isValidUUID) {
+        console.log(`ID da etapa atual não é um UUID válido: ${stageId}. Buscando UUID correspondente...`);
+        
+        const uuidResponse = await fetch(`/api/stages/uuid?stageId=${stageId}&candidateId=${candidateId}`);
+        
+        if (uuidResponse.ok) {
+          const uuidData = await uuidResponse.json();
+          
+          if (uuidData && uuidData.uuid) {
+            console.log(`UUID correspondente encontrado: ${uuidData.uuid}`);
+            currentStageId = uuidData.uuid;
+          } else {
+            console.error('UUID correspondente não encontrado');
+            throw new Error('UUID correspondente não encontrado');
+          }
+        } else {
+          console.error('Erro ao buscar UUID correspondente');
+          throw new Error('Erro ao buscar UUID correspondente');
+        }
+      }
+      
+      // Marcar a etapa atual como concluída
+      await fetch('/api/responses/mark-stage-completed', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ candidateId }),
+        body: JSON.stringify({
+          stageId: currentStageId,
+          candidateId
+        }),
       });
       
-      if (!completeResponse.ok) {
-        console.error('Erro ao marcar teste como concluído:', await completeResponse.text());
-        showToast('Erro ao finalizar o teste. Por favor, tente novamente.', 'error');
-        return;
+      // Buscar a próxima etapa
+      const response = await fetch(`/api/stages/next?currentStage=${currentStageId}&candidateId=${candidateId}`);
+      
+      if (!response.ok) {
+        throw new Error('Erro ao buscar próxima etapa');
       }
       
-      // Atualizar dados na sessão
-      if (typeof window !== 'undefined') {
-        const storedCandidateData = sessionStorage.getItem('candidateData');
-        if (storedCandidateData) {
-          try {
-            const parsedData = JSON.parse(storedCandidateData);
-            parsedData.completed = true;
-            parsedData.status = 'APPROVED';
-            sessionStorage.setItem('candidateData', JSON.stringify(parsedData));
-          } catch (error) {
-            console.error('Erro ao atualizar dados do candidato na sessão:', error);
+      const nextStageData = await response.json();
+      console.log('Dados da próxima etapa:', nextStageData);
+      
+      if (nextStageData.hasNextStage && nextStageData.nextStageId) {
+        // Verificar se o ID da próxima etapa é um UUID válido
+        const isNextStageIdValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(nextStageData.nextStageId);
+        
+        if (isNextStageIdValidUUID) {
+          console.log(`Avançando para a próxima etapa: ${nextStageData.nextStageId}`);
+          router.push(`/teste/etapa/${nextStageData.nextStageId}?candidateId=${candidateId}`);
+        } else {
+          console.log(`ID da próxima etapa não é um UUID válido: ${nextStageData.nextStageId}. Buscando UUID correspondente...`);
+          
+          // Buscar o UUID correspondente ao ID não-UUID
+          const uuidResponse = await fetch(`/api/stages/uuid?stageId=${nextStageData.nextStageId}&candidateId=${candidateId}`);
+          
+          if (uuidResponse.ok) {
+            const uuidData = await uuidResponse.json();
+            
+            if (uuidData && uuidData.uuid) {
+              console.log(`UUID correspondente encontrado: ${uuidData.uuid}. Redirecionando...`);
+              router.push(`/teste/etapa/${uuidData.uuid}?candidateId=${candidateId}`);
+            } else {
+              console.error('UUID correspondente não encontrado');
+              throw new Error('UUID correspondente não encontrado');
+            }
+          } else {
+            console.error('Erro ao buscar UUID correspondente');
+            throw new Error('Erro ao buscar UUID correspondente');
           }
         }
+      } else {
+        console.log('Não há próxima etapa. Redirecionando para a página de conclusão...');
+        router.push(`/teste/conclusao?candidateId=${candidateId}`);
       }
-      
-      // Redirecionar para a página de conclusão
-      console.log('Redirecionando para a página de conclusão...');
-      router.push(`/teste/conclusao?candidateId=${candidateId}`);
     } catch (error) {
-      console.error('Erro ao finalizar teste:', error);
-      showToast('Erro ao finalizar teste. Por favor, tente novamente.', 'error');
+      console.error('Erro ao avançar para a próxima etapa:', error);
+      setError('Ocorreu um erro ao tentar avançar para a próxima etapa. Por favor, tente novamente.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
-
-  const handleSaveProgress = (values: Record<string, string>) => {
-    saveResponsesToLocalStorage(values)
-    showToast('Progresso salvo com sucesso! Você pode continuar mais tarde.', 'success')
-  }
-
-  useEffect(() => {
-    if (typeof document !== 'undefined') {
-      // Verificar se o estilo já existe para evitar duplicação
-      if (!document.getElementById('custom-button-styles')) {
-        const styleEl = document.createElement('style');
-        styleEl.id = 'custom-button-styles';
-        styleEl.textContent = `
-          .btn-success {
-            background-color: #10B981;
-            color: white;
-            font-weight: bold;
-            padding: 0.5rem 1rem;
-            border-radius: 0.375rem;
-            transition-property: background-color, border-color, color, fill, stroke;
-            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-            transition-duration: 150ms;
-          }
-          .btn-success:hover {
-            background-color: #059669;
-          }
-          .btn-secondary {
-            background-color: #6B7280;
-            color: white;
-            font-weight: bold;
-            padding: 0.5rem 1rem;
-            border-radius: 0.375rem;
-            transition-property: background-color, border-color, color, fill, stroke;
-            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-            transition-duration: 150ms;
-          }
-          .btn-secondary:hover {
-            background-color: #4B5563;
-          }
-        `;
-        document.head.appendChild(styleEl);
-      }
-    }
-  }, []);
 
   useEffect(() => {
     if (!stageId || !candidateId) return;
@@ -560,7 +426,89 @@ const TestStage: NextPage = () => {
           console.error('Erro ao buscar UUID:', error);
         });
     }
+
+    // Verificar se a etapa já foi respondida
+    const checkIfStageCompleted = async () => {
+      try {
+        const response = await fetch(`/api/responses/check-stage-completed?stageId=${stageId}&candidateId=${candidateId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setStageCompleted(data.completed);
+          
+          if (data.completed) {
+            console.log(`Etapa ${stageId} já foi respondida pelo candidato ${candidateId}`);
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao verificar se a etapa foi respondida:', error);
+      }
+    };
+
+    checkIfStageCompleted();
   }, [stageId, candidateId, router]);
+
+  // Função para salvar o progresso
+  const handleSaveProgress = (values: Record<string, string>) => {
+    saveResponsesToLocalStorage(values);
+    showToast('Progresso salvo com sucesso! Você pode continuar mais tarde.', 'success');
+  };
+
+  // Função para finalizar o teste
+  const finalizeTest = async () => {
+    setIsSubmitting(true);
+    
+    try {
+      console.log(`Finalizando teste para candidato ${candidateId}...`);
+      
+      // Marcar a etapa atual como concluída
+      await fetch('/api/responses/mark-stage-completed', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          stageId: stageId as string,
+          candidateId
+        }),
+      });
+      
+      // Marcar o teste como concluído
+      const completeResponse = await fetch('/api/candidates/complete-test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ candidateId }),
+      });
+      
+      if (!completeResponse.ok) {
+        throw new Error('Erro ao marcar teste como concluído');
+      }
+      
+      // Atualizar dados na sessão
+      if (typeof window !== 'undefined') {
+        const storedCandidateData = sessionStorage.getItem('candidateData');
+        if (storedCandidateData) {
+          try {
+            const parsedData = JSON.parse(storedCandidateData);
+            parsedData.completed = true;
+            parsedData.status = 'APPROVED';
+            sessionStorage.setItem('candidateData', JSON.stringify(parsedData));
+          } catch (error) {
+            console.error('Erro ao atualizar dados do candidato na sessão:', error);
+          }
+        }
+      }
+      
+      // Redirecionar para a página de conclusão
+      router.push(`/teste/conclusao?candidateId=${candidateId}`);
+    } catch (error) {
+      console.error('Erro ao finalizar teste:', error);
+      setError('Ocorreu um erro ao finalizar o teste. Por favor, tente novamente.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -641,29 +589,29 @@ const TestStage: NextPage = () => {
             
             <div className="flex justify-between items-center mb-6">
               <div className="flex space-x-1">
-                {testData && testData.stageCount ? (
-                  // Se temos o número de etapas do teste, usar esse valor
-                  Array.from({ length: testData.stageCount }, (_, i) => i + 1).map((step) => (
+                {totalStages ? (
+                  // Se temos o número total de etapas, usar esse valor
+                  Array.from({ length: totalStages }, (_, i) => i).map((stepIndex) => (
                     <div 
-                      key={step}
+                      key={stepIndex}
                       className={`w-8 h-2 rounded-full ${
-                        parseInt(stageId as string) === step 
+                        currentStageIndex === stepIndex 
                           ? 'bg-primary-600' 
-                          : parseInt(stageId as string) > step 
+                          : currentStageIndex > stepIndex 
                             ? 'bg-primary-300' 
                             : 'bg-gray-200'
                       }`}
                     ></div>
                   ))
                 ) : (
-                  // Fallback para 6 etapas se não temos essa informação
-                  [1, 2, 3, 4, 5, 6].map((step) => (
+                  // Fallback para 3 etapas se não temos essa informação
+                  [0, 1, 2].map((stepIndex) => (
                     <div 
-                      key={step}
+                      key={stepIndex}
                       className={`w-8 h-2 rounded-full ${
-                        parseInt(stageId as string) === step 
+                        currentStageIndex === stepIndex 
                           ? 'bg-primary-600' 
-                          : parseInt(stageId as string) > step 
+                          : currentStageIndex > stepIndex 
                             ? 'bg-primary-300' 
                             : 'bg-gray-200'
                       }`}
@@ -672,113 +620,187 @@ const TestStage: NextPage = () => {
                 )}
               </div>
               <div className="text-sm text-secondary-500">
-                Etapa {stageId} de {testData && testData.stageCount ? testData.stageCount : totalStages || '?'}
+                Etapa {currentStageIndex !== null ? currentStageIndex + 1 : '?'} de {totalStages || '?'}
               </div>
             </div>
           </div>
 
-          <Formik
-            initialValues={savedResponses}
-            onSubmit={handleSubmit}
-            validate={validateResponses}
-          >
-            {({ values, isSubmitting, errors, touched }) => (
-              <Form>
-                <div className="space-y-8">
-                  {questions.map((question, index) => (
-                    <div key={question.id} className="card">
-                      <h3 className="text-lg font-semibold text-secondary-800 mb-4">
-                        {index + 1}. {question.text}
-                      </h3>
-                      <div className="space-y-3">
-                        {question.options.map((option) => (
-                          <label 
-                            key={option.id} 
-                            className={`flex items-start p-3 border rounded-lg cursor-pointer hover:bg-primary-50 transition-colors ${
-                              errors[question.id] && touched[question.id] ? 'border-red-300' : ''
-                            }`}
+          {stageCompleted ? (
+            <div className="card p-8 text-center">
+              <div className="text-5xl mb-4 text-green-500">✓</div>
+              <h2 className="text-2xl font-bold text-secondary-900 mb-4">Etapa já concluída</h2>
+              <p className="text-secondary-600 mb-6">
+                Você já respondeu todas as questões desta etapa. 
+                Utilize o botão abaixo para continuar para a próxima etapa.
+              </p>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  goToNextStage();
+                }}
+                disabled={isSubmitting}
+                className="btn-primary"
+              >
+                {isSubmitting ? (
+                  <span className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processando...
+                  </span>
+                ) : (
+                  'Próxima Etapa'
+                )}
+              </button>
+            </div>
+          ) : (
+            <Formik
+              initialValues={savedResponses}
+              onSubmit={handleSubmit}
+              validate={validateResponses}
+            >
+              {({ values, isSubmitting, errors, touched }) => (
+                <Form>
+                  <div className="space-y-8">
+                    {questions.map((question, index) => (
+                      <div key={question.id} className="card">
+                        <h3 className="text-lg font-semibold text-secondary-800 mb-4">
+                          {index + 1}. {question.text}
+                        </h3>
+                        <div className="space-y-3">
+                          {question.options.map((option) => (
+                            <label 
+                              key={option.id} 
+                              className={`flex items-start p-3 border rounded-lg cursor-pointer hover:bg-primary-50 transition-colors ${
+                                errors[question.id] && touched[question.id] ? 'border-red-300' : ''
+                              }`}
+                            >
+                              <Field
+                                type="radio"
+                                name={question.id}
+                                value={option.id}
+                                className="mt-1 mr-3"
+                              />
+                              <span className="text-secondary-700">{option.text}</span>
+                            </label>
+                          ))}
+                          {errors[question.id] && touched[question.id] && (
+                            <div className="text-red-500 text-sm mt-1">{errors[question.id]}</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-8 flex justify-between">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveProgress(values)}
+                      className="px-4 py-2 border border-primary-300 text-primary-700 rounded-md hover:bg-primary-50"
+                    >
+                      Salvar Progresso
+                    </button>
+                    <div className="flex flex-col items-end">
+                      <div className="text-yellow-600 text-sm mb-2 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                        Não será possível retornar após avançar
+                      </div>
+                      <div className="flex space-x-3">
+                        {/* Mostrar o botão de próxima etapa quando não for a última etapa 
+                            Casos específicos:
+                            1. Se totalStages === 2 e currentStageIndex === 0, sempre mostrar o botão de próxima etapa
+                            2. Para outros casos, verificar se não é a última etapa
+                        */}
+                        {((totalStages === 2 && currentStageIndex === 0) || 
+                           (!isLastStage && currentStageIndex !== null && totalStages !== null && currentStageIndex < totalStages - 1)) && (
+                          <button
+                            type="button"
+                            disabled={isSubmitting}
+                            className="btn-primary"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (checkAllQuestionsAnswered(values)) {
+                                setIsSubmitting(true);
+                                // Primeiro enviar as respostas
+                                handleSubmit(values).then(success => {
+                                  if (success) {
+                                    // Se o envio foi bem-sucedido, avançar para a próxima etapa
+                                    goToNextStage(values);
+                                  } else {
+                                    setIsSubmitting(false);
+                                  }
+                                }).catch(() => {
+                                  setIsSubmitting(false);
+                                });
+                              }
+                            }}
                           >
-                            <Field
-                              type="radio"
-                              name={question.id}
-                              value={option.id}
-                              className="mt-1 mr-3"
-                            />
-                            <span className="text-secondary-700">{option.text}</span>
-                          </label>
-                        ))}
-                        {errors[question.id] && touched[question.id] && (
-                          <div className="text-red-500 text-sm mt-1">{errors[question.id]}</div>
+                            {isSubmitting ? (
+                              <span className="flex items-center">
+                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Avançando...
+                              </span>
+                            ) : 'Próxima Etapa'}
+                          </button>
+                        )}
+                        
+                        {/* Mostrar o botão de finalizar teste apenas quando for a última etapa 
+                            Para testes com 2 etapas, mostrar apenas na etapa 2 (índice 1)
+                        */}
+                        {((totalStages === 2 && currentStageIndex === 1) || 
+                           (totalStages !== 2 && isLastStage) || 
+                           (currentStageIndex !== null && totalStages !== null && currentStageIndex === totalStages - 1)) && (
+                          <button
+                            type="button"
+                            disabled={isSubmitting}
+                            className="btn-primary bg-green-600 hover:bg-green-700"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (checkAllQuestionsAnswered(values)) {
+                                // Primeiro marcar a etapa como concluída
+                                fetch('/api/responses/mark-stage-completed', {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                  },
+                                  body: JSON.stringify({
+                                    stageId: stageId as string,
+                                    candidateId
+                                  }),
+                                }).then(() => {
+                                  // Depois finalizar o teste
+                                  finalizeTest();
+                                }).catch(error => {
+                                  console.error('Erro ao marcar etapa como concluída:', error);
+                                  showToast('Erro ao finalizar teste. Por favor, tente novamente.', 'error');
+                                });
+                              }
+                            }}
+                          >
+                            {isSubmitting ? (
+                              <span className="flex items-center">
+                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Finalizando...
+                              </span>
+                            ) : 'Finalizar Teste'}
+                          </button>
                         )}
                       </div>
                     </div>
-                  ))}
-                </div>
-
-                <div className="mt-8 flex justify-between">
-                  <button
-                    type="button"
-                    onClick={() => handleSaveProgress(values)}
-                    className="px-4 py-2 border border-primary-300 text-primary-700 rounded-md hover:bg-primary-50"
-                  >
-                    Salvar Progresso
-                  </button>
-                  <div className="flex flex-col items-end">
-                    <div className="text-yellow-600 text-sm mb-2 flex items-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                      Não será possível retornar após avançar
-                    </div>
-                    <div className="flex space-x-3">
-                      {/* Mostrar o botão de próxima etapa quando não for a última etapa 
-                          Casos específicos:
-                          1. Se totalStages === 2 e currentStageIndex === 0, sempre mostrar o botão de próxima etapa
-                          2. Para outros casos, verificar se não é a última etapa
-                      */}
-                      {((totalStages === 2 && currentStageIndex === 0) || 
-                         (!isLastStage && currentStageIndex !== null && totalStages !== null && currentStageIndex < totalStages - 1)) && (
-                        <button
-                          type="submit"
-                          disabled={isSubmitting}
-                          className="btn-primary"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (checkAllQuestionsAnswered(values)) {
-                              handleSubmit(values).then(() => goToNextStage());
-                            }
-                          }}
-                        >
-                          {isSubmitting ? 'Enviando...' : 'Próxima Etapa'}
-                        </button>
-                      )}
-                      
-                      {/* Mostrar o botão de finalizar teste apenas quando for a última etapa 
-                          Para testes com 2 etapas, mostrar apenas na etapa 2 (índice 1)
-                      */}
-                      {((totalStages === 2 && currentStageIndex === 1) || 
-                         (totalStages !== 2 && isLastStage) || 
-                         (currentStageIndex !== null && totalStages !== null && currentStageIndex === totalStages - 1)) && (
-                        <button
-                          type="submit"
-                          disabled={isSubmitting}
-                          className="btn-success"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (checkAllQuestionsAnswered(values)) {
-                              handleSubmit(values).then(() => finalizeTest());
-                            }
-                          }}
-                        >
-                          {isSubmitting ? 'Enviando...' : 'Finalizar Teste'}
-                        </button>
-                      )}
-                    </div>
                   </div>
-                </div>
-              </Form>
-            )}
-          </Formik>
+                </Form>
+              )}
+            </Formik>
+          )}
         </main>
       </div>
     </div>
