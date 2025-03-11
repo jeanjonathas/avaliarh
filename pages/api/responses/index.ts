@@ -69,6 +69,43 @@ export default async function handler(
             return null
           }
 
+          // Verificar se a etapa passada na requisição existe e pertence ao teste do candidato
+          let currentStageId = stageId;
+          let currentStageName = "";
+          
+          // Se temos um stageId na requisição, verificar se é válido
+          if (stageId) {
+            try {
+              // Verificar se a etapa pertence ao teste do candidato
+              const testStage = await prisma.testStage.findFirst({
+                where: {
+                  stageId: stageId,
+                  testId: candidate.testId || ""
+                },
+                include: {
+                  stage: true
+                }
+              });
+              
+              if (testStage) {
+                currentStageId = stageId;
+                currentStageName = testStage.stage.title;
+                console.log(`Usando etapa da requisição: ${currentStageName} (${currentStageId})`);
+              } else {
+                console.log(`Etapa ${stageId} não pertence ao teste ${candidate.testId}, usando etapa da questão`);
+                currentStageId = question.stageId;
+                currentStageName = question.Stage?.title || "Sem Etapa";
+              }
+            } catch (error) {
+              console.error("Erro ao verificar etapa:", error);
+              currentStageId = question.stageId;
+              currentStageName = question.Stage?.title || "Sem Etapa";
+            }
+          } else {
+            currentStageId = question.stageId;
+            currentStageName = question.Stage?.title || "Sem Etapa";
+          }
+
           // Verificar se já existe uma resposta para esta pergunta
           const existingResponse = await prisma.response.findUnique({
             where: {
@@ -93,7 +130,9 @@ export default async function handler(
             id: question.id,
             text: question.text,
             categoryId: question.categoryId,
-            categoryName: question.Category?.name || null
+            categoryName: question.Category?.name || null,
+            stageId: currentStageId,
+            stageName: currentStageName
           }
 
           // Preparar os dados com tipagem correta para o modelo Response
@@ -106,27 +145,49 @@ export default async function handler(
             allOptionsSnapshot: JSON.stringify(allOptionsSnapshot) as Prisma.InputJsonValue,
             questionSnapshot: JSON.stringify(questionSnapshot) as Prisma.InputJsonValue,
             categoryName: question.Category?.name || null,
-            stageName: question.Stage?.title || null
+            stageName: currentStageName,
+            stageId: currentStageId
           };
           
           if (existingResponse) {
-            // Atualizar resposta existente com snapshot atualizado
             console.log(`Atualizando resposta existente: ${existingResponse.id}`);
-            return prisma.response.update({
-              where: {
-                id: existingResponse.id,
-              },
-              data: responseData,
-            })
+            try {
+              // Usar $executeRaw para atualizar a resposta existente
+              // Isso contorna problemas de tipagem do Prisma Client
+              const result = await prisma.$executeRaw`
+                UPDATE "Response"
+                SET 
+                  "optionId" = ${response.optionId},
+                  "questionText" = ${question.text},
+                  "optionText" = ${selectedOption.text},
+                  "isCorrectOption" = ${selectedOption.isCorrect},
+                  "allOptionsSnapshot" = ${JSON.stringify(allOptionsSnapshot)}::jsonb,
+                  "questionSnapshot" = ${JSON.stringify(questionSnapshot)}::jsonb,
+                  "categoryName" = ${question.Category?.name || null},
+                  "stageName" = ${currentStageName},
+                  "stageId" = ${currentStageId},
+                  "updatedAt" = NOW()
+                WHERE "id" = ${existingResponse.id}
+                RETURNING *;
+              `;
+              console.log(`Resposta atualizada com SQL raw: ${result}`);
+              return existingResponse;
+            } catch (error) {
+              console.error('Erro ao atualizar resposta:', error);
+              throw error;
+            }
           } else {
             // Criar nova resposta com snapshot
             try {
               console.log(`Criando nova resposta para questão ${response.questionId}`);
               const newResponse = await prisma.response.create({
                 data: {
+                  id: uuidv4(),
                   candidateId,
                   questionId: response.questionId,
-                  ...responseData
+                  ...responseData,
+                  createdAt: new Date(),
+                  updatedAt: new Date()
                 },
               });
               console.log(`Resposta criada com sucesso: ${newResponse.id}`);
@@ -170,6 +231,7 @@ export default async function handler(
                       "isCorrectOption", 
                       "stageName", 
                       "categoryName", 
+                      "stageId",
                       "createdAt", 
                       "updatedAt"
                     ) 
@@ -181,8 +243,9 @@ export default async function handler(
                       ${question.text}, 
                       ${option.text}, 
                       ${option.isCorrect}, 
-                      ${question.Stage?.title || null}, 
+                      ${currentStageName}, 
                       ${question.Category?.name || null}, 
+                      ${currentStageId},
                       NOW(), 
                       NOW()
                     )

@@ -22,68 +22,27 @@ export default async function handler(
     
     // Verificar se o ID da etapa é um UUID válido
     const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(stageId);
-    let stageUUID = stageId;
     
-    // Se não for um UUID válido, buscar o UUID correspondente
     if (!isValidUUID) {
-      // Verificar se é um número (ordem)
-      const isOrderNumber = /^\d+$/.test(stageId);
-      
-      if (isOrderNumber) {
-        // Buscar o testId associado ao candidato
-        const candidate = await prisma.candidate.findUnique({
-          where: { id: candidateId },
-          select: { testId: true }
-        });
-        
-        if (!candidate || !candidate.testId) {
-          return res.status(404).json({ 
-            error: 'Candidato não encontrado ou sem teste associado',
-            completed: false
-          });
-        }
-        
-        // Buscar a etapa pelo número da ordem
-        const testStage = await prisma.testStage.findFirst({
-          where: {
-            testId: candidate.testId,
-            order: parseInt(stageId)
-          },
-          select: { stageId: true }
-        });
-        
-        if (testStage) {
-          stageUUID = testStage.stageId;
-        } else {
-          return res.status(404).json({ 
-            error: 'Etapa não encontrada',
-            completed: false
-          });
-        }
-      } else {
-        // Buscar pelo ID personalizado (não implementado ainda)
-        return res.status(400).json({ 
-          error: 'Formato de ID de etapa não suportado',
-          completed: false
-        });
-      }
+      return res.status(400).json({ 
+        error: 'ID de etapa inválido. Todas as etapas agora usam apenas UUIDs padrão.',
+        completed: false
+      });
     }
     
-    // Verificar se existem respostas para esta etapa
-    const responses = await prisma.response.findMany({
-      where: {
-        candidateId,
-        question: {
-          stageQuestions: {
-            some: {
-              stage: {
-                id: stageUUID
-              }
-            }
-          }
-        }
-      }
-    });
+    // Usar o UUID diretamente, pois não temos mais IDs personalizados
+    const stageUUID = stageId;
+    
+    // Verificar se existem respostas para esta etapa usando SQL raw para contornar limitações do tipo
+    const responseCountResult = await prisma.$queryRaw`
+      SELECT COUNT(*) as count 
+      FROM "Response" 
+      WHERE "candidateId" = ${candidateId} 
+      AND "stageId" = ${stageUUID}
+    `;
+    
+    // Extrair o número de respostas do resultado
+    const responseCount = Number(responseCountResult[0]?.count || 0);
     
     // Buscar o número total de questões nesta etapa
     const questionCount = await prisma.stageQuestion.count({
@@ -93,11 +52,11 @@ export default async function handler(
     });
     
     // Se o número de respostas for igual ao número de questões, a etapa está completa
-    const completed = responses.length > 0 && responses.length >= questionCount;
+    const completed = responseCount > 0 && responseCount >= questionCount;
     
     return res.status(200).json({
       completed,
-      responseCount: responses.length,
+      responseCount,
       questionCount
     });
     

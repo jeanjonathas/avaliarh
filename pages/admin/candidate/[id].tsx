@@ -492,12 +492,12 @@ const CandidateDetails = () => {
   };
 
   // Dados para o gráfico de radar - usando dinamicamente os nomes das etapas
-  const radarData = {
-    labels: candidate?.stageScores?.map(score => score.name) || [],
+  const [radarData, setRadarData] = useState({
+    labels: [],
     datasets: [
       {
         label: 'Desempenho do Candidato',
-        data: candidate?.stageScores?.map(score => score.percentage) || [],
+        data: [],
         backgroundColor: 'rgba(54, 162, 235, 0.2)',
         borderColor: 'rgba(54, 162, 235, 1)',
         borderWidth: 2,
@@ -510,8 +510,8 @@ const CandidateDetails = () => {
         fill: true
       }
     ],
-  }
-  
+  })
+
   // Opções para o gráfico de radar
   const radarOptions = {
     responsive: true,
@@ -549,14 +549,14 @@ const CandidateDetails = () => {
       }
     },
   }
-  
+
   // Dados para o gráfico de barras - usando dinamicamente os nomes das etapas
-  const barData = {
-    labels: candidate?.stageScores?.map(score => score.name) || [],
+  const [barData, setBarData] = useState({
+    labels: [],
     datasets: [
       {
         label: 'Acertos',
-        data: candidate?.stageScores?.map(score => score.correct) || [],
+        data: [],
         backgroundColor: 'rgba(75, 192, 192, 0.7)',
         borderRadius: 4,
         barPercentage: 0.6,
@@ -564,15 +564,15 @@ const CandidateDetails = () => {
       },
       {
         label: 'Total',
-        data: candidate?.stageScores?.map(score => score.total) || [],
+        data: [],
         backgroundColor: 'rgba(200, 200, 200, 0.7)',
         borderRadius: 4,
         barPercentage: 0.6,
         categoryPercentage: 0.7,
       }
     ]
-  }
-  
+  })
+
   // Opções para o gráfico de barras - com escala Y dinâmica
   const barOptions = {
     responsive: true,
@@ -612,7 +612,110 @@ const CandidateDetails = () => {
       }
     },
   }
-  
+
+  // Efeito para processar os dados do candidato quando eles são carregados
+  useEffect(() => {
+    if (candidate && candidate.id) {
+      console.log('Dados do candidato carregados:', candidate);
+      
+      // Processar as respostas para agrupar por etapa
+      if (candidate.responses && candidate.responses.length > 0) {
+        console.log('Processando respostas:', candidate.responses.length);
+        
+        // Ordenar as respostas por ID de etapa para garantir consistência
+        const sortedResponses = [...candidate.responses].sort((a, b) => {
+          const stageA = a.question?.Stage?.id || '';
+          const stageB = b.question?.Stage?.id || '';
+          return stageA.localeCompare(stageB);
+        });
+        
+        // Agrupar respostas por etapa
+        const stageResponses: Record<string, Response[]> = {};
+        
+        sortedResponses.forEach(response => {
+          let stageName = 'Etapa não identificada';
+          
+          // Tentar obter o nome da etapa de várias fontes
+          if (response.stageName) {
+            stageName = response.stageName;
+          } else if (response.question && response.question.Stage && response.question.Stage.title) {
+            stageName = response.question.Stage.title;
+          } else if (response.questionSnapshot) {
+            try {
+              const snapshot = typeof response.questionSnapshot === 'string' 
+                ? JSON.parse(response.questionSnapshot)
+                : response.questionSnapshot;
+              
+              if (snapshot.stageName) {
+                stageName = snapshot.stageName;
+              }
+            } catch (e) {
+              console.error('Erro ao parsear questionSnapshot:', e);
+            }
+          }
+          
+          if (!stageResponses[stageName]) {
+            stageResponses[stageName] = [];
+          }
+          stageResponses[stageName].push(response);
+        });
+        
+        console.log('Respostas agrupadas por etapa:', Object.keys(stageResponses));
+      }
+      
+      // Processar os dados de desempenho para os gráficos
+      if (candidate.stageScores && candidate.stageScores.length > 0) {
+        console.log('Processando dados de desempenho:', candidate.stageScores);
+        
+        // Ordenar as etapas para garantir consistência na visualização
+        const sortedStages = [...candidate.stageScores].sort((a, b) => a.name.localeCompare(b.name));
+        
+        // Atualizar os dados dos gráficos
+        setRadarData({
+          labels: sortedStages.map(score => score.name),
+          datasets: [
+            {
+              label: 'Desempenho do Candidato',
+              data: sortedStages.map(score => score.percentage),
+              backgroundColor: 'rgba(54, 162, 235, 0.2)',
+              borderColor: 'rgba(54, 162, 235, 1)',
+              borderWidth: 2,
+              pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+              pointBorderColor: '#fff',
+              pointHoverBackgroundColor: '#fff',
+              pointHoverBorderColor: 'rgba(54, 162, 235, 1)',
+              pointRadius: 4,
+              pointHoverRadius: 6,
+              fill: true
+            }
+          ],
+        });
+        
+        setBarData({
+          labels: sortedStages.map(score => score.name),
+          datasets: [
+            {
+              label: 'Acertos',
+              data: sortedStages.map(score => score.correct),
+              backgroundColor: 'rgba(75, 192, 192, 0.7)',
+              borderRadius: 4,
+              barPercentage: 0.6,
+              categoryPercentage: 0.7,
+            },
+            {
+              label: 'Total',
+              data: sortedStages.map(score => score.total),
+              backgroundColor: 'rgba(200, 200, 200, 0.7)',
+              borderRadius: 4,
+              barPercentage: 0.6,
+              categoryPercentage: 0.7,
+            }
+          ]
+        });
+      }
+    }
+  }, [candidate]);
+
   if (status === 'loading' || loading) {
     return (
       <div className="min-h-screen bg-secondary-50 flex justify-center items-center">
@@ -688,7 +791,7 @@ const CandidateDetails = () => {
               title="Próximo candidato"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10 10.586 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
               </svg>
             </button>
           </div>
@@ -723,7 +826,7 @@ const CandidateDetails = () => {
                 >
                   <div className="flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-1.707-.707L12 7 8.707 4.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
                     Respostas
                   </div>
@@ -777,26 +880,24 @@ const CandidateDetails = () => {
                             {/* Agrupar respostas por etapa */}
                             {(() => {
                               // Agrupar respostas por etapa
-                              const stageResponses = {};
+                              const stageResponses: Record<string, Response[]> = {};
                               
-                              // Converter para array se não for
-                              const responsesArray = Array.isArray(candidate.responses) ? candidate.responses : [];
-                              console.log('Processando respostas:', responsesArray.length);
+                              // Primeiro, vamos ordenar as respostas por ID de etapa para garantir que apareçam na ordem correta
+                              const sortedResponses = [...candidate.responses].sort((a, b) => {
+                                const stageA = a.question?.Stage?.id || '';
+                                const stageB = b.question?.Stage?.id || '';
+                                return stageA.localeCompare(stageB);
+                              });
                               
-                              responsesArray.forEach(response => {
-                                // Tentar obter o nome da etapa de várias fontes possíveis
-                                let stageName = 'Sem Etapa';
+                              sortedResponses.forEach(response => {
+                                let stageName = 'Etapa não identificada';
                                 
-                                // Verificar se temos o campo stageName diretamente
+                                // Tentar obter o nome da etapa de várias fontes
                                 if (response.stageName) {
                                   stageName = response.stageName;
-                                }
-                                // Verificar se temos a relação question.Stage
-                                else if (response.question && response.question.Stage && response.question.Stage.title) {
+                                } else if (response.question && response.question.Stage && response.question.Stage.title) {
                                   stageName = response.question.Stage.title;
-                                }
-                                // Verificar se temos o snapshot da questão com informações da etapa
-                                else if (response.questionSnapshot) {
+                                } else if (response.questionSnapshot) {
                                   try {
                                     const snapshot = typeof response.questionSnapshot === 'string' 
                                       ? JSON.parse(response.questionSnapshot)
@@ -817,7 +918,7 @@ const CandidateDetails = () => {
                               });
                               
                               return Object.entries(stageResponses).map(([stageName, responses]: [string, any[]]) => (
-                                <div key={stageName} className="border border-secondary-200 rounded-lg overflow-hidden">
+                                <div key={stageName} className="border border-secondary-200 rounded-lg overflow-hidden mb-6">
                                   <div className="bg-secondary-50 px-4 py-3 border-b border-secondary-200">
                                     <h4 className="font-medium text-secondary-800">{stageName}</h4>
                                   </div>
@@ -908,13 +1009,16 @@ const CandidateDetails = () => {
                                             {allOptionsSnapshot.length > 0 ? (
                                               allOptionsSnapshot.map(option => {
                                                 const isSelected = option.id === response.optionId;
-                                                // Usar a variável isCorrect para a opção selecionada, mas para as outras opções usar o valor do snapshot
-                                                const optionIsCorrect = isSelected ? isCorrect : option.isCorrect;
+                                                const optionIsCorrect = option.isCorrect;
                                                 
                                                 return (
                                                   <div 
   key={option.id} 
-  className={`flex items-start p-2 rounded ${isSelected ? (optionIsCorrect ? 'bg-green-50' : 'bg-red-50') : ''}`}
+  className={`flex items-start p-2 rounded ${
+    isSelected 
+      ? (optionIsCorrect ? 'bg-green-50' : 'bg-red-50') 
+      : (optionIsCorrect && !isCorrect ? 'bg-green-50/30 border border-green-100' : '')
+  }`}
 >
                                                     <div className="flex-shrink-0 mt-0.5">
                                                     {isSelected ? (
@@ -922,13 +1026,17 @@ const CandidateDetails = () => {
                                                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                                         </svg>
                                                       ) : (
-                                                        <svg className="h-5 w-5 text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        <svg className={`h-5 w-5 ${optionIsCorrect && !isCorrect ? 'text-green-300' : 'text-secondary-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                         </svg>
                                                       )}
                                                     </div>
                                                     <div className="ml-2">
-                                                      <p className={`text-sm ${isSelected ? (optionIsCorrect ? 'text-green-700' : 'text-red-700') : 'text-secondary-600'}`}>
+                                                      <p className={`text-sm ${
+                                                        isSelected 
+                                                          ? (optionIsCorrect ? 'text-green-700' : 'text-red-700') 
+                                                          : (optionIsCorrect && !isCorrect ? 'text-green-600/80 font-medium' : 'text-secondary-600')
+                                                      }`}>
                                                         {option.text}
                                                       </p>
                                                       {isSelected && (
@@ -939,6 +1047,9 @@ const CandidateDetails = () => {
                                                             <span className="text-red-600">Resposta incorreta</span>
                                                           )}
                                                         </p>
+                                                      )}
+                                                      {!isSelected && optionIsCorrect && !isCorrect && (
+                                                        <p className="text-xs mt-1 text-green-600/80">Resposta correta</p>
                                                       )}
                                                     </div>
                                                   </div>
@@ -1404,7 +1515,7 @@ const CandidateDetails = () => {
                           <div className="bg-white p-3 rounded-md border border-secondary-200">
                             <span className="text-sm text-secondary-600">Código do Convite:</span>
                             <div className="flex items-center justify-between mt-1">
-                              <p className="font-medium text-lg text-primary-600">{candidate?.inviteCode || 'Não gerado'}</p>
+                              <p className="font-medium text-lg text-primary-600">{candidate?.inviteCode}</p>
                               <button
                                 onClick={generateNewInvite}
                                 disabled={isGeneratingInvite}
@@ -1548,7 +1659,7 @@ const CandidateDetails = () => {
                           >
                             <span>Ver currículo</span>
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2H6z" />
+                              <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2v-1H4a1 1 0 00-1 1v1H0a2 2 0 000 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1a2 2 0 00-2 2v3a2 2 0 002 2h3a2 2 0 002-2V7a1 1 0 10-2 0v3a1 1 0 10-2 0V7a1 1 0 10-2 0v3a2 2 0 002 2h3z" />
                             </svg>
                           </Link>
                         </div>

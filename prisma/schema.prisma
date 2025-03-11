@@ -31,34 +31,34 @@ model Admin {
 }
 
 model Candidate {
-  id             String         @id @default(uuid())
+  id             String          @id @default(uuid())
   name           String
   email          String
   phone          String?
   position       String?
-  testDate       DateTime       @default(now())
-  completed      Boolean        @default(false)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  testDate       DateTime        @default(now())
+  completed      Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
   infoJobsLink   String?
   interviewDate  DateTime?
   observations   String?
   rating         Float?
   resumeFile     String?
   socialMediaUrl String?
-  status         Status         @default(PENDING)
-  inviteCode     String?        @unique
-  inviteSent     Boolean        @default(false)
-  inviteAttempts Int            @default(0)
+  status         Status          @default(PENDING)
+  inviteCode     String?         @unique
+  inviteSent     Boolean         @default(false)
+  inviteAttempts Int             @default(0)
   inviteExpires  DateTime?
   github         String?
   linkedin       String?
   portfolio      String?
   resumeUrl      String?
   testId         String?
-  test           tests?         @relation(fields: [testId], references: [id])
-  responses      Response[]
+  test           tests?          @relation(fields: [testId], references: [id])
   candidateTests CandidateTest[]
+  responses      Response[]
 }
 
 model Question {
@@ -71,7 +71,8 @@ model Question {
   options        Option[]
   Category       Category?       @relation(fields: [categoryId], references: [id])
   Stage          Stage           @relation(fields: [stageId], references: [id], onDelete: Cascade)
-  responses      Response[]
+  // Removendo a relação direta com Response para permitir exclusão de perguntas
+  // responses      Response[]
   stageQuestions StageQuestion[]
   testQuestions  TestQuestion[]
 }
@@ -84,7 +85,8 @@ model Option {
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
   question   Question   @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  responses  Response[]
+  // Removendo a relação direta com Response para permitir exclusão de opções
+  // responses  Response[]
 }
 
 model Response {
@@ -101,9 +103,12 @@ model Response {
   questionSnapshot   Json?
   categoryName       String?
   stageName          String?
+  stageId            String?
   candidate          Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-  option             Option    @relation(fields: [optionId], references: [id])
-  question           Question  @relation(fields: [questionId], references: [id])
+  // Removendo a relação direta com Option para permitir exclusão de opções
+  // option             Option    @relation(fields: [optionId], references: [id])
+  // Removendo a relação direta com Question para permitir exclusão de perguntas
+  // question           Question  @relation(fields: [questionId], references: [id])
 
   @@unique([candidateId, questionId])
 }
@@ -152,10 +157,10 @@ model tests {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   candidates     Candidate[]
+  candidateTests CandidateTest[]
   stages         Stage[]
   testQuestions  TestQuestion[]
   TestStage      TestStage[]
-  candidateTests CandidateTest[]
 }
 
 model Category {
@@ -200,22 +205,20 @@ model TestQuestion {
   @@index([stageId])
 }
 
-// Nova tabela para relacionar candidatos e testes
 model CandidateTest {
-  id           String    @id @default(uuid())
-  candidateId  String
-  testId       String
-  inviteCode   String    @unique
-  inviteExpires DateTime?
-  inviteSent   Boolean   @default(false)
-  inviteAttempts Int     @default(0)
-  completed    Boolean   @default(false)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  
-  candidate    Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-  test         tests     @relation(fields: [testId], references: [id], onDelete: Cascade)
-  
+  id             String    @id @default(uuid())
+  candidateId    String
+  testId         String
+  inviteCode     String    @unique
+  inviteExpires  DateTime?
+  inviteSent     Boolean   @default(false)
+  inviteAttempts Int       @default(0)
+  completed      Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  candidate      Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  test           tests     @relation(fields: [testId], references: [id], onDelete: Cascade)
+
   @@unique([candidateId, testId])
   @@index([candidateId])
   @@index([testId])

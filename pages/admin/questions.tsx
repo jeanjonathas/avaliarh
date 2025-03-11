@@ -574,7 +574,7 @@ const Questions: NextPage = () => {
         method: 'DELETE',
       });
 
-      if (response.ok) {
+      if (response.status === 204) {
         // Substituir o alert pelo novo sistema de notificações
         notify.showSuccess('Pergunta excluída com sucesso!');
         
@@ -586,10 +586,56 @@ const Questions: NextPage = () => {
         
         // Recarregar as perguntas
         fetchQuestions();
+      } else if (response.status === 409) {
+        // Pergunta está associada a um teste ou tem respostas
+        const data = await response.json();
+        
+        let confirmMessage = 'Tem certeza que deseja continuar?';
+        
+        if (data.hasResponses && data.isAssociatedWithTest) {
+          confirmMessage = 'Esta pergunta possui respostas de candidatos e está associada a um ou mais testes. Os dados das respostas estão seguros em snapshots, então você pode prosseguir com a exclusão. Tem certeza que deseja continuar?';
+        } else if (data.hasResponses) {
+          confirmMessage = 'Esta pergunta possui respostas de candidatos. Os dados das respostas estão seguros em snapshots, então você pode prosseguir com a exclusão. Tem certeza que deseja continuar?';
+        } else if (data.isAssociatedWithTest) {
+          confirmMessage = 'Esta pergunta está associada a um ou mais testes. Remover a pergunta irá desassociá-la de todos os testes. Tem certeza que deseja continuar?';
+        }
+        
+        // Mostrar confirmação especial
+        notify.confirm(
+          'Atenção: Exclusão de pergunta',
+          confirmMessage,
+          async () => {
+            // Se o usuário confirmar, fazer uma segunda requisição para forçar a exclusão
+            const forceDeleteResponse = await fetch(`/api/admin/questions/${id}/force-delete`, {
+              method: 'DELETE',
+            });
+            
+            if (forceDeleteResponse.ok) {
+              notify.showSuccess('Pergunta excluída com sucesso!');
+              
+              // Se a pergunta excluída for a atual, limpar o estado de edição
+              if (currentQuestion?.id === id) {
+                setIsEditing(false);
+                setCurrentQuestion(null);
+              }
+              
+              // Recarregar as perguntas
+              fetchQuestions();
+            } else {
+              const errorData = await forceDeleteResponse.json();
+              notify.showError(`Erro ao excluir pergunta: ${errorData.error || 'Erro desconhecido'}`);
+            }
+          },
+          {
+            type: 'warning',
+            confirmText: 'Sim, excluir mesmo assim',
+            cancelText: 'Cancelar'
+          }
+        );
       } else {
         const errorData = await response.json();
         // Substituir o alert pelo novo sistema de notificações
-        notify.showError(`Erro ao excluir pergunta: ${errorData.message || 'Erro desconhecido'}`);
+        notify.showError(`Erro ao excluir pergunta: ${errorData.error || 'Erro desconhecido'}`);
       }
     } catch (error) {
       console.error('Erro ao excluir pergunta:', error);

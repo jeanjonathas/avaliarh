@@ -3,6 +3,24 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
 import { prisma } from '../../../../lib/prisma'
 
+// Definindo a interface para o tipo Response com os campos adicionais
+interface ResponseWithSnapshot {
+  id: string;
+  candidateId: string;
+  questionId: string;
+  optionId: string;
+  questionText: string;
+  optionText: string;
+  isCorrectOption: boolean;
+  allOptionsSnapshot?: any;
+  questionSnapshot?: any;
+  categoryName?: string | null;
+  stageName?: string | null;
+  stageId?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Função auxiliar para converter BigInt para Number
 function convertBigIntToNumber(obj: any): any {
   if (obj === null || obj === undefined) {
@@ -49,11 +67,7 @@ export default async function handler(
           createdAt: 'desc'
         },
         include: {
-          responses: {
-            include: {
-              option: true
-            }
-          }
+          responses: true
         }
       });
       
@@ -64,8 +78,12 @@ export default async function handler(
         // Calcular pontuação apenas se o candidato tiver respostas
         let score = null;
         if (candidate.completed && candidate.responses.length > 0) {
-          const correctResponses = candidate.responses.filter(r => r.option.isCorrect).length;
-          score = (correctResponses / candidate.responses.length) * 100;
+          // Converter as respostas para o tipo personalizado
+          const typedResponses = candidate.responses as unknown as ResponseWithSnapshot[];
+          
+          // Usar o campo isCorrectOption que está armazenado diretamente na resposta
+          const correctResponses = typedResponses.filter(response => response.isCorrectOption).length;
+          score = (correctResponses / typedResponses.length) * 100;
         }
         
         // Converter datas para strings para evitar problemas de serialização
@@ -112,18 +130,16 @@ export default async function handler(
               // Buscar pontuações por etapa
               const stageScores = await prisma.$queryRaw`
                 SELECT 
-                  s.id, 
-                  s.title as name,
-                  COUNT(CASE WHEN o."isCorrect" = true THEN 1 ELSE NULL END) as correct,
-                  COUNT(r.id) as total,
-                  (COUNT(CASE WHEN o."isCorrect" = true THEN 1 ELSE NULL END)::float / COUNT(r.id)::float * 100)::int as percentage
-                FROM "Response" r
-                JOIN "Question" q ON r."questionId" = q.id
-                JOIN "Stage" s ON q."stageId" = s.id
-                JOIN "Option" o ON r."optionId" = o.id
-                WHERE r."candidateId" = ${candidate.id}
-                GROUP BY s.id, s.title
-                ORDER BY s.order
+                  "stageId" as id, 
+                  "stageName" as name,
+                  COUNT(CASE WHEN "isCorrectOption" = true THEN 1 ELSE NULL END) as correct,
+                  COUNT(id) as total,
+                  (COUNT(CASE WHEN "isCorrectOption" = true THEN 1 ELSE NULL END)::float / COUNT(id)::float * 100)::int as percentage
+                FROM "Response" 
+                WHERE "candidateId" = ${candidate.id}
+                  AND "stageId" IS NOT NULL
+                GROUP BY "stageId", "stageName"
+                ORDER BY "stageName"
               `;
               
               // Converter BigInt para Number nos resultados de stageScores

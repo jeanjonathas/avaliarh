@@ -61,15 +61,14 @@ export default async function handler(
       }
     }
 
-    // Se o stageId for um ID personalizado (como "stage-logic-01"), buscar por correspondência parcial
-    const customIdStage = testStages.find(ts => 
-      ts.stage.id.includes(stageId as string) || 
+    // Buscar apenas por título da etapa como fallback
+    const titleMatch = testStages.find(ts => 
       ts.stage.title.toLowerCase().includes((stageId as string).toLowerCase())
     );
 
-    if (customIdStage) {
-      console.log(`Etapa com ID personalizado ${stageId} encontrada: ${customIdStage.stageId}`);
-      return res.status(200).json({ uuid: customIdStage.stageId });
+    if (titleMatch) {
+      console.log(`Etapa encontrada pelo título: ${titleMatch.stage.title} (${titleMatch.stageId})`);
+      return res.status(200).json({ uuid: titleMatch.stageId });
     }
 
     // Se não encontrou correspondência, retornar erro

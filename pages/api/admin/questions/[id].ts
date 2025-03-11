@@ -226,12 +226,43 @@ export default async function handler(
     }
   } else if (req.method === 'DELETE') {
     try {
-      // Excluir a pergunta usando SQL puro com conversão explícita
-      await prisma.$executeRaw`
-        DELETE FROM "Question" WHERE id::text = ${id}::text
+      // Verificar se a pergunta tem respostas associadas
+      const responseCount = await prisma.$queryRaw`
+        SELECT COUNT(*) as count FROM "Response" WHERE "questionId"::text = ${id}::text
       `;
+      
+      // Verificar se a pergunta está associada a algum teste
+      const testQuestionCount = await prisma.$queryRaw`
+        SELECT COUNT(*) as count FROM "TestQuestion" WHERE "questionId"::text = ${id}::text
+      `;
+      
+      const hasResponses = responseCount[0].count > 0;
+      const isAssociatedWithTest = testQuestionCount[0].count > 0;
+      
+      // Se a pergunta não estiver associada a nenhum teste e não tiver respostas, podemos excluí-la diretamente
+      if (!isAssociatedWithTest && !hasResponses) {
+        // Remover todas as opções associadas à pergunta
+        await prisma.$executeRaw`
+          DELETE FROM "Option" WHERE "questionId"::text = ${id}::text
+        `;
 
-      return res.status(204).end()
+        // Excluir a pergunta
+        await prisma.$executeRaw`
+          DELETE FROM "Question" WHERE id::text = ${id}::text
+        `;
+
+        return res.status(204).end();
+      } else {
+        // Se a pergunta estiver associada a um teste ou tiver respostas, retornar um status especial
+        return res.status(409).json({
+          error: 'Esta pergunta não pode ser excluída diretamente.',
+          isAssociatedWithTest,
+          hasResponses,
+          message: hasResponses 
+            ? 'Esta pergunta possui respostas de candidatos. Os dados das respostas estão seguros em snapshots, então você pode prosseguir com a exclusão se necessário.' 
+            : 'Esta pergunta está associada a um ou mais testes.'
+        });
+      }
     } catch (error) {
       console.error('Erro ao excluir pergunta:', error);
       return res.status(500).json({ error: 'Erro ao excluir a pergunta' })

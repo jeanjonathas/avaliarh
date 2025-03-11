@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../lib/prisma';
+import { v4 as uuidv4 } from 'uuid';
 
 export default async function handler(
   req: NextApiRequest,
@@ -74,7 +75,9 @@ export default async function handler(
       include: {
         question: {
           include: {
-            options: true
+            options: true,
+            Category: true,
+            Stage: true
           }
         }
       }
@@ -93,13 +96,70 @@ export default async function handler(
       
       // Se não existir resposta e a questão tiver opções, criar uma resposta automática
       if (!existingResponse && sq.question.options.length > 0) {
-        await prisma.response.create({
-          data: {
-            candidateId,
-            questionId: sq.questionId,
-            optionId: sq.question.options[0].id
-          }
-        });
+        const selectedOption = sq.question.options[0];
+        
+        try {
+          // Usar o prisma.$queryRaw para contornar problemas de tipagem
+          await prisma.$executeRaw`
+            INSERT INTO "Response" (
+              "id", 
+              "candidateId", 
+              "questionId", 
+              "optionId", 
+              "questionText", 
+              "optionText", 
+              "isCorrectOption", 
+              "allOptionsSnapshot", 
+              "questionSnapshot", 
+              "categoryName", 
+              "stageName", 
+              "stageId",
+              "createdAt", 
+              "updatedAt"
+            ) VALUES (
+              ${uuidv4()}, 
+              ${candidateId}, 
+              ${sq.questionId}, 
+              ${selectedOption.id}, 
+              ${sq.question.text}, 
+              ${selectedOption.text}, 
+              ${selectedOption.isCorrect}, 
+              ${JSON.stringify(sq.question.options)}::jsonb, 
+              ${JSON.stringify({
+                id: sq.question.id,
+                text: sq.question.text,
+                categoryId: sq.question.categoryId,
+                categoryName: sq.question.Category?.name || null,
+                stageName: sq.question.Stage?.title || null,
+                stageId: sq.question.Stage?.id || null
+              })}::jsonb, 
+              ${sq.question.Category?.name || null}, 
+              ${sq.question.Stage?.title || null}, 
+              ${sq.question.Stage?.id || null},
+              NOW(), 
+              NOW()
+            )
+          `;
+          
+          console.log(`Resposta automática criada para a questão ${sq.questionId}`);
+        } catch (error) {
+          console.error('Erro ao criar resposta automática:', error);
+          // Fallback: tentar criar apenas com os campos básicos
+          await prisma.response.create({
+            data: {
+              candidateId,
+              questionId: sq.questionId,
+              optionId: selectedOption.id,
+              //@ts-ignore - Ignorar erros de tipagem, pois sabemos que estes campos existem no banco
+              questionText: sq.question.text,
+              optionText: selectedOption.text,
+              isCorrectOption: selectedOption.isCorrect,
+              stageName: sq.question.Stage?.title || null,
+              stageId: sq.question.Stage?.id || null,
+              categoryName: sq.question.Category?.name || null
+            } as any
+          });
+        }
       }
     }
     
