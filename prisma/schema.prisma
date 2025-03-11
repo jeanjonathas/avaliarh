@@ -31,33 +31,32 @@ model Admin {
 }
 
 model Candidate {
-  id             String     @id @default(uuid())
+  id             String          @id @default(uuid())
   name           String
   email          String
   phone          String?
   position       String?
-  testDate       DateTime   @default(now())
-  completed      Boolean    @default(false)
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  testDate       DateTime        @default(now())
+  completed      Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
   infoJobsLink   String?
   interviewDate  DateTime?
   observations   String?
   rating         Float?
   resumeFile     String?
   socialMediaUrl String?
-  status         Status     @default(PENDING)
-  inviteCode     String?    @unique
-  inviteSent     Boolean    @default(false)
-  inviteAttempts Int        @default(0)
-  inviteExpires  DateTime?
+  status         Status          @default(PENDING)
   github         String?
   linkedin       String?
   portfolio      String?
   resumeUrl      String?
+  // Campo testId mantido para compatibilidade com código existente
   testId         String?
-  test           tests?     @relation(fields: [testId], references: [id])
+  test           tests?          @relation(fields: [testId], references: [id])
   responses      Response[]
+  // Nova relação com a tabela CandidateTest
+  candidateTests CandidateTest[]
 }
 
 model Question {
@@ -136,17 +135,19 @@ model TestStage {
 }
 
 model tests {
-  id          String        @id @default(uuid())
+  id          String          @id @default(uuid())
   title       String
   description String?
   timeLimit   Int?
-  active      Boolean       @default(true)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  active      Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
   candidates  Candidate[]
   stages      Stage[]
   TestStage   TestStage[]
   testQuestions TestQuestion[]
+  // Nova relação com a tabela CandidateTest
+  candidateTests CandidateTest[]
 }
 
 model Category {
@@ -194,6 +195,27 @@ model TestQuestion {
 enum Role {
   ADMIN
   USER
+}
+
+// Nova tabela para relacionar candidatos e testes
+model CandidateTest {
+  id           String    @id @default(uuid())
+  candidateId  String
+  testId       String
+  inviteCode   String    @unique
+  inviteExpires DateTime?
+  inviteSent   Boolean   @default(false)
+  inviteAttempts Int     @default(0)
+  completed    Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  
+  candidate    Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  test         tests     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  
+  @@unique([candidateId, testId])
+  @@index([candidateId])
+  @@index([testId])
 }
 
 enum Status {

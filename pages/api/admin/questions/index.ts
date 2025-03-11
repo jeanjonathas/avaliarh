@@ -17,9 +17,9 @@ export default async function handler(
     try {
       console.log('Iniciando busca de perguntas');
       let questions = [];
-      const { stageId, testId, categoryId } = req.query;
+      const { stageId, testId, categoryId, ids } = req.query;
       
-      console.log('Parâmetros de busca:', { stageId, testId, categoryId });
+      console.log('Parâmetros de busca:', { stageId, testId, categoryId, ids });
       
       try {
         // Consulta simplificada sem o JOIN com Category
@@ -111,6 +111,43 @@ export default async function handler(
             WHERE ts."testId" = ${testId}
             ORDER BY COALESCE(s.order, 0) ASC, q."createdAt" DESC
           `;
+        } else if (ids) {
+          // Buscar perguntas por IDs específicos
+          console.log('Buscando perguntas por IDs específicos:', ids);
+          
+          // Converter string de IDs separados por vírgula em um array
+          const questionIds = typeof ids === 'string' ? ids.split(',') : Array.isArray(ids) ? ids : [];
+          
+          if (questionIds.length === 0) {
+            return res.status(400).json({ error: 'IDs de perguntas inválidos' });
+          }
+          
+          // Construir a consulta SQL com os IDs
+          const placeholders = questionIds.map((_, i) => `$${i + 1}`).join(', ');
+          
+          // Executar a consulta usando $queryRawUnsafe para passar os IDs como parâmetros
+          const query = `
+            SELECT 
+              q.id, 
+              q.text, 
+              q."stageId",
+              q."categoryId",
+              q."createdAt", 
+              q."updatedAt",
+              s.title as "stageTitle", 
+              s.description as "stageDescription",
+              s.order as "stageOrder",
+              c.name as "categoryName",
+              c.description as "categoryDescription",
+              'MEDIUM' as difficulty
+            FROM "Question" q
+            LEFT JOIN "Stage" s ON q."stageId" = s.id
+            LEFT JOIN "Category" c ON q."categoryId" = c.id
+            WHERE q.id IN (${placeholders})
+            ORDER BY COALESCE(s.order, 0) ASC, q."createdAt" DESC
+          `;
+          
+          questions = await prisma.$queryRawUnsafe(query, ...questionIds);
         } else {
           console.log('Buscando todas as perguntas');
           // Obter todas as perguntas

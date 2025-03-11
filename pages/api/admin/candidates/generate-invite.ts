@@ -15,8 +15,8 @@ async function generateUniqueInviteCode(): Promise<string> {
     // Gerar um novo código
     inviteCode = Math.floor(1000 + Math.random() * 9000).toString();
     
-    // Verificar se o código já está em uso por algum candidato
-    const existingCandidate = await prisma.candidate.findFirst({
+    // Verificar se o código já está em uso em CandidateTest
+    const existingCandidateTest = await prisma.candidateTest.findFirst({
       where: {
         inviteCode: inviteCode
       }
@@ -29,8 +29,8 @@ async function generateUniqueInviteCode(): Promise<string> {
       }
     });
     
-    // O código é único se não existir nenhum candidato com ele e não estiver no histórico
-    if (!existingCandidate && !usedInviteCode) {
+    // O código é único se não existir em nenhum CandidateTest e não estiver no histórico
+    if (!existingCandidateTest && !usedInviteCode) {
       isUnique = true;
     }
   }
@@ -122,20 +122,84 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       message = 'Novo código de convite gerado com sucesso!';
     }
     
-    // Atualizar o candidato com o código de convite e data de expiração
-    const updatedCandidate = await prisma.$executeRaw`
-      UPDATE "Candidate"
-      SET 
-        "inviteCode" = ${inviteCode},
-        "inviteExpires" = ${inviteExpires},
-        "inviteAttempts" = 0,
-        "testId" = ${testId}
-      WHERE id = ${candidateId}
-    `;
+    // Verificar se o candidato já tem um teste associado com o mesmo ID
+    const existingCandidateTest = await prisma.candidateTest.findUnique({
+      where: {
+        candidateId_testId: {
+          candidateId: candidateId,
+          testId: testId
+        }
+      }
+    });
     
-    // Buscar o candidato atualizado para retornar na resposta
+    let candidateTestId;
+    
+    if (existingCandidateTest) {
+      // Se já existe uma associação com o mesmo teste, apenas atualizar o código de convite
+      console.log(`Atualizando convite existente para o teste ${testId}`);
+      
+      // Se o candidato já tinha um código, salvar no histórico antes de gerar um novo
+      if (existingCandidateTest.inviteCode) {
+        try {
+          await prisma.usedInviteCode.create({
+            data: {
+              code: existingCandidateTest.inviteCode,
+              usedAt: new Date(),
+              expiresAt: existingCandidateTest.inviteExpires || new Date(new Date().setDate(new Date().getDate() + 7))
+            }
+          });
+          console.log(`Código anterior ${existingCandidateTest.inviteCode} salvo no histórico`);
+        } catch (error) {
+          // Se o código já estiver no histórico, apenas ignorar o erro
+          console.log(`Código ${existingCandidateTest.inviteCode} já existe no histórico ou erro ao salvar`);
+        }
+      }
+      
+      // Atualizar o CandidateTest existente
+      const updatedCandidateTest = await prisma.candidateTest.update({
+        where: {
+          id: existingCandidateTest.id
+        },
+        data: {
+          inviteCode: inviteCode,
+          inviteExpires: inviteExpires,
+          inviteAttempts: 0,
+          inviteSent: false
+        }
+      });
+      
+      candidateTestId = updatedCandidateTest.id;
+      message = 'Código de convite atualizado para o teste existente!';
+    } else {
+      // Se não existe, criar uma nova associação entre candidato e teste
+      console.log(`Criando nova associação entre candidato ${candidateId} e teste ${testId}`);
+      
+      // Criar um novo CandidateTest
+      const newCandidateTest = await prisma.candidateTest.create({
+        data: {
+          candidateId: candidateId,
+          testId: testId,
+          inviteCode: inviteCode,
+          inviteExpires: inviteExpires,
+          inviteAttempts: 0,
+          inviteSent: false,
+          completed: false
+        }
+      });
+      
+      candidateTestId = newCandidateTest.id;
+      message = 'Nova associação entre candidato e teste criada com sucesso!';
+    }
+    
+    // Buscar o candidato e o teste associado para retornar na resposta
     const refreshedCandidate = await prisma.candidate.findUnique({
       where: { id: candidateId },
+      include: {
+        candidateTests: {
+          where: { id: candidateTestId },
+          include: { test: true }
+        }
+      }
     });
     
     // Inicializar variáveis para o resultado do email
@@ -154,10 +218,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       emailSent = emailResult.success;
       emailPreviewUrl = emailResult.previewUrl;
       
-      // Atualizar o status de envio do convite
+      // Atualizar o status de envio do convite no CandidateTest
       if (emailSent) {
-        await prisma.candidate.update({
-          where: { id: candidateId },
+        await prisma.candidateTest.update({
+          where: { id: candidateTestId },
           data: { inviteSent: true }
         });
       }

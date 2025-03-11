@@ -643,15 +643,61 @@ const TestDetail: NextPage = () => {
         throw new Error(errorData.error || 'Erro ao adicionar perguntas à etapa')
       }
 
+      // Obter os dados da resposta da API
+      const result = await response.json()
+      console.log('Perguntas adicionadas:', result)
+
+      // Atualizar apenas a etapa afetada no estado local
+      if (test && test.testStages && result.associations) {
+        // Buscar as perguntas completas que foram adicionadas
+        const addedQuestionIds = result.associations.map(assoc => assoc.questionId)
+        const addedQuestionsResponse = await fetch(`/api/admin/questions?ids=${addedQuestionIds.join(',')}`)
+        const addedQuestionsData = await addedQuestionsResponse.json()
+        
+        // Encontrar o testStage que contém a etapa afetada
+        const updatedTestStages = test.testStages.map(testStage => {
+          // Se não for a etapa que estamos modificando, retorna sem alterações
+          if (testStage.stageId !== selectedStageId) return testStage
+          
+          // Criar novos questionStages para as perguntas adicionadas
+          const newQuestionStages = addedQuestionsData.map((question, index) => ({
+            id: `${testStage.stageId}_${question.id}`,
+            questionId: question.id,
+            stageId: testStage.stageId,
+            order: (testStage.stage.questionStages?.length || 0) + index,
+            question: question
+          }))
+          
+          // Se for a etapa afetada, adiciona as novas perguntas à lista de questionStages
+          return {
+            ...testStage,
+            stage: {
+              ...testStage.stage,
+              questionStages: [
+                ...(testStage.stage.questionStages || []),
+                ...newQuestionStages
+              ]
+            }
+          }
+        })
+
+        // Atualizar o estado com as alterações locais
+        setTest({
+          ...test,
+          testStages: updatedTestStages
+        })
+        
+        notify.showSuccess('Perguntas adicionadas com sucesso!')
+      } else {
+        // Caso haja algum problema com o estado ou com a resposta da API, recarregar todos os dados
+        await reloadTestData()
+        notify.showSuccess('Perguntas adicionadas com sucesso!')
+      }
+
       // Limpar a seleção
       setSelectedQuestions([])
       setSelectedStageId('')
-
-      // Recarregar os dados do teste após um pequeno delay para garantir que o banco de dados foi atualizado
-      setTimeout(async () => {
-        await reloadTestData()
-        notify.showSuccess('Perguntas adicionadas com sucesso!')
-      }, 500)
+      setShowAddQuestionsModal(false)
     } catch (error) {
       console.error('Erro:', error)
       notify.showError(error instanceof Error ? error.message : 'Ocorreu um erro ao adicionar as perguntas. Por favor, tente novamente.')
@@ -681,11 +727,37 @@ const TestDetail: NextPage = () => {
           const result = await response.json()
           console.log(`[Frontend] Pergunta removida com sucesso: ${JSON.stringify(result)}`);
 
-          // Recarregar os dados do teste após um pequeno delay para garantir que o banco de dados foi atualizado
-          setTimeout(async () => {
-            await reloadTestData()
+          // Atualizar apenas a etapa afetada no estado local
+          if (test && test.testStages) {
+            // Encontrar o testStage que contém a etapa afetada
+            const updatedTestStages = test.testStages.map(testStage => {
+              // Se não for a etapa que estamos modificando, retorna sem alterações
+              if (testStage.stageId !== stageId) return testStage;
+              
+              // Se for a etapa afetada, remove a pergunta da lista de questionStages
+              return {
+                ...testStage,
+                stage: {
+                  ...testStage.stage,
+                  questionStages: testStage.stage.questionStages?.filter(
+                    qs => qs.questionId !== questionId
+                  ) || []
+                }
+              };
+            });
+
+            // Atualizar o estado com as alterações locais
+            setTest({
+              ...test,
+              testStages: updatedTestStages
+            });
+            
             notify.showSuccess(result.message || 'Pergunta removida da etapa com sucesso!')
-          }, 500)
+          } else {
+            // Caso haja algum problema com o estado, recarregar todos os dados
+            await reloadTestData();
+            notify.showSuccess(result.message || 'Pergunta removida da etapa com sucesso!')
+          }
         } catch (error) {
           console.error('Erro:', error)
           notify.showError(error instanceof Error ? error.message : 'Ocorreu um erro ao remover a pergunta. Por favor, tente novamente.')
