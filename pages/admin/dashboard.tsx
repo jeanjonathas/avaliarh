@@ -127,7 +127,7 @@ const Dashboard: NextPage = () => {
     datasets: [
       {
         label: 'Candidatos Aprovados',
-        data: [12, 19, 15, 22, 24, 18],
+        data: [0, 0, 0, 0, 0, 0],
         borderColor: 'rgba(75, 192, 192, 1)',
         backgroundColor: 'rgba(75, 192, 192, 0.2)',
         tension: 0.4,
@@ -135,7 +135,7 @@ const Dashboard: NextPage = () => {
       },
       {
         label: 'Candidatos Rejeitados',
-        data: [8, 12, 10, 15, 10, 7],
+        data: [0, 0, 0, 0, 0, 0],
         borderColor: 'rgba(255, 99, 132, 1)',
         backgroundColor: 'rgba(255, 99, 132, 0.2)',
         tension: 0.4,
@@ -339,6 +339,62 @@ const Dashboard: NextPage = () => {
       router.push('/admin/login')
     }
   }, [status, router])
+  
+  // Atualizar dados de tendências com base nos candidatos
+  useEffect(() => {
+    if (candidates.length > 0) {
+      // Obter os últimos 6 meses
+      const today = new Date();
+      const months = [];
+      const approvedCounts = [];
+      const rejectedCounts = [];
+      
+      // Gerar os últimos 6 meses
+      for (let i = 5; i >= 0; i--) {
+        const month = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        const monthName = month.toLocaleString('pt-BR', { month: 'short' }).charAt(0).toUpperCase() + 
+                         month.toLocaleString('pt-BR', { month: 'short' }).slice(1, 3);
+        months.push(monthName);
+        
+        // Filtrar candidatos para este mês
+        const monthCandidates = candidates.filter(candidate => {
+          const candidateDate = new Date(candidate.createdAt);
+          return candidateDate.getMonth() === month.getMonth() && 
+                 candidateDate.getFullYear() === month.getFullYear();
+        });
+        
+        // Contar aprovados e rejeitados
+        const approved = monthCandidates.filter(c => c.status === 'APPROVED').length;
+        const rejected = monthCandidates.filter(c => c.status === 'REJECTED').length;
+        
+        approvedCounts.push(approved);
+        rejectedCounts.push(rejected);
+      }
+      
+      // Atualizar o gráfico de tendências
+      setTrendData({
+        labels: months,
+        datasets: [
+          {
+            label: 'Candidatos Aprovados',
+            data: approvedCounts,
+            borderColor: 'rgba(75, 192, 192, 1)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            tension: 0.4,
+            fill: true,
+          },
+          {
+            label: 'Candidatos Rejeitados',
+            data: rejectedCounts,
+            borderColor: 'rgba(255, 99, 132, 1)',
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+            tension: 0.4,
+            fill: true,
+          }
+        ]
+      });
+    }
+  }, [candidates])
   
   useEffect(() => {
     // Carregar a lista de candidatos
@@ -550,12 +606,20 @@ const Dashboard: NextPage = () => {
     // Filtro por pontuação
     let scoreMatch = true;
     if (scoreFilter !== 'ALL') {
+      // Calcular a pontuação geral do candidato com base nas etapas do teste
+      let overallScore = 0;
+      if (candidate.stageScores && candidate.stageScores.length > 0) {
+        const totalCorrect = candidate.stageScores.reduce((acc, stage) => acc + stage.correct, 0);
+        const totalQuestions = candidate.stageScores.reduce((acc, stage) => acc + stage.total, 0);
+        overallScore = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+      }
+      
       if (scoreFilter === 'HIGH') {
-        scoreMatch = candidate.score !== undefined && candidate.score >= 80;
+        scoreMatch = overallScore >= 80;
       } else if (scoreFilter === 'MEDIUM') {
-        scoreMatch = candidate.score !== undefined && candidate.score >= 60 && candidate.score < 80;
+        scoreMatch = overallScore >= 60 && overallScore < 80;
       } else if (scoreFilter === 'LOW') {
-        scoreMatch = candidate.score !== undefined && candidate.score < 60;
+        scoreMatch = overallScore < 60;
       }
     }
     
@@ -597,7 +661,12 @@ const Dashboard: NextPage = () => {
         candidate.position || '',
         candidate.status === 'APPROVED' ? 'Aprovado' : 
           candidate.status === 'REJECTED' ? 'Reprovado' : 'Pendente',
-        candidate.score !== undefined ? candidate.score : '',
+        candidate.stageScores && candidate.stageScores.length > 0 ? 
+          (() => {
+            const totalCorrect = candidate.stageScores.reduce((acc, stage) => acc + stage.correct, 0);
+            const totalQuestions = candidate.stageScores.reduce((acc, stage) => acc + stage.total, 0);
+            return totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+          })() : '',
         candidate.rating || '',
         stageScores[0] !== undefined ? stageScores[0] : '',
         stageScores[1] !== undefined ? stageScores[1] : '',
@@ -906,28 +975,36 @@ const Dashboard: NextPage = () => {
       return 0;
     }
     
+    // Verificar se o candidato tem 100% em todas as etapas
+    const allPerfect = candidate.stageScores.every(score => score.percentage === 100);
+    if (allPerfect) {
+      return 100; // Se acertou 100% em todas as etapas, a compatibilidade é 100%
+    }
+    
     // Determinar qual perfil ideal usar
     const candidatePosition = candidate.position || 'Padrão';
     const profileToUse = idealProfiles[candidatePosition] || idealProfiles['Padrão'];
     
     // Calcular a pontuação de compatibilidade
-    let totalDifference = 0;
+    let totalScore = 0;
     let validStages = 0;
     
     candidate.stageScores.forEach((score, index) => {
       if (index < 6 && profileToUse[index] !== undefined) {
-        // Calcular a diferença absoluta entre a pontuação do candidato e o perfil ideal
-        const difference = Math.abs(score.percentage - profileToUse[index]);
-        totalDifference += difference;
+        // Se a pontuação do candidato for maior ou igual ao perfil ideal, considerar como 100% compatível nessa etapa
+        // Caso contrário, calcular a proporção da pontuação do candidato em relação ao perfil ideal
+        const stageCompatibility = score.percentage >= profileToUse[index] ? 
+          100 : (score.percentage / profileToUse[index]) * 100;
+        
+        totalScore += stageCompatibility;
         validStages++;
       }
     });
     
     if (validStages === 0) return 0;
     
-    // Converter a diferença média em uma pontuação de compatibilidade (100 - diferença média)
-    const averageDifference = totalDifference / validStages;
-    const compatibilityScore = Math.max(0, 100 - averageDifference);
+    // Calcular a média de compatibilidade
+    const compatibilityScore = totalScore / validStages;
     
     return compatibilityScore.toFixed(1);
   };
@@ -1414,7 +1491,13 @@ return (
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500">
-                        {candidate.score !== undefined ? `${candidate.score}%` : '-'}
+                        {candidate.stageScores && candidate.stageScores.length > 0 ? 
+                          (() => {
+                            const totalCorrect = candidate.stageScores.reduce((acc, stage) => acc + stage.correct, 0);
+                            const totalQuestions = candidate.stageScores.reduce((acc, stage) => acc + stage.total, 0);
+                            const percentage = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+                            return `${percentage}%`;
+                          })() : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">

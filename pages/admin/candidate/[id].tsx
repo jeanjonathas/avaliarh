@@ -454,20 +454,13 @@ const CandidateDetails = () => {
     }
   };
 
-  // Dados para o gráfico de radar
+  // Dados para o gráfico de radar - usando dinamicamente os nomes das etapas
   const radarData = {
-    labels: [
-      'Raciocínio Lógico',
-      'Matemática Básica',
-      'Compreensão Verbal',
-      'Aptidão Espacial',
-      'Raciocínio Abstrato',
-      'Tomada de Decisão'
-    ],
+    labels: candidate?.stageScores?.map(score => score.name) || [],
     datasets: [
       {
         label: 'Desempenho do Candidato',
-        data: candidate?.stageScores?.map(score => score.percentage) || [0, 0, 0, 0, 0, 0],
+        data: candidate?.stageScores?.map(score => score.percentage) || [],
         backgroundColor: 'rgba(54, 162, 235, 0.2)',
         borderColor: 'rgba(54, 162, 235, 1)',
         borderWidth: 2,
@@ -520,20 +513,13 @@ const CandidateDetails = () => {
     },
   }
   
-  // Dados para o gráfico de barras
+  // Dados para o gráfico de barras - usando dinamicamente os nomes das etapas
   const barData = {
-    labels: [
-      'Raciocínio Lógico',
-      'Matemática Básica',
-      'Compreensão Verbal',
-      'Aptidão Espacial',
-      'Raciocínio Abstrato',
-      'Tomada de Decisão'
-    ],
+    labels: candidate?.stageScores?.map(score => score.name) || [],
     datasets: [
       {
         label: 'Acertos',
-        data: candidate?.stageScores?.map(score => score.correct) || [0, 0, 0, 0, 0, 0],
+        data: candidate?.stageScores?.map(score => score.correct) || [],
         backgroundColor: 'rgba(75, 192, 192, 0.7)',
         borderRadius: 4,
         barPercentage: 0.6,
@@ -541,7 +527,7 @@ const CandidateDetails = () => {
       },
       {
         label: 'Total',
-        data: candidate?.stageScores?.map(score => score.total) || [0, 0, 0, 0, 0, 0],
+        data: candidate?.stageScores?.map(score => score.total) || [],
         backgroundColor: 'rgba(200, 200, 200, 0.7)',
         borderRadius: 4,
         barPercentage: 0.6,
@@ -550,16 +536,18 @@ const CandidateDetails = () => {
     ]
   }
   
-  // Opções para o gráfico de barras
+  // Opções para o gráfico de barras - com escala Y dinâmica
   const barOptions = {
     responsive: true,
     maintainAspectRatio: false,
     scales: {
       y: {
         beginAtZero: true,
-        max: 10,
+        // Definir o máximo com base no maior número de questões nas etapas
+        max: candidate?.stageScores ? 
+          Math.max(...candidate.stageScores.map(score => score.total), 10) : 10,
         ticks: {
-          stepSize: 2,
+          stepSize: 1,
         },
       },
       x: {
@@ -725,22 +713,38 @@ const CandidateDetails = () => {
                         {/* Gráfico de Radar - Desempenho por Habilidade */}
                         <div className="bg-white p-6 rounded-lg shadow-md">
                           <h3 className="text-lg font-semibold text-secondary-800 mb-4">Desempenho por Habilidade</h3>
-                          <div className="h-80">
-                            <Radar data={radarData} options={radarOptions} />
-                          </div>
+                          {candidate.stageScores && candidate.stageScores.length > 0 ? (
+                            <div className="h-80">
+                              <Radar data={radarData} options={radarOptions} />
+                            </div>
+                          ) : (
+                            <div className="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
+                              <p className="text-yellow-700">
+                                Não há dados de desempenho disponíveis para este candidato.
+                              </p>
+                            </div>
+                          )}
                           <div className="mt-4 text-sm text-gray-500">
-                            <p>Este gráfico mostra o desempenho do candidato em cada uma das seis etapas de avaliação.</p>
+                            <p>Este gráfico mostra o desempenho percentual do candidato em cada etapa de avaliação.</p>
                           </div>
                         </div>
                         
                         {/* Gráfico de Barras - Desempenho por Etapa */}
                         <div className="bg-white p-6 rounded-lg shadow-md">
                           <h3 className="text-lg font-semibold text-secondary-800 mb-4">Desempenho por Etapa</h3>
-                          <div className="h-80">
-                            <Bar data={barData} options={barOptions} />
-                          </div>
+                          {candidate.stageScores && candidate.stageScores.length > 0 ? (
+                            <div className="h-80">
+                              <Bar data={barData} options={barOptions} />
+                            </div>
+                          ) : (
+                            <div className="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
+                              <p className="text-yellow-700">
+                                Não há dados de desempenho disponíveis para este candidato.
+                              </p>
+                            </div>
+                          )}
                           <div className="mt-4 text-sm text-gray-500">
-                            <p>Este gráfico mostra o número de respostas corretas e incorretas em cada etapa.</p>
+                            <p>Este gráfico mostra o número de respostas corretas em comparação com o total de questões em cada etapa.</p>
                           </div>
                         </div>
                       </>
@@ -754,6 +758,12 @@ const CandidateDetails = () => {
                       <div className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
                         <p className="text-blue-700">
                           O candidato ainda não realizou o teste. Os dados de desempenho estarão disponíveis após a conclusão da avaliação.
+                        </p>
+                      </div>
+                    ) : !candidate.stageScores || candidate.stageScores.length === 0 ? (
+                      <div className="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
+                        <p className="text-yellow-700">
+                          Não há dados de desempenho disponíveis para este candidato, mesmo tendo completado o teste.
                         </p>
                       </div>
                     ) : (
@@ -839,16 +849,26 @@ const CandidateDetails = () => {
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500">
                                 <div className="flex items-center">
-                                  <span className="mr-2">{candidate.score}%</span>
-                                  <div className="w-24 bg-secondary-200 rounded-full h-2.5">
-                                    <div 
-                                      className={`h-2.5 rounded-full ${
-                                        candidate.score >= 80 ? 'bg-green-500' : 
-                                        candidate.score >= 60 ? 'bg-yellow-500' : 'bg-red-500'
-                                      }`}
-                                      style={{ width: `${candidate.score}%` }}
-                                    ></div>
-                                  </div>
+                                  {/* Calcular a porcentagem geral com base nos acertos e total de questões */}
+                                  {(() => {
+                                    const totalCorrect = candidate.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0;
+                                    const totalQuestions = candidate.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0;
+                                    const percentage = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+                                    return (
+                                      <>
+                                        <span className="mr-2">{percentage}%</span>
+                                        <div className="w-24 bg-secondary-200 rounded-full h-2.5">
+                                          <div 
+                                            className={`h-2.5 rounded-full ${
+                                              percentage >= 80 ? 'bg-green-500' : 
+                                              percentage >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                                            }`}
+                                            style={{ width: `${percentage}%` }}
+                                          ></div>
+                                        </div>
+                                      </>
+                                    );
+                                  })()}
                                 </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
@@ -856,19 +876,31 @@ const CandidateDetails = () => {
                                   <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
                                     Aguardando Respostas
                                   </span>
-                                ) : candidate.score >= 80 ? (
-                                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                    Aprovado
-                                  </span>
-                                ) : candidate.score >= 60 ? (
-                                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                    Consideração
-                                  </span>
-                                ) : (
-                                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                                    Reprovado
-                                  </span>
-                                )}
+                                ) : (() => {
+                                  const totalCorrect = candidate.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0;
+                                  const totalQuestions = candidate.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0;
+                                  const percentage = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+                                  
+                                  if (percentage >= 80) {
+                                    return (
+                                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                        Aprovado
+                                      </span>
+                                    );
+                                  } else if (percentage >= 60) {
+                                    return (
+                                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                        Consideração
+                                      </span>
+                                    );
+                                  } else {
+                                    return (
+                                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                        Reprovado
+                                      </span>
+                                    );
+                                  }
+                                })()}
                               </td>
                             </tr>
                           </tbody>
@@ -888,28 +920,42 @@ const CandidateDetails = () => {
                             Este candidato ainda não realizou o teste. As recomendações serão geradas após a conclusão da avaliação.
                           </p>
                         </div>
-                      ) : candidate.score >= 80 ? (
-                        <div className="p-4 bg-green-50 border-l-4 border-green-500 rounded">
-                          <h4 className="font-medium text-green-800">Candidato Recomendado</h4>
-                          <p className="mt-2 text-green-700">
-                            Este candidato demonstrou excelente desempenho na avaliação. Recomendamos prosseguir com o processo de contratação.
-                          </p>
-                        </div>
-                      ) : candidate.score >= 60 ? (
-                        <div className="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
-                          <h4 className="font-medium text-yellow-800">Candidato para Consideração</h4>
-                          <p className="mt-2 text-yellow-700">
-                            Este candidato demonstrou desempenho satisfatório. Recomendamos avaliar outros aspectos como experiência e entrevista antes de tomar uma decisão.
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded">
-                          <h4 className="font-medium text-red-800">Candidato Não Recomendado</h4>
-                          <p className="mt-2 text-red-700">
-                            Este candidato não atingiu a pontuação mínima necessária. Recomendamos considerar outros candidatos.
-                          </p>
-                        </div>
-                      )}
+                      ) : (() => {
+                        // Calcular a porcentagem geral com base nos acertos e total de questões
+                        const totalCorrect = candidate.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0;
+                        const totalQuestions = candidate.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0;
+                        const percentage = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+                        
+                        if (percentage >= 80) {
+                          return (
+                            <div className="p-4 bg-green-50 border-l-4 border-green-500 rounded">
+                              <h4 className="font-medium text-green-800">Candidato Recomendado</h4>
+                              <p className="mt-2 text-green-700">
+                                Este candidato demonstrou excelente desempenho na avaliação. Recomendamos prosseguir com o processo de contratação.
+                              </p>
+                            </div>
+                          );
+                        } else if (percentage >= 60) {
+                          return (
+                            <div className="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
+                              <h4 className="font-medium text-yellow-800">Candidato para Consideração</h4>
+                              <p className="mt-2 text-yellow-700">
+                                Este candidato demonstrou desempenho satisfatório. Recomendamos avaliar outros aspectos como experiência e entrevista antes de tomar uma decisão.
+                              </p>
+                            </div>
+                          );
+                        } else {
+                          return (
+                            <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded">
+                              <h4 className="font-medium text-red-800">Candidato Não Recomendado</h4>
+                              <p className="mt-2 text-red-700">
+                                Este candidato não atingiu a pontuação mínima necessária. Recomendamos considerar outros candidatos.
+                              </p>
+                            </div>
+                          );
+                        }
+                      })()
+                      }
                       
                       {/* Áreas para desenvolvimento */}
                       {candidate.completed && (
@@ -1141,10 +1187,17 @@ const CandidateDetails = () => {
                             <p className="font-medium">{candidate.completed ? 'Completo' : 'Incompleto'}</p>
                           </div>
                           
-                          {candidate.score !== undefined && (
+                          {candidate.completed && candidate.stageScores && candidate.stageScores.length > 0 && (
                             <div>
                               <span className="text-sm text-secondary-600">Pontuação Geral:</span>
-                              <p className="font-medium">{candidate.score.toFixed(1)}%</p>
+                              <p className="font-medium">
+                                {(() => {
+                                  const totalCorrect = candidate.stageScores.reduce((acc, stage) => acc + stage.correct, 0);
+                                  const totalQuestions = candidate.stageScores.reduce((acc, stage) => acc + stage.total, 0);
+                                  const percentage = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+                                  return `${percentage.toFixed(1)}%`;
+                                })()}
+                              </p>
                             </div>
                           )}
                         </div>
