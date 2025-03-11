@@ -18,6 +18,9 @@ interface Response {
   categoryName?: string;
   questionSnapshot?: string | any;
   allOptionsSnapshot?: string | any;
+  allOptions?: Option[];
+  correctOptionId?: string;
+  correctOptionText?: string;
 }
 
 interface Candidate {
@@ -230,66 +233,133 @@ const ResponsesTab: React.FC<ResponsesTabProps> = ({ candidate }) => {
 
   // Renderizar as respostas de uma etapa
   const renderResponses = (responses: any[]) => {
+    console.log(`Renderizando ${responses.length} respostas`);
+    
     return (
       <div className="divide-y divide-gray-100">
         {responses.map((response, index) => {
+          console.log(`Processando resposta ${index + 1}/${responses.length}:`, response);
+          
           // Tentar obter as opções do snapshot, se disponível
           let options: Option[] = [];
+          
+          // Verificar se a resposta tem allOptionsSnapshot
           if (response.allOptionsSnapshot) {
             try {
               // Verificar se o snapshot já é um objeto ou se precisa ser parseado
               if (typeof response.allOptionsSnapshot === 'string') {
                 options = JSON.parse(response.allOptionsSnapshot);
+                console.log(`Parseado allOptionsSnapshot de string para ${options.length} opções`);
               } else {
                 options = response.allOptionsSnapshot;
+                console.log(`Usando allOptionsSnapshot como objeto com ${options.length} opções`);
               }
+              
+              // Verificar se options é um array
+              if (!Array.isArray(options)) {
+                console.error('allOptionsSnapshot não é um array:', options);
+                options = [];
+              }
+              
+              console.log(`Processando ${options.length} opções para a questão: ${response.questionText}`);
             } catch (e) {
               console.error('Erro ao processar allOptionsSnapshot:', e);
             }
+          } else {
+            console.log('Nenhum dado de allOptionsSnapshot disponível para esta resposta');
+          }
+          
+          // Criar um array com pelo menos a opção escolhida se não tivermos outras opções
+          if (options.length === 0 && response.optionText) {
+            options = [{
+              id: response.optionId || 'selected',
+              text: response.optionText,
+              isCorrect: response.isCorrectOption || false
+            }];
+            
+            // Se tivermos informação sobre a opção correta, adicionar também
+            if (response.correctOptionId && response.correctOptionId !== response.optionId) {
+              options.push({
+                id: response.correctOptionId,
+                text: response.correctOptionText || 'Alternativa correta',
+                isCorrect: true
+              });
+            }
+            
+            console.log('Criado array de opções a partir da resposta:', options);
           }
           
           return (
             <div key={response.id || index} className="p-4">
               <div className="mb-2">
-                <h4 className="font-medium text-gray-900">{response.questionText || 'Pergunta sem texto'}</h4>
-                {response.categoryName && (
-                  <span className="inline-block mt-1 px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded">
-                    {response.categoryName}
-                  </span>
-                )}
+                <div className="font-medium text-gray-800">{response.questionText || 'Pergunta sem texto'}</div>
+                <div className="text-sm text-gray-500">{response.categoryName || 'Sem categoria'}</div>
               </div>
               
-              {/* Exibir a resposta do candidato */}
+              {/* Mostrar todas as alternativas */}
               <div className="mt-3">
-                <p className="text-sm text-gray-500 mb-1">Resposta do candidato:</p>
-                <div className={`p-2 rounded ${response.isCorrectOption ? 'bg-green-50 border border-green-100' : 'bg-red-50 border border-red-100'}`}>
-                  <p className={`text-sm ${response.isCorrectOption ? 'text-green-700' : 'text-red-700'}`}>
-                    {response.optionText || 'Sem resposta'}
-                  </p>
+                <div className="text-sm font-medium text-gray-700 mb-1">Alternativas:</div>
+                <div className="space-y-2">
+                  {options.length > 0 ? (
+                    options.map((option, optIndex) => {
+                      // Determinar se esta opção foi a selecionada pelo candidato
+                      const isSelected = option.id === response.optionId;
+                      
+                      // Determinar o estilo baseado se é correta e/ou selecionada
+                      let optionStyle = "pl-2 py-1 rounded text-sm ";
+                      
+                      if (option.isCorrect && isSelected) {
+                        // Resposta correta e selecionada
+                        optionStyle += "bg-green-100 border-l-4 border-green-500 font-medium";
+                      } else if (option.isCorrect) {
+                        // Resposta correta mas não selecionada
+                        optionStyle += "bg-green-50 border-l-4 border-green-300";
+                      } else if (isSelected) {
+                        // Resposta incorreta e selecionada
+                        optionStyle += "bg-red-100 border-l-4 border-red-500 font-medium";
+                      } else {
+                        // Opção normal
+                        optionStyle += "bg-gray-50 border-l-4 border-gray-300";
+                      }
+                      
+                      return (
+                        <div key={option.id || `option-${optIndex}`} className={optionStyle}>
+                          <div className="flex items-start">
+                            <div className={`flex-grow ${isSelected ? 'font-medium' : ''}`}>
+                              {isSelected ? (
+                                <span className="flex items-center">
+                                  <svg className="h-4 w-4 text-blue-600 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                  </svg>
+                                  {option.text || 'Alternativa sem texto'}
+                                </span>
+                              ) : (
+                                <span className="pl-5">
+                                  {option.text || 'Alternativa sem texto'}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex-shrink-0 ml-2">
+                              {isSelected && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                  Escolhida
+                                </span>
+                              )}
+                              {option.isCorrect && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 ml-1">
+                                  Correta
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-sm text-gray-500 italic">Nenhuma alternativa disponível</div>
+                  )}
                 </div>
               </div>
-              
-              {/* Exibir todas as opções disponíveis */}
-              {options.length > 0 && (
-                <div className="mt-3">
-                  <p className="text-sm text-gray-500 mb-1">Todas as opções:</p>
-                  <ul className="space-y-1">
-                    {options.map((option, optIndex) => (
-                      <li 
-                        key={option.id || optIndex} 
-                        className={`text-sm p-1 rounded ${
-                          option.isCorrect ? 'text-green-700 bg-green-50' : 
-                          (option.id === response.optionId && !response.isCorrectOption) ? 'text-red-700 bg-red-50' : ''
-                        }`}
-                      >
-                        {option.text}
-                        {option.isCorrect && <span className="ml-2 text-xs text-green-600">(Correta)</span>}
-                        {option.id === response.optionId && !option.isCorrect && <span className="ml-2 text-xs text-red-600">(Selecionada)</span>}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
             </div>
           );
         })}

@@ -82,19 +82,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       
       // Criar um mapa para armazenar as respostas agrupadas por etapa
       const responsesByStage: Record<string, any[]> = {};
-      
-      // Criar um mapa para relacionar IDs de etapas com seus nomes
       const stageIdToNameMap: Record<string, string> = {};
+      const stageOrderMap: Record<string, number> = {};
       
-      // Preencher o mapa de IDs de etapas para nomes
+      // Inicializar o mapa de etapas com base nas etapas do teste
       if (candidate.test && candidate.test.TestStage) {
         candidate.test.TestStage.forEach(testStage => {
           const stageId = testStage.stage.id;
           const stageName = testStage.stage.title;
-          stageIdToNameMap[stageId] = stageName;
+          const stageOrder = testStage.order || 0;
           
           // Inicializar o array de respostas para esta etapa
           responsesByStage[stageId] = [];
+          
+          // Mapear o ID da etapa para o nome
+          stageIdToNameMap[stageId] = stageName;
+          
+          // Mapear o ID da etapa para a ordem
+          stageOrderMap[stageId] = stageOrder;
           
           console.log(`Mapeando etapa: ${stageName} (${stageId})`);
         });
@@ -105,116 +110,89 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         responsesByStage[stageId] = [];
       });
       
-      // Agrupar respostas por etapa
+      // Processar cada resposta para adicionar informações extras
       candidate.responses.forEach(response => {
-        let stageName = 'Sem Etapa';
-        let stageId = '';
-        let stageFound = false;
-        
         // Converter a resposta para o tipo com campos adicionais
         const typedResponse = response as unknown as ResponseWithSnapshot;
         
-        // Tentar obter o stageId diretamente da resposta
-        if (typedResponse.stageId) {
-          stageId = typedResponse.stageId;
-          stageName = typedResponse.stageName || 'Sem Etapa';
-          
+        // Criar uma cópia da resposta para processamento
+        const processedResponse: any = { ...response };
+        
+        // Verificar se a resposta tem um stageId válido
+        let stageId = typedResponse.stageId;
+        let stageName = '';
+        let stageFound = false;
+        
+        // Verificar se a etapa existe no mapa (ou seja, pertence ao teste atual)
+        if (stageId && responsesByStage[stageId]) {
+          stageName = stageIdToNameMap[stageId] || 'Etapa Desconhecida';
+          stageFound = true;
           console.log(`Processando resposta para etapa: ${stageName} (${stageId})`);
+          console.log(`Etapa pertence ao teste atual: ${stageName}`);
+        } else if (stageId) {
+          // A etapa não pertence ao teste atual, mas temos um ID
+          console.log(`Processando resposta para etapa: ${stageIdToNameMap[stageId] || stageId} (${stageId})`);
+          console.log(`Etapa não pertence ao teste atual: ${stageIdToNameMap[stageId] || stageId}. Verificando outras fontes...`);
           
-          // Verificar se esta etapa pertence ao teste atual
-          if (stageIdToNameMap[stageId]) {
-            stageFound = true;
-            console.log(`Etapa pertence ao teste atual: ${stageName}`);
-          } else {
-            console.log(`Etapa não pertence ao teste atual: ${stageName}. Verificando outras fontes...`);
-          }
-        }
-        
-        // Se não encontrou a etapa via stageId, tentar pelo campo stageName
-        if (!stageFound && typedResponse.stageName) {
-          stageName = typedResponse.stageName;
-          
-          // Verificar se esta etapa pertence ao teste atual pelo nome
-          const stageEntry = Object.entries(stageIdToNameMap).find(([id, name]) => name === stageName);
-          if (stageEntry) {
-            stageId = stageEntry[0];
-            stageFound = true;
-            console.log(`Etapa encontrada pelo nome: ${stageName} (${stageId})`);
-          } else {
-            console.log(`Etapa pelo nome não pertence ao teste atual: ${stageName}. Verificando outras fontes...`);
-          }
-        }
-        
-        // Tentar pelo questionSnapshot
-        if (!stageFound && typedResponse.questionSnapshot) {
-          try {
-            const questionData = typeof typedResponse.questionSnapshot === 'string' 
-              ? JSON.parse(typedResponse.questionSnapshot) 
-              : typedResponse.questionSnapshot;
+          // Tentar encontrar a etapa pelo nome
+          if (typedResponse.stageName) {
+            const matchingStage = Object.entries(stageIdToNameMap).find(([id, name]) => 
+              name.toLowerCase() === typedResponse.stageName?.toLowerCase()
+            );
             
-            if (questionData.stageId) {
-              stageId = questionData.stageId;
-              stageName = questionData.stageName || 'Sem Etapa';
+            if (matchingStage) {
+              stageId = matchingStage[0];
+              stageName = matchingStage[1];
+              stageFound = true;
+              console.log(`Etapa encontrada pelo nome: ${stageName} (${stageId})`);
+            } else {
+              console.log(`Etapa pelo nome não pertence ao teste atual: ${typedResponse.stageName}. Verificando outras fontes...`);
+            }
+          }
+          
+          // Tentar encontrar a etapa via questionSnapshot
+          if (!stageFound && typedResponse.questionSnapshot) {
+            const questionSnapshot = typeof typedResponse.questionSnapshot === 'string'
+              ? JSON.parse(typedResponse.questionSnapshot)
+              : typedResponse.questionSnapshot;
               
-              // Verificar se esta etapa pertence ao teste atual
-              if (stageIdToNameMap[stageId]) {
+            if (questionSnapshot && questionSnapshot.stageName) {
+              const matchingStage = Object.entries(stageIdToNameMap).find(([id, name]) => 
+                name.toLowerCase() === questionSnapshot.stageName.toLowerCase()
+              );
+              
+              if (matchingStage) {
+                stageId = matchingStage[0];
+                stageName = matchingStage[1];
                 stageFound = true;
                 console.log(`Etapa encontrada via questionSnapshot: ${stageName} (${stageId})`);
               } else {
-                console.log(`Etapa via questionSnapshot não pertence ao teste atual: ${stageName}`);
-                
-                // Verificar se a questão está associada ao teste atual através de testQuestions
-                if (candidate.test && candidate.test.testQuestions) {
-                  const testQuestion = candidate.test.testQuestions.find(tq => 
-                    tq.questionId === response.questionId
-                  );
-                  
-                  if (testQuestion) {
-                    stageId = testQuestion.stageId;
-                    stageName = stageIdToNameMap[stageId] || 'Etapa Desconhecida';
-                    stageFound = true;
-                    console.log(`Usando etapa atual da questão via testQuestions: ${stageName} (${stageId})`);
-                  }
-                }
+                console.log(`Etapa via questionSnapshot não pertence ao teste atual: ${questionSnapshot.stageName}`);
               }
             }
-          } catch (error) {
-            console.error('Erro ao processar questionSnapshot:', error);
           }
-        }
-        
-        // Se não encontrou nenhuma etapa válida, tentar encontrar a etapa correta via testQuestions
-        if (!stageFound && candidate.test && candidate.test.testQuestions) {
-          const testQuestion = candidate.test.testQuestions.find(tq => 
-            tq.questionId === response.questionId
-          );
           
-          if (testQuestion) {
-            stageId = testQuestion.stageId;
-            stageName = stageIdToNameMap[stageId] || 'Etapa Desconhecida';
-            stageFound = true;
-            console.log(`Etapa encontrada via testQuestions: ${stageName} (${stageId})`);
-          } else if (candidate.test.TestStage && candidate.test.TestStage.length > 0) {
-            // Se não encontramos a questão em testQuestions, usar a primeira etapa como último recurso
-            const firstStage = candidate.test.TestStage[0];
-            stageName = firstStage.stage.title;
-            stageId = firstStage.stage.id;
-            
-            stageFound = true;
-            console.log(`Usando primeira etapa do teste como fallback: ${stageName} (${stageId})`);
+          // Se ainda não encontrou a etapa, tentar encontrar via testQuestions
+          if (!stageFound && typedResponse.questionId) {
+            try {
+              // Encontrar a etapa atual da questão via testQuestions
+              const testQuestion = candidate.test.testQuestions.find(tq => 
+                tq.questionId === typedResponse.questionId
+              );
+              
+              if (testQuestion && testQuestion.stageId && responsesByStage[testQuestion.stageId]) {
+                stageId = testQuestion.stageId;
+                stageName = stageIdToNameMap[stageId] || 'Etapa Desconhecida';
+                stageFound = true;
+                console.log(`Usando etapa atual da questão via testQuestions: ${stageName} (${stageId})`);
+              }
+            } catch (error) {
+              console.error('Erro ao buscar etapa via testQuestions:', error);
+            }
           }
+        } else {
+          console.log('Resposta sem etapa associada:', response.id);
         }
-        
-        // Criar uma cópia da resposta para processamento
-        const processedResponse: any = {
-          id: response.id,
-          questionId: response.questionId,
-          optionId: response.optionId,
-          createdAt: response.createdAt,
-          updatedAt: response.updatedAt,
-          stageName: stageName,
-          stageId: stageId
-        };
         
         // Adicionar informações da opção a partir do snapshot
         if (typedResponse.optionText) {
@@ -234,7 +212,61 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           processedResponse.categoryName = typedResponse.categoryName;
         }
         
+        // Processar o snapshot para garantir que é um objeto válido
+        if (typedResponse.allOptionsSnapshot) {
+          try {
+            // Se for uma string, tentar parsear
+            if (typeof typedResponse.allOptionsSnapshot === 'string') {
+              typedResponse.allOptionsSnapshot = JSON.parse(typedResponse.allOptionsSnapshot);
+            }
+            
+            // Verificar se é um array
+            if (!Array.isArray(typedResponse.allOptionsSnapshot)) {
+              console.error('allOptionsSnapshot não é um array:', typedResponse.allOptionsSnapshot);
+              typedResponse.allOptionsSnapshot = [];
+            } else {
+              console.log(`allOptionsSnapshot para questão ${typedResponse.questionId} contém ${typedResponse.allOptionsSnapshot.length} opções:`, 
+                JSON.stringify(typedResponse.allOptionsSnapshot));
+            }
+          } catch (error) {
+            console.error('Erro ao processar allOptionsSnapshot:', error);
+            typedResponse.allOptionsSnapshot = [];
+          }
+        } else {
+          console.log(`Nenhum allOptionsSnapshot encontrado para questão ${typedResponse.questionId}`);
+          typedResponse.allOptionsSnapshot = [];
+        }
+        
         // Usar os snapshots para obter mais informações
+        if (typedResponse.allOptionsSnapshot) {
+          const allOptionsSnapshot = typedResponse.allOptionsSnapshot;
+            
+          console.log(`allOptionsSnapshot para questão ${typedResponse.questionId} contém ${allOptionsSnapshot.length} opções:`, JSON.stringify(allOptionsSnapshot));
+          
+          // Preservar o allOptionsSnapshot na resposta processada
+          processedResponse.allOptionsSnapshot = allOptionsSnapshot;
+          
+          // Encontrar a opção correta e a opção selecionada
+          const correctOption = allOptionsSnapshot.find((opt: any) => opt.isCorrect);
+          const selectedOption = allOptionsSnapshot.find((opt: any) => opt.id === response.optionId);
+          
+          if (correctOption) {
+            processedResponse.correctOptionId = correctOption.id;
+            processedResponse.correctOptionText = correctOption.text;
+          }
+          
+          // Adicionar informações da opção selecionada
+          if (selectedOption) {
+            if (!processedResponse.optionText && selectedOption.text) {
+              processedResponse.optionText = selectedOption.text;
+            }
+            
+            if (processedResponse.isCorrectOption === undefined && selectedOption.isCorrect !== undefined) {
+              processedResponse.isCorrectOption = selectedOption.isCorrect;
+            }
+          }
+        }
+        
         if (typedResponse.questionSnapshot) {
           const questionSnapshot = typeof typedResponse.questionSnapshot === 'string'
             ? JSON.parse(typedResponse.questionSnapshot)
@@ -246,26 +278,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           
           if (!processedResponse.categoryName && questionSnapshot.categoryName) {
             processedResponse.categoryName = questionSnapshot.categoryName;
-          }
-        }
-        
-        if (typedResponse.allOptionsSnapshot) {
-          const allOptionsSnapshot = typeof typedResponse.allOptionsSnapshot === 'string'
-            ? JSON.parse(typedResponse.allOptionsSnapshot)
-            : typedResponse.allOptionsSnapshot;
-            
-          processedResponse.allOptions = allOptionsSnapshot;
-          
-          // Encontrar a opção selecionada no snapshot
-          const selectedOption = allOptionsSnapshot.find((opt: any) => opt.id === response.optionId);
-          if (selectedOption) {
-            if (!processedResponse.optionText && selectedOption.text) {
-              processedResponse.optionText = selectedOption.text;
-            }
-            
-            if (processedResponse.isCorrect === undefined && selectedOption.isCorrect !== undefined) {
-              processedResponse.isCorrect = selectedOption.isCorrect;
-            }
           }
         }
         
@@ -332,6 +344,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const testStages = candidate.test.TestStage || [];
       console.log(`O teste possui ${testStages.length} etapas`);
       
+      // Inicializar o mapa de ID para nome da etapa
+      const stageIdToNameMap: Record<string, string> = {};
+      
       // Inicializar o mapa com todas as etapas do teste
       const stageMap: Record<string, {
         id: string;
@@ -349,71 +364,108 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           correct: 0,
           total: 0
         };
+        stageIdToNameMap[stage.id] = stage.title;
         console.log(`Etapa do teste identificada: ${stage.title} (${stage.id})`);
       });
       
-      // Processar as respostas do candidato, se houver
-      if (candidate.responses && candidate.responses.length > 0) {
-        console.log(`Processando ${candidate.responses.length} respostas para cálculo de desempenho`);
-        
-        // Processar cada resposta
-        candidate.responses.forEach(response => {
-          // Converter a resposta para o tipo com campos adicionais
-          const typedResponse = response as unknown as ResponseWithSnapshot;
-          
-          // Verificar se a resposta tem um stageId válido
-          if (!typedResponse.stageId) {
-            console.log('Resposta sem etapa associada:', response.id);
-            return;
-          }
-          
-          let stageId = typedResponse.stageId;
-          
-          console.log(`Analisando ID da etapa: ${stageId}`);
-          
-          // Verificar se a etapa existe no mapa (apenas processar etapas que pertencem ao teste atual)
-          if (stageMap[stageId]) {
-            stageMap[stageId].total++;
-            
-            // Verificar se a resposta está correta
-            if (typedResponse.isCorrectOption) {
-              stageMap[stageId].correct++;
-              console.log(`Resposta correta para etapa ${stageMap[stageId].name}`);
-            } else {
-              console.log(`Resposta incorreta para etapa ${stageMap[stageId].name}`);
-            }
-          } else {
-            console.log(`Etapa ${stageId} não pertence ao teste atual, ignorando para cálculo de pontuação`);
-          }
-        });
-      }
+      // Obter todas as etapas do teste atual
+      const testStageIds = testStages.map(ts => ts.stageId);
+      console.log(`O teste possui ${testStageIds.length} etapas`);
       
-      // Calcular percentuais para cada etapa
+      // Filtrar apenas as respostas que pertencem ao teste atual
+      // Isso resolve o problema de respostas de testes antigos aparecerem
+      const currentTestResponses = candidate.responses.filter(response => {
+        const typedResponse = response as unknown as ResponseWithSnapshot;
+        
+        // Verificar se a resposta tem um stageId que pertence ao teste atual
+        if (typedResponse.stageId && testStageIds.includes(typedResponse.stageId)) {
+          return true;
+        }
+        
+        // Verificar via questionSnapshot
+        if (typedResponse.questionSnapshot) {
+          try {
+            const questionData = typeof typedResponse.questionSnapshot === 'string'
+              ? JSON.parse(typedResponse.questionSnapshot)
+              : typedResponse.questionSnapshot;
+              
+            if (questionData.stageId && testStageIds.includes(questionData.stageId)) {
+              return true;
+            }
+          } catch (error) {
+            console.error('Erro ao processar questionSnapshot:', error);
+          }
+        }
+        
+        // Verificar via testQuestions
+        if (typedResponse.questionId) {
+          const testQuestion = candidate.test.testQuestions.find(tq => 
+            tq.questionId === typedResponse.questionId
+          );
+          
+          if (testQuestion && testStageIds.includes(testQuestion.stageId)) {
+            return true;
+          }
+        }
+        
+        // Se chegou aqui, a resposta não pertence ao teste atual
+        console.log(`Resposta ${response.id} não pertence ao teste atual e será ignorada`);
+        return false;
+      });
+      
+      // Substituir as respostas do candidato pelas respostas filtradas
+      candidate.responses = currentTestResponses;
+      
+      console.log(`Processando ${currentTestResponses.length} respostas para cálculo de desempenho`);
+      
+      // Processar cada resposta para adicionar informações extras
+      currentTestResponses.forEach(response => {
+        // Converter a resposta para o tipo com campos adicionais
+        const typedResponse = response as unknown as ResponseWithSnapshot;
+        
+        // Verificar se a resposta tem um stageId válido
+        if (!typedResponse.stageId) {
+          console.log('Resposta sem etapa associada:', response.id);
+          return;
+        }
+        
+        // Verificar se a etapa existe no mapa (ou seja, pertence ao teste atual)
+        if (stageMap[typedResponse.stageId]) {
+          console.log(`Analisando ID da etapa: ${typedResponse.stageId}`);
+          
+          // Incrementar o total de respostas para esta etapa
+          stageMap[typedResponse.stageId].total++;
+          
+          // Verificar se a resposta está correta
+          if (typedResponse.isCorrectOption) {
+            stageMap[typedResponse.stageId].correct++;
+            console.log(`Resposta correta para etapa ${stageMap[typedResponse.stageId].name}`);
+          } else {
+            console.log(`Resposta incorreta para etapa ${stageMap[typedResponse.stageId].name}`);
+          }
+        }
+      });
+      
+      // Calcular as pontuações por etapa
       stageScores = Object.values(stageMap).map(stage => {
         const percentage = stage.total > 0 ? Math.round((stage.correct / stage.total) * 100) : 0;
         return {
-          id: stage.id,
-          name: stage.name,
-          correct: stage.correct,
-          total: stage.total,
+          ...stage,
           percentage
         };
       });
       
       console.log(`Calculadas ${stageScores.length} etapas de pontuação:`, JSON.stringify(stageScores));
       
-      // Calcular pontuação geral apenas para as respostas das etapas do teste atual
-      const validResponses = candidate.responses.filter(r => {
-        // Converter a resposta para o tipo com campos adicionais
-        const typedR = r as unknown as ResponseWithSnapshot;
-        // Verificar se a resposta tem um stageId válido e se pertence a uma etapa do teste atual
-        return typedR.stageId && stageMap[typedR.stageId];
+      // Calcular a pontuação total
+      const validResponses = currentTestResponses.filter(r => {
+        const typedResponse = r as unknown as ResponseWithSnapshot;
+        return stageMap[typedResponse.stageId] !== undefined;
       });
       
-      // Contar respostas corretas usando o campo isCorrectOption
       const totalCorrect = validResponses.filter(r => {
-        const typedR = r as unknown as ResponseWithSnapshot;
-        return typedR.isCorrectOption === true;
+        const typedResponse = r as unknown as ResponseWithSnapshot;
+        return typedResponse.isCorrectOption;
       }).length;
       
       totalScore = validResponses.length > 0 ? 

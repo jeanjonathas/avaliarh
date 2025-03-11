@@ -123,6 +123,9 @@ export default async function handler(
             text: opt.text,
             isCorrect: opt.isCorrect
           }))
+          
+          console.log(`Salvando snapshot de ${allOptionsSnapshot.length} opções para a questão ${question.id}:`, 
+            JSON.stringify(allOptionsSnapshot));
 
           // Preparar o snapshot da questão
           // Importante: Isso preserva o texto da questão mesmo se for editada depois
