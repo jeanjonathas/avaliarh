@@ -20,6 +20,7 @@ interface TestData {
   title: string;
   description?: string;
   timeLimit?: number;
+  stageCount?: number;
 }
 
 const TestStage: NextPage = () => {
@@ -142,13 +143,21 @@ const TestStage: NextPage = () => {
     const fetchQuestions = async () => {
       try {
         setLoading(true)
-        const response = await fetch(`/api/questions?stageId=${stageId}`)
+        // Passar o ID do candidato para o endpoint de questões
+        const response = await fetch(`/api/questions?stageId=${stageId}&candidateId=${candidateId}`)
         
         if (!response.ok) {
           throw new Error('Erro ao carregar as questões')
         }
         
         const data = await response.json()
+        console.log('Dados recebidos do endpoint de questões:', data)
+        
+        // Verificar se o teste carregado corresponde ao teste do candidato
+        if (data.testId && testData && data.testId !== testData.id) {
+          console.warn(`Teste ID diferente: API retornou ${data.testId}, mas o teste carregado é ${testData.id}`)
+        }
+        
         setQuestions(data.questions)
         setStageInfo({
           title: data.stageTitle || `Etapa ${stageId}`,
@@ -202,12 +211,106 @@ const TestStage: NextPage = () => {
       }
 
       // Verificar se há próxima etapa
-      const nextStageId = parseInt(stageId as string) + 1
-      
-      if (nextStageId <= 6) {
-        router.push(`/teste/etapa/${nextStageId}?candidateId=${candidateId}`)
-      } else {
-        // Redirecionar para a página de conclusão
+      // Buscar a próxima etapa do teste associado ao candidato
+      try {
+        console.log(`Buscando próxima etapa após etapa ${stageId} para candidato ${candidateId}...`);
+        
+        const nextStageResponse = await fetch(`/api/stages/next?currentStage=${stageId}&candidateId=${candidateId}`);
+        
+        // Verificar se a resposta foi bem-sucedida
+        if (nextStageResponse.ok) {
+          const nextStageData = await nextStageResponse.json();
+          console.log('Resposta da próxima etapa:', nextStageData);
+          
+          if (nextStageData.hasNextStage && nextStageData.nextStageId) {
+            console.log(`Redirecionando para a próxima etapa: ${nextStageData.nextStageId}`);
+            // Redirecionar para a próxima etapa
+            router.push(`/teste/etapa/${nextStageData.nextStageId}?candidateId=${candidateId}`)
+          } else {
+            console.log('Não há próxima etapa, finalizando o teste...');
+            
+            // Marcar o teste como concluído
+            try {
+              console.log(`Marcando teste como concluído para o candidato ${candidateId}...`);
+              
+              const completeResponse = await fetch('/api/candidates/complete-test', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ candidateId }),
+              });
+              
+              if (completeResponse.ok) {
+                const completeData = await completeResponse.json();
+                console.log('Teste marcado como concluído com sucesso:', completeData);
+                
+                // Atualizar dados na sessão
+                if (typeof window !== 'undefined') {
+                  const storedCandidateData = sessionStorage.getItem('candidateData');
+                  if (storedCandidateData) {
+                    try {
+                      const parsedData = JSON.parse(storedCandidateData);
+                      parsedData.completed = true;
+                      parsedData.status = 'APPROVED';
+                      sessionStorage.setItem('candidateData', JSON.stringify(parsedData));
+                    } catch (error) {
+                      console.error('Erro ao atualizar dados do candidato na sessão:', error);
+                    }
+                  }
+                }
+              } else {
+                console.error('Erro ao marcar teste como concluído:', await completeResponse.text());
+              }
+            } catch (completeError) {
+              console.error('Erro ao marcar teste como concluído:', completeError);
+              // Continuar mesmo com erro, pois o importante é mostrar a tela de conclusão
+            }
+            
+            console.log(`Redirecionando para a página de conclusão...`);
+            // Redirecionar para a página de conclusão
+            router.push(`/teste/conclusao?candidateId=${candidateId}`)
+          }
+        } else {
+          // Se a resposta não foi bem-sucedida, tratar como se não houvesse próxima etapa
+          console.log('Resposta da API de próxima etapa não foi bem-sucedida:', nextStageResponse.status);
+          
+          // Tentar marcar o teste como concluído antes de redirecionar
+          try {
+            console.log(`Marcando teste como concluído (fallback) para o candidato ${candidateId}...`);
+            
+            await fetch('/api/candidates/complete-test', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ candidateId }),
+            });
+          } catch (completeError) {
+            console.error('Erro ao marcar teste como concluído (fallback):', completeError);
+          }
+          
+          router.push(`/teste/conclusao?candidateId=${candidateId}`)
+        }
+      } catch (error) {
+        console.error('Erro ao buscar próxima etapa:', error);
+        
+        // Em caso de erro, tentar marcar o teste como concluído antes de redirecionar
+        try {
+          console.log(`Marcando teste como concluído (erro) para o candidato ${candidateId}...`);
+          
+          await fetch('/api/candidates/complete-test', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ candidateId }),
+          });
+        } catch (completeError) {
+          console.error('Erro ao marcar teste como concluído (erro):', completeError);
+        }
+        
+        // Em caso de erro, assumir que não há próxima etapa e redirecionar para conclusão
         router.push(`/teste/conclusao?candidateId=${candidateId}`)
       }
     } catch (error) {
@@ -302,21 +405,38 @@ const TestStage: NextPage = () => {
             
             <div className="flex justify-between items-center mb-6">
               <div className="flex space-x-1">
-                {[1, 2, 3, 4, 5, 6].map((step) => (
-                  <div 
-                    key={step}
-                    className={`w-8 h-2 rounded-full ${
-                      parseInt(stageId as string) === step 
-                        ? 'bg-primary-600' 
-                        : parseInt(stageId as string) > step 
-                          ? 'bg-primary-300' 
-                          : 'bg-gray-200'
-                    }`}
-                  ></div>
-                ))}
+                {testData && testData.stageCount ? (
+                  // Se temos o número de etapas do teste, usar esse valor
+                  Array.from({ length: testData.stageCount }, (_, i) => i + 1).map((step) => (
+                    <div 
+                      key={step}
+                      className={`w-8 h-2 rounded-full ${
+                        parseInt(stageId as string) === step 
+                          ? 'bg-primary-600' 
+                          : parseInt(stageId as string) > step 
+                            ? 'bg-primary-300' 
+                            : 'bg-gray-200'
+                      }`}
+                    ></div>
+                  ))
+                ) : (
+                  // Fallback para 6 etapas se não temos essa informação
+                  [1, 2, 3, 4, 5, 6].map((step) => (
+                    <div 
+                      key={step}
+                      className={`w-8 h-2 rounded-full ${
+                        parseInt(stageId as string) === step 
+                          ? 'bg-primary-600' 
+                          : parseInt(stageId as string) > step 
+                            ? 'bg-primary-300' 
+                            : 'bg-gray-200'
+                      }`}
+                    ></div>
+                  ))
+                )}
               </div>
               <div className="text-sm text-secondary-500">
-                Etapa {stageId} de 6
+                Etapa {stageId} de {testData && testData.stageCount ? testData.stageCount : '6'}
               </div>
             </div>
           </div>

@@ -96,12 +96,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let message: string;
     
     // Se o candidato já tem um código válido e não expirado, reutilizá-lo
+    // Mas sempre atualizamos o testId, mesmo se o código for reutilizado
     if (candidate.inviteCode && 
         candidate.inviteExpires && 
         new Date(candidate.inviteExpires) > new Date() && 
         !forceNew) {
       inviteCode = candidate.inviteCode;
-      message = 'Código de convite existente recuperado com sucesso!';
+      message = 'Código de convite existente recuperado com sucesso! O teste associado foi atualizado.';
     } else {
       // Se o candidato já tinha um código, salvar no histórico antes de gerar um novo
       if (candidate.inviteCode) {
@@ -125,6 +126,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       message = 'Novo código de convite gerado com sucesso!';
     }
     
+    // Verificar se o testId atual do candidato é diferente do novo testId
+    if (candidate.testId !== testId) {
+      console.log(`Atualizando testId do candidato de ${candidate.testId} para ${testId}`);
+    }
+    
     // Atualizar o candidato com o novo código de convite e teste
     await prisma.candidate.update({
       where: { id: candidateId },
@@ -133,7 +139,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         inviteExpires: inviteExpires,
         inviteAttempts: 0,
         inviteSent: false,
-        testId: testId
+        testId: testId,
+        // Limpar qualquer progresso anterior se o teste for alterado
+        ...(candidate.testId !== testId ? { completed: false } : {})
       }
     });
     

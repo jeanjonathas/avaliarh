@@ -98,6 +98,7 @@ model Response {
   optionText         String
   isCorrectOption    Boolean
   allOptionsSnapshot Json?
+  questionSnapshot   Json?
   categoryName       String?
   stageName          String?
   candidate          Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)

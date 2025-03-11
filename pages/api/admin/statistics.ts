@@ -71,6 +71,9 @@ export default async function handler(
           COUNT(CASE WHEN status = 'PENDING' THEN 1 ELSE NULL END)::int as pending
         FROM "Candidate"
       `;
+      
+      // Log para debug
+      console.log('Estatísticas de candidatos:', candidateStats);
 
       // Calcular taxa de sucesso média esperada e real
       const expectedSuccessRate = 70; // Taxa de sucesso esperada (pode ser ajustada)

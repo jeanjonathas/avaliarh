@@ -86,15 +86,26 @@ const CandidatesPage: NextPage = () => {
   useEffect(() => {
     const fetchCandidates = async () => {
       try {
+        console.log('CandidatesPage: Iniciando carregamento de candidatos...')
+        setLoading(true)
+        
         const response = await fetch('/api/admin/candidates')
         if (!response.ok) {
-          throw new Error('Erro ao carregar candidatos')
+          throw new Error(`Erro ao carregar candidatos: ${response.status} ${response.statusText}`)
         }
+        
         const data = await response.json()
-        setCandidates(data)
+        console.log(`CandidatesPage: Candidatos carregados com sucesso. Total: ${data.length}`)
+        
+        if (Array.isArray(data)) {
+          setCandidates(data)
+        } else {
+          console.error('CandidatesPage: Dados de candidatos não são um array:', data)
+          setCandidates([])
+        }
       } catch (error) {
         setError('Erro ao carregar candidatos')
-        console.error('Erro:', error)
+        console.error('CandidatesPage: Erro ao carregar candidatos:', error)
       } finally {
         setLoading(false)
       }
@@ -179,6 +190,7 @@ const CandidatesPage: NextPage = () => {
     setError('')
     
     try {
+      console.log('Enviando dados para criar candidato:', newCandidate)
       const response = await fetch('/api/admin/candidates/create', {
         method: 'POST',
         headers: {
@@ -188,11 +200,18 @@ const CandidatesPage: NextPage = () => {
       })
 
       if (!response.ok) {
-        throw new Error('Erro ao adicionar candidato')
+        const errorText = await response.text()
+        console.error('Erro na resposta do servidor:', errorText)
+        throw new Error(`Erro ao adicionar candidato: ${response.status} ${response.statusText}`)
       }
 
       const data = await response.json()
-      setCandidates([data, ...candidates])
+      console.log('Candidato criado com sucesso:', data)
+      
+      // Adicionar o novo candidato no início da lista
+      const updatedCandidates = [data, ...candidates]
+      setCandidates(updatedCandidates)
+      console.log(`Lista de candidatos atualizada. Total: ${updatedCandidates.length}`)
       
       // Resetar todos os estados relacionados ao convite para evitar geração automática
       setShowGenerateInvitePrompt(false)

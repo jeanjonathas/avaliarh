@@ -63,12 +63,17 @@ const Conclusao: NextPage = () => {
     }
   }, [])
 
+  const [testMarkedAsCompleted, setTestMarkedAsCompleted] = useState(false)
+  const [completionError, setCompletionError] = useState(false)
+  
   // Marcar o teste como concluído no banco de dados
   useEffect(() => {
     const markTestAsCompleted = async () => {
       if (!candidateId) return
       
       try {
+        console.log(`Marcando teste como concluído para o candidato ${candidateId}...`)
+        
         const response = await fetch('/api/candidates/complete-test', {
           method: 'POST',
           headers: {
@@ -77,18 +82,45 @@ const Conclusao: NextPage = () => {
           body: JSON.stringify({ candidateId }),
         })
         
-        if (!response.ok) {
-          console.error('Erro ao marcar teste como concluído')
+        if (response.ok) {
+          console.log('Teste marcado como concluído com sucesso!')
+          setTestMarkedAsCompleted(true)
+          setCompletionError(false)
+          
+          // Limpar dados de sessão para evitar acesso posterior
+          if (typeof window !== 'undefined') {
+            // Manter os dados do candidato para exibição, mas marcar como concluído
+            const storedCandidateData = sessionStorage.getItem('candidateData')
+            if (storedCandidateData) {
+              try {
+                const parsedData = JSON.parse(storedCandidateData)
+                parsedData.completed = true
+                sessionStorage.setItem('candidateData', JSON.stringify(parsedData))
+              } catch (error) {
+                console.error('Erro ao atualizar dados do candidato na sessão:', error)
+              }
+            }
+          }
+        } else {
+          console.error('Erro ao marcar teste como concluído:', await response.text())
+          setCompletionError(true)
+          
+          // Tentar novamente após 3 segundos
+          setTimeout(markTestAsCompleted, 3000)
         }
       } catch (error) {
-        console.error('Erro:', error)
+        console.error('Erro ao marcar teste como concluído:', error)
+        setCompletionError(true)
+        
+        // Tentar novamente após 3 segundos
+        setTimeout(markTestAsCompleted, 3000)
       }
     }
     
-    if (candidateId) {
+    if (candidateId && !testMarkedAsCompleted) {
       markTestAsCompleted()
     }
-  }, [candidateId])
+  }, [candidateId, testMarkedAsCompleted])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -169,6 +201,18 @@ const Conclusao: NextPage = () => {
             </div>
             
             <h1 className="text-3xl font-bold text-secondary-900 mb-4">Avaliação Concluída!</h1>
+            
+            {completionError && (
+              <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-lg mb-4 max-w-lg mx-auto text-sm">
+                Estamos finalizando o registro da sua avaliação. Por favor, aguarde um momento...
+              </div>
+            )}
+            
+            {testMarkedAsCompleted && (
+              <div className="bg-green-50 border border-green-200 text-green-800 p-3 rounded-lg mb-4 max-w-lg mx-auto text-sm">
+                Sua avaliação foi registrada com sucesso!
+              </div>
+            )}
             
             {candidateData && (
               <p className="text-xl text-secondary-700 mb-6">

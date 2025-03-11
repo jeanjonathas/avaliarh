@@ -345,16 +345,24 @@ const Dashboard: NextPage = () => {
     const fetchCandidates = async () => {
       try {
         setLoading(true)
+        console.log('Dashboard: Iniciando carregamento de candidatos...')
         const response = await fetch('/api/admin/candidates')
         
         if (!response.ok) {
-          throw new Error('Erro ao carregar os candidatos')
+          throw new Error(`Erro ao carregar os candidatos: ${response.status} ${response.statusText}`)
         }
         
         const data = await response.json()
-        setCandidates(data)
+        console.log(`Dashboard: Candidatos carregados com sucesso. Total: ${data.length}`)
+        
+        if (Array.isArray(data)) {
+          setCandidates(data)
+        } else {
+          console.error('Dashboard: Dados de candidatos não são um array:', data)
+          setCandidates([])
+        }
       } catch (error) {
-        console.error('Erro:', error)
+        console.error('Dashboard: Erro ao carregar candidatos:', error)
         setError('Não foi possível carregar os candidatos. Por favor, tente novamente.')
       } finally {
         setLoading(false)

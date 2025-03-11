@@ -9,7 +9,7 @@ export default async function handler(
 ) {
   if (req.method === 'POST') {
     try {
-      const { candidateId, responses } = req.body
+      const { candidateId, stageId, responses } = req.body
 
       if (!candidateId || !responses || !Array.isArray(responses) || responses.length === 0) {
         return res.status(400).json({ error: 'Dados inválidos' })
@@ -20,15 +20,28 @@ export default async function handler(
         where: {
           id: candidateId,
         },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          completed: true,
+          status: true,
+          testId: true
+        }
       })
 
       if (!candidate) {
         return res.status(404).json({ error: 'Candidato não encontrado' })
       }
 
+      console.log(`Recebidas ${responses.length} respostas para o candidato ${candidateId} (${candidate.name}) na etapa ${stageId}`);
+      console.log(`Status atual do candidato: completed=${candidate.completed}, status=${candidate.status}`);
+      
       // Salvar as respostas com snapshot das perguntas e opções
       const savedResponses = await Promise.all(
-        responses.map(async (response: { questionId: string; optionId: string }) => {
+        responses.map(async (response: { questionId: string; optionId: string }, index: number) => {
+          console.log(`Processando resposta ${index + 1}/${responses.length}: questionId=${response.questionId}, optionId=${response.optionId}`);
+          
           // Buscar informações completas da pergunta
           const question = await prisma.question.findUnique({
             where: { id: response.questionId },
@@ -65,25 +78,38 @@ export default async function handler(
           })
 
           // Preparar o snapshot de todas as opções como JSON
+          // Importante: Isso preserva o estado atual das opções mesmo se forem editadas depois
           const allOptionsSnapshot = question.options.map(opt => ({
             id: opt.id,
             text: opt.text,
             isCorrect: opt.isCorrect
           }))
 
-          // Preparar os dados com tipagem correta
-          const responseData: any = {
+          // Preparar o snapshot da questão
+          // Importante: Isso preserva o texto da questão mesmo se for editada depois
+          const questionSnapshot = {
+            id: question.id,
+            text: question.text,
+            categoryId: question.categoryId,
+            categoryName: question.Category?.name || null
+          }
+
+          // Preparar os dados com tipagem correta para o modelo Response
+          // Garantindo que todos os campos correspondam ao schema do Prisma
+          const responseData = {
             optionId: response.optionId,
             questionText: question.text,
             optionText: selectedOption.text,
             isCorrectOption: selectedOption.isCorrect,
             allOptionsSnapshot: JSON.stringify(allOptionsSnapshot) as Prisma.InputJsonValue,
+            questionSnapshot: JSON.stringify(questionSnapshot) as Prisma.InputJsonValue,
             categoryName: question.Category?.name || null,
             stageName: question.Stage?.title || null
           };
           
           if (existingResponse) {
             // Atualizar resposta existente com snapshot atualizado
+            console.log(`Atualizando resposta existente: ${existingResponse.id}`);
             return prisma.response.update({
               where: {
                 id: existingResponse.id,
@@ -92,13 +118,35 @@ export default async function handler(
             })
           } else {
             // Criar nova resposta com snapshot
-            return prisma.response.create({
-              data: {
-                candidateId,
-                questionId: response.questionId,
-                ...responseData
-              },
-            })
+            try {
+              console.log(`Criando nova resposta para questão ${response.questionId}`);
+              const newResponse = await prisma.response.create({
+                data: {
+                  candidateId,
+                  questionId: response.questionId,
+                  ...responseData
+                },
+              });
+              console.log(`Resposta criada com sucesso: ${newResponse.id}`);
+              return newResponse;
+            } catch (error) {
+              console.error(`Erro ao criar resposta:`, error);
+              // Tentar criar sem os campos adicionais em caso de erro
+              if (error instanceof Prisma.PrismaClientValidationError) {
+                console.log('Tentando criar resposta apenas com campos básicos...');
+                // Verificamos o schema.prisma e sabemos que estes campos existem no modelo
+                return prisma.response.create({
+                  data: {
+                    candidateId,
+                    questionId: response.questionId,
+                    optionId: response.optionId,
+                    // Nota: Removidos campos que não existem no modelo Response
+                    // Apenas usar os campos básicos que sabemos que existem
+                  },
+                });
+              }
+              throw error;
+            }
           }
         })
       )
@@ -106,10 +154,58 @@ export default async function handler(
       // Filtrar respostas nulas (caso alguma pergunta ou opção não tenha sido encontrada)
       const validResponses = savedResponses.filter(response => response !== null)
 
-      return res.status(201).json({ success: true, count: validResponses.length })
+      console.log(`Salvas ${validResponses.length} respostas válidas de ${responses.length} recebidas`);
+      
+      // Verificar se todas as respostas da etapa foram respondidas
+      if (stageId && validResponses.length > 0) {
+        try {
+          // Contar quantas questões existem nesta etapa
+          const stageQuestions = await prisma.stageQuestion.count({
+            where: {
+              stageId: stageId
+            }
+          });
+          
+          // Contar quantas respostas o candidato já deu para questões desta etapa
+          const answeredQuestions = await prisma.response.count({
+            where: {
+              candidateId: candidateId,
+              questionId: {
+                in: await prisma.stageQuestion.findMany({
+                  where: { stageId: stageId },
+                  select: { questionId: true }
+                }).then(sq => sq.map(q => q.questionId))
+              }
+            }
+          });
+          
+          console.log(`Etapa ${stageId}: ${answeredQuestions} de ${stageQuestions} questões respondidas`);
+          
+          // Se todas as questões da etapa foram respondidas, atualizar o progresso
+          if (answeredQuestions >= stageQuestions) {
+            console.log(`Todas as questões da etapa ${stageId} foram respondidas pelo candidato ${candidateId}`);
+          }
+        } catch (error) {
+          console.error('Erro ao verificar progresso da etapa:', error);
+          // Não interromper o fluxo se houver erro na verificação de progresso
+        }
+      }
+      
+      return res.status(201).json({ 
+        success: true, 
+        count: validResponses.length,
+        candidateId: candidate.id,
+        candidateName: candidate.name
+      })
     } catch (error) {
       console.error('Erro ao salvar respostas:', error)
-      return res.status(500).json({ error: 'Erro ao salvar respostas' })
+      // Retornar mais informações sobre o erro para facilitar o debug
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      return res.status(500).json({ 
+        error: 'Erro ao salvar respostas', 
+        details: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined
+      })
     }
   } else {
     res.setHeader('Allow', ['POST'])

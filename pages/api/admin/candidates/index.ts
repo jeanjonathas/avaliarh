@@ -3,6 +3,31 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
 import { prisma } from '../../../../lib/prisma'
 
+// Função auxiliar para converter BigInt para Number
+function convertBigIntToNumber(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  if (typeof obj === 'bigint') {
+    return Number(obj);
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(convertBigIntToNumber);
+  }
+
+  if (typeof obj === 'object') {
+    const result: any = {};
+    for (const key in obj) {
+      result[key] = convertBigIntToNumber(obj[key]);
+    }
+    return result;
+  }
+
+  return obj;
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -16,19 +41,60 @@ export default async function handler(
   if (req.method === 'GET') {
     try {
       // Buscar todos os candidatos
-      const candidates = await prisma.$queryRaw`
-        SELECT c.*, 
-          CASE 
-            WHEN c.completed = true THEN 
-              (SELECT COUNT(*) FROM "Response" r 
-               JOIN "Option" o ON r."optionId" = o.id 
-               WHERE r."candidateId" = c.id AND o."isCorrect" = true)::float / 
-              (SELECT COUNT(*) FROM "Response" WHERE "candidateId" = c.id)::float * 100 
-            ELSE NULL 
-          END as score
-        FROM "Candidate" c
-        ORDER BY c."testDate" DESC
-      `;
+      // Usando Prisma Client em vez de SQL raw para melhor tipagem e segurança
+      console.log('Buscando candidatos...');
+      
+      const allCandidates = await prisma.candidate.findMany({
+        orderBy: {
+          createdAt: 'desc'
+        },
+        include: {
+          responses: {
+            include: {
+              option: true
+            }
+          }
+        }
+      });
+      
+      console.log(`Encontrados ${allCandidates.length} candidatos no banco de dados.`);
+      
+      // Processar os candidatos para calcular a pontuação
+      const candidates = allCandidates.map(candidate => {
+        // Calcular pontuação apenas se o candidato tiver respostas
+        let score = null;
+        if (candidate.completed && candidate.responses.length > 0) {
+          const correctResponses = candidate.responses.filter(r => r.option.isCorrect).length;
+          score = (correctResponses / candidate.responses.length) * 100;
+        }
+        
+        // Converter datas para strings para evitar problemas de serialização
+        const serializedCandidate = {
+          ...candidate,
+          id: candidate.id,
+          name: candidate.name,
+          email: candidate.email,
+          phone: candidate.phone,
+          position: candidate.position,
+          testDate: candidate.testDate ? candidate.testDate.toISOString() : null,
+          interviewDate: candidate.interviewDate ? candidate.interviewDate.toISOString() : null,
+          completed: candidate.completed,
+          createdAt: candidate.createdAt.toISOString(),
+          updatedAt: candidate.updatedAt.toISOString(),
+          inviteExpires: candidate.inviteExpires ? candidate.inviteExpires.toISOString() : null,
+          status: candidate.status,
+          inviteCode: candidate.inviteCode,
+          inviteSent: candidate.inviteSent,
+          inviteAttempts: Number(candidate.inviteAttempts), // Converter possível BigInt
+          score,
+          // Remover campos que não podem ser serializados para JSON
+          responses: undefined
+        };
+        
+        return serializedCandidate;
+      });
+      
+      console.log(`Processados ${candidates.length} candidatos para exibição.`);
 
       // Processar os candidatos
       const processedCandidates = Array.isArray(candidates) 
@@ -60,16 +126,25 @@ export default async function handler(
                 ORDER BY s.order
               `;
               
+              // Converter BigInt para Number nos resultados de stageScores
+              const convertedStageScores = Array.isArray(stageScores) 
+                ? convertBigIntToNumber(stageScores) 
+                : [];
+              
               return {
                 ...candidate,
                 score: Math.round(candidate.score) || 0,
-                stageScores: Array.isArray(stageScores) ? stageScores : []
+                stageScores: convertedStageScores
               };
             })
           )
         : [];
 
-      return res.status(200).json(processedCandidates);
+      // Garantir que todos os valores BigInt sejam convertidos para Number
+      const serializedCandidates = convertBigIntToNumber(processedCandidates);
+      console.log('Candidatos serializados com sucesso.');
+      
+      return res.status(200).json(serializedCandidates);
     } catch (error) {
       console.error('Erro ao carregar candidatos:', error);
       // Retornar array vazio em vez de erro para não quebrar a UI

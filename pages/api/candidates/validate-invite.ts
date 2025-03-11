@@ -16,8 +16,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Código de convite é obrigatório' });
     }
     
+    console.log(`Validando código de convite: ${inviteCode}`);
+    
     // Buscar o candidato pelo código de convite usando SQL raw
-    // Incluindo o testId na consulta
+    // Incluindo o testId e status na consulta
     const candidates = await prisma.$queryRaw`
       SELECT 
         id, 
@@ -26,6 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         phone, 
         position, 
         completed, 
+        status,
         "inviteExpires", 
         "inviteAttempts",
         "testId"
@@ -62,13 +65,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     
     // Verificar se o candidato já completou o teste
-    if (candidate.completed) {
-      return res.status(400).json({ error: 'Este candidato já completou a avaliação' });
+    console.log(`Status do candidato: completed=${candidate.completed}, status=${candidate.status}`);
+    
+    if (candidate.completed || candidate.status === 'APPROVED') {
+      console.log(`Candidato ${candidate.id} (${candidate.name}) já completou a avaliação`);
+      return res.status(400).json({ 
+        error: 'Este candidato já completou a avaliação',
+        completed: true
+      });
     }
     
     // Buscar informações do teste associado, se houver
     let test = null;
+    let stageCount = 0;
+    
     if (candidate.testId) {
+      console.log(`Buscando informações do teste ID: ${candidate.testId}`);
+      
+      // Buscar informações básicas do teste
       const tests = await prisma.$queryRaw`
         SELECT id, title, description, "timeLimit"
         FROM tests
@@ -76,6 +90,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       `;
       
       test = Array.isArray(tests) && tests.length > 0 ? tests[0] : null;
+      
+      if (test) {
+        // Contar quantas etapas o teste tem
+        const testStages = await prisma.testStage.findMany({
+          where: {
+            testId: candidate.testId
+          },
+          orderBy: {
+            order: 'asc'
+          }
+        });
+        
+        stageCount = testStages.length;
+        console.log(`Teste encontrado: ${test.title}, com ${stageCount} etapas`);
+        
+        // Adicionar o número de etapas ao objeto de teste
+        test.stageCount = stageCount;
+      } else {
+        console.log(`Teste com ID ${candidate.testId} não encontrado`);
+      }
     }
     
     // Resetar o contador de tentativas após um login bem-sucedido
@@ -86,6 +120,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     `;
     
     // Retornar os dados do candidato e do teste associado
+    console.log(`Retornando dados do candidato ${candidate.id} (${candidate.name}) e teste associado`);
+    
     return res.status(200).json({
       success: true,
       candidate: {
@@ -94,7 +130,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         email: candidate.email,
         phone: candidate.phone,
         position: candidate.position || null,
-        testId: candidate.testId || null
+        testId: candidate.testId || null,
+        completed: candidate.completed,
+        status: candidate.status
       },
       test: test
     });
