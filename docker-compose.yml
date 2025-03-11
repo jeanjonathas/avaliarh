@@ -39,7 +39,7 @@ services:
     image: node:18
     entrypoint: ["/bin/bash", "-c"]
     command: [
-      "while [ ! -f /app/.setup_complete ]; do echo 'Waiting for setup to complete...' && sleep 5; done && cd /app && npm install --no-fund --no-audit --legacy-peer-deps && npx prisma generate && npm run build || (echo 'Build failed, applying hotfix...' && node /app/hotfix.js && node /app/enhanced-candidate-hotfix.js && npm run build) && npm run start"
+      "while [ ! -f /app/.setup_complete ]; do echo 'Waiting for setup to complete...' && sleep 5; done && cd /app && npm install --no-fund --no-audit --legacy-peer-deps && npx prisma generate && npm run build || (echo 'Build failed, applying hotfix...' && node /app/hotfix.js && node /app/enhanced-candidate-hotfix.js && node /app/database-migration-hotfix.js && npx prisma migrate deploy && node /app/verify-migration.js && npm run build) && npm run start"
     ]
     volumes:
       - app_data:/app

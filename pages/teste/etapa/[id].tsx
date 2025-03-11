@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Formik, Form, Field } from 'formik'
 import * as Yup from 'yup'
+import useNotificationSystem from '../../../hooks/useNotificationSystem'
 
 interface Question {
   id: string
@@ -35,6 +36,11 @@ const TestStage: NextPage = () => {
   const [isReconnecting, setIsReconnecting] = useState(false)
   const [isOffline, setIsOffline] = useState(false)
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null)
+  const [isLastStage, setIsLastStage] = useState(false)
+  const [currentStageIndex, setCurrentStageIndex] = useState<number | null>(null)
+  const [totalStages, setTotalStages] = useState<number | null>(null)
+  const [validationTriggered, setValidationTriggered] = useState(false)
+  const notify = useNotificationSystem()
 
   // Função para salvar respostas no localStorage
   const saveResponsesToLocalStorage = (responses: Record<string, string>) => {
@@ -137,6 +143,29 @@ const TestStage: NextPage = () => {
     }
   }, [isReconnecting])
 
+  // Verificar se é a última etapa
+  useEffect(() => {
+    if (!stageId || !candidateId) return;
+
+    const checkIfLastStage = async () => {
+      try {
+        const response = await fetch(`/api/stages/next?currentStage=${stageId}&candidateId=${candidateId}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Dados da próxima etapa:', data);
+          setIsLastStage(!data.hasNextStage);
+          setCurrentStageIndex(data.currentStageIndex);
+          setTotalStages(data.totalStages);
+        }
+      } catch (error) {
+        console.error('Erro ao verificar se é a última etapa:', error);
+      }
+    };
+
+    checkIfLastStage();
+  }, [stageId, candidateId]);
+
   useEffect(() => {
     if (!stageId || !candidateId) return
 
@@ -177,12 +206,49 @@ const TestStage: NextPage = () => {
     fetchQuestions()
   }, [stageId, candidateId])
 
+  // Validação para verificar se todas as perguntas foram respondidas
+  const validateResponses = (values: Record<string, string>) => {
+    // Só executar a validação quando o botão de envio for clicado
+    if (!validationTriggered) {
+      return {};
+    }
+    
+    const errors: Record<string, string> = {};
+    const unansweredQuestions = questions.filter(question => !values[question.id]);
+    
+    if (unansweredQuestions.length > 0) {
+      unansweredQuestions.forEach(question => {
+        errors[question.id] = 'Por favor, selecione uma resposta';
+      });
+      
+      // Usar o sistema de notificação personalizado
+      notify.showWarning(`Por favor, responda todas as questões antes de continuar. Faltam ${unansweredQuestions.length} resposta(s).`);
+      
+      // Resetar o trigger de validação após exibir a mensagem
+      setValidationTriggered(false);
+      
+      return errors;
+    }
+    
+    return {};
+  };
+
   const handleSubmit = async (values: Record<string, string>) => {
+    // Ativar validação antes de processar o envio
+    setValidationTriggered(true);
+    
+    // Verificar se todas as perguntas foram respondidas
+    const unansweredQuestions = questions.filter(question => !values[question.id]);
+    if (unansweredQuestions.length > 0) {
+      notify.showWarning(`Por favor, responda todas as questões antes de continuar. Faltam ${unansweredQuestions.length} resposta(s).`);
+      return;
+    }
+    
     try {
       if (isOffline) {
         // Se estiver offline, apenas salvar localmente
         saveResponsesToLocalStorage(values)
-        alert('Você está offline. Suas respostas foram salvas localmente e serão enviadas quando a conexão for restaurada.')
+        notify.showInfo('Você está offline. Suas respostas foram salvas localmente e serão enviadas quando a conexão for restaurada.');
         return
       }
 
@@ -323,7 +389,7 @@ const TestStage: NextPage = () => {
 
   const handleSaveProgress = (values: Record<string, string>) => {
     saveResponsesToLocalStorage(values)
-    alert('Progresso salvo com sucesso! Você pode continuar mais tarde.')
+    notify.showSuccess('Progresso salvo com sucesso! Você pode continuar mais tarde.');
   }
 
   if (loading) {
@@ -436,7 +502,7 @@ const TestStage: NextPage = () => {
                 )}
               </div>
               <div className="text-sm text-secondary-500">
-                Etapa {stageId} de {testData && testData.stageCount ? testData.stageCount : '6'}
+                Etapa {stageId} de {testData && testData.stageCount ? testData.stageCount : totalStages || '?'}
               </div>
             </div>
           </div>
@@ -444,8 +510,9 @@ const TestStage: NextPage = () => {
           <Formik
             initialValues={savedResponses}
             onSubmit={handleSubmit}
+            validate={validateResponses}
           >
-            {({ values, isSubmitting }) => (
+            {({ values, isSubmitting, errors, touched }) => (
               <Form>
                 <div className="space-y-8">
                   {questions.map((question, index) => (
@@ -457,7 +524,9 @@ const TestStage: NextPage = () => {
                         {question.options.map((option) => (
                           <label 
                             key={option.id} 
-                            className="flex items-start p-3 border rounded-lg cursor-pointer hover:bg-primary-50 transition-colors"
+                            className={`flex items-start p-3 border rounded-lg cursor-pointer hover:bg-primary-50 transition-colors ${
+                              errors[question.id] && touched[question.id] ? 'border-red-300' : ''
+                            }`}
                           >
                             <Field
                               type="radio"
@@ -468,35 +537,45 @@ const TestStage: NextPage = () => {
                             <span className="text-secondary-700">{option.text}</span>
                           </label>
                         ))}
+                        {errors[question.id] && touched[question.id] && (
+                          <div className="text-red-500 text-sm mt-1">{errors[question.id]}</div>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <div className="mt-8 flex justify-between">
-                  <button
-                    type="button"
-                    onClick={() => handleSaveProgress(values)}
-                    className="px-4 py-2 border border-primary-300 text-primary-700 rounded-md hover:bg-primary-50"
-                  >
-                    Salvar Progresso
-                  </button>
-                  <div className="flex space-x-4">
-                    <Link 
-                      href={parseInt(stageId as string) > 1 
-                        ? `/teste/etapa/${parseInt(stageId as string) - 1}?candidateId=${candidateId}` 
-                        : `/teste/introducao`
-                      }
-                      className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+                <div className="mt-8">
+                  <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm text-yellow-700">
+                          <strong>Atenção:</strong> Após avançar para a próxima etapa, não será possível retornar.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-between">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveProgress(values)}
+                      className="px-4 py-2 border border-primary-300 text-primary-700 rounded-md hover:bg-primary-50"
                     >
-                      Voltar
-                    </Link>
+                      Salvar Progresso
+                    </button>
                     <button
                       type="submit"
                       disabled={isSubmitting}
                       className="btn-primary"
+                      onClick={() => setValidationTriggered(true)}
                     >
-                      {isSubmitting ? 'Enviando...' : 'Próxima Etapa'}
+                      {isSubmitting ? 'Enviando...' : (currentStageIndex === totalStages - 1) ? 'Finalizar Teste' : 'Próxima Etapa'}
                     </button>
                   </div>
                 </div>
