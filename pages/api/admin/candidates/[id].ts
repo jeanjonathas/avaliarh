@@ -50,7 +50,7 @@ export default async function handler(
     try {
       console.log(`Buscando candidato com ID: ${id}`);
       
-      // Buscar o candidato com informações do teste associado
+      // Buscar o candidato com informações do teste associado e snapshots das respostas
       const candidate = await prisma.candidate.findUnique({
         where: { id },
         include: {
@@ -59,7 +59,8 @@ export default async function handler(
               option: true,
               question: {
                 include: {
-                  Stage: true
+                  Stage: true,
+                  Category: true
                 }
               }
             }
@@ -67,11 +68,113 @@ export default async function handler(
         }
       });
       
+      // Verificar se o candidato tem respostas
+      if (candidate) {
+        console.log('Verificando respostas do candidato:', candidate.id);
+        console.log('Respostas iniciais:', candidate.responses ? candidate.responses.length : 0);
+        
+        // Buscar respostas diretamente independentemente se já foram encontradas ou não
+        // Isso garante que tenhamos todas as respostas disponíveis
+        const responses = await prisma.response.findMany({
+          where: { candidateId: id },
+          include: {
+            option: true,
+            question: {
+              include: {
+                Stage: true,
+                Category: true
+              }
+            }
+          }
+        });
+        
+        console.log(`Encontradas ${responses.length} respostas diretamente para o candidato ${id}`);
+        
+        if (responses.length > 0) {
+          // Atualizar o objeto do candidato com as respostas encontradas
+          candidate.responses = responses;
+          console.log('Respostas atualizadas no objeto do candidato');
+        }
+      }
+      
       if (!candidate) {
         return res.status(404).json({ error: 'Candidato não encontrado' })
       }
       
       console.log(`Candidato encontrado: ${candidate.name}, testId: ${candidate.testId}`);
+      console.log(`Status de conclusão do teste: ${candidate.completed}`);
+      console.log(`Quantidade de respostas: ${candidate.responses ? candidate.responses.length : 'nenhuma'}`);
+      
+      if (candidate.responses && candidate.responses.length > 0) {
+        console.log(`Encontradas ${candidate.responses.length} respostas para o candidato`);
+        
+        // Mostrar todas as respostas encontradas
+        console.log(`Detalhando todas as ${candidate.responses.length} respostas:`);
+        candidate.responses.forEach((response: any, index) => {
+          console.log(`Resposta ${index + 1}:`);
+          console.log(`- ID: ${response.id}`);
+          
+          // Acessar os textos da questão e opção de várias formas possíveis
+          let questionText = 'N/A';
+          let optionText = 'N/A';
+          let stageName = 'N/A';
+          
+          // Tentar obter o texto da questão
+          if (response.questionText) {
+            questionText = response.questionText;
+          } else if (response.question && response.question.text) {
+            questionText = response.question.text;
+          }
+          
+          // Tentar obter o texto da opção
+          if (response.optionText) {
+            optionText = response.optionText;
+          } else if (response.option && response.option.text) {
+            optionText = response.option.text;
+          }
+          
+          // Tentar obter o nome da etapa
+          if (response.stageName) {
+            stageName = response.stageName;
+          } else if (response.question && response.question.Stage && response.question.Stage.title) {
+            stageName = response.question.Stage.title;
+          }
+          
+          console.log(`- Texto da questão: ${questionText}`);
+          console.log(`- Texto da opção: ${optionText}`);
+          console.log(`- Nome da etapa: ${stageName}`);
+          
+          // Verificar se temos snapshots
+          const hasQuestionSnapshot = !!(response.questionSnapshot);
+          const hasOptionsSnapshot = !!(response.allOptionsSnapshot);
+          
+          console.log(`- Tem questionSnapshot: ${hasQuestionSnapshot}`);
+          console.log(`- Tipo do questionSnapshot: ${hasQuestionSnapshot ? typeof response.questionSnapshot : 'N/A'}`);
+          console.log(`- Tem allOptionsSnapshot: ${hasOptionsSnapshot}`);
+          console.log(`- Tipo do allOptionsSnapshot: ${hasOptionsSnapshot ? typeof response.allOptionsSnapshot : 'N/A'}`);
+          
+          // Tentar parsear os snapshots se forem strings
+          if (hasQuestionSnapshot && typeof response.questionSnapshot === 'string') {
+            try {
+              const parsed = JSON.parse(response.questionSnapshot);
+              console.log(`- questionSnapshot parseado: ${JSON.stringify(parsed).substring(0, 100)}...`);
+            } catch (e: any) {
+              console.error(`- Erro ao parsear questionSnapshot: ${e.message}`);
+            }
+          }
+          
+          if (hasOptionsSnapshot && typeof response.allOptionsSnapshot === 'string') {
+            try {
+              const parsed = JSON.parse(response.allOptionsSnapshot);
+              console.log(`- allOptionsSnapshot parseado: ${JSON.stringify(parsed).substring(0, 100)}...`);
+            } catch (e: any) {
+              console.error(`- Erro ao parsear allOptionsSnapshot: ${e.message}`);
+            }
+          }
+        });
+      } else {
+        console.log('Nenhuma resposta encontrada para este candidato');
+      }
       
       let stageScores = [];
       let totalScore = 0;
@@ -226,7 +329,8 @@ export default async function handler(
         createdAt: candidate.createdAt ? candidate.createdAt.toISOString() : null,
         updatedAt: candidate.updatedAt ? candidate.updatedAt.toISOString() : null,
         inviteAttempts: Number(candidate.inviteAttempts), // Converter possível BigInt
-        responses: undefined // Remover respostas completas para evitar payload grande
+        // Manter as respostas para exibição na aba de respostas
+        responses: candidate.responses
       };
 
       // Garantir que todos os valores BigInt sejam convertidos para Number

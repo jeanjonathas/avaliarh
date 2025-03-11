@@ -39,6 +39,34 @@ ChartJS.register(
   Filler
 )
 
+interface Response {
+  id: string
+  questionId: string
+  optionId: string
+  questionText: string
+  optionText: string
+  isCorrectOption: boolean
+  stageName?: string
+  categoryName?: string
+  questionSnapshot?: string | any
+  allOptionsSnapshot?: string | any
+  question?: {
+    Stage?: {
+      id: string
+      title: string
+    }
+    Category?: {
+      id: string
+      name: string
+    }
+  }
+  option?: {
+    id: string
+    text: string
+    isCorrect: boolean
+  }
+}
+
 interface Candidate {
   id: string
   name: string
@@ -66,7 +94,7 @@ interface Candidate {
   score?: number
   createdAt: string
   updatedAt: string
-  responses?: any[]
+  responses?: Response[]
   stageScores?: {
     id: string
     name: string
@@ -85,7 +113,7 @@ const CandidateDetails = () => {
   const [candidate, setCandidate] = useState<Candidate | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [activeTab, setActiveTab] = useState('performance')
+  const [activeTab, setActiveTab] = useState<'performance' | 'profile' | 'responses'>('performance')
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [currentIndex, setCurrentIndex] = useState(-1)
   const [formData, setFormData] = useState({
@@ -144,6 +172,15 @@ const CandidateDetails = () => {
       }
       
       const data = await response.json();
+      console.log('Dados recebidos da API:', data);
+      console.log('Respostas recebidas:', data.responses ? data.responses.length : 0);
+      
+      // Garantir que as respostas sejam um array
+      if (data.responses && !Array.isArray(data.responses)) {
+        console.error('Respostas não é um array:', data.responses);
+        data.responses = [];
+      }
+      
       setCandidate(data);
       
       setFormData({
@@ -678,6 +715,21 @@ const CandidateDetails = () => {
                 </button>
                 <button
                   className={`px-6 py-4 font-medium text-sm focus:outline-none transition-colors duration-200 ${
+                    activeTab === 'responses'
+                      ? 'border-b-2 border-primary-600 text-primary-600 bg-primary-50'
+                      : 'text-secondary-600 hover:text-primary-500 hover:bg-secondary-50'
+                  }`}
+                  onClick={() => setActiveTab('responses')}
+                >
+                  <div className="flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                    </svg>
+                    Respostas
+                  </div>
+                </button>
+                <button
+                  className={`px-6 py-4 font-medium text-sm focus:outline-none transition-colors duration-200 ${
                     activeTab === 'profile'
                       ? 'border-b-2 border-primary-600 text-primary-600 bg-primary-50'
                       : 'text-secondary-600 hover:text-primary-500 hover:bg-secondary-50'
@@ -695,7 +747,244 @@ const CandidateDetails = () => {
             </div>
             
             <div className="p-6">
-              {activeTab === 'performance' ? (
+              {activeTab === 'responses' ? (
+                <div className="space-y-6">
+                  <div className="bg-white p-6 rounded-lg shadow-md">
+                    <h3 className="text-lg font-semibold text-secondary-800 mb-4">Respostas do Candidato</h3>
+                    
+                    {!candidate.completed ? (
+                      <div className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+                        <h4 className="font-medium text-blue-800">Aguardando Respostas</h4>
+                        <p className="mt-2 text-blue-700">
+                          Este candidato ainda não realizou o teste. As respostas serão exibidas após a conclusão da avaliação.
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        {/* Adicionar logs para depuração */}
+                        <div style={{ display: 'none' }} id="debug-info" data-has-responses={candidate.responses && candidate.responses.length > 0 ? 'true' : 'false'}></div>
+                        {typeof window !== 'undefined' && (
+                          <>
+                            {console.log('Dados do candidato na renderização:', candidate)}
+                            {console.log('Respostas disponíveis na renderização:', candidate.responses ? candidate.responses.length : 0)}
+                            {console.log('Tipo de candidate.responses:', candidate.responses ? typeof candidate.responses : 'undefined')}
+                            {console.log('É um array?', candidate.responses ? Array.isArray(candidate.responses) : 'N/A')}
+                            {candidate.responses && candidate.responses.length > 0 && console.log('Primeira resposta:', candidate.responses[0])}
+                          </>
+                        )}
+                        {candidate.responses && Array.isArray(candidate.responses) && candidate.responses.length > 0 ? (
+                          <div className="space-y-6">
+                            {/* Agrupar respostas por etapa */}
+                            {(() => {
+                              // Agrupar respostas por etapa
+                              const stageResponses = {};
+                              
+                              // Converter para array se não for
+                              const responsesArray = Array.isArray(candidate.responses) ? candidate.responses : [];
+                              console.log('Processando respostas:', responsesArray.length);
+                              
+                              responsesArray.forEach(response => {
+                                // Tentar obter o nome da etapa de várias fontes possíveis
+                                let stageName = 'Sem Etapa';
+                                
+                                // Verificar se temos o campo stageName diretamente
+                                if (response.stageName) {
+                                  stageName = response.stageName;
+                                }
+                                // Verificar se temos a relação question.Stage
+                                else if (response.question && response.question.Stage && response.question.Stage.title) {
+                                  stageName = response.question.Stage.title;
+                                }
+                                // Verificar se temos o snapshot da questão com informações da etapa
+                                else if (response.questionSnapshot) {
+                                  try {
+                                    const snapshot = typeof response.questionSnapshot === 'string' 
+                                      ? JSON.parse(response.questionSnapshot)
+                                      : response.questionSnapshot;
+                                    
+                                    if (snapshot.stageName) {
+                                      stageName = snapshot.stageName;
+                                    }
+                                  } catch (e) {
+                                    console.error('Erro ao parsear questionSnapshot:', e);
+                                  }
+                                }
+                                
+                                if (!stageResponses[stageName]) {
+                                  stageResponses[stageName] = [];
+                                }
+                                stageResponses[stageName].push(response);
+                              });
+                              
+                              return Object.entries(stageResponses).map(([stageName, responses]: [string, any[]]) => (
+                                <div key={stageName} className="border border-secondary-200 rounded-lg overflow-hidden">
+                                  <div className="bg-secondary-50 px-4 py-3 border-b border-secondary-200">
+                                    <h4 className="font-medium text-secondary-800">{stageName}</h4>
+                                  </div>
+                                  <div className="divide-y divide-secondary-200">
+                                    {responses.map((response, index) => {
+                                      // Acessar o snapshot da questão e opções
+                                      let questionSnapshot: {id?: string; text?: string; categoryId?: string; categoryName?: string} = {};
+                                      let allOptionsSnapshot: {id: string; text: string; isCorrect: boolean}[] = [];
+                                      let questionText = '';
+                                      let selectedOptionText = '';
+                                      let isCorrect = false;
+                                      
+                                      try {
+                                        // Tentar obter o texto da questão de várias fontes possíveis
+                                        if (response.questionText) {
+                                          questionText = response.questionText;
+                                        } else if (response.question && response.question.text) {
+                                          questionText = response.question.text;
+                                        }
+                                        
+                                        // Tentar obter o texto da opção selecionada
+                                        if (response.optionText) {
+                                          selectedOptionText = response.optionText;
+                                        } else if (response.option && response.option.text) {
+                                          selectedOptionText = response.option.text;
+                                        }
+                                        
+                                        // Verificar se a resposta está correta
+                                        if (response.isCorrectOption !== undefined) {
+                                          isCorrect = response.isCorrectOption;
+                                        } else if (response.option && response.option.isCorrect !== undefined) {
+                                          isCorrect = response.option.isCorrect;
+                                        }
+                                        
+                                        // Processar o snapshot da questão
+                                        if (response.questionSnapshot) {
+                                          // Verificar se já é um objeto ou se precisa ser parseado
+                                          if (typeof response.questionSnapshot === 'string') {
+                                            questionSnapshot = JSON.parse(response.questionSnapshot);
+                                          } else {
+                                            questionSnapshot = response.questionSnapshot as any;
+                                          }
+                                          
+                                          // Se ainda não temos o texto da questão, usar o do snapshot
+                                          if (!questionText && questionSnapshot.text) {
+                                            questionText = questionSnapshot.text;
+                                          }
+                                        }
+                                        
+                                        // Processar o snapshot das opções
+                                        if (response.allOptionsSnapshot) {
+                                          // Verificar se já é um array ou se precisa ser parseado
+                                          if (typeof response.allOptionsSnapshot === 'string') {
+                                            allOptionsSnapshot = JSON.parse(response.allOptionsSnapshot);
+                                          } else {
+                                            allOptionsSnapshot = response.allOptionsSnapshot as any;
+                                          }
+                                          
+                                          // Se ainda não temos o texto da opção selecionada, procurar no snapshot
+                                          if (!selectedOptionText && allOptionsSnapshot.length > 0) {
+                                            const selectedOption = allOptionsSnapshot.find(opt => opt.id === response.optionId);
+                                            if (selectedOption) {
+                                              selectedOptionText = selectedOption.text;
+                                              if (isCorrect === false && selectedOption.isCorrect !== undefined) {
+                                                isCorrect = selectedOption.isCorrect;
+                                              }
+                                            }
+                                          }
+                                        }
+                                      } catch (error) {
+                                        console.error('Erro ao acessar snapshot:', error);
+                                      }
+                                      
+                                      return (
+                                        <div key={response.id} className="p-4">
+                                          <div className="mb-3">
+                                          <p className="font-medium text-secondary-700">
+  {index + 1}. {questionText || (questionSnapshot && questionSnapshot.text) || 'Pergunta não disponível'}
+</p>
+{(questionSnapshot && questionSnapshot.categoryName || response.categoryName) && (
+  <span className="inline-block mt-1 px-2 py-0.5 text-xs bg-secondary-100 text-secondary-600 rounded">
+    {(questionSnapshot && questionSnapshot.categoryName) || response.categoryName}
+  </span>
+)}
+                                          </div>
+                                          
+                                          <div className="ml-4 space-y-2">
+                                            {allOptionsSnapshot.length > 0 ? (
+                                              allOptionsSnapshot.map(option => {
+                                                const isSelected = option.id === response.optionId;
+                                                // Usar a variável isCorrect para a opção selecionada, mas para as outras opções usar o valor do snapshot
+                                                const optionIsCorrect = isSelected ? isCorrect : option.isCorrect;
+                                                
+                                                return (
+                                                  <div 
+  key={option.id} 
+  className={`flex items-start p-2 rounded ${isSelected ? (optionIsCorrect ? 'bg-green-50' : 'bg-red-50') : ''}`}
+>
+                                                    <div className="flex-shrink-0 mt-0.5">
+                                                    {isSelected ? (
+  <svg className={`h-5 w-5 ${optionIsCorrect ? 'text-green-500' : 'text-red-500'}`} fill="currentColor" viewBox="0 0 20 20">
+                                                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                        </svg>
+                                                      ) : (
+                                                        <svg className="h-5 w-5 text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        </svg>
+                                                      )}
+                                                    </div>
+                                                    <div className="ml-2">
+                                                      <p className={`text-sm ${isSelected ? (optionIsCorrect ? 'text-green-700' : 'text-red-700') : 'text-secondary-600'}`}>
+                                                        {option.text}
+                                                      </p>
+                                                      {isSelected && (
+                                                        <p className="text-xs mt-1">
+                                                          {optionIsCorrect ? (
+                                                            <span className="text-green-600">Resposta correta</span>
+                                                          ) : (
+                                                            <span className="text-red-600">Resposta incorreta</span>
+                                                          )}
+                                                        </p>
+                                                      )}
+                                                    </div>
+                                                  </div>
+                                                );
+                                              })
+                                            ) : (
+                                              <div className="p-2">
+                                                <p className="text-sm text-secondary-600">
+                                                  <strong>Resposta selecionada:</strong> {selectedOptionText || response.optionText || response.option?.text || 'Não disponível'}
+                                                </p>
+                                                <p className="text-xs mt-1">
+                                                  {isCorrect ? (
+                                                    <span className="text-green-600">Resposta correta</span>
+                                                  ) : (
+                                                    <span className="text-red-600">Resposta incorreta</span>
+                                                  )}
+                                                </p>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ));
+                            })()}
+                          </div>
+                        ) : (
+                          <div className="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
+                            <h4 className="font-medium text-yellow-800">Sem Respostas</h4>
+                            <p className="mt-2 text-yellow-700">
+                              Não foram encontradas respostas para este candidato.
+                              {candidate.completed ? ' O teste está marcado como concluído, mas não há respostas registradas.' : ' O candidato ainda não completou o teste.'}
+                            </p>
+                            <p className="mt-2 text-sm text-yellow-600">
+                              ID do candidato: {candidate.id}<br />
+                              {candidate.testId ? `ID do teste: ${candidate.testId}` : 'Nenhum teste associado'}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : activeTab === 'performance' ? (
                 <div className="space-y-8">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {!candidate.completed ? (
