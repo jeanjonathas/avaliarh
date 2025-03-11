@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
@@ -26,9 +26,34 @@ export default async function handler(
         return res.status(404).json({ error: 'Candidato não encontrado' })
       }
 
-      // Salvar as respostas
+      // Salvar as respostas com snapshot das perguntas e opções
       const savedResponses = await Promise.all(
         responses.map(async (response: { questionId: string; optionId: string }) => {
+          // Buscar informações completas da pergunta
+          const question = await prisma.question.findUnique({
+            where: { id: response.questionId },
+            include: {
+              options: true,
+              Category: true,
+              Stage: true
+            }
+          })
+
+          if (!question) {
+            console.error(`Pergunta não encontrada: ${response.questionId}`)
+            return null
+          }
+
+          // Buscar informações da opção selecionada
+          const selectedOption = await prisma.option.findUnique({
+            where: { id: response.optionId }
+          })
+
+          if (!selectedOption) {
+            console.error(`Opção não encontrada: ${response.optionId}`)
+            return null
+          }
+
           // Verificar se já existe uma resposta para esta pergunta
           const existingResponse = await prisma.response.findUnique({
             where: {
@@ -39,30 +64,49 @@ export default async function handler(
             },
           })
 
+          // Preparar o snapshot de todas as opções como JSON
+          const allOptionsSnapshot = question.options.map(opt => ({
+            id: opt.id,
+            text: opt.text,
+            isCorrect: opt.isCorrect
+          }))
+
+          // Preparar os dados com tipagem correta
+          const responseData: any = {
+            optionId: response.optionId,
+            questionText: question.text,
+            optionText: selectedOption.text,
+            isCorrectOption: selectedOption.isCorrect,
+            allOptionsSnapshot: JSON.stringify(allOptionsSnapshot) as Prisma.InputJsonValue,
+            categoryName: question.Category?.name || null,
+            stageName: question.Stage?.title || null
+          };
+          
           if (existingResponse) {
-            // Atualizar resposta existente
+            // Atualizar resposta existente com snapshot atualizado
             return prisma.response.update({
               where: {
                 id: existingResponse.id,
               },
-              data: {
-                optionId: response.optionId,
-              },
+              data: responseData,
             })
           } else {
-            // Criar nova resposta
+            // Criar nova resposta com snapshot
             return prisma.response.create({
               data: {
                 candidateId,
                 questionId: response.questionId,
-                optionId: response.optionId,
+                ...responseData
               },
             })
           }
         })
       )
 
-      return res.status(201).json({ success: true, count: savedResponses.length })
+      // Filtrar respostas nulas (caso alguma pergunta ou opção não tenha sido encontrada)
+      const validResponses = savedResponses.filter(response => response !== null)
+
+      return res.status(201).json({ success: true, count: validResponses.length })
     } catch (error) {
       console.error('Erro ao salvar respostas:', error)
       return res.status(500).json({ error: 'Erro ao salvar respostas' })

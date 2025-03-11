@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl"]
 }
 
@@ -31,47 +31,49 @@ model Admin {
 }
 
 model Candidate {
-  id             String          @id @default(uuid())
+  id             String         @id @default(uuid())
   name           String
   email          String
   phone          String?
   position       String?
-  testDate       DateTime        @default(now())
-  completed      Boolean         @default(false)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  testDate       DateTime       @default(now())
+  completed      Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
   infoJobsLink   String?
   interviewDate  DateTime?
   observations   String?
   rating         Float?
   resumeFile     String?
   socialMediaUrl String?
-  status         Status          @default(PENDING)
+  status         Status         @default(PENDING)
+  inviteCode     String?        @unique
+  inviteSent     Boolean        @default(false)
+  inviteAttempts Int            @default(0)
+  inviteExpires  DateTime?
   github         String?
   linkedin       String?
   portfolio      String?
   resumeUrl      String?
-  // Campo testId mantido para compatibilidade com código existente
   testId         String?
-  test           tests?          @relation(fields: [testId], references: [id])
+  test           tests?         @relation(fields: [testId], references: [id])
   responses      Response[]
-  // Nova relação com a tabela CandidateTest
   candidateTests CandidateTest[]
 }
 
 model Question {
-  id               String           @id @default(uuid())
-  text             String
-  stageId          String
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  categoryId       String?
-  options          Option[]
-  Category         Category?        @relation(fields: [categoryId], references: [id])
-  Stage            Stage            @relation(fields: [stageId], references: [id], onDelete: Cascade)
-  responses        Response[]
-  stageQuestions   StageQuestion[]  // Relação com a tabela StageQuestion
-  testQuestions    TestQuestion[]   // Nova relação com a tabela TestQuestion
+  id             String          @id @default(uuid())
+  text           String
+  stageId        String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  categoryId     String?
+  options        Option[]
+  Category       Category?       @relation(fields: [categoryId], references: [id])
+  Stage          Stage           @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  responses      Response[]
+  stageQuestions StageQuestion[]
+  testQuestions  TestQuestion[]
 }
 
 model Option {
@@ -86,15 +88,21 @@ model Option {
 }
 
 model Response {
-  id          String    @id @default(uuid())
-  candidateId String
-  questionId  String
-  optionId    String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-  option      Option    @relation(fields: [optionId], references: [id])
-  question    Question  @relation(fields: [questionId], references: [id])
+  id                 String    @id @default(uuid())
+  candidateId        String
+  questionId         String
+  optionId           String
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  questionText       String
+  optionText         String
+  isCorrectOption    Boolean
+  allOptionsSnapshot Json?
+  categoryName       String?
+  stageName          String?
+  candidate          Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  option             Option    @relation(fields: [optionId], references: [id])
+  question           Question  @relation(fields: [questionId], references: [id])
 
   @@unique([candidateId, questionId])
 }
@@ -107,18 +115,18 @@ model UsedInviteCode {
 }
 
 model Stage {
-  id             String           @id
+  id             String          @id
   title          String
   description    String?
   order          Int
-  createdAt      DateTime         @default(now())
+  createdAt      DateTime        @default(now())
   updatedAt      DateTime
   testId         String?
   Question       Question[]
-  test           tests?           @relation(fields: [testId], references: [id])
+  test           tests?          @relation(fields: [testId], references: [id])
+  stageQuestions StageQuestion[]
+  testQuestions  TestQuestion[]
   TestStage      TestStage[]
-  stageQuestions StageQuestion[]  // Relação com a tabela StageQuestion
-  testQuestions  TestQuestion[]   // Nova relação com a tabela TestQuestion
 }
 
 model TestStage {
@@ -135,18 +143,17 @@ model TestStage {
 }
 
 model tests {
-  id          String          @id @default(uuid())
-  title       String
-  description String?
-  timeLimit   Int?
-  active      Boolean         @default(true)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  candidates  Candidate[]
-  stages      Stage[]
-  TestStage   TestStage[]
-  testQuestions TestQuestion[]
-  // Nova relação com a tabela CandidateTest
+  id             String          @id @default(uuid())
+  title          String
+  description    String?
+  timeLimit      Int?
+  active         Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  candidates     Candidate[]
+  stages         Stage[]
+  testQuestions  TestQuestion[]
+  TestStage      TestStage[]
   candidateTests CandidateTest[]
 }
 
@@ -160,14 +167,14 @@ model Category {
 }
 
 model StageQuestion {
-  id          String    @id @default(uuid())
-  stageId     String
-  questionId  String
-  order       Int       @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  stage       Stage     @relation(fields: [stageId], references: [id], onDelete: Cascade)
-  question    Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  id         String   @id @default(uuid())
+  stageId    String
+  questionId String
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  stage      Stage    @relation(fields: [stageId], references: [id], onDelete: Cascade)
 
   @@unique([stageId, questionId])
   @@index([stageId])
@@ -175,26 +182,21 @@ model StageQuestion {
 }
 
 model TestQuestion {
-  id          String    @id @default(uuid())
-  testId      String
-  questionId  String
-  stageId     String
-  order       Int       @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  test        tests     @relation(fields: [testId], references: [id], onDelete: Cascade)
-  question    Question  @relation(fields: [questionId], references: [id])
-  stage       Stage     @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  id         String   @id @default(uuid())
+  testId     String
+  questionId String
+  stageId    String
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  question   Question @relation(fields: [questionId], references: [id])
+  stage      Stage    @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  test       tests    @relation(fields: [testId], references: [id], onDelete: Cascade)
 
   @@unique([testId, stageId, questionId])
   @@index([testId])
   @@index([questionId])
   @@index([stageId])
-}
-
-enum Role {
-  ADMIN
-  USER
 }
 
 // Nova tabela para relacionar candidatos e testes
@@ -216,6 +218,11 @@ model CandidateTest {
   @@unique([candidateId, testId])
   @@index([candidateId])
   @@index([testId])
+}
+
+enum Role {
+  ADMIN
+  USER
 }
 
 enum Status {
