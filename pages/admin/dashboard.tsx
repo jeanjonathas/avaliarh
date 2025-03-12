@@ -100,17 +100,17 @@ const Dashboard: NextPage = () => {
   const [scoreFilter, setScoreFilter] = useState('ALL')
   const [showProfileEditor, setShowProfileEditor] = useState(false)
   const [editableProfiles, setEditableProfiles] = useState<Record<string, number[]>>({
-    'Desenvolvedor Frontend': [85, 70, 65, 80, 75, 60],
-    'Desenvolvedor Backend': [80, 85, 60, 65, 75, 70],
-    'Analista de Dados': [70, 90, 75, 60, 80, 65],
-    'Designer UX/UI': [60, 65, 80, 90, 75, 70],
-    'Gerente de Projetos': [70, 75, 85, 65, 70, 90],
-    'Analista de QA': [80, 75, 70, 75, 85, 80],
-    'DevOps Engineer': [75, 85, 65, 70, 80, 75],
-    'Analista de Segurança': [85, 80, 70, 65, 90, 75],
-    'Analista de Sistemas': [75, 80, 75, 70, 80, 75],
-    'Suporte Técnico': [70, 65, 80, 65, 70, 85],
-    'Padrão': [80, 75, 70, 75, 80, 85]
+    'Desenvolvedor Frontend': [],
+    'Desenvolvedor Backend': [],
+    'Analista de Dados': [],
+    'Designer UX/UI': [],
+    'Gerente de Projetos': [],
+    'Analista de QA': [],
+    'DevOps Engineer': [],
+    'Analista de Segurança': [],
+    'Analista de Sistemas': [],
+    'Suporte Técnico': [],
+    'Padrão': []
   })
   const [currentProfile, setCurrentProfile] = useState('Padrão')
   const [newProfileName, setNewProfileName] = useState('')
@@ -123,11 +123,11 @@ const Dashboard: NextPage = () => {
     rating: '0',
   })
   const [trendData, setTrendData] = useState({
-    labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
+    labels: [],
     datasets: [
       {
         label: 'Candidatos Aprovados',
-        data: [0, 0, 0, 0, 0, 0],
+        data: [],
         borderColor: 'rgba(75, 192, 192, 1)',
         backgroundColor: 'rgba(75, 192, 192, 0.2)',
         tension: 0.4,
@@ -135,7 +135,7 @@ const Dashboard: NextPage = () => {
       },
       {
         label: 'Candidatos Rejeitados',
-        data: [0, 0, 0, 0, 0, 0],
+        data: [],
         borderColor: 'rgba(255, 99, 132, 1)',
         backgroundColor: 'rgba(255, 99, 132, 0.2)',
         tension: 0.4,
@@ -144,79 +144,72 @@ const Dashboard: NextPage = () => {
     ]
   })
   const [stageDistributionData, setStageDistributionData] = useState({
-    labels: ['0-20%', '21-40%', '41-60%', '61-80%', '81-100%'],
+    labels: [],
     datasets: [
       {
         label: 'Raciocínio Lógico',
-        data: [0, 0, 0, 0, 0],
+        data: [],
         backgroundColor: 'rgba(255, 99, 132, 0.7)',
         borderWidth: 0,
         borderRadius: 4,
       },
       {
         label: 'Matemática Básica',
-        data: [0, 0, 0, 0, 0],
+        data: [],
         backgroundColor: 'rgba(54, 162, 235, 0.7)',
         borderWidth: 0,
         borderRadius: 4,
       },
       {
         label: 'Compreensão Verbal',
-        data: [0, 0, 0, 0, 0],
+        data: [],
         backgroundColor: 'rgba(255, 206, 86, 0.7)',
         borderWidth: 0,
         borderRadius: 4,
       },
       {
         label: 'Aptidão Espacial',
-        data: [0, 0, 0, 0, 0],
+        data: [],
         backgroundColor: 'rgba(75, 192, 192, 0.7)',
         borderWidth: 0,
         borderRadius: 4,
       },
       {
         label: 'Raciocínio Abstrato',
-        data: [0, 0, 0, 0, 0],
+        data: [],
         backgroundColor: 'rgba(153, 102, 255, 0.7)',
         borderWidth: 0,
         borderRadius: 4,
       },
       {
         label: 'Tomada de Decisão',
-        data: [0, 0, 0, 0, 0],
+        data: [],
         backgroundColor: 'rgba(255, 159, 64, 0.7)',
         borderWidth: 0,
         borderRadius: 4,
       }
     ]
   })
-  const [idealProfiles, setIdealProfiles] = useState({
-    'Desenvolvedor Frontend': [85, 70, 65, 80, 75, 60],
-    'Desenvolvedor Backend': [80, 85, 60, 65, 75, 70],
-    'Analista de Dados': [70, 90, 75, 60, 80, 65],
-    'Designer UX/UI': [60, 65, 80, 90, 75, 70],
-    'Gerente de Projetos': [70, 75, 85, 65, 70, 90],
-    'Analista de QA': [80, 75, 70, 75, 85, 80],
-    'DevOps Engineer': [75, 85, 65, 70, 80, 75],
-    'Analista de Segurança': [85, 80, 70, 65, 90, 75],
-    'Analista de Sistemas': [75, 80, 75, 70, 80, 75],
-    'Suporte Técnico': [70, 65, 80, 65, 70, 85],
-    'Padrão': [80, 75, 70, 75, 80, 85]
+  const [idealProfiles, setIdealProfiles] = useState<Record<string, number[]>>({
+    'Desenvolvedor Frontend': [],
+    'Desenvolvedor Backend': [],
+    'Analista de Dados': [],
+    'Designer UX/UI': [],
+    'Gerente de Projetos': [],
+    'Analista de QA': [],
+    'DevOps Engineer': [],
+    'Analista de Segurança': [],
+    'Analista de Sistemas': [],
+    'Suporte Técnico': [],
+    'Padrão': []
   })
   const [selectedProfile, setSelectedProfile] = useState('Padrão')
   const [idealProfileData, setIdealProfileData] = useState({
-    labels: [
-      'Raciocínio Lógico', 
-      'Matemática Básica', 
-      'Compreensão Verbal', 
-      'Aptidão Espacial', 
-      'Raciocínio Abstrato', 
-      'Tomada de Decisão'
-    ],
+    labels: [],
     datasets: [
       {
         label: 'Candidato',
-        data: [0, 0, 0, 0, 0, 0],
+        data: [],
         backgroundColor: 'rgba(54, 162, 235, 0.2)',
         borderColor: 'rgba(54, 162, 235, 1)',
         borderWidth: 2,
@@ -230,7 +223,7 @@ const Dashboard: NextPage = () => {
       },
       {
         label: 'Perfil Ideal',
-        data: [80, 75, 70, 75, 80, 85], // Valores ideais para cada etapa (podem ser ajustados)
+        data: [], // Valores ideais para cada etapa (podem ser ajustados)
         backgroundColor: 'rgba(255, 99, 132, 0.2)',
         borderColor: 'rgba(255, 99, 132, 1)',
         borderWidth: 2,
@@ -245,18 +238,11 @@ const Dashboard: NextPage = () => {
     ]
   })
   const [categorySuccessData, setCategorySuccessData] = useState({
-    labels: [
-      'Raciocínio Lógico',
-      'Matemática Básica',
-      'Compreensão Verbal',
-      'Aptidão Espacial',
-      'Raciocínio Abstrato',
-      'Tomada de Decisão'
-    ],
+    labels: [],
     datasets: [
       {
         label: 'Taxa de Sucesso (%)',
-        data: [0, 0, 0, 0, 0, 0],
+        data: [],
         backgroundColor: [
           'rgba(255, 99, 132, 0.7)',
           'rgba(54, 162, 235, 0.7)',
@@ -279,18 +265,11 @@ const Dashboard: NextPage = () => {
     ]
   })
   const [realVsExpectedData, setRealVsExpectedData] = useState({
-    labels: [
-      'Raciocínio Lógico',
-      'Matemática Básica',
-      'Compreensão Verbal',
-      'Aptidão Espacial',
-      'Raciocínio Abstrato',
-      'Tomada de Decisão'
-    ],
+    labels: [],
     datasets: [
       {
         label: 'Taxa Real',
-        data: [0, 0, 0, 0, 0, 0],
+        data: [],
         backgroundColor: 'rgba(54, 162, 235, 0.7)',
         borderColor: 'rgba(54, 162, 235, 1)',
         borderWidth: 1,
@@ -298,7 +277,7 @@ const Dashboard: NextPage = () => {
       },
       {
         label: 'Taxa Esperada',
-        data: [70, 70, 70, 70, 70, 70],
+        data: [],
         backgroundColor: 'rgba(255, 99, 132, 0.7)',
         borderColor: 'rgba(255, 99, 132, 1)',
         borderWidth: 1,
@@ -307,10 +286,10 @@ const Dashboard: NextPage = () => {
     ]
   })
   const [overallPerformanceData, setOverallPerformanceData] = useState({
-    labels: ['Aprovados', 'Reprovados', 'Pendentes'],
+    labels: [],
     datasets: [
       {
-        data: [0, 0, 0],
+        data: [],
         backgroundColor: [
           'rgba(75, 192, 192, 0.7)',
           'rgba(255, 99, 132, 0.7)',
@@ -322,6 +301,29 @@ const Dashboard: NextPage = () => {
           'rgba(255, 206, 86, 1)'
         ],
         borderWidth: 1,
+      }
+    ]
+  })
+  const [comparisonData, setComparisonData] = useState({
+    labels: [],
+    datasets: [
+      {
+        label: 'Candidato',
+        data: [],
+        backgroundColor: 'rgba(54, 162, 235, 0.7)',
+        borderWidth: 0,
+        borderRadius: 4,
+        barPercentage: 0.6,
+        categoryPercentage: 0.7,
+      },
+      {
+        label: 'Média Geral',
+        data: [],
+        backgroundColor: 'rgba(75, 192, 192, 0.7)',
+        borderWidth: 0,
+        borderRadius: 4,
+        barPercentage: 0.6,
+        categoryPercentage: 0.7,
       }
     ]
   })
@@ -439,46 +441,176 @@ const Dashboard: NextPage = () => {
 
         console.log('Estatísticas recebidas:', data);
 
-        // Atualizar dados dos novos gráficos com os dados estatísticos
+        // Atualizar dados dos gráficos com os dados estatísticos
         if (data && data.stageStats && Array.isArray(data.stageStats)) {
+          // Obter os nomes das etapas para usar como labels em todos os gráficos
+          const stageNames = data.stageStats.map(stage => stage.name);
+          
           // Atualizar gráfico de taxa de sucesso por categoria
-          setCategorySuccessData(prev => ({
-            ...prev,
+          setCategorySuccessData({
+            labels: stageNames,
             datasets: [{
-              ...prev.datasets[0],
-              data: data.stageStats.map(stage => parseFloat(stage.successRate) || 0)
+              label: 'Taxa de Sucesso (%)',
+              data: data.stageStats.map(stage => parseFloat(stage.successRate) || 0),
+              backgroundColor: [
+                'rgba(255, 99, 132, 0.7)',
+                'rgba(54, 162, 235, 0.7)',
+                'rgba(255, 206, 86, 0.7)',
+                'rgba(75, 192, 192, 0.7)',
+                'rgba(153, 102, 255, 0.7)',
+                'rgba(255, 159, 64, 0.7)'
+              ],
+              borderColor: [
+                'rgba(255, 99, 132, 1)',
+                'rgba(54, 162, 235, 1)',
+                'rgba(255, 206, 86, 1)',
+                'rgba(75, 192, 192, 1)',
+                'rgba(153, 102, 255, 1)',
+                'rgba(255, 159, 64, 1)'
+              ],
+              borderWidth: 1,
+              borderRadius: 4,
             }]
-          }));
+          });
 
           // Atualizar gráfico de comparação real vs esperado
-          setRealVsExpectedData(prev => ({
-            ...prev,
+          setRealVsExpectedData({
+            labels: stageNames,
             datasets: [
               {
-                ...prev.datasets[0],
-                data: data.stageStats.map(stage => parseFloat(stage.successRate) || 0)
+                label: 'Taxa Real',
+                data: data.stageStats.map(stage => parseFloat(stage.successRate) || 0),
+                backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1,
+                borderRadius: 4,
               },
               {
-                ...prev.datasets[1],
-                data: Array(6).fill(data.expectedSuccessRate || 70)
+                label: 'Taxa Esperada',
+                data: Array(stageNames.length).fill(data.expectedSuccessRate || 70),
+                backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                borderColor: 'rgba(255, 99, 132, 1)',
+                borderWidth: 1,
+                borderRadius: 4,
               }
             ]
+          });
+          
+          // Atualizar gráfico de radar (desempenho por etapa)
+          setIdealProfileData({
+            labels: stageNames,
+            datasets: [
+              {
+                label: 'Candidato',
+                data: Array(stageNames.length).fill(0), // Será atualizado quando um candidato for selecionado
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgba(54, 162, 235, 1)',
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                fill: true
+              },
+              {
+                label: 'Perfil Ideal',
+                data: Array(stageNames.length).fill(75), // Valor padrão para o perfil ideal
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                borderColor: 'rgba(255, 99, 132, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(255, 99, 132, 1)',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgba(255, 99, 132, 1)',
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                fill: true
+              }
+            ]
+          });
+          
+          // Atualizar os perfis ideais para cada cargo
+          const updatedProfiles: Record<string, number[]> = {};
+          Object.keys(idealProfiles).forEach(profile => {
+            updatedProfiles[profile] = Array(stageNames.length).fill(75); // Valor padrão
+          });
+          setIdealProfiles(updatedProfiles);
+          setEditableProfiles(updatedProfiles);
+          
+          // Atualizar gráfico de distribuição por etapa
+          const stageLabels = ['0-20%', '21-40%', '41-60%', '61-80%', '81-100%'];
+          const updatedDatasets = stageNames.map((name, index) => ({
+            label: name,
+            data: Array(5).fill(0), // Inicializar com zeros
+            backgroundColor: [
+              'rgba(255, 99, 132, 0.7)',
+              'rgba(54, 162, 235, 0.7)',
+              'rgba(255, 206, 86, 0.7)',
+              'rgba(75, 192, 192, 0.7)',
+              'rgba(153, 102, 255, 0.7)',
+              'rgba(255, 159, 64, 0.7)'
+            ][index % 6], // Usar cores cíclicas
+            borderWidth: 0,
+            borderRadius: 4,
+            stack: 'Stack ' + index
           }));
+          
+          setStageDistributionData({
+            labels: stageLabels,
+            datasets: updatedDatasets
+          });
+          
+          // Atualizar gráfico de comparação (candidato vs média)
+          setComparisonData({
+            labels: stageNames,
+            datasets: [
+              {
+                label: 'Candidato',
+                data: Array(stageNames.length).fill(0),
+                backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                borderWidth: 0,
+                borderRadius: 4,
+                barPercentage: 0.6,
+                categoryPercentage: 0.7,
+              },
+              {
+                label: 'Média Geral',
+                data: data.stageStats.map(stage => parseFloat(stage.successRate) || 0),
+                backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                borderWidth: 0,
+                borderRadius: 4,
+                barPercentage: 0.6,
+                categoryPercentage: 0.7,
+              }
+            ]
+          });
         }
 
         // Atualizar gráfico de desempenho geral
         if (data && data.candidateStats) {
-          setOverallPerformanceData(prev => ({
-            ...prev,
+          setOverallPerformanceData({
+            labels: ['Aprovados', 'Reprovados', 'Pendentes'],
             datasets: [{
-              ...prev.datasets[0],
               data: [
                 parseInt(data.candidateStats.approved) || 0,
                 parseInt(data.candidateStats.rejected) || 0,
                 parseInt(data.candidateStats.pending) || 0
-              ]
+              ],
+              backgroundColor: [
+                'rgba(75, 192, 192, 0.7)',
+                'rgba(255, 99, 132, 0.7)',
+                'rgba(255, 206, 86, 0.7)'
+              ],
+              borderColor: [
+                'rgba(75, 192, 192, 1)',
+                'rgba(255, 99, 132, 1)',
+                'rgba(255, 206, 86, 1)'
+              ],
+              borderWidth: 1,
             }]
-          }));
+          });
         }
       } catch (error) {
         console.error('Erro ao carregar estatísticas:', error)
@@ -494,15 +626,25 @@ const Dashboard: NextPage = () => {
   
   useEffect(() => {
     // Calcular distribuição de pontuação por etapa
-    if (candidates.length > 0) {
-      // Inicializar arrays para contagem
-      const stageCounts = Array(6).fill(0).map(() => Array(5).fill(0));
+    if (candidates.length > 0 && statistics && statistics.stageStats) {
+      const stageCount = statistics.stageStats.length;
+      
+      // Inicializar arrays para contagem com base no número real de etapas
+      const stageCounts = Array(stageCount).fill(0).map(() => Array(5).fill(0));
+      
+      // Mapear IDs de etapas para índices
+      const stageIdToIndex = {};
+      statistics.stageStats.forEach((stage, index) => {
+        stageIdToIndex[stage.id] = index;
+      });
       
       // Contar candidatos em cada faixa de pontuação por etapa
       candidates.forEach(candidate => {
         if (candidate.stageScores) {
-          candidate.stageScores.forEach((score, stageIndex) => {
-            if (stageIndex < 6) {
+          candidate.stageScores.forEach(score => {
+            // Verificar se a etapa existe nas estatísticas
+            if (stageIdToIndex.hasOwnProperty(score.id)) {
+              const stageIndex = stageIdToIndex[score.id];
               // Determinar a faixa de pontuação (0-20%, 21-40%, etc.)
               const scoreRange = Math.min(Math.floor(score.percentage / 20), 4);
               stageCounts[stageIndex][scoreRange]++;
@@ -512,20 +654,379 @@ const Dashboard: NextPage = () => {
       });
       
       // Atualizar dados do gráfico
-      const newDatasets = stageDistributionData.datasets.map((dataset, i) => ({
-        ...dataset,
-        data: i < 6 ? stageCounts[i] : dataset.data
-      }));
-      
-      setStageDistributionData(prevData => ({
-        ...prevData,
-        datasets: newDatasets
-      }));
+      setStageDistributionData(prevData => {
+        // Criar novos datasets com base nas etapas reais
+        const newDatasets = statistics.stageStats.map((stage, index) => ({
+          label: stage.name,
+          data: stageCounts[index],
+          backgroundColor: [
+            'rgba(255, 99, 132, 0.7)',
+            'rgba(54, 162, 235, 0.7)',
+            'rgba(255, 206, 86, 0.7)',
+            'rgba(75, 192, 192, 0.7)',
+            'rgba(153, 102, 255, 0.7)',
+            'rgba(255, 159, 64, 0.7)'
+          ][index % 6], // Usar cores cíclicas
+          borderWidth: 0,
+          borderRadius: 4,
+          stack: 'Stack ' + index
+        }));
+        
+        return {
+          labels: ['0-20%', '21-40%', '41-60%', '61-80%', '81-100%'],
+          datasets: newDatasets
+        };
+      });
     }
-  }, [candidates]); // Removido stageDistributionData das dependências
+  }, [candidates, statistics]); // Adicionado statistics como dependência
   
-  // Função para atualizar o gráfico de perfil ideal quando um candidato é selecionado
   useEffect(() => {
+    // Verificar se o usuário está autenticado
+    if (status === 'unauthenticated') {
+      router.push('/admin/login')
+    }
+  }, [status, router])
+  
+  // Atualizar dados de tendências com base nos candidatos
+  useEffect(() => {
+    if (candidates.length > 0) {
+      // Obter os últimos 6 meses
+      const today = new Date();
+      const months = [];
+      const approvedCounts = [];
+      const rejectedCounts = [];
+      
+      // Gerar os últimos 6 meses
+      for (let i = 5; i >= 0; i--) {
+        const month = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        const monthName = month.toLocaleString('pt-BR', { month: 'short' }).charAt(0).toUpperCase() + 
+                         month.toLocaleString('pt-BR', { month: 'short' }).slice(1, 3);
+        months.push(monthName);
+        
+        // Filtrar candidatos para este mês
+        const monthCandidates = candidates.filter(candidate => {
+          const candidateDate = new Date(candidate.createdAt);
+          return candidateDate.getMonth() === month.getMonth() && 
+                 candidateDate.getFullYear() === month.getFullYear();
+        });
+        
+        // Contar aprovados e rejeitados
+        const approved = monthCandidates.filter(c => c.status === 'APPROVED').length;
+        const rejected = monthCandidates.filter(c => c.status === 'REJECTED').length;
+        
+        approvedCounts.push(approved);
+        rejectedCounts.push(rejected);
+      }
+      
+      // Atualizar o gráfico de tendências
+      setTrendData({
+        labels: months,
+        datasets: [
+          {
+            label: 'Candidatos Aprovados',
+            data: approvedCounts,
+            borderColor: 'rgba(75, 192, 192, 1)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            tension: 0.4,
+            fill: true,
+          },
+          {
+            label: 'Candidatos Rejeitados',
+            data: rejectedCounts,
+            borderColor: 'rgba(255, 99, 132, 1)',
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+            tension: 0.4,
+            fill: true,
+          }
+        ]
+      });
+    }
+  }, [candidates])
+  
+  useEffect(() => {
+    // Carregar a lista de candidatos
+    const fetchCandidates = async () => {
+      try {
+        setLoading(true)
+        console.log('Dashboard: Iniciando carregamento de candidatos...')
+        const response = await fetch('/api/admin/candidates')
+        
+        if (!response.ok) {
+          throw new Error(`Erro ao carregar os candidatos: ${response.status} ${response.statusText}`)
+        }
+        
+        const data = await response.json()
+        console.log(`Dashboard: Candidatos carregados com sucesso. Total: ${data.length}`)
+        
+        if (Array.isArray(data)) {
+          setCandidates(data)
+        } else {
+          console.error('Dashboard: Dados de candidatos não são um array:', data)
+          setCandidates([])
+        }
+      } catch (error) {
+        console.error('Dashboard: Erro ao carregar candidatos:', error)
+        setError('Não foi possível carregar os candidatos. Por favor, tente novamente.')
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    // Carregar estatísticas para os gráficos
+    const fetchStatistics = async () => {
+      try {
+        const response = await fetch('/api/admin/statistics')
+        
+        if (!response.ok) {
+          throw new Error('Erro ao carregar estatísticas')
+        }
+        
+        const data = await response.json()
+        setStatistics(data)
+
+        console.log('Estatísticas recebidas:', data);
+
+        // Atualizar dados dos gráficos com os dados estatísticos
+        if (data && data.stageStats && Array.isArray(data.stageStats)) {
+          // Obter os nomes das etapas para usar como labels em todos os gráficos
+          const stageNames = data.stageStats.map(stage => stage.name);
+          
+          // Atualizar gráfico de taxa de sucesso por categoria
+          setCategorySuccessData({
+            labels: stageNames,
+            datasets: [{
+              label: 'Taxa de Sucesso (%)',
+              data: data.stageStats.map(stage => parseFloat(stage.successRate) || 0),
+              backgroundColor: [
+                'rgba(255, 99, 132, 0.7)',
+                'rgba(54, 162, 235, 0.7)',
+                'rgba(255, 206, 86, 0.7)',
+                'rgba(75, 192, 192, 0.7)',
+                'rgba(153, 102, 255, 0.7)',
+                'rgba(255, 159, 64, 0.7)'
+              ],
+              borderColor: [
+                'rgba(255, 99, 132, 1)',
+                'rgba(54, 162, 235, 1)',
+                'rgba(255, 206, 86, 1)',
+                'rgba(75, 192, 192, 1)',
+                'rgba(153, 102, 255, 1)',
+                'rgba(255, 159, 64, 1)'
+              ],
+              borderWidth: 1,
+              borderRadius: 4,
+            }]
+          });
+
+          // Atualizar gráfico de comparação real vs esperado
+          setRealVsExpectedData({
+            labels: stageNames,
+            datasets: [
+              {
+                label: 'Taxa Real',
+                data: data.stageStats.map(stage => parseFloat(stage.successRate) || 0),
+                backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1,
+                borderRadius: 4,
+              },
+              {
+                label: 'Taxa Esperada',
+                data: Array(stageNames.length).fill(data.expectedSuccessRate || 70),
+                backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                borderColor: 'rgba(255, 99, 132, 1)',
+                borderWidth: 1,
+                borderRadius: 4,
+              }
+            ]
+          });
+          
+          // Atualizar gráfico de radar (desempenho por etapa)
+          setIdealProfileData({
+            labels: stageNames,
+            datasets: [
+              {
+                label: 'Candidato',
+                data: Array(stageNames.length).fill(0), // Será atualizado quando um candidato for selecionado
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgba(54, 162, 235, 1)',
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                fill: true
+              },
+              {
+                label: 'Perfil Ideal',
+                data: Array(stageNames.length).fill(75), // Valor padrão para o perfil ideal
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                borderColor: 'rgba(255, 99, 132, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(255, 99, 132, 1)',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgba(255, 99, 132, 1)',
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                fill: true
+              }
+            ]
+          });
+          
+          // Atualizar os perfis ideais para cada cargo
+          const updatedProfiles: Record<string, number[]> = {};
+          Object.keys(idealProfiles).forEach(profile => {
+            updatedProfiles[profile] = Array(stageNames.length).fill(75); // Valor padrão
+          });
+          setIdealProfiles(updatedProfiles);
+          setEditableProfiles(updatedProfiles);
+          
+          // Atualizar gráfico de distribuição por etapa
+          const stageLabels = ['0-20%', '21-40%', '41-60%', '61-80%', '81-100%'];
+          const updatedDatasets = stageNames.map((name, index) => ({
+            label: name,
+            data: Array(5).fill(0), // Inicializar com zeros
+            backgroundColor: [
+              'rgba(255, 99, 132, 0.7)',
+              'rgba(54, 162, 235, 0.7)',
+              'rgba(255, 206, 86, 0.7)',
+              'rgba(75, 192, 192, 0.7)',
+              'rgba(153, 102, 255, 0.7)',
+              'rgba(255, 159, 64, 0.7)'
+            ][index % 6], // Usar cores cíclicas
+            borderWidth: 0,
+            borderRadius: 4,
+            stack: 'Stack ' + index
+          }));
+          
+          setStageDistributionData({
+            labels: stageLabels,
+            datasets: updatedDatasets
+          });
+          
+          // Atualizar gráfico de comparação (candidato vs média)
+          setComparisonData({
+            labels: stageNames,
+            datasets: [
+              {
+                label: 'Candidato',
+                data: Array(stageNames.length).fill(0),
+                backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                borderWidth: 0,
+                borderRadius: 4,
+                barPercentage: 0.6,
+                categoryPercentage: 0.7,
+              },
+              {
+                label: 'Média Geral',
+                data: data.stageStats.map(stage => parseFloat(stage.successRate) || 0),
+                backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                borderWidth: 0,
+                borderRadius: 4,
+                barPercentage: 0.6,
+                categoryPercentage: 0.7,
+              }
+            ]
+          });
+        }
+
+        // Atualizar gráfico de desempenho geral
+        if (data && data.candidateStats) {
+          setOverallPerformanceData({
+            labels: ['Aprovados', 'Reprovados', 'Pendentes'],
+            datasets: [{
+              data: [
+                parseInt(data.candidateStats.approved) || 0,
+                parseInt(data.candidateStats.rejected) || 0,
+                parseInt(data.candidateStats.pending) || 0
+              ],
+              backgroundColor: [
+                'rgba(75, 192, 192, 0.7)',
+                'rgba(255, 99, 132, 0.7)',
+                'rgba(255, 206, 86, 0.7)'
+              ],
+              borderColor: [
+                'rgba(75, 192, 192, 1)',
+                'rgba(255, 99, 132, 1)',
+                'rgba(255, 206, 86, 1)'
+              ],
+              borderWidth: 1,
+            }]
+          });
+        }
+      } catch (error) {
+        console.error('Erro ao carregar estatísticas:', error)
+        // Não definir erro global para não bloquear a visualização dos candidatos
+      }
+    }
+    
+    if (status === 'authenticated') {
+      fetchCandidates()
+      fetchStatistics()
+    }
+  }, [status])
+  
+  useEffect(() => {
+    // Calcular distribuição de pontuação por etapa
+    if (candidates.length > 0 && statistics && statistics.stageStats) {
+      const stageCount = statistics.stageStats.length;
+      
+      // Inicializar arrays para contagem com base no número real de etapas
+      const stageCounts = Array(stageCount).fill(0).map(() => Array(5).fill(0));
+      
+      // Mapear IDs de etapas para índices
+      const stageIdToIndex = {};
+      statistics.stageStats.forEach((stage, index) => {
+        stageIdToIndex[stage.id] = index;
+      });
+      
+      // Contar candidatos em cada faixa de pontuação por etapa
+      candidates.forEach(candidate => {
+        if (candidate.stageScores) {
+          candidate.stageScores.forEach(score => {
+            // Verificar se a etapa existe nas estatísticas
+            if (stageIdToIndex.hasOwnProperty(score.id)) {
+              const stageIndex = stageIdToIndex[score.id];
+              // Determinar a faixa de pontuação (0-20%, 21-40%, etc.)
+              const scoreRange = Math.min(Math.floor(score.percentage / 20), 4);
+              stageCounts[stageIndex][scoreRange]++;
+            }
+          });
+        }
+      });
+      
+      // Atualizar dados do gráfico
+      setStageDistributionData(prevData => {
+        // Criar novos datasets com base nas etapas reais
+        const newDatasets = statistics.stageStats.map((stage, index) => ({
+          label: stage.name,
+          data: stageCounts[index],
+          backgroundColor: [
+            'rgba(255, 99, 132, 0.7)',
+            'rgba(54, 162, 235, 0.7)',
+            'rgba(255, 206, 86, 0.7)',
+            'rgba(75, 192, 192, 0.7)',
+            'rgba(153, 102, 255, 0.7)',
+            'rgba(255, 159, 64, 0.7)'
+          ][index % 6], // Usar cores cíclicas
+          borderWidth: 0,
+          borderRadius: 4,
+          stack: 'Stack ' + index
+        }));
+        
+        return {
+          labels: ['0-20%', '21-40%', '41-60%', '61-80%', '81-100%'],
+          datasets: newDatasets
+        };
+      });
+    }
+  }, [candidates, statistics]); // Adicionado statistics como dependência
+  
+  useEffect(() => {
+    // Função para atualizar o gráfico de perfil ideal quando um candidato é selecionado
     if (selectedCandidate) {
       // Determinar qual perfil ideal usar com base no cargo do candidato
       const candidatePosition = selectedCandidate.position || 'Padrão';
@@ -628,6 +1129,14 @@ const Dashboard: NextPage = () => {
   
   // Função para exportar candidatos para CSV
   const exportToCSV = () => {
+    if (!statistics || !statistics.stageStats) {
+      alert('Não foi possível exportar. Estatísticas não carregadas.');
+      return;
+    }
+    
+    // Obter nomes das etapas
+    const stageNames = statistics.stageStats.map(stage => stage.name);
+    
     // Cabeçalhos do CSV
     const headers = [
       'Nome',
@@ -636,12 +1145,7 @@ const Dashboard: NextPage = () => {
       'Status',
       'Pontuação Geral',
       'Avaliação',
-      'Raciocínio Lógico',
-      'Matemática Básica',
-      'Compreensão Verbal',
-      'Aptidão Espacial',
-      'Raciocínio Abstrato',
-      'Tomada de Decisão',
+      ...stageNames, // Adicionar nomes dinâmicos das etapas
       'Notas'
     ];
 
@@ -650,30 +1154,43 @@ const Dashboard: NextPage = () => {
       // Obter pontuações por etapa (se disponíveis)
       const stageScores = {};
       if (candidate.stageScores) {
-        candidate.stageScores.forEach((score, index) => {
-          stageScores[index] = score.percentage;
+        candidate.stageScores.forEach(score => {
+          // Usar o ID da etapa como chave
+          stageScores[score.id] = score.percentage;
         });
       }
 
-      return [
+      // Calcular pontuação geral
+      const overallScore = (() => {
+        if (candidate.stageScores && candidate.stageScores.length > 0) {
+          const totalCorrect = candidate.stageScores.reduce((acc, stage) => acc + stage.correct, 0);
+          const totalQuestions = candidate.stageScores.reduce((acc, stage) => acc + stage.total, 0);
+          return totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+        }
+        return '';
+      })();
+
+      // Criar linha base com informações gerais
+      const baseRow = [
         candidate.name,
         candidate.email,
         candidate.position || '',
         candidate.status === 'APPROVED' ? 'Aprovado' : 
           candidate.status === 'REJECTED' ? 'Reprovado' : 'Pendente',
-        candidate.stageScores && candidate.stageScores.length > 0 ? 
-          (() => {
-            const totalCorrect = candidate.stageScores.reduce((acc, stage) => acc + stage.correct, 0);
-            const totalQuestions = candidate.stageScores.reduce((acc, stage) => acc + stage.total, 0);
-            return totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
-          })() : '',
+        overallScore,
         candidate.rating || '',
-        stageScores[0] !== undefined ? stageScores[0] : '',
-        stageScores[1] !== undefined ? stageScores[1] : '',
-        stageScores[2] !== undefined ? stageScores[2] : '',
-        stageScores[3] !== undefined ? stageScores[3] : '',
-        stageScores[4] !== undefined ? stageScores[4] : '',
-        stageScores[5] !== undefined ? stageScores[5] : '',
+      ];
+      
+      // Adicionar pontuações para cada etapa
+      const stageScoresValues = statistics.stageStats.map(stage => {
+        // Procurar a pontuação do candidato para esta etapa
+        return stageScores[stage.id] !== undefined ? stageScores[stage.id] : '';
+      });
+      
+      // Retornar linha completa
+      return [
+        ...baseRow,
+        ...stageScoresValues,
         candidate.observations || ''
       ];
     });
@@ -704,18 +1221,11 @@ const Dashboard: NextPage = () => {
   
   // Dados para o gráfico de radar (desempenho por etapa)
   const radarData = {
-    labels: [
-      'Raciocínio Lógico', 
-      'Matemática Básica', 
-      'Compreensão Verbal', 
-      'Aptidão Espacial', 
-      'Raciocínio Abstrato', 
-      'Tomada de Decisão'
-    ],
+    labels: idealProfileData.labels,
     datasets: [
       {
         label: 'Desempenho por Etapa (%)',
-        data: selectedCandidate?.stageScores?.map(stage => stage.percentage) || [0, 0, 0, 0, 0, 0],
+        data: selectedCandidate?.stageScores?.map(stage => stage.percentage) || Array(idealProfileData.labels.length).fill(0),
         backgroundColor: 'rgba(54, 162, 235, 0.2)',
         borderColor: 'rgba(54, 162, 235, 1)',
         borderWidth: 2,
@@ -766,39 +1276,11 @@ const Dashboard: NextPage = () => {
     },
     maintainAspectRatio: false,
   };
-  
-  // Dados para o gráfico de comparação (candidato vs média)
-  const comparisonData = {
-    labels: [
-      'Raciocínio Lógico', 
-      'Matemática Básica', 
-      'Compreensão Verbal', 
-      'Aptidão Espacial', 
-      'Raciocínio Abstrato', 
-      'Tomada de Decisão'
-    ],
-    datasets: [
-      {
-        label: 'Candidato',
-        data: selectedCandidate?.stageScores?.map(stage => stage.percentage) || [0, 0, 0, 0, 0, 0],
-        backgroundColor: 'rgba(54, 162, 235, 0.7)',
-        borderWidth: 0,
-        borderRadius: 4,
-        barPercentage: 0.6,
-        categoryPercentage: 0.7,
-      },
-      {
-        label: 'Média Geral',
-        data: statistics?.averageStageScores || [0, 0, 0, 0, 0, 0],
-        backgroundColor: 'rgba(75, 192, 192, 0.7)',
-        borderWidth: 0,
-        borderRadius: 4,
-        barPercentage: 0.6,
-        categoryPercentage: 0.7,
-      }
-    ]
-  };
 
+// Este useEffect foi removido porque estava duplicado, causando o erro:
+// "Rendered more hooks than during the previous render"
+// A mesma funcionalidade já existe em outro lugar do código
+  // Dados para o gráfico de comparação (candidato vs média)
   const comparisonOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -1490,13 +1972,12 @@ return (
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         {candidate.stageScores && candidate.stageScores.length > 0 ? 
                           (() => {
                             const totalCorrect = candidate.stageScores.reduce((acc, stage) => acc + stage.correct, 0);
                             const totalQuestions = candidate.stageScores.reduce((acc, stage) => acc + stage.total, 0);
-                            const percentage = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
-                            return `${percentage}%`;
+                            return totalQuestions > 0 ? `${Math.round((totalCorrect / totalQuestions) * 100)}%` : 0;
                           })() : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
