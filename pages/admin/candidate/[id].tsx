@@ -691,8 +691,8 @@ const CandidateDetails = () => {
       if (candidate.stageScores && candidate.stageScores.length > 0) {
         console.log('Processando dados de desempenho:', candidate.stageScores);
         
-        // Ordenar as etapas para garantir consistência na visualização
-        const sortedStages = [...candidate.stageScores].sort((a, b) => a.name.localeCompare(b.name));
+        // Usar a ordem que vem do backend, que já está ordenada corretamente
+        const sortedStages = [...candidate.stageScores];
         
         // Atualizar os dados dos gráficos
         setRadarData({

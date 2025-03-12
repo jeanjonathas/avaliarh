@@ -410,10 +410,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       name: string;
       correct: number;
       total: number;
+      order?: number; // Adicionar campo de ordem
     }> = {};
     
     // Inicializar o mapa de ID para nome da etapa
     const stageIdToNameMap: Record<string, string> = {};
+
+    // Inicializar o mapa de ID para ordem da etapa
+    const stageOrderMap: Record<string, number> = {};
+
+    // Inicializar o mapa para armazenar respostas por etapa (para estatísticas)
+    const responsesByStage: Record<string, any[]> = {};
 
     // Verificar se o candidato tem um teste associado
     if (candidate.test) {
@@ -430,10 +437,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           id: stage.id,
           name: stage.title,
           correct: 0,
-          total: 0
+          total: 0,
+          order: testStage.order || 0 // Adicionar a ordem da etapa
         };
         stageIdToNameMap[stage.id] = stage.title;
-        console.log(`Etapa do teste identificada: ${stage.title} (${stage.id})`);
+        stageOrderMap[stage.id] = testStage.order || 0;
+        console.log(`Etapa do teste identificada: ${stage.title} (${stage.id}), ordem: ${testStage.order || 0}`);
       });
       
       // Obter todas as etapas do teste atual
@@ -495,6 +504,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Agrupar respostas por stageId
       const stageGroups = new Map();
       
+      // Primeiro passo: coletar todas as etapas das respostas
       candidate.responses.forEach(response => {
         const typedResponse = response as unknown as ResponseWithSnapshot;
         let stageId = typedResponse.stageId || null;
@@ -505,21 +515,64 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             stageGroups.set(stageId, {
               id: stageId,
               name: stageName,
-              responses: []
+              responses: [],
+              // Tentar extrair ordem da etapa do questionSnapshot
+              order: 0
             });
             
-            // Adicionar ao mapa de etapas
-            stageMap[stageId] = {
-              id: stageId,
-              name: stageName,
-              correct: 0,
-              total: 0
-            };
-            stageIdToNameMap[stageId] = stageName;
+            // Tentar determinar a ordem da etapa a partir dos dados disponíveis
+            if (typedResponse.questionSnapshot) {
+              try {
+                const questionData = typeof typedResponse.questionSnapshot === 'string'
+                  ? JSON.parse(typedResponse.questionSnapshot)
+                  : typedResponse.questionSnapshot;
+                
+                if (questionData.stageOrder !== undefined) {
+                  stageGroups.get(stageId).order = questionData.stageOrder;
+                }
+              } catch (error) {
+                console.error('Erro ao processar questionSnapshot para ordem:', error);
+              }
+            }
           }
           
           stageGroups.get(stageId).responses.push(typedResponse);
         }
+      });
+      
+      // Segundo passo: ordenar as etapas baseado na ordem encontrada ou atribuir ordem sequencial
+      let currentOrder = 1;
+      const sortedStages = Array.from(stageGroups.values())
+        .sort((a, b) => {
+          // Se ambos têm ordem definida, usar essa ordem
+          if (a.order && b.order) {
+            return a.order - b.order;
+          }
+          // Se apenas um tem ordem definida, priorizar o que tem
+          if (a.order) return -1;
+          if (b.order) return 1;
+          
+          // Se nenhum tem ordem, ordenar pelo nome da etapa
+          return a.name.localeCompare(b.name);
+        });
+      
+      // Terceiro passo: atribuir as etapas ordenadas aos mapas
+      sortedStages.forEach((stage, index) => {
+        const orderToUse = stage.order || currentOrder++;
+        
+        // Adicionar ao mapa de etapas
+        stageMap[stage.id] = {
+          id: stage.id,
+          name: stage.name,
+          correct: 0,
+          total: 0,
+          order: orderToUse
+        };
+        
+        // Adicionar aos mapas auxiliares
+        stageIdToNameMap[stage.id] = stage.name;
+        stageOrderMap[stage.id] = orderToUse;
+        responsesByStage[stage.id] = [];
       });
       
       console.log(`Criadas ${stageGroups.size} etapas virtuais baseadas nas respostas do candidato.`);
@@ -596,9 +649,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const percentage = stage.total > 0 ? Math.round((stage.correct / stage.total) * 100) : 0;
       return {
         ...stage,
-        percentage
+        percentage,
+        order: stageOrderMap[stage.id] || 0 // Adicionar a ordem da etapa
       };
     });
+    
+    // Ordenar as etapas pela ordem definida no teste
+    stageScores.sort((a, b) => a.order - b.order);
     
     console.log(`Calculadas ${stageScores.length} etapas de pontuação:`, JSON.stringify(stageScores));
     
