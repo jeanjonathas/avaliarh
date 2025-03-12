@@ -44,7 +44,13 @@ interface Candidate {
   id: string;
   name: string;
   score?: number;
+  timeSpent?: number; // Tempo gasto em segundos
   stageScores?: StageScore[];
+  test?: {
+    id: string;
+    title: string;
+    timeLimit?: number; // Limite de tempo em minutos
+  };
 }
 
 interface PerformanceTabProps {
@@ -343,6 +349,22 @@ const PerformanceTab: React.FC<PerformanceTabProps> = ({ candidate }) => {
     }
   }, [candidate]);
 
+  // Função para formatar o tempo em horas, minutos e segundos
+  const formatTime = (timeInSeconds?: number): string => {
+    if (!timeInSeconds) return "Não disponível";
+    
+    const hours = Math.floor(timeInSeconds / 3600);
+    const minutes = Math.floor((timeInSeconds % 3600) / 60);
+    const seconds = timeInSeconds % 60;
+    
+    const parts = [];
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0 || hours > 0) parts.push(`${minutes}m`);
+    parts.push(`${seconds}s`);
+    
+    return parts.join(' ');
+  };
+
   // Função para renderizar os cards de resumo
   const renderSummaryCards = () => {
     if (!candidate?.stageScores || candidate.stageScores.length === 0) return null;
@@ -352,7 +374,7 @@ const PerformanceTab: React.FC<PerformanceTabProps> = ({ candidate }) => {
     const overallPercentage = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
     
     return (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <div className="bg-white p-4 rounded-lg shadow-md">
           <h4 className="text-sm font-medium text-secondary-500 mb-1">Pontuação Geral</h4>
           <div className="flex items-end">
@@ -374,6 +396,18 @@ const PerformanceTab: React.FC<PerformanceTabProps> = ({ candidate }) => {
           <div className="flex items-end">
             <span className="text-3xl font-bold text-secondary-900">{candidate.stageScores.length}</span>
             <span className="text-sm text-secondary-500 ml-2 mb-1">etapas</span>
+          </div>
+        </div>
+        
+        <div className="bg-white p-4 rounded-lg shadow-md">
+          <h4 className="text-sm font-medium text-secondary-500 mb-1">Tempo Total</h4>
+          <div className="flex items-end">
+            <span className="text-3xl font-bold text-secondary-900">{formatTime(candidate.timeSpent)}</span>
+            {candidate.test?.timeLimit && (
+              <span className="text-sm text-secondary-500 ml-2 mb-1">
+                de {candidate.test.timeLimit}min disponíveis
+              </span>
+            )}
           </div>
         </div>
       </div>

@@ -56,6 +56,7 @@ model Candidate {
   portfolio      String?
   resumeUrl      String?
   testId         String?
+  timeSpent      Int?            @default(0)
   test           tests?          @relation(fields: [testId], references: [id])
   candidateTests CandidateTest[]
   responses      Response[]
@@ -104,6 +105,7 @@ model Response {
   categoryName       String?
   stageName          String?
   stageId            String?
+  timeSpent          Int?      @default(0) // Tempo gasto em segundos para responder esta questão
   candidate          Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   // Removendo a relação direta com Option para permitir exclusão de opções
   // option             Option    @relation(fields: [optionId], references: [id])

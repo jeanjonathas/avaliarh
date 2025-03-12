@@ -92,6 +92,7 @@ interface Candidate {
   inviteAttempts?: number
   testId?: string
   score?: number
+  timeSpent?: number
   createdAt: string
   updatedAt: string
   responses?: Response[]
@@ -136,6 +137,29 @@ const CandidateDetails = () => {
   const [isLoadingTests, setIsLoadingTests] = useState(false);
   const [selectedTest, setSelectedTest] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  // Função para formatar o tempo em horas, minutos e segundos
+  const formatTime = (seconds) => {
+    if (!seconds) return '0s';
+    
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = seconds % 60;
+    
+    let formattedTime = '';
+    
+    if (hours > 0) {
+      formattedTime += `${hours}h `;
+    }
+    
+    if (minutes > 0 || hours > 0) {
+      formattedTime += `${minutes}m `;
+    }
+    
+    formattedTime += `${remainingSeconds}s`;
+    
+    return formattedTime;
+  };
 
   // Verificar autenticação
   useEffect(() => {
@@ -932,7 +956,7 @@ const CandidateDetails = () => {
                                       let isCorrect = false;
                                       
                                       try {
-                                        // Tentar obter o texto da questão de várias fontes possíveis
+                                        // Tentar obter o texto da questão de várias fontes
                                         if (response.questionText) {
                                           questionText = response.questionText;
                                         } else if (response.question && response.question.text) {
@@ -1023,11 +1047,11 @@ const CandidateDetails = () => {
                                                     <div className="flex-shrink-0 mt-0.5">
                                                     {isSelected ? (
   <svg className={`h-5 w-5 ${optionIsCorrect ? 'text-green-500' : 'text-red-500'}`} fill="currentColor" viewBox="0 0 20 20">
-                                                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                          <path fillRule="evenodd" d="M10 18a8 8 0 11-16 0 8 8 0 0116 0zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4a1 1 0 010-1.414l-4-4a1 1 0 00-1.414 0z" clipRule="evenodd" />
                                                         </svg>
                                                       ) : (
                                                         <svg className={`h-5 w-5 ${optionIsCorrect && !isCorrect ? 'text-green-300' : 'text-secondary-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                         </svg>
                                                       )}
                                                     </div>
@@ -1097,58 +1121,115 @@ const CandidateDetails = () => {
                 </div>
               ) : activeTab === 'performance' ? (
                 <div className="space-y-8">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {!candidate.completed ? (
-                      // Mensagem quando o candidato ainda não realizou o teste
-                      <div className="bg-white p-6 rounded-lg shadow-md md:col-span-2">
-                        <div className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
-                          <h4 className="font-medium text-blue-800">Avaliação Pendente</h4>
-                          <p className="mt-2 text-blue-700">
-                            O candidato ainda não realizou o teste. Os gráficos de desempenho estarão disponíveis após a conclusão.
-                          </p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Cards de resumo de desempenho */}
+                    <div className="bg-white p-5 rounded-lg shadow-md border-l-4 border-primary-500">
+                      <div className="flex items-center">
+                        <div className="p-3 rounded-full bg-primary-100 text-primary-600">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                          </svg>
+                        </div>
+                        <div className="ml-4">
+                          <h4 className="text-sm font-medium text-secondary-500">Pontuação Geral</h4>
+                          <div className="flex items-baseline">
+                            <span className="text-2xl font-semibold text-secondary-900">
+                              {(() => {
+                                const totalCorrect = candidate.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0;
+                                const totalQuestions = candidate.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0;
+                                const percentage = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+                                return `${percentage}%`;
+                              })()}
+                            </span>
+                            <span className="ml-2 text-sm text-secondary-500">
+                              ({candidate.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0}/{candidate.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0})
+                            </span>
+                          </div>
                         </div>
                       </div>
+                    </div>
+                    
+                    <div className="bg-white p-5 rounded-lg shadow-md border-l-4 border-blue-500">
+                      <div className="flex items-center">
+                        <div className="p-3 rounded-full bg-blue-100 text-blue-600">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div className="ml-4">
+                          <h4 className="text-sm font-medium text-secondary-500">Status do Teste</h4>
+                          <div className="flex items-baseline">
+                            <span className="text-2xl font-semibold text-secondary-900">
+                              {!candidate.completed ? 'Pendente' : (() => {
+                                const totalCorrect = candidate.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0;
+                                const totalQuestions = candidate.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0;
+                                const percentage = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+                                
+                                if (percentage >= 80) return 'Aprovado';
+                                if (percentage >= 60) return 'Consideração';
+                                return 'Reprovado';
+                              })()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-white p-5 rounded-lg shadow-md border-l-4 border-amber-500">
+                      <div className="flex items-center">
+                        <div className="p-3 rounded-full bg-amber-100 text-amber-600">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div className="ml-4">
+                          <h4 className="text-sm font-medium text-secondary-500">Tempo Gasto</h4>
+                          <div className="flex items-baseline">
+                            <span className="text-2xl font-semibold text-secondary-900">
+                              {formatTime(candidate.timeSpent)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Gráfico de Radar - Desempenho por Habilidade */}
+                  <div className="bg-white p-6 rounded-lg shadow-md">
+                    <h3 className="text-lg font-semibold text-secondary-800 mb-4">Desempenho por Habilidade</h3>
+                    {candidate.stageScores && candidate.stageScores.length > 0 ? (
+                      <div className="h-80">
+                        <Radar data={radarData} options={radarOptions} />
+                      </div>
                     ) : (
-                      <>
-                        {/* Gráfico de Radar - Desempenho por Habilidade */}
-                        <div className="bg-white p-6 rounded-lg shadow-md">
-                          <h3 className="text-lg font-semibold text-secondary-800 mb-4">Desempenho por Habilidade</h3>
-                          {candidate.stageScores && candidate.stageScores.length > 0 ? (
-                            <div className="h-80">
-                              <Radar data={radarData} options={radarOptions} />
-                            </div>
-                          ) : (
-                            <div className="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
-                              <p className="text-yellow-700">
-                                Não há dados de desempenho disponíveis para este candidato.
-                              </p>
-                            </div>
-                          )}
-                          <div className="mt-4 text-sm text-gray-500">
-                            <p>Este gráfico mostra o desempenho percentual do candidato em cada etapa de avaliação.</p>
-                          </div>
-                        </div>
-                        
-                        {/* Gráfico de Barras - Desempenho por Etapa */}
-                        <div className="bg-white p-6 rounded-lg shadow-md">
-                          <h3 className="text-lg font-semibold text-secondary-800 mb-4">Desempenho por Etapa</h3>
-                          {candidate.stageScores && candidate.stageScores.length > 0 ? (
-                            <div className="h-80">
-                              <Bar data={barData} options={barOptions} />
-                            </div>
-                          ) : (
-                            <div className="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
-                              <p className="text-yellow-700">
-                                Não há dados de desempenho disponíveis para este candidato.
-                              </p>
-                            </div>
-                          )}
-                          <div className="mt-4 text-sm text-gray-500">
-                            <p>Este gráfico mostra o número de respostas corretas em comparação com o total de questões em cada etapa.</p>
-                          </div>
-                        </div>
-                      </>
+                      <div className="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
+                        <p className="text-yellow-700">
+                          Não há dados de desempenho disponíveis para este candidato.
+                        </p>
+                      </div>
                     )}
+                    <div className="mt-4 text-sm text-gray-500">
+                      <p>Este gráfico mostra o desempenho percentual do candidato em cada etapa de avaliação.</p>
+                    </div>
+                  </div>
+                  
+                  {/* Gráfico de Barras - Desempenho por Etapa */}
+                  <div className="bg-white p-6 rounded-lg shadow-md">
+                    <h3 className="text-lg font-semibold text-secondary-800 mb-4">Desempenho por Etapa</h3>
+                    {candidate.stageScores && candidate.stageScores.length > 0 ? (
+                      <div className="h-80">
+                        <Bar data={barData} options={barOptions} />
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
+                        <p className="text-yellow-700">
+                          Não há dados de desempenho disponíveis para este candidato.
+                        </p>
+                      </div>
+                    )}
+                    <div className="mt-4 text-sm text-gray-500">
+                      <p>Este gráfico mostra o número de respostas corretas em comparação com o total de questões em cada etapa.</p>
+                    </div>
                   </div>
                   
                   {/* Tabela de Desempenho Detalhado */}

@@ -33,6 +33,7 @@ interface Candidate {
   inviteAttempts?: number;
   testId?: string;
   score?: number;
+  timeSpent?: number; // Tempo gasto em segundos
   createdAt: string;
   updatedAt: string;
   responses?: Response[];
@@ -40,6 +41,7 @@ interface Candidate {
   test?: {
     id: string;
     title: string;
+    timeLimit?: number; // Limite de tempo em minutos
     TestStage: {
       stage: {
         id: string;

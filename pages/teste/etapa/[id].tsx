@@ -1,5 +1,5 @@
 import { NextPage } from 'next'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -35,7 +35,9 @@ const TestStage: NextPage = () => {
   const [savedResponses, setSavedResponses] = useState<Record<string, string>>({})
   const [isReconnecting, setIsReconnecting] = useState(false)
   const [isOffline, setIsOffline] = useState(false)
-  const [timeRemaining, setTimeRemaining] = useState<number | null>(null)
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+  const [timeSpent, setTimeSpent] = useState<number>(0);
+  const [startTime, setStartTime] = useState<number>(Date.now());
   const [isLastStage, setIsLastStage] = useState(false)
   const [currentStageIndex, setCurrentStageIndex] = useState<number | null>(null)
   const [totalStages, setTotalStages] = useState<number | null>(null)
@@ -70,6 +72,41 @@ const TestStage: NextPage = () => {
     return {}
   }
 
+  // Função para salvar o tempo no localStorage
+  const saveTimeToLocalStorage = (remainingTime: number | null, spentTime: number) => {
+    if (typeof window !== 'undefined' && candidateId) {
+      const timeData = {
+        remainingTime,
+        spentTime,
+        lastUpdated: Date.now()
+      };
+      
+      localStorage.setItem(
+        `candidate_${candidateId}_time`, 
+        JSON.stringify(timeData)
+      );
+      
+      console.log(`Tempo salvo no localStorage: ${remainingTime}s restantes, ${spentTime}s gastos, timestamp: ${new Date().toISOString()}`);
+    }
+  };
+
+  // Função para carregar o tempo do localStorage
+  const loadTimeFromLocalStorage = () => {
+    if (typeof window !== 'undefined' && candidateId) {
+      const saved = localStorage.getItem(`candidate_${candidateId}_time`);
+      if (saved) {
+        try {
+          const parsedTime = JSON.parse(saved);
+          console.log(`Tempo carregado do localStorage: ${parsedTime.remainingTime}s restantes, ${parsedTime.spentTime}s gastos`);
+          return parsedTime;
+        } catch (e) {
+          console.error('Erro ao carregar tempo salvo:', e);
+        }
+      }
+    }
+    return null;
+  };
+
   // Carregar dados do teste da sessão
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -79,34 +116,90 @@ const TestStage: NextPage = () => {
           const parsedData = JSON.parse(storedTestData)
           setTestData(parsedData)
           
-          // Se o teste tem um limite de tempo, iniciar o contador
-          if (parsedData.timeLimit) {
-            // Converter minutos para segundos
-            setTimeRemaining(parsedData.timeLimit * 60)
+          // Carregar o tempo salvo do localStorage
+          const savedTime = loadTimeFromLocalStorage();
+          
+          if (savedTime && savedTime.remainingTime !== null) {
+            // Se temos um tempo salvo, usá-lo
+            console.log(`Usando tempo salvo: ${savedTime.remainingTime}s restantes`);
+            setTimeRemaining(savedTime.remainingTime);
+            setTimeSpent(savedTime.spentTime || 0);
+          } else if (parsedData.timeLimit) {
+            // Se não temos tempo salvo, mas o teste tem um limite, iniciar o contador
+            console.log(`Inicializando tempo do zero: ${parsedData.timeLimit * 60}s`);
+            setTimeRemaining(parsedData.timeLimit * 60);
           }
         } catch (error) {
           console.error('Erro ao carregar dados do teste:', error)
         }
       }
     }
-  }, [])
+  }, [candidateId]) // Adicionar candidateId como dependência para recarregar quando mudar
 
-  // Contador regressivo para o limite de tempo
+  // Efeito para inicializar o contador de tempo
   useEffect(() => {
-    if (timeRemaining === null || timeRemaining <= 0) return;
+    // Inicializar o tempo de início
+    setStartTime(Date.now());
     
-    const timer = setInterval(() => {
-      setTimeRemaining(prev => {
-        if (prev === null || prev <= 0) {
-          clearInterval(timer);
-          return 0;
+    // Carregar o tempo salvo do localStorage
+    if (typeof window !== 'undefined' && candidateId) {
+      const savedTime = loadTimeFromLocalStorage();
+      if (savedTime) {
+        console.log(`Tempo carregado do localStorage: ${savedTime.remainingTime}s restantes, ${savedTime.spentTime}s gastos`);
+        if (savedTime.remainingTime !== null) {
+          setTimeRemaining(savedTime.remainingTime);
         }
-        return prev - 1;
-      });
+        setTimeSpent(savedTime.spentTime || 0);
+      }
+    }
+  }, [candidateId, stageId]); // Recarregar quando o candidato ou a etapa mudar
+
+  // Referências para valores atuais
+  const timeRemainingRef = useRef(timeRemaining);
+  const timeSpentRef = useRef(timeSpent);
+
+  // Atualizar as referências quando os valores mudarem
+  useEffect(() => {
+    timeRemainingRef.current = timeRemaining;
+  }, [timeRemaining]);
+  
+  useEffect(() => {
+    timeSpentRef.current = timeSpent;
+  }, [timeSpent]);
+
+  // Contador de tempo (regressivo ou progressivo dependendo do tipo de teste)
+  useEffect(() => {
+    console.log("Iniciando contador de tempo...");
+    
+    // Criar um único timer para ambos os tipos de contagem
+    const timerInterval = setInterval(() => {
+      // Sempre incrementar o tempo gasto
+      setTimeSpent(prevTimeSpent => prevTimeSpent + 1);
+      
+      // Se temos um limite de tempo, decrementar o tempo restante
+      if (timeRemainingRef.current !== null) {
+        setTimeRemaining(prevTimeRemaining => {
+          if (prevTimeRemaining !== null && prevTimeRemaining > 0) {
+            // Ainda tem tempo restante
+            return prevTimeRemaining - 1;
+          }
+          return 0; // Tempo esgotado
+        });
+      }
+      
+      // Salvar o tempo a cada 5 segundos
+      const currentTimeSpent = timeSpentRef.current;
+      if (currentTimeSpent % 5 === 0) {
+        saveTimeToLocalStorage(timeRemainingRef.current, currentTimeSpent);
+      }
     }, 1000);
     
-    return () => clearInterval(timer);
-  }, [timeRemaining]);
+    // Limpar o timer quando o componente for desmontado
+    return () => {
+      console.log("Limpando timer de tempo");
+      clearInterval(timerInterval);
+    };
+  }, []); // Sem dependências para garantir que o timer seja criado apenas uma vez
 
   // Formatar o tempo restante
   const formatTimeRemaining = () => {
@@ -115,6 +208,15 @@ const TestStage: NextPage = () => {
     const hours = Math.floor(timeRemaining / 3600);
     const minutes = Math.floor((timeRemaining % 3600) / 60);
     const seconds = timeRemaining % 60;
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  // Formatar o tempo gasto
+  const formatTimeSpent = () => {
+    const hours = Math.floor(timeSpent / 3600);
+    const minutes = Math.floor((timeSpent % 3600) / 60);
+    const seconds = timeSpent % 60;
     
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
@@ -254,10 +356,15 @@ const TestStage: NextPage = () => {
     try {
       console.log('Enviando respostas:', values);
       
+      // Calcular o tempo gasto em segundos
+      const timeSpentSeconds = Math.floor((Date.now() - startTime) / 1000);
+      console.log(`Tempo gasto nesta etapa: ${timeSpentSeconds} segundos`);
+      
       // Converter o objeto de valores para o formato de array esperado pela API
       const formattedResponses = Object.entries(values).map(([questionId, optionId]) => ({
         questionId,
-        optionId
+        optionId,
+        timeSpent: timeSpentSeconds // Adicionar o tempo gasto para cada resposta
       }));
       
       console.log('Respostas formatadas:', formattedResponses);
@@ -271,6 +378,7 @@ const TestStage: NextPage = () => {
           candidateId,
           stageId,
           responses: formattedResponses,
+          timeSpent: timeSpentSeconds // Adicionar o tempo total gasto na etapa
         }),
       });
       
@@ -298,6 +406,10 @@ const TestStage: NextPage = () => {
   // Função para avançar para a próxima etapa
   const goToNextStage = async (values?: Record<string, string>) => {
     setIsSubmitting(true);
+    
+    // Salvar o tempo atual antes de avançar
+    saveTimeToLocalStorage(timeRemaining, timeSpent);
+    console.log(`Salvando tempo antes de avançar: ${timeRemaining}s restantes, ${timeSpent}s gastos`);
     
     try {
       console.log(`Buscando próxima etapa para stageId=${stageId} e candidateId=${candidateId}...`);
@@ -510,6 +622,14 @@ const TestStage: NextPage = () => {
     }
   };
 
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setTimeSpent(Date.now() - startTime);
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [startTime]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-primary-50">
@@ -539,6 +659,50 @@ const TestStage: NextPage = () => {
     )
   }
 
+  const renderHeader = () => {
+    return (
+      <div className="mb-8">
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-2xl font-bold text-secondary-800">
+            {testData?.title || 'Teste de Avaliação'}
+          </h1>
+          <div className="flex items-center">
+            {timeRemaining !== null ? (
+              // Se tem limite de tempo, mostrar apenas contador regressivo
+              <div className={`text-lg font-medium ${timeRemaining < 300 ? 'text-red-600' : 'text-secondary-600'}`}>
+                <span className="mr-2">⏱️</span>
+                Tempo restante: {formatTimeRemaining()}
+              </div>
+            ) : (
+              // Se não tem limite, mostrar apenas tempo decorrido
+              <div className="text-lg font-medium text-secondary-600">
+                <span className="mr-2">⏳</span>
+                Tempo: {formatTimeSpent()}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-semibold text-secondary-700 mb-1">
+              {stageInfo?.title || 'Carregando...'}
+            </h2>
+            <p className="text-secondary-500">
+              {currentStageIndex !== null && totalStages !== null
+                ? `Etapa ${currentStageIndex + 1} de ${totalStages}`
+                : 'Carregando...'}
+            </p>
+          </div>
+          {stageCompleted && (
+            <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+              Etapa concluída
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white">
       <div className="container mx-auto px-4 py-8">
@@ -559,23 +723,15 @@ const TestStage: NextPage = () => {
               Modo Offline
             </div>
           )}
-          
-          {testData && testData.timeLimit && (
-            <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg text-sm flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-              </svg>
-              <span>Tempo restante: {formatTimeRemaining()}</span>
-            </div>
-          )}
         </header>
 
         <main className="max-w-4xl mx-auto">
+          {renderHeader()}
           <div className="card mb-6">
             <div className="flex justify-between items-start mb-4">
               <div>
-                <h1 className="text-2xl font-bold text-secondary-900">{stageInfo.title}</h1>
-                <p className="text-secondary-600">{stageInfo.description}</p>
+                <h1 className="text-2xl font-bold text-secondary-900">{stageInfo?.title}</h1>
+                <p className="text-secondary-600">{stageInfo?.description}</p>
               </div>
               
               {testData && (

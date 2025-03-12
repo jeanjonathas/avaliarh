@@ -52,7 +52,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       include: {
         responses: true,
         test: {
-          include: {
+          select: {
+            id: true,
+            title: true,
+            timeLimit: true,
             TestStage: {
               include: {
                 stage: true
