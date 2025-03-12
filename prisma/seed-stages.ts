@@ -1,4 +1,5 @@
-const { PrismaClient } = require('@prisma/client')
+import { PrismaClient } from '@prisma/client'
+import * as crypto from 'crypto'
 
 const prisma = new PrismaClient()
 
@@ -134,9 +135,11 @@ async function main() {
     
     const createdStage = await prisma.stage.create({
       data: {
+        id: crypto.randomBytes(16).toString('hex'), // Adiciona um ID único
         title: stage.title,
         description: stage.description,
         order: stage.order,
+        updatedAt: new Date(), // Adiciona a data de atualização
       },
     })
 
