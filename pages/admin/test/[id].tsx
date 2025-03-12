@@ -600,7 +600,7 @@ const TestDetail: NextPage = () => {
     
     // Filtro por categoria
     if (selectedCategory !== 'all') {
-      if (!question.categories.some(cat => cat.id === selectedCategory)) {
+      if (!question.categories || !question.categories.some(cat => cat.id === selectedCategory)) {
         return false
       }
     }
