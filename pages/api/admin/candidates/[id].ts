@@ -200,7 +200,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
         
         if (typedResponse.isCorrectOption !== undefined) {
-          processedResponse.isCorrect = typedResponse.isCorrectOption;
+          processedResponse.isCorrectOption = typedResponse.isCorrectOption;
         }
         
         // Adicionar informações da questão a partir do snapshot
@@ -263,6 +263,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             
             if (processedResponse.isCorrectOption === undefined && selectedOption.isCorrect !== undefined) {
               processedResponse.isCorrectOption = selectedOption.isCorrect;
+            }
+          }
+          
+          // Garantir que isCorrectOption seja definido mesmo se selectedOption não tiver essa propriedade
+          if (processedResponse.isCorrectOption === undefined) {
+            // Verificar se a opção selecionada é a correta comparando IDs
+            if (correctOption && correctOption.id === response.optionId) {
+              processedResponse.isCorrectOption = true;
+              console.log(`Definindo isCorrectOption=true para a resposta ${response.id} baseado na comparação de IDs`);
+            } else {
+              processedResponse.isCorrectOption = false;
+              console.log(`Definindo isCorrectOption=false para a resposta ${response.id} baseado na comparação de IDs`);
             }
           }
         }
@@ -379,6 +391,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         // Verificar se a resposta tem um stageId que pertence ao teste atual
         if (typedResponse.stageId && testStageIds.includes(typedResponse.stageId)) {
+          console.log(`Resposta ${response.id} pertence ao teste atual via stageId direto`);
           return true;
         }
         
@@ -390,6 +403,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               : typedResponse.questionSnapshot;
               
             if (questionData.stageId && testStageIds.includes(questionData.stageId)) {
+              console.log(`Resposta ${response.id} pertence ao teste atual via questionSnapshot`);
               return true;
             }
           } catch (error) {
@@ -397,13 +411,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }
         
-        // Verificar via testQuestions
+        // Verificar via testQuestions - método mais confiável
         if (typedResponse.questionId) {
           const testQuestion = candidate.test.testQuestions.find(tq => 
             tq.questionId === typedResponse.questionId
           );
           
           if (testQuestion && testStageIds.includes(testQuestion.stageId)) {
+            console.log(`Resposta ${response.id} pertence ao teste atual via testQuestions`);
+            
+            // Atualizar o stageId da resposta para garantir consistência
+            (response as any).stageId = testQuestion.stageId;
+            
             return true;
           }
         }
@@ -442,6 +461,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             console.log(`Resposta correta para etapa ${stageMap[typedResponse.stageId].name}`);
           } else {
             console.log(`Resposta incorreta para etapa ${stageMap[typedResponse.stageId].name}`);
+          }
+        } else {
+          // Tentar encontrar a etapa por outros meios
+          console.log(`Etapa ${typedResponse.stageId} não encontrada no mapa. Tentando alternativas...`);
+          
+          // Verificar via testQuestions
+          if (typedResponse.questionId) {
+            const testQuestion = candidate.test.testQuestions.find(tq => 
+              tq.questionId === typedResponse.questionId
+            );
+            
+            if (testQuestion && stageMap[testQuestion.stageId]) {
+              const stageId = testQuestion.stageId;
+              console.log(`Encontrada etapa alternativa via testQuestions: ${stageMap[stageId].name} (${stageId})`);
+              
+              // Incrementar o total de respostas para esta etapa
+              stageMap[stageId].total++;
+              
+              // Verificar se a resposta está correta
+              if (typedResponse.isCorrectOption) {
+                stageMap[stageId].correct++;
+                console.log(`Resposta correta para etapa ${stageMap[stageId].name}`);
+              } else {
+                console.log(`Resposta incorreta para etapa ${stageMap[stageId].name}`);
+              }
+            }
           }
         }
       });
