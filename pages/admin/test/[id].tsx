@@ -33,7 +33,9 @@ interface Question {
   id: string
   text: string
   options: Option[]
-  categories: Category[]
+  categoryId?: string
+  categoryName?: string
+  categories?: Category[] // Mantido para compatibilidade com código existente
 }
 
 interface Option {
@@ -600,7 +602,7 @@ const TestDetail: NextPage = () => {
     
     // Filtro por categoria
     if (selectedCategory !== 'all') {
-      if (!question.categories || !question.categories.some(cat => cat.id === selectedCategory)) {
+      if (!question.categoryId || question.categoryId !== selectedCategory) {
         return false
       }
     }
