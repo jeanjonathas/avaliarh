@@ -784,14 +784,14 @@ const TestStage: NextPage = () => {
               )}
             </div>
             
-            <div className="flex justify-between items-center mb-6">
-              <div className="flex space-x-1">
+            <div className="flex flex-wrap justify-between items-center mb-6">
+              <div className="flex flex-wrap gap-1 max-w-full">
                 {totalStages ? (
                   // Se temos o número total de etapas, usar esse valor
                   Array.from({ length: totalStages }, (_, i) => i).map((stepIndex) => (
                     <div 
                       key={stepIndex}
-                      className={`w-8 h-2 rounded-full ${
+                      className={`w-6 h-2 rounded-full ${
                         currentStageIndex === stepIndex 
                           ? 'bg-primary-600' 
                           : currentStageIndex > stepIndex 
@@ -805,7 +805,7 @@ const TestStage: NextPage = () => {
                   [0, 1, 2].map((stepIndex) => (
                     <div 
                       key={stepIndex}
-                      className={`w-8 h-2 rounded-full ${
+                      className={`w-6 h-2 rounded-full ${
                         currentStageIndex === stepIndex 
                           ? 'bg-primary-600' 
                           : currentStageIndex > stepIndex 

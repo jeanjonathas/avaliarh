@@ -101,7 +101,8 @@ const Introducao: NextPage = () => {
         position: values.position || '',
         instagram: values.instagram || '',
         photoUrl: values.photoUrl || '',
-        testId: testData?.id
+        testId: testData?.id,
+        fromTest: true // Indicar que a requisição vem do teste
       }
       
       console.log('Enviando dados do candidato:', candidateInfo);
