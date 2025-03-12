@@ -74,13 +74,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       
       // Buscar as respostas do candidato para exibição
       const responses = await prisma.response.findMany({
-        where: { candidateId: candidate.id },
-        include: {
-          question: {
-            include: { Stage: true }
-          },
-          option: true
-        }
+        where: { candidateId: candidate.id }
       });
       
       console.log(`Encontradas ${responses.length} respostas para o candidato ${candidate.id}`);
@@ -88,7 +82,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       try {
         // Buscar snapshots separadamente para evitar problemas de tipo
         const responsesWithSnapshots = await prisma.$queryRaw`
-          SELECT id, "questionSnapshot", "allOptionsSnapshot"
+          SELECT id, "questionSnapshot", "allOptionsSnapshot", "stageName", "questionText", "optionText"
           FROM "Response"
           WHERE "candidateId" = ${candidate.id}
         ` as any[];
@@ -101,19 +95,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return {
             ...response,
             questionSnapshot: snapshot?.questionSnapshot,
-            allOptionsSnapshot: snapshot?.allOptionsSnapshot
+            allOptionsSnapshot: snapshot?.allOptionsSnapshot,
+            stageName: snapshot?.stageName || response.stageName || 'Sem Etapa',
+            questionText: snapshot?.questionText || response.questionText || '',
+            optionText: snapshot?.optionText || response.optionText || ''
           };
         });
         
         // Formatar as respostas para exibição
         const formattedResponses = combinedResponses.map(response => {
           // Tentar obter o texto da questão e opção de várias fontes possíveis
-          let questionText = '';
-          let optionText = '';
-          let stageName = response.question.Stage?.title || 'Sem Etapa';
+          let questionText = response.questionText || '';
+          let optionText = response.optionText || '';
+          let stageName = response.stageName || 'Sem Etapa';
           
-          // Processar o snapshot da questão se existir
-          if (response.questionSnapshot) {
+          // Processar o snapshot da questão se existir e se o questionText ainda não estiver definido
+          if (!questionText && response.questionSnapshot) {
             try {
               const questionSnapshot = typeof response.questionSnapshot === 'string' 
                 ? JSON.parse(response.questionSnapshot) 
@@ -122,29 +119,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               questionText = questionSnapshot.text || '';
             } catch (error) {
               console.error('Erro ao processar questionSnapshot:', error);
-              questionText = response.question.text || '';
             }
-          } else {
-            questionText = response.question.text || '';
-          }
-          
-          // Buscar o texto da opção diretamente do banco de dados
-          // O modelo Response já tem o texto da opção armazenado na coluna optionText
-          try {
-            // Tentar acessar a propriedade optionText diretamente
-            const typedResponse = response as any;
-            if (typedResponse.optionText) {
-              optionText = typedResponse.optionText;
-              console.log(`Usando optionText do banco: ${optionText}`);
-            } else {
-              // Fallback para o texto da opção relacionada
-              optionText = response.option.text || '';
-              console.log(`Usando option.text: ${optionText}`);
-            }
-          } catch (error) {
-            console.error('Erro ao acessar optionText:', error);
-            // Fallback para o texto da opção relacionada
-            optionText = response.option.text || '';
           }
           
           return {
