@@ -106,6 +106,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           
           console.log(`Mapeando etapa: ${stageName} (${stageId})`);
         });
+      } else {
+        // Se o teste foi excluído, criar etapas virtuais baseadas nas respostas
+        console.log("Teste não encontrado ou excluído. Criando etapas virtuais baseadas nas respostas.");
+        
+        // Agrupar respostas por stageId
+        const stageGroups = new Map();
+        
+        candidate.responses.forEach(response => {
+          const typedResponse = response as unknown as ResponseWithSnapshot;
+          let stageId = typedResponse.stageId || null;
+          let stageName = typedResponse.stageName || null;
+          
+          if (stageId && stageName) {
+            if (!stageGroups.has(stageId)) {
+              stageGroups.set(stageId, {
+                id: stageId,
+                name: stageName,
+                responses: []
+              });
+              
+              // Adicionar ao mapa de etapas
+              stageIdToNameMap[stageId] = stageName;
+              stageOrderMap[stageId] = stageGroups.size; // Ordem baseada na ordem de descoberta
+              responsesByStage[stageId] = [];
+            }
+          }
+        });
+        
+        console.log(`Criadas ${stageGroups.size} etapas virtuais baseadas nas respostas do candidato.`);
       }
       
       // Inicializar o objeto de respostas por etapa
@@ -375,6 +404,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let totalScore = 0;
     let responsesToCorrect: string[] = [];
 
+    // Inicializar o mapa com todas as etapas
+    const stageMap: Record<string, {
+      id: string;
+      name: string;
+      correct: number;
+      total: number;
+    }> = {};
+    
+    // Inicializar o mapa de ID para nome da etapa
+    const stageIdToNameMap: Record<string, string> = {};
+
     // Verificar se o candidato tem um teste associado
     if (candidate.test) {
       console.log(`Candidato está associado ao teste: ${candidate.test.title}`);
@@ -382,17 +422,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Obter todas as etapas do teste através da relação TestStage
       const testStages = candidate.test.TestStage || [];
       console.log(`O teste possui ${testStages.length} etapas`);
-      
-      // Inicializar o mapa de ID para nome da etapa
-      const stageIdToNameMap: Record<string, string> = {};
-      
-      // Inicializar o mapa com todas as etapas do teste
-      const stageMap: Record<string, {
-        id: string;
-        name: string;
-        correct: number;
-        total: number;
-      }> = {};
       
       // Adicionar todas as etapas do teste ao mapa
       testStages.forEach(testStage => {
@@ -440,33 +469,67 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         // Verificar via testQuestions - método mais confiável
         if (typedResponse.questionId) {
-          const testQuestion = candidate.test.testQuestions.find(tq => 
-            tq.questionId === typedResponse.questionId
-          );
-          
-          if (testQuestion && testStageIds.includes(testQuestion.stageId)) {
-            console.log(`Resposta ${response.id} pertence ao teste atual via testQuestions`);
+          try {
+            const testQuestion = candidate.test.testQuestions.find(tq => 
+              tq.questionId === typedResponse.questionId
+            );
             
-            // Atualizar o stageId da resposta para garantir consistência
-            (response as any).stageId = testQuestion.stageId;
-            
-            return true;
+            if (testQuestion) {
+              console.log(`Resposta ${response.id} pertence ao teste atual via testQuestions`);
+              return true;
+            }
+          } catch (error) {
+            console.error('Erro ao verificar testQuestions:', error);
           }
         }
         
-        // Se chegou aqui, a resposta não pertence ao teste atual
-        console.log(`Resposta ${response.id} não pertence ao teste atual e será ignorada`);
+        console.log(`Resposta ${response.id} NÃO pertence ao teste atual`);
         return false;
       });
       
-      // Substituir as respostas do candidato pelas respostas filtradas
-      candidate.responses = currentTestResponses;
+      console.log(`Processando ${currentTestResponses.length} respostas para o teste atual`);
+    } else {
+      // Se o teste foi excluído, criar etapas virtuais baseadas nas respostas
+      console.log("Teste não encontrado ou excluído. Criando etapas virtuais para cálculo de pontuação.");
       
-      console.log(`Processando ${currentTestResponses.length} respostas para cálculo de desempenho`);
+      // Agrupar respostas por stageId
+      const stageGroups = new Map();
       
-      // Processar cada resposta para adicionar informações extras
+      candidate.responses.forEach(response => {
+        const typedResponse = response as unknown as ResponseWithSnapshot;
+        let stageId = typedResponse.stageId || null;
+        let stageName = typedResponse.stageName || 'Etapa Desconhecida';
+        
+        if (stageId) {
+          if (!stageGroups.has(stageId)) {
+            stageGroups.set(stageId, {
+              id: stageId,
+              name: stageName,
+              responses: []
+            });
+            
+            // Adicionar ao mapa de etapas
+            stageMap[stageId] = {
+              id: stageId,
+              name: stageName,
+              correct: 0,
+              total: 0
+            };
+            stageIdToNameMap[stageId] = stageName;
+          }
+          
+          stageGroups.get(stageId).responses.push(typedResponse);
+        }
+      });
+      
+      console.log(`Criadas ${stageGroups.size} etapas virtuais baseadas nas respostas do candidato.`);
+      
+      // Usar todas as respostas do candidato para cálculo
+      const currentTestResponses = candidate.responses;
+      console.log(`Processando ${currentTestResponses.length} respostas para o candidato.`);
+      
+      // Processar cada resposta para calcular a pontuação
       currentTestResponses.forEach(response => {
-        // Converter a resposta para o tipo com campos adicionais
         const typedResponse = response as unknown as ResponseWithSnapshot;
         
         // Verificar se a resposta tem um stageId válido
@@ -475,7 +538,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return;
         }
         
-        // Verificar se a etapa existe no mapa (ou seja, pertence ao teste atual)
+        // Verificar se a etapa existe no mapa
         if (stageMap[typedResponse.stageId]) {
           console.log(`Analisando ID da etapa: ${typedResponse.stageId}`);
           
@@ -523,139 +586,82 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
           }
         } else {
-          // Tentar encontrar a etapa por outros meios
-          console.log(`Etapa ${typedResponse.stageId} não encontrada no mapa. Tentando alternativas...`);
-          
-          // Verificar via testQuestions
-          if (typedResponse.questionId) {
-            const testQuestion = candidate.test.testQuestions.find(tq => 
-              tq.questionId === typedResponse.questionId
-            );
-            
-            if (testQuestion && stageMap[testQuestion.stageId]) {
-              const stageId = testQuestion.stageId;
-              console.log(`Encontrada etapa alternativa via testQuestions: ${stageMap[stageId].name} (${stageId})`);
-              
-              // Incrementar o total de respostas para esta etapa
-              stageMap[stageId].total++;
-              
-              // Verificar se a resposta está correta
-              if (typedResponse.isCorrectOption) {
-                stageMap[stageId].correct++;
-                console.log(`Resposta correta para etapa ${stageMap[stageId].name}`);
-              } else {
-                console.log(`Resposta incorreta para etapa ${stageMap[stageId].name}`);
-                
-                // Verificar se há um problema de inconsistência com o optionId
-                if (typedResponse.allOptionsSnapshot) {
-                  try {
-                    const allOptions = typeof typedResponse.allOptionsSnapshot === 'string'
-                      ? JSON.parse(typedResponse.allOptionsSnapshot)
-                      : typedResponse.allOptionsSnapshot;
-                    
-                    // Verificar se a opção selecionada deveria ser correta
-                    const selectedOption = allOptions.find((opt: any) => opt.id === typedResponse.optionId);
-                    const correctOption = allOptions.find((opt: any) => opt.isCorrect === true);
-                    
-                    if (selectedOption && correctOption) {
-                      console.log(`Opção selecionada: ${selectedOption.text} (${selectedOption.id})`);
-                      console.log(`Opção correta: ${correctOption.text} (${correctOption.id})`);
-                      
-                      // Se a opção selecionada é a mesma que a correta (comparando texto), mas o isCorrectOption é falso
-                      // isso indica um problema de inconsistência
-                      if (selectedOption.id === correctOption.id || 
-                          selectedOption.text === correctOption.text) {
-                        console.log(`POSSÍVEL ERRO DE INCONSISTÊNCIA DETECTADO: A opção selecionada parece ser a correta!`);
-                        console.log(`Corrigindo a pontuação para esta resposta.`);
-                        stageMap[stageId].correct++;
-                        
-                        // Marcar que esta resposta deveria ser correta para atualização posterior
-                        responsesToCorrect.push(typedResponse.id);
-                        console.log(`Adicionando resposta ${typedResponse.id} à lista de correções`);
-                      }
-                    }
-                  } catch (error) {
-                    console.error('Erro ao verificar inconsistência nas opções:', error);
-                  }
-                }
-              }
-            }
-          }
+          console.log(`Etapa ${typedResponse.stageId} não encontrada no mapa de etapas.`);
         }
       });
+    }
+    
+    // Calcular as pontuações por etapa
+    stageScores = Object.values(stageMap).map(stage => {
+      const percentage = stage.total > 0 ? Math.round((stage.correct / stage.total) * 100) : 0;
+      return {
+        ...stage,
+        percentage
+      };
+    });
+    
+    console.log(`Calculadas ${stageScores.length} etapas de pontuação:`, JSON.stringify(stageScores));
+    
+    // Calcular a pontuação total
+    const validResponses = candidate.responses.filter(r => {
+      const typedResponse = r as unknown as ResponseWithSnapshot;
+      return stageMap[typedResponse.stageId] !== undefined;
+    });
+    
+    let totalCorrect = validResponses.filter(r => {
+      const typedResponse = r as unknown as ResponseWithSnapshot;
       
-      // Calcular as pontuações por etapa
-      stageScores = Object.values(stageMap).map(stage => {
-        const percentage = stage.total > 0 ? Math.round((stage.correct / stage.total) * 100) : 0;
-        return {
-          ...stage,
-          percentage
-        };
-      });
+      // Verificar se a resposta está marcada como correta
+      if (typedResponse.isCorrectOption) {
+        return true;
+      }
       
-      console.log(`Calculadas ${stageScores.length} etapas de pontuação:`, JSON.stringify(stageScores));
-      
-      // Calcular a pontuação total
-      const validResponses = currentTestResponses.filter(r => {
-        const typedResponse = r as unknown as ResponseWithSnapshot;
-        return stageMap[typedResponse.stageId] !== undefined;
-      });
-      
-      let totalCorrect = validResponses.filter(r => {
-        const typedResponse = r as unknown as ResponseWithSnapshot;
-        
-        // Verificar se a resposta está marcada como correta
-        if (typedResponse.isCorrectOption) {
-          return true;
-        }
-        
-        // Verificar se há inconsistência (resposta correta marcada como incorreta)
-        if (typedResponse.allOptionsSnapshot) {
-          try {
-            const allOptions = typeof typedResponse.allOptionsSnapshot === 'string'
-              ? JSON.parse(typedResponse.allOptionsSnapshot)
-              : typedResponse.allOptionsSnapshot;
-            
-            // Verificar se a opção selecionada deveria ser correta
-            const selectedOption = allOptions.find((opt: any) => opt.id === typedResponse.optionId);
-            const correctOption = allOptions.find((opt: any) => opt.isCorrect === true);
-            
-            if (selectedOption && correctOption) {
-              // Se a opção selecionada é a mesma que a correta (comparando texto ou ID)
-              // isso indica um problema de inconsistência
-              if (selectedOption.id === correctOption.id || 
-                  selectedOption.text === correctOption.text) {
-                console.log(`Corrigindo pontuação: resposta ${typedResponse.id} deveria ser marcada como correta`);
-                return true;
-              }
-            }
-          } catch (error) {
-            console.error('Erro ao verificar inconsistência nas opções:', error);
-          }
-        }
-        
-        return false;
-      }).length;
-      
-      totalScore = validResponses.length > 0 ? 
-        Math.round((totalCorrect / validResponses.length) * 100) : 0;
-      
-      // Atualizar as respostas que foram identificadas como incorretamente marcadas
-      if (responsesToCorrect.length > 0) {
-        console.log(`Atualizando ${responsesToCorrect.length} respostas com inconsistências...`);
-        
+      // Verificar se há inconsistência (resposta correta marcada como incorreta)
+      if (typedResponse.allOptionsSnapshot) {
         try {
-          // Atualizar cada resposta para marcar como correta
-          for (const responseId of responsesToCorrect) {
-            await prisma.response.update({
-              where: { id: responseId },
-              data: { isCorrectOption: true }
-            });
-            console.log(`Resposta ${responseId} atualizada para correta`);
+          const allOptions = typeof typedResponse.allOptionsSnapshot === 'string'
+            ? JSON.parse(typedResponse.allOptionsSnapshot)
+            : typedResponse.allOptionsSnapshot;
+          
+          // Verificar se a opção selecionada deveria ser correta
+          const selectedOption = allOptions.find((opt: any) => opt.id === typedResponse.optionId);
+          const correctOption = allOptions.find((opt: any) => opt.isCorrect === true);
+          
+          if (selectedOption && correctOption) {
+            // Se a opção selecionada é a mesma que a correta (comparando texto ou ID)
+            // isso indica um problema de inconsistência
+            if (selectedOption.id === correctOption.id || 
+                selectedOption.text === correctOption.text) {
+              console.log(`Corrigindo pontuação: resposta ${typedResponse.id} deveria ser marcada como correta`);
+              return true;
+            }
           }
         } catch (error) {
-          console.error('Erro ao atualizar respostas com inconsistências:', error);
+          console.error('Erro ao verificar inconsistência nas opções:', error);
         }
+      }
+      
+      return false;
+    }).length;
+    
+    totalScore = validResponses.length > 0 ? 
+      Math.round((totalCorrect / validResponses.length) * 100) : 0;
+    
+    // Atualizar as respostas que foram identificadas como incorretamente marcadas
+    if (responsesToCorrect.length > 0) {
+      console.log(`Atualizando ${responsesToCorrect.length} respostas com inconsistências...`);
+      
+      try {
+        // Atualizar cada resposta para marcar como correta
+        for (const responseId of responsesToCorrect) {
+          await prisma.response.update({
+            where: { id: responseId },
+            data: { isCorrectOption: true }
+          });
+          console.log(`Resposta ${responseId} atualizada para correta`);
+        }
+      } catch (error) {
+        console.error('Erro ao atualizar respostas com inconsistências:', error);
       }
     }
 
