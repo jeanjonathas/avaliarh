@@ -212,11 +212,11 @@ export default async function handler(
                     }
                   });
                   
-                  const option = await prisma.option.findUnique({
+                  const selectedOption = await prisma.option.findUnique({
                     where: { id: response.optionId }
                   });
                   
-                  if (!question || !option) {
+                  if (!question || !selectedOption) {
                     console.error('Questão ou opção não encontrada');
                     return null;
                   }
@@ -244,8 +244,8 @@ export default async function handler(
                       ${response.questionId}, 
                       ${response.optionId}, 
                       ${question.text}, 
-                      ${option.text}, 
-                      ${option.isCorrect}, 
+                      ${selectedOption.text}, 
+                      ${selectedOption.isCorrect}, 
                       ${currentStageName}, 
                       ${question.Category?.name || null}, 
                       ${currentStageId},
