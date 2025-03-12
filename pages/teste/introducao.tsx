@@ -55,9 +55,11 @@ const Introducao: NextPage = () => {
         try {
           const parsedData = JSON.parse(storedCandidateData)
           
-          // Não precisamos mais extrair dados do campo observations
-          // pois usaremos os campos apropriados do modelo
+          // Adicionar logs para depuração
           console.log('Dados do candidato carregados:', parsedData)
+          console.log('requestPhoto:', parsedData.requestPhoto)
+          console.log('Tipo de requestPhoto:', typeof parsedData.requestPhoto)
+          
           setCandidateData(parsedData)
           
           // Se temos uma foto, vamos atualizar o formValues também

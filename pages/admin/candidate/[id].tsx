@@ -103,6 +103,7 @@ interface Candidate {
     total: number
     percentage: number
   }[]
+  photoUrl?: string
 }
 
 const CandidateDetails = () => {
@@ -137,6 +138,7 @@ const CandidateDetails = () => {
   const [isLoadingTests, setIsLoadingTests] = useState(false);
   const [selectedTest, setSelectedTest] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
 
   // Função para formatar o tempo em horas, minutos e segundos
   const formatTime = (seconds) => {
@@ -655,7 +657,7 @@ const CandidateDetails = () => {
       if (candidate.responses && candidate.responses.length > 0) {
         console.log('Processando respostas:', candidate.responses.length);
         
-        // Ordenar as respostas por ID de etapa para garantir consistência
+        // Ordenar as respostas por ID de etapa para garantir que apareçam na ordem correta
         const sortedResponses = [...candidate.responses].sort((a, b) => {
           const stageA = a.question?.Stage?.id || '';
           const stageB = b.question?.Stage?.id || '';
@@ -1594,6 +1596,25 @@ const CandidateDetails = () => {
                     </div>
                     
                     <div className="md:w-1/3 space-y-6 mt-6 md:mt-0">
+                      {/* Foto do Candidato */}
+                      {candidate.photoUrl && (
+                        <div className="bg-white border border-secondary-200 rounded-lg p-4 mb-4">
+                          <h3 className="text-lg font-semibold text-secondary-800 mb-3">Foto do Candidato</h3>
+                          <div className="flex flex-col items-center">
+                            <div 
+                              className="relative w-48 h-auto rounded-lg overflow-hidden border border-secondary-200 cursor-pointer"
+                              onClick={() => setShowPhotoModal(true)}
+                            >
+                              <img 
+                                src={candidate.photoUrl} 
+                                alt={`Foto de ${candidate.name}`}
+                                className="max-w-full w-full object-contain rounded-lg"
+                              />
+                            </div>
+                            <p className="text-sm text-secondary-600 mt-2">Clique na foto para visualizar em tamanho completo</p>
+                          </div>
+                        </div>
+                      )}
                       <div className="bg-white border border-secondary-200 rounded-lg p-4 mb-4">
                         <h3 className="text-lg font-semibold text-secondary-800 mb-3">Informações do Convite</h3>
                         <div className="space-y-3">
@@ -1924,6 +1945,40 @@ const CandidateDetails = () => {
                   Fechar
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {showPhotoModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center p-4 border-b">
+              <h2 className="text-xl font-bold text-secondary-800">
+                Foto de {candidate?.name}
+              </h2>
+              <button 
+                onClick={() => setShowPhotoModal(false)}
+                className="text-gray-500 hover:text-gray-700 focus:outline-none"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
+              <img 
+                src={candidate?.photoUrl} 
+                alt={`Foto de ${candidate?.name}`}
+                className="max-w-full max-h-[70vh] object-contain rounded-lg"
+              />
+            </div>
+            
+            <div className="p-4 border-t">
+              <p className="text-sm text-secondary-600">
+                {candidate?.position ? `Candidato para ${candidate.position}` : 'Candidato'}
+              </p>
             </div>
           </div>
         </div>

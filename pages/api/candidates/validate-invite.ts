@@ -43,7 +43,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         observations,
         instagram,
         score,
-        "showResults"
+        "showResults",
+        "requestPhoto",
+        "photoUrl"
       FROM "Candidate"
       WHERE "inviteCode" = ${inviteCode}
     `;
@@ -266,7 +268,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         observations: candidate.observations,
         instagram: candidate.instagram,
         score: candidate.score,
-        showResults: candidate.showResults
+        showResults: candidate.showResults,
+        requestPhoto: candidate.requestPhoto,
+        photoUrl: candidate.photoUrl
       },
       test: test,
       securityToken: candidateSecurityToken

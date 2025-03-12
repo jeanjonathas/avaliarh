@@ -16,13 +16,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const prisma = new PrismaClient()
 
   try {
-    const { id, name, email, phone, position, instagram } = req.body
+    const { id, name, email, phone, position, instagram, photoUrl } = req.body
 
     if (!id || !name || !email) {
       return res.status(400).json({ error: 'ID, nome e email são obrigatórios' })
     }
 
-    // Usar SQL raw para atualizar o candidato, incluindo o campo instagram
+    // Usar SQL raw para atualizar o candidato, incluindo o campo instagram e photoUrl
     const updatedCandidate = await prisma.$queryRaw`
       UPDATE "Candidate"
       SET 
@@ -31,6 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         phone = ${phone || null},
         position = ${position || null},
         instagram = ${instagram || null},
+        "photoUrl" = ${photoUrl || null},
         "updatedAt" = NOW()
       WHERE id = ${id}
       RETURNING *
