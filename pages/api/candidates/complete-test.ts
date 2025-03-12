@@ -23,13 +23,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         name: true,
         email: true,
         completed: true,
-        status: true,
-        responses: {
-          select: {
-            id: true,
-            isCorrectOption: true
-          }
-        }
+        status: true
       }
     });
     
@@ -41,10 +35,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(`Candidato encontrado: ${candidate.name} (${candidate.email})`);
     console.log(`Status atual: completed=${candidate.completed}, status=${candidate.status}`);
     
+    // Buscar as respostas do candidato separadamente
+    const responses = await prisma.response.findMany({
+      where: { candidateId },
+      select: {
+        id: true,
+        isCorrectOption: true
+      }
+    });
+    
+    console.log(`Candidato ${candidate.name} encontrado, processando ${responses.length} respostas`);
+    
     // Calcular a taxa de acerto
-    const totalQuestions = candidate.responses.length;
-    const correctAnswers = candidate.responses.filter(response => response.isCorrectOption).length;
-    const accuracyRate = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
+    const totalQuestions = responses.length;
+    const correctAnswers = responses.filter(r => r.isCorrectOption).length;
+    const accuracyRate = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
     
     console.log(`Desempenho do candidato: ${correctAnswers}/${totalQuestions} (${accuracyRate}%)`);
     

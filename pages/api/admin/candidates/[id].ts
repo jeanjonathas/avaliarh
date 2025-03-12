@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
-import { PrismaClient, Candidate } from '@prisma/client'
+import { PrismaClient, Candidate, Response } from '@prisma/client'
 
 // Função auxiliar para converter BigInt para Number
 function convertBigIntToNumber(obj: any): any {
@@ -135,31 +135,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
       
       // Formatar datas para evitar problemas de serialização
-      const formattedCandidate = {
+      const formattedCandidate: any = {
         ...candidate,
         testDate: candidate.testDate ? candidate.testDate.toISOString() : null,
         interviewDate: candidate.interviewDate ? candidate.interviewDate.toISOString() : null,
         inviteExpires: candidate.inviteExpires ? candidate.inviteExpires.toISOString() : null,
         createdAt: candidate.createdAt ? candidate.createdAt.toISOString() : null,
         updatedAt: candidate.updatedAt ? candidate.updatedAt.toISOString() : null,
-        responses: responses.map(response => ({
-          ...response,
-          createdAt: response.createdAt ? response.createdAt.toISOString() : null,
-          updatedAt: response.updatedAt ? response.updatedAt.toISOString() : null
-        })),
-        test: test ? {
-          id: test.id,
-          title: test.title,
-          description: test.description,
-          createdAt: test.createdAt.toISOString(),
-          updatedAt: test.updatedAt.toISOString()
-        } : null,
-        stageScores,
-        score: totalScore, // Adicionar o score para compatibilidade com código existente
-        totalScore, // Adicionar o totalScore para o novo código
-        completed: candidateCompleted,
-        status: candidateStatus // Usar o status atualizado
       };
+      
+      // Adicionar respostas e teste ao formattedCandidate
+      formattedCandidate.responses = responses.map(response => ({
+        ...response,
+        createdAt: response.createdAt ? response.createdAt.toISOString() : null,
+        updatedAt: response.updatedAt ? response.updatedAt.toISOString() : null
+      }));
+      formattedCandidate.test = test ? {
+        id: test.id,
+        title: test.title,
+        description: test.description,
+        createdAt: test.createdAt.toISOString(),
+        updatedAt: test.updatedAt.toISOString()
+      } : null;
+      formattedCandidate.stageScores = stageScores;
+      formattedCandidate.score = totalScore; // Adicionar o score para compatibilidade com código existente
+      formattedCandidate.totalScore = totalScore; // Adicionar o totalScore para o novo código
+      formattedCandidate.completed = candidateCompleted;
+      formattedCandidate.status = candidateStatus; // Usar o status atualizado
       
       return res.status(200).json({ 
         candidate: convertBigIntToNumber(formattedCandidate)
@@ -252,7 +254,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const updatedCandidateRaw = rawResult[0];
             
             // Formatar datas para evitar problemas de serialização
-            const formattedCandidate = {
+            const formattedCandidate: any = {
               ...updatedCandidateRaw,
               testDate: updatedCandidateRaw.testDate ? updatedCandidateRaw.testDate.toISOString() : null,
               interviewDate: updatedCandidateRaw.interviewDate ? updatedCandidateRaw.interviewDate.toISOString() : null,
@@ -269,7 +271,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         // Se não houve atualização via SQL raw ou se ela não retornou resultados,
         // use o resultado da atualização via Prisma
-        const formattedCandidate = {
+        const formattedCandidate: any = {
           ...updatedCandidate,
           testDate: updatedCandidate.testDate ? updatedCandidate.testDate.toISOString() : null,
           interviewDate: updatedCandidate.interviewDate ? updatedCandidate.interviewDate.toISOString() : null,
