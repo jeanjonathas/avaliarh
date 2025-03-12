@@ -190,13 +190,13 @@ export default async function handler(
         stage: {
           id: question.stage_id,
           title: question.stage_title,
-          description: question.stage_description || '',
+          description: question.stage_description === null ? '' : question.stage_description,
           order: question.stage_order || 0
         },
         category: question.category_id ? {
           id: question.category_id,
-          name: question.category_name || '',
-          description: question.category_description || ''
+          name: question.category_name === null ? '' : question.category_name,
+          description: question.category_description === null ? '' : question.category_description
         } : null
       };
 
@@ -340,13 +340,13 @@ export default async function handler(
         stage: {
           id: question.stage_id,
           title: question.stage_title,
-          description: question.stage_description || '',
+          description: question.stage_description === null ? '' : question.stage_description,
           order: question.stage_order || 0
         },
         category: question.category_id ? {
           id: question.category_id,
-          name: question.category_name || '',
-          description: question.category_description || ''
+          name: question.category_name === null ? '' : question.category_name,
+          description: question.category_description === null ? '' : question.category_description
         } : null
       };
 
