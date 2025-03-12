@@ -35,9 +35,8 @@ export default async function handler(
           completed: true,
           status: true,
           testId: true,
-          timeSpent: true
         }
-      })
+      });
 
       if (!candidate) {
         return res.status(404).json({ error: 'Candidato não encontrado' })
@@ -48,17 +47,21 @@ export default async function handler(
       
       // Atualizar o tempo total gasto pelo candidato
       if (timeSpent && typeof timeSpent === 'number') {
-        // Verificar se o candidato tem a propriedade timeSpent
-        const currentTimeSpent = (candidate as any).timeSpent || 0;
+        // Buscar o tempo atual diretamente do banco de dados
+        const candidateWithTime = await prisma.$queryRaw`
+          SELECT "timeSpent" FROM "Candidate" WHERE id = ${candidateId}
+        ` as Array<{timeSpent: number | null}>;
+        
+        const currentTimeSpent = candidateWithTime[0]?.timeSpent || 0;
         console.log(`Atualizando tempo gasto pelo candidato. Anterior: ${currentTimeSpent}s, Adicionando: ${timeSpent}s`);
         const updatedTimeSpent = currentTimeSpent + timeSpent;
         
-        await prisma.candidate.update({
-          where: { id: candidateId },
-          data: { 
-            timeSpent: updatedTimeSpent 
-          }
-        });
+        // Usando uma query SQL direta para atualizar o timeSpent
+        await prisma.$executeRaw`
+          UPDATE "Candidate"
+          SET "timeSpent" = ${updatedTimeSpent}
+          WHERE id = ${candidateId}
+        `;
         
         console.log(`Tempo total atualizado para ${updatedTimeSpent} segundos`);
       }
@@ -74,7 +77,7 @@ export default async function handler(
               where: { id: response.questionId },
               include: {
                 options: true,
-                Category: true
+                Category: true,
               }
             });
 
@@ -105,7 +108,7 @@ export default async function handler(
                 testId: candidate.testId
               },
               include: {
-                stage: true
+                stage: true,
               }
             });
 
@@ -122,7 +125,7 @@ export default async function handler(
               categoryName: question.Category?.name || null,
               questionSnapshot: JSON.stringify(question),
               allOptionsSnapshot: JSON.stringify(question.options),
-              timeSpent: response.timeSpent || null // Salvar o tempo gasto na resposta
+              timeSpent: response.timeSpent || null, // Salvar o tempo gasto na resposta
             };
 
             if (existingResponse) {
@@ -247,7 +250,7 @@ export default async function handler(
       )
 
       // Filtrar respostas nulas (caso alguma pergunta ou opção não tenha sido encontrada)
-      const validResponses = savedResponses.filter(response => response !== null)
+      const validResponses = savedResponses.filter(response => response !== null);
 
       console.log(`Salvas ${validResponses.length} respostas válidas de ${responses.length} recebidas`);
       
@@ -290,17 +293,17 @@ export default async function handler(
         success: true, 
         count: validResponses.length,
         candidateId: candidate.id,
-        candidateName: candidate.name
-      })
+        candidateName: candidate.name,
+      });
     } catch (error) {
-      console.error('Erro ao salvar respostas:', error)
+      console.error('Erro ao salvar respostas:', error);
       // Retornar mais informações sobre o erro para facilitar o debug
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
       return res.status(500).json({ 
         error: 'Erro ao salvar respostas', 
         details: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined
-      })
+        stack: error instanceof Error ? error.stack : undefined,
+      });
     }
   } else {
     res.setHeader('Allow', ['POST'])
