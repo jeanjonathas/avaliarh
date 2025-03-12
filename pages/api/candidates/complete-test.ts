@@ -23,7 +23,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         name: true,
         email: true,
         completed: true,
-        status: true
+        status: true,
+        responses: {
+          select: {
+            id: true,
+            isCorrectOption: true
+          }
+        }
       }
     });
     
@@ -35,29 +41,52 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(`Candidato encontrado: ${candidate.name} (${candidate.email})`);
     console.log(`Status atual: completed=${candidate.completed}, status=${candidate.status}`);
     
-    // Atualizar o status do candidato para completed e APPROVED
-    const updatedCandidate = await prisma.candidate.update({
-      where: { id: candidateId },
-      data: { 
-        completed: true,
-        status: 'APPROVED' // Atualizar o status para APPROVED
-      }
+    // Calcular a taxa de acerto
+    const totalQuestions = candidate.responses.length;
+    const correctAnswers = candidate.responses.filter(response => response.isCorrectOption).length;
+    const accuracyRate = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
+    
+    console.log(`Desempenho do candidato: ${correctAnswers}/${totalQuestions} (${accuracyRate}%)`);
+    
+    // Armazenar as informações de pontuação no campo observations
+    const scoreInfo = JSON.stringify({
+      score: correctAnswers,
+      totalQuestions: totalQuestions,
+      accuracyRate: accuracyRate
     });
     
-    console.log(`Candidato atualizado com sucesso: completed=${updatedCandidate.completed}, status=${updatedCandidate.status}`);
+    // Atualizar o candidato como concluído usando SQL raw
+    const updatedCandidate = await prisma.$queryRaw`
+      UPDATE "Candidate"
+      SET 
+        completed = true,
+        status = 'APPROVED',
+        observations = ${scoreInfo},
+        score = ${correctAnswers},
+        "updatedAt" = NOW()
+      WHERE id = ${candidateId}
+      RETURNING *
+    `;
+    
+    console.log(`Candidato atualizado com sucesso: completed=${updatedCandidate[0].completed}, status=${updatedCandidate[0].status}`);
     
     return res.status(200).json({ 
       success: true, 
-      message: 'Teste marcado como concluído com sucesso',
+      message: 'Teste concluído com sucesso',
       candidate: {
-        id: updatedCandidate.id,
-        completed: updatedCandidate.completed,
-        status: updatedCandidate.status
+        id: updatedCandidate[0].id,
+        name: updatedCandidate[0].name,
+        email: updatedCandidate[0].email,
+        score: correctAnswers,
+        totalQuestions: totalQuestions,
+        accuracyRate: accuracyRate,
+        completed: updatedCandidate[0].completed,
+        status: updatedCandidate[0].status
       }
     });
   } catch (error) {
-    console.error('Erro ao marcar teste como concluído:', error);
-    return res.status(500).json({ error: 'Erro ao marcar teste como concluído' });
+    console.error('Erro ao concluir teste:', error);
+    return res.status(500).json({ error: 'Erro ao concluir teste' });
   } finally {
     await prisma.$disconnect();
   }

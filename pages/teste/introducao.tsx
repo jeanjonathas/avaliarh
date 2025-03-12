@@ -1,16 +1,20 @@
 import { NextPage } from 'next'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Formik, Form, Field, ErrorMessage } from 'formik'
 import * as Yup from 'yup'
 
-const validationSchema = Yup.object({
+const validationSchema = (requestPhoto: boolean = true) => Yup.object({
   name: Yup.string().required('Nome é obrigatório'),
   email: Yup.string().email('Email inválido').required('Email é obrigatório'),
   phone: Yup.string().required('Telefone é obrigatório'),
-  position: Yup.string().required('Cargo desejado é obrigatório'),
+  position: Yup.string(), // Tornando o campo opcional
+  instagram: Yup.string(), // Tornando o campo opcional
+  photoConsent: requestPhoto 
+    ? Yup.boolean().oneOf([true], 'Você precisa concordar com o uso da sua foto para identificação').required()
+    : Yup.boolean(),
 })
 
 interface CandidateData {
@@ -20,6 +24,11 @@ interface CandidateData {
   phone?: string;
   position?: string;
   testId?: string;
+  instagram?: string;
+  photoUrl?: string;
+  observations?: string;
+  requestPhoto?: boolean;
+  showResults?: boolean;
 }
 
 interface TestData {
@@ -38,56 +47,85 @@ const Introducao: NextPage = () => {
 
   useEffect(() => {
     // Verificar se há dados do candidato na sessão
-    const storedCandidateData = sessionStorage.getItem('candidateData')
-    const storedTestData = sessionStorage.getItem('testData')
-    
-    if (storedCandidateData) {
-      try {
-        const parsedData = JSON.parse(storedCandidateData)
-        setCandidateData(parsedData)
-      } catch (error) {
-        console.error('Erro ao carregar dados do candidato:', error)
+    if (typeof window !== 'undefined') {
+      const storedCandidateData = sessionStorage.getItem('candidateData')
+      const storedTestData = sessionStorage.getItem('testData')
+      
+      if (storedCandidateData) {
+        try {
+          const parsedData = JSON.parse(storedCandidateData)
+          
+          // Não precisamos mais extrair dados do campo observations
+          // pois usaremos os campos apropriados do modelo
+          console.log('Dados do candidato carregados:', parsedData)
+          setCandidateData(parsedData)
+          
+          // Se temos uma foto, vamos atualizar o formValues também
+          if (parsedData.photoUrl) {
+            setFormValues(prev => ({
+              ...prev,
+              photoUrl: parsedData.photoUrl
+            }));
+          }
+        } catch (error) {
+          console.error('Erro ao carregar dados do candidato:', error)
+        }
       }
-    }
-    
-    if (storedTestData) {
-      try {
-        const parsedData = JSON.parse(storedTestData)
-        setTestData(parsedData)
-      } catch (error) {
-        console.error('Erro ao carregar dados do teste:', error)
+      
+      if (storedTestData) {
+        try {
+          const parsedData = JSON.parse(storedTestData)
+          setTestData(parsedData)
+        } catch (error) {
+          console.error('Erro ao carregar dados do teste:', error)
+        }
       }
     }
   }, [])
 
-  const handleSubmit = async (values: any) => {
-    try {
-      // Se já temos o ID do candidato, não precisamos criar um novo
-      if (candidateData?.id) {
-        // Buscar a primeira etapa do teste associado ao candidato
-        await fetchFirstStageAndRedirect(candidateData.id);
-        return;
-      }
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
-      // Caso contrário, salvar os dados do candidato no banco de dados
-      const response = await fetch('/api/candidates', {
-        method: 'POST',
+  const handleSubmit = async (values: any) => {
+    setIsSubmitting(true)
+    
+    try {
+      // Preparar o objeto com os dados do candidato
+      const candidateInfo = {
+        id: candidateData?.id || '',
+        name: values.name,
+        email: values.email,
+        phone: values.phone,
+        position: values.position || '',
+        instagram: values.instagram || '',
+        photoUrl: values.photoUrl || '',
+        testId: testData?.id
+      }
+      
+      console.log('Enviando dados do candidato:', candidateInfo);
+      
+      // Atualizar os dados do candidato na API
+      const response = await fetch('/api/candidates/update', {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(values),
-      });
-
+        body: JSON.stringify(candidateInfo),
+      })
+      
       if (response.ok) {
-        const data = await response.json();
-        // Buscar a primeira etapa do teste e redirecionar
-        await fetchFirstStageAndRedirect(data.id);
+        // Buscar a primeira etapa do teste associado ao candidato
+        await fetchFirstStageAndRedirect(candidateInfo.id);
       } else {
-        throw new Error('Erro ao salvar os dados');
+        const errorData = await response.json()
+        console.error('Erro na resposta da API:', errorData);
+        setError(errorData.message || 'Erro ao salvar os dados. Tente novamente.')
       }
     } catch (error) {
-      console.error('Erro:', error);
-      alert('Ocorreu um erro ao salvar seus dados. Por favor, tente novamente.');
+      console.error('Erro ao enviar dados:', error)
+      setError('Ocorreu um erro ao enviar os dados. Tente novamente.')
+    } finally {
+      setIsSubmitting(false)
     }
   };
 
@@ -157,16 +195,110 @@ const Introducao: NextPage = () => {
   };
 
   // Se temos os dados do candidato e estamos na etapa de formulário, vamos para a primeira etapa
+  // Removendo este efeito colateral que estava causando o envio automático do formulário
+  // useEffect(() => {
+  //   if (candidateData && step === 'form') {
+  //     handleSubmit({
+  //       name: candidateData.name,
+  //       email: candidateData.email,
+  //       phone: candidateData.phone || '',
+  //       position: candidateData.position || '',
+  //     })
+  //   }
+  // }, [step, candidateData])
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [showCamera, setShowCamera] = useState(false);
+  const [formValues, setFormValues] = useState({
+    name: candidateData?.name || '',
+    email: candidateData?.email || '',
+    phone: candidateData?.phone || '',
+    position: candidateData?.position || '',
+    instagram: candidateData?.instagram || '',
+    photoUrl: candidateData?.photoUrl || '',
+    photoConsent: false,
+  });
+
+  // Atualizar os valores do formulário quando os dados do candidato mudarem
   useEffect(() => {
-    if (candidateData && step === 'form') {
-      handleSubmit({
-        name: candidateData.name,
-        email: candidateData.email,
+    if (candidateData) {
+      setFormValues({
+        name: candidateData.name || '',
+        email: candidateData.email || '',
         phone: candidateData.phone || '',
         position: candidateData.position || '',
-      })
+        instagram: candidateData.instagram || '',
+        photoUrl: candidateData.photoUrl || '',
+        photoConsent: false,
+      });
     }
-  }, [step, candidateData])
+  }, [candidateData]);
+
+  const capturePhoto = async () => {
+    setShowCamera(true);
+    if (navigator.mediaDevices.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        videoRef.current.srcObject = stream;
+      } catch (error) {
+        console.error('Erro ao acessar a câmera:', error)
+      }
+    }
+  };
+
+  const takePhoto = async (setFieldValue: any) => {
+    if (videoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      const ctx = canvas.getContext('2d');
+      
+      if (ctx) {
+        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+        const photoUrl = canvas.toDataURL('image/jpeg');
+        
+        // Atualizar o valor no formulário
+        setFieldValue('photoUrl', photoUrl);
+        
+        // Atualizar também o estado local
+        setFormValues(prev => ({
+          ...prev,
+          photoUrl
+        }));
+        
+        // Fechar a câmera
+        setShowCamera(false);
+        
+        // Parar a transmissão de vídeo
+        if (videoRef.current.srcObject) {
+          const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+          tracks.forEach(track => track.stop());
+          videoRef.current.srcObject = null;
+        }
+      }
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, setFieldValue: any) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const photoUrl = reader.result as string;
+        
+        // Atualizar o valor no formulário
+        setFieldValue('photoUrl', photoUrl);
+        
+        // Atualizar também o estado local
+        setFormValues(prev => ({
+          ...prev,
+          photoUrl
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white">
@@ -278,17 +410,12 @@ const Introducao: NextPage = () => {
               <h1 className="text-3xl font-bold text-secondary-900 mb-6">Dados do Candidato</h1>
               
               <Formik
-                initialValues={{ 
-                  name: candidateData?.name || '', 
-                  email: candidateData?.email || '', 
-                  phone: candidateData?.phone || '', 
-                  position: candidateData?.position || '' 
-                }}
-                validationSchema={validationSchema}
+                initialValues={formValues}
+                validationSchema={validationSchema(candidateData?.requestPhoto === true)}
                 onSubmit={handleSubmit}
                 enableReinitialize
               >
-                {({ isSubmitting }) => (
+                {({ isSubmitting, setFieldValue, values }) => (
                   <Form className="space-y-6">
                     <div>
                       <label htmlFor="name" className="block text-sm font-medium text-secondary-700 mb-1">
@@ -345,10 +472,165 @@ const Introducao: NextPage = () => {
                         id="position"
                         className="input-field"
                         placeholder="Ex: Desenvolvedor Front-end"
-                        disabled={!!candidateData}
                       />
                       <ErrorMessage name="position" component="div" className="text-red-500 text-sm mt-1" />
                     </div>
+                    
+                    <div>
+                      <label htmlFor="instagram" className="block text-sm font-medium text-secondary-700 mb-1">
+                        Instagram (opcional)
+                      </label>
+                      <Field
+                        type="text"
+                        name="instagram"
+                        id="instagram"
+                        className="input-field"
+                        placeholder="@seu-usuario"
+                      />
+                      <ErrorMessage name="instagram" component="div" className="text-red-500 text-sm mt-1" />
+                    </div>
+                    
+                    {/* Seção de foto - só exibir se requestPhoto for true */}
+                    {(!candidateData || candidateData.requestPhoto === true) && (
+                      <div className="space-y-3">
+                        <label className="block text-sm font-medium text-secondary-700 mb-1">
+                          Foto para Identificação
+                        </label>
+                        <div className="flex flex-col items-center space-y-4">
+                          <div className="relative h-48 w-48 border-2 border-dashed border-secondary-300 rounded-lg flex items-center justify-center bg-secondary-50">
+                            {formValues.photoUrl ? (
+                              <div className="relative h-full w-full">
+                                <Image 
+                                  src={formValues.photoUrl} 
+                                  alt="Foto do candidato" 
+                                  layout="fill" 
+                                  objectFit="cover" 
+                                  className="rounded-lg"
+                                />
+                                <button 
+                                  type="button"
+                                  onClick={() => {
+                                    setFieldValue('photoUrl', '');
+                                    setFormValues({...formValues, photoUrl: ''});
+                                  }}
+                                  className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                  </svg>
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="text-center p-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-secondary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0118.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" clipRule="evenodd" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" clipRule="evenodd" />
+                                </svg>
+                                <p className="mt-2 text-sm text-secondary-500">Clique para adicionar uma foto</p>
+                                <p className="text-xs text-secondary-400">Essa foto será usada apenas para identificação</p>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="flex space-x-3">
+                            <button
+                              type="button"
+                              onClick={() => capturePhoto()}
+                              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                            >
+                              <div className="flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M4 5a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.121-1.121A2 2 0 0111.172 3H8.828a2 2 0 00-1.414.586L6.293 4.707A1 1 0 015.586 5H4zm6 9a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                                </svg>
+                                Tirar Selfie
+                              </div>
+                            </button>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              id="photo-upload"
+                              className="hidden"
+                              onChange={(e) => handleFileUpload(e, setFieldValue)}
+                              ref={fileInputRef}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => fileInputRef.current?.click()}
+                              className="px-4 py-2 bg-secondary-200 text-secondary-700 rounded-md hover:bg-secondary-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary-500"
+                            >
+                              <div className="flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a3 3 0 00-3-3 3 3 0 00-3 3v4a3 3 0 013 3 3 3 0 003-3V7a1 1 0 10-2 0v4a1 1 0 11-2 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
+                                </svg>
+                                Upload
+                              </div>
+                            </button>
+                          </div>
+                        </div>
+                        
+                        {/* Modal para captura de foto */}
+                        {showCamera && (
+                          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                            <div className="bg-white p-6 rounded-lg max-w-lg w-full">
+                              <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-lg font-medium text-secondary-900">Capturar Foto</h3>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowCamera(false)}
+                                  className="text-secondary-400 hover:text-secondary-500"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              </div>
+                              <div className="relative">
+                                <video
+                                  ref={videoRef}
+                                  autoPlay
+                                  playsInline
+                                  className="w-full h-auto rounded-md"
+                                ></video>
+                              </div>
+                              <div className="mt-4 flex justify-center">
+                                <button
+                                  type="button"
+                                  onClick={() => takePhoto(setFieldValue)}
+                                  className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                                >
+                                  Capturar
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Seção de autorização para uso da foto - só exibir se requestPhoto for true */}
+                    {(!candidateData || candidateData.requestPhoto === true) && (
+                      <div>
+                        <label htmlFor="photoConsent" className="block text-sm font-medium text-secondary-700 mb-1">
+                          Autorização para uso da foto
+                        </label>
+                        <div className="flex items-start">
+                          <div className="flex items-center h-5">
+                            <Field
+                              type="checkbox"
+                              name="photoConsent"
+                              id="photoConsent"
+                              className="focus:ring-primary-500 h-4 w-4 text-primary-600 border-secondary-300 rounded"
+                            />
+                          </div>
+                          <div className="ml-3 text-sm">
+                            <label htmlFor="photoConsent" className="text-secondary-600">
+                              Eu autorizo o uso da minha foto apenas para fins de identificação durante o processo seletivo. E estou ciente que minha foto apenas será usada para o fim de identificação deste processo seletivo e depois excluída.
+                            </label>
+                            <ErrorMessage name="photoConsent" component="div" className="text-red-500 text-sm mt-1" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     
                     <div className="flex justify-between">
                       <button
@@ -360,9 +642,11 @@ const Introducao: NextPage = () => {
                       </button>
                       <button
                         type="submit"
-                        disabled={isSubmitting || !!candidateData}
+                        disabled={isSubmitting || (candidateData?.requestPhoto === true && !values.photoUrl)}
                         className={`px-4 py-2 bg-primary-600 text-white rounded-md ${
-                          isSubmitting || !!candidateData ? 'opacity-70 cursor-not-allowed' : 'hover:bg-primary-700'
+                          isSubmitting || (candidateData?.requestPhoto === true && !values.photoUrl) 
+                            ? 'opacity-70 cursor-not-allowed' 
+                            : 'hover:bg-primary-700'
                         }`}
                       >
                         {isSubmitting ? 'Enviando...' : 'Iniciar Teste'}

@@ -1,8 +1,16 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../lib/prisma';
+import crypto from 'crypto';
 
-// Número máximo de tentativas permitidas
-const MAX_ATTEMPTS = 5;
+// Função para gerar um token de segurança baseado no ID do candidato e uma chave secreta
+function generateSecurityToken(candidateId: string): string {
+  // Em produção, use uma variável de ambiente para a chave secreta
+  const secretKey = process.env.SECURITY_TOKEN_SECRET || 'avaliarh-security-key';
+  return crypto
+    .createHmac('sha256', secretKey)
+    .update(candidateId)
+    .digest('hex');
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -10,7 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
   
   try {
-    const { inviteCode } = req.body;
+    const { inviteCode, securityToken } = req.body;
     
     if (!inviteCode) {
       return res.status(400).json({ error: 'Código de convite é obrigatório' });
@@ -19,7 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(`Validando código de convite: ${inviteCode}`);
     
     // Buscar o candidato pelo código de convite usando SQL raw
-    // Incluindo o testId e status na consulta
+    // Incluindo o testId, status e score na consulta
     const candidates = await prisma.$queryRaw`
       SELECT 
         id, 
@@ -31,7 +39,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         status,
         "inviteExpires", 
         "inviteAttempts",
-        "testId"
+        "testId",
+        observations,
+        instagram,
+        score,
+        "showResults"
       FROM "Candidate"
       WHERE "inviteCode" = ${inviteCode}
     `;
@@ -45,7 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'Código de convite inválido' });
     }
     
-    // Incrementar o contador de tentativas
+    // Incrementar o contador de tentativas (mantemos o contador para fins de log, mas não limitamos mais)
     await prisma.$executeRaw`
       UPDATE "Candidate"
       SET "inviteAttempts" = "inviteAttempts" + 1
@@ -57,29 +69,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'O código de convite expirou' });
     }
     
-    // Verificar se excedeu o número máximo de tentativas
-    if (candidate.inviteAttempts + 1 >= MAX_ATTEMPTS) {
-      return res.status(400).json({ 
-        error: 'Número máximo de tentativas excedido. Entre em contato com o administrador.'
-      });
-    }
-    
     // Verificar se o candidato já completou o teste
     console.log(`Status do candidato: completed=${candidate.completed}, status=${candidate.status}`);
     
     if (candidate.completed || candidate.status === 'APPROVED') {
       console.log(`Candidato ${candidate.id} (${candidate.name}) já completou a avaliação`);
       
-      console.log(`Buscando respostas para o candidato ${candidate.id}`);
-      
-      // Buscar as respostas do candidato para exibição
-      const responses = await prisma.response.findMany({
-        where: { candidateId: candidate.id }
-      });
-      
-      console.log(`Encontradas ${responses.length} respostas para o candidato ${candidate.id}`);
-      
       try {
+        console.log(`Buscando respostas para o candidato ${candidate.id}`);
+        
+        // Buscar as respostas do candidato para exibição
+        const responses = await prisma.response.findMany({
+          where: { candidateId: candidate.id }
+        });
+        
+        console.log(`Encontradas ${responses.length} respostas para o candidato ${candidate.id}`);
+        
         // Buscar snapshots separadamente para evitar problemas de tipo
         const responsesWithSnapshots = await prisma.$queryRaw`
           SELECT id, "questionSnapshot", "allOptionsSnapshot", "stageName", "questionText", "optionText"
@@ -141,18 +146,58 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           responsesByStage[response.stageName].push(response);
         });
         
-        return res.status(400).json({ 
-          error: 'Este candidato já completou a avaliação',
+        // Extrair dados de pontuação do campo observations se existirem
+        let scoreData = {
+          score: candidate.score || 0,
+          totalQuestions: 0,
+          accuracyRate: 0
+        };
+        
+        if (candidate.observations) {
+          try {
+            const parsedObservations = JSON.parse(candidate.observations);
+            if (parsedObservations.score !== undefined && 
+                parsedObservations.totalQuestions !== undefined && 
+                parsedObservations.accuracyRate !== undefined) {
+              // Normalizar a taxa de acerto para garantir que seja um valor entre 0 e 1
+              // Se o valor já estiver entre 0 e 1, mantemos como está
+              // Se for maior que 1, assumimos que é um percentual (0-100) e dividimos por 100
+              const normalizedAccuracyRate = 
+                parsedObservations.accuracyRate > 1 
+                  ? parsedObservations.accuracyRate / 100 
+                  : parsedObservations.accuracyRate;
+              
+              scoreData = {
+                score: parsedObservations.score,
+                totalQuestions: parsedObservations.totalQuestions,
+                accuracyRate: normalizedAccuracyRate
+              };
+            }
+          } catch (e) {
+            console.error('Erro ao analisar observations:', e);
+          }
+        }
+        
+        // Retornar um status 200 (sucesso) em vez de 400 (erro)
+        return res.status(200).json({ 
+          success: true,
+          message: 'Este candidato já completou a avaliação',
           completed: true,
           candidateName: candidate.name,
-          responsesByStage
+          candidateEmail: candidate.email,
+          responsesByStage,
+          showResults: candidate.showResults,
+          scoreData
         });
       } catch (error) {
         console.error('Erro ao processar respostas do candidato:', error);
-        return res.status(400).json({ 
-          error: 'Este candidato já completou a avaliação, mas não foi possível recuperar suas respostas',
+        // Ainda retornar um status 200 mesmo em caso de erro, mas indicando que não foi possível recuperar as respostas
+        return res.status(200).json({ 
+          success: true,
+          message: 'Este candidato já completou a avaliação, mas não foi possível recuperar suas respostas',
           completed: true,
-          candidateName: candidate.name
+          candidateName: candidate.name,
+          candidateEmail: candidate.email
         });
       }
     }
@@ -204,6 +249,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Retornar os dados do candidato e do teste associado
     console.log(`Retornando dados do candidato ${candidate.id} (${candidate.name}) e teste associado`);
     
+    // Gerar um token de segurança para este candidato
+    const candidateSecurityToken = generateSecurityToken(candidate.id);
+    
     return res.status(200).json({
       success: true,
       candidate: {
@@ -214,9 +262,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         position: candidate.position || null,
         testId: candidate.testId || null,
         completed: candidate.completed,
-        status: candidate.status
+        status: candidate.status,
+        observations: candidate.observations,
+        instagram: candidate.instagram,
+        score: candidate.score,
+        showResults: candidate.showResults
       },
-      test: test
+      test: test,
+      securityToken: candidateSecurityToken
     });
   } catch (error) {
     console.error('Erro ao validar convite:', error);

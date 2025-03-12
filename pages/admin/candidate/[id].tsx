@@ -197,32 +197,41 @@ const CandidateDetails = () => {
       
       const data = await response.json();
       console.log('Dados recebidos da API:', data);
-      console.log('Respostas recebidas:', data.responses ? data.responses.length : 0);
       
-      // Garantir que as respostas sejam um array
-      if (data.responses && !Array.isArray(data.responses)) {
-        console.error('Respostas não é um array:', data.responses);
-        data.responses = [];
+      // Extrair o objeto candidate da resposta
+      const candidateData = data.candidate;
+      
+      if (!candidateData) {
+        throw new Error('Dados do candidato não encontrados na resposta');
       }
       
-      setCandidate(data);
+      console.log('Dados do candidato:', candidateData);
+      console.log('Respostas recebidas:', candidateData.responses ? candidateData.responses.length : 0);
+      
+      // Garantir que as respostas sejam um array
+      if (candidateData.responses && !Array.isArray(candidateData.responses)) {
+        console.error('Respostas não é um array:', candidateData.responses);
+        candidateData.responses = [];
+      }
+      
+      setCandidate(candidateData);
       
       setFormData({
-        name: data.name || '',
-        email: data.email || '',
-        position: data.position || '',
-        status: data.status || 'PENDING',
-        observations: data.observations || '',
-        rating: data.rating ? data.rating.toString() : '0',
-        inviteCode: data.inviteCode || '',
-        inviteExpires: data.inviteExpires || null,
-        inviteSent: data.inviteSent || false,
-        inviteAttempts: data.inviteAttempts || 0,
-        testId: data.testId || ''
+        name: candidateData.name || '',
+        email: candidateData.email || '',
+        position: candidateData.position || '',
+        status: candidateData.status || 'PENDING',
+        observations: candidateData.observations || '',
+        rating: candidateData.rating ? candidateData.rating.toString() : '0',
+        inviteCode: candidateData.inviteCode || '',
+        inviteExpires: candidateData.inviteExpires || null,
+        inviteSent: candidateData.inviteSent || false,
+        inviteAttempts: candidateData.inviteAttempts || 0,
+        testId: candidateData.testId || ''
       });
       
-      if (data.testId) {
-        setSelectedTest(data.testId);
+      if (candidateData.testId) {
+        setSelectedTest(candidateData.testId);
       }
       
       setError(null);

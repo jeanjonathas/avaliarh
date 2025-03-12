@@ -20,7 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   
   try {
     console.log('Recebendo requisição para criar candidato:', req.body);
-    const { name, email, phone, position, linkedin, github, portfolio, resumeUrl } = req.body;
+    const { name, email, phone, position, instagram, resumeUrl, requestPhoto, showResults } = req.body;
     
     if (!name || !email) {
       console.error('Erro: Nome e email são obrigatórios');
@@ -38,10 +38,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       inviteAttempts: 0,
       inviteSent: false,
       testDate: new Date(), // Garantir que testDate seja definido
-      linkedin: linkedin || null,
-      github: github || null,
-      portfolio: portfolio || null,
+      instagram: instagram || null,
       resumeUrl: resumeUrl || null,
+      requestPhoto: requestPhoto !== undefined ? requestPhoto : true,
+      showResults: showResults !== undefined ? showResults : true,
+      // Armazenar as preferências como observações em formato JSON
+      observations: JSON.stringify({
+        requestPhoto: requestPhoto !== undefined ? requestPhoto : true,
+        showResults: showResults !== undefined ? showResults : true
+      })
     };
     
     console.log('Criando candidato com os dados:', candidateData);

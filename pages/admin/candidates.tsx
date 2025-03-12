@@ -59,6 +59,8 @@ const CandidatesPage: NextPage = () => {
     email: '',
     phone: '',
     position: '',
+    requestPhoto: true,
+    showResults: true,
   })
   const [inviteCode, setInviteCode] = useState('')
   const [inviteExpires, setInviteExpires] = useState('')
@@ -220,7 +222,7 @@ const CandidatesPage: NextPage = () => {
       
       // Fechar o modal de adição após adicionar o candidato com sucesso
       setShowAddModal(false)
-      setNewCandidate({ name: '', email: '', phone: '', position: '' })
+      setNewCandidate({ name: '', email: '', phone: '', position: '', requestPhoto: true, showResults: true })
       
       // Configurar e mostrar a modal de sucesso
       setAddedCandidateId(data.id)
@@ -358,7 +360,7 @@ const CandidatesPage: NextPage = () => {
   // Fechar modal e resetar estados
   const handleCloseModal = () => {
     setShowAddModal(false)
-    setNewCandidate({ name: '', email: '', phone: '', position: '' })
+    setNewCandidate({ name: '', email: '', phone: '', position: '', requestPhoto: true, showResults: true })
     setInviteCode('')
     setInviteExpires('')
     setShowInviteSection(false)
@@ -648,7 +650,9 @@ const CandidatesPage: NextPage = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500">
-                        {candidate.score !== undefined ? `${candidate.score}%` : '-'}
+                        {candidate.score !== undefined ? 
+                          `${candidate.score > 1 ? candidate.score : Math.round(candidate.score * 100)}%` 
+                          : '-'}
                       </td>
                       <td className="px-6 py-4">
                         <Rating
@@ -928,6 +932,32 @@ const CandidatesPage: NextPage = () => {
                           onChange={(e) => setNewCandidate({ ...newCandidate, position: e.target.value })}
                           className="input-field"
                         />
+                      </div>
+                      <div className="flex flex-col space-y-4">
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="requestPhoto"
+                            checked={newCandidate.requestPhoto}
+                            onChange={(e) => setNewCandidate({ ...newCandidate, requestPhoto: e.target.checked })}
+                            className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                          />
+                          <label htmlFor="requestPhoto" className="text-sm font-medium text-gray-700">
+                            Solicitar foto do candidato
+                          </label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="showResults"
+                            checked={newCandidate.showResults}
+                            onChange={(e) => setNewCandidate({ ...newCandidate, showResults: e.target.checked })}
+                            className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                          />
+                          <label htmlFor="showResults" className="text-sm font-medium text-gray-700">
+                            Mostrar resultados ao final do teste
+                          </label>
+                        </div>
                       </div>
                     </div>
                   </div>

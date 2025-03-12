@@ -50,17 +50,17 @@ const Home: NextPage = () => {
       const data = await response.json()
       
       if (!response.ok) {
-        // Verificar se o teste já foi concluído, mesmo com erro
-        if (data.completed && data.responsesByStage) {
-          console.log('Teste já concluído, redirecionando para página de respostas anteriores');
-          // Armazenar os dados das respostas na sessão
-          sessionStorage.setItem('completedResponses', JSON.stringify(data));
-          // Redirecionar para a página de visualização de respostas
-          router.push(`/teste/respostas-anteriores?code=${inviteCode}`);
-          return;
-        }
-        
         throw new Error(data.error || 'Erro ao validar código de convite')
+      }
+
+      // Verificar se o teste já foi concluído
+      if (data.completed && data.responsesByStage) {
+        console.log('Teste já concluído, redirecionando para página de respostas anteriores');
+        // Armazenar os dados das respostas na sessão
+        sessionStorage.setItem('completedResponses', JSON.stringify(data));
+        // Redirecionar para a página de visualização de respostas
+        router.push(`/teste/respostas-anteriores?code=${inviteCode}`);
+        return;
       }
 
       // Armazenar os dados do candidato na sessão

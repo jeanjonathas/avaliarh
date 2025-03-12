@@ -31,25 +31,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'Candidato não encontrado' });
     }
     
-    // Atualizar os dados do candidato
-    const updatedCandidate = await prisma.candidate.update({
-      where: { id: candidateId },
-      data: {
-        name: name || candidate.name,
-        email: email || candidate.email,
-        phone: phone || candidate.phone,
-        position: position || candidate.position,
-        linkedin: linkedin || candidate.linkedin,
-        github: github || candidate.github,
-        portfolio: portfolio || candidate.portfolio,
-        updatedAt: new Date()
-      }
-    });
+    // Atualizar os dados do candidato usando SQL raw
+    const updatedCandidate = await prisma.$queryRaw`
+      UPDATE "Candidate"
+      SET 
+        name = ${name || candidate.name},
+        email = ${email || candidate.email},
+        phone = ${phone || candidate.phone},
+        position = ${position || candidate.position},
+        linkedin = ${linkedin || candidate.linkedin},
+        github = ${github || candidate.github},
+        portfolio = ${portfolio || candidate.portfolio},
+        "updatedAt" = NOW()
+      WHERE id = ${candidateId}
+      RETURNING *
+    `;
     
     return res.status(200).json({ 
       success: true, 
       message: 'Dados de contato atualizados com sucesso',
-      data: updatedCandidate
+      data: updatedCandidate[0]
     });
   } catch (error) {
     console.error('Erro ao atualizar dados de contato:', error);

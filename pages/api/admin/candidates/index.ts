@@ -1,7 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
-import { prisma } from '../../../../lib/prisma'
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
 
 // Definindo a interface para o tipo Response com os campos adicionais
 interface ResponseWithSnapshot {
@@ -56,210 +58,147 @@ export default async function handler(
     return res.status(401).json({ error: 'Não autorizado' })
   }
 
-  if (req.method === 'GET') {
-    try {
-      // Buscar todos os candidatos
-      // Usando Prisma Client em vez de SQL raw para melhor tipagem e segurança
-      console.log('Buscando candidatos...');
-      
-      const allCandidates = await prisma.candidate.findMany({
+  try {
+    if (req.method === 'GET') {
+      const { status, search, testId } = req.query
+
+      // Construir o filtro base
+      let whereClause: any = {}
+
+      // Adicionar filtro por status, se fornecido
+      if (status && status !== 'all') {
+        whereClause.status = status
+      }
+
+      // Adicionar filtro por testId, se fornecido
+      if (testId) {
+        whereClause.testId = testId
+      }
+
+      // Adicionar filtro de busca, se fornecido
+      if (search) {
+        const searchTerm = String(search).trim()
+        if (searchTerm) {
+          whereClause.OR = [
+            { name: { contains: searchTerm, mode: 'insensitive' } },
+            { email: { contains: searchTerm, mode: 'insensitive' } },
+            { position: { contains: searchTerm, mode: 'insensitive' } }
+          ]
+        }
+      }
+
+      // Buscar candidatos com filtros
+      const candidates = await prisma.candidate.findMany({
+        where: whereClause,
         orderBy: {
           createdAt: 'desc'
         },
         include: {
-          responses: true
-        }
-      });
-      
-      console.log(`Encontrados ${allCandidates.length} candidatos no banco de dados.`);
-      
-      // Processar os candidatos para calcular a pontuação
-      const candidates = allCandidates.map(candidate => {
-        // Calcular pontuação apenas se o candidato tiver respostas
-        let score = null;
-        if (candidate.completed && candidate.responses.length > 0) {
-          // Converter as respostas para o tipo personalizado
-          const typedResponses = candidate.responses as unknown as ResponseWithSnapshot[];
-          
-          // Contar respostas corretas, verificando também inconsistências
-          let correctResponses = 0;
-          let totalResponses = typedResponses.length;
-          
-          typedResponses.forEach(response => {
-            // Verificar se a resposta está marcada como correta
-            if (response.isCorrectOption) {
-              correctResponses++;
-              return;
+          responses: true,
+          test: {
+            select: {
+              id: true,
+              title: true
             }
-            
-            // Verificar se há inconsistência (resposta correta marcada como incorreta)
-            if (response.allOptionsSnapshot) {
-              try {
-                const allOptions = typeof response.allOptionsSnapshot === 'string'
-                  ? JSON.parse(response.allOptionsSnapshot)
-                  : response.allOptionsSnapshot;
-                
-                // Verificar se a opção selecionada deveria ser correta
-                const selectedOption = allOptions.find((opt: any) => opt.id === response.optionId);
-                const correctOption = allOptions.find((opt: any) => opt.isCorrect === true);
-                
-                if (selectedOption && correctOption) {
-                  // Se a opção selecionada é a mesma que a correta (comparando texto ou ID)
-                  if (selectedOption.id === correctOption.id || 
-                      selectedOption.text === correctOption.text) {
-                    console.log(`Corrigindo inconsistência: Resposta ${response.id} deveria ser marcada como correta`);
-                    correctResponses++;
-                  }
-                }
-              } catch (error) {
-                console.error('Erro ao verificar inconsistência nas opções:', error);
+          }
+        }
+      })
+
+      // Processar os candidatos para incluir estatísticas
+      const processedCandidates = candidates.map(candidate => {
+        // Calcular estatísticas
+        const totalResponses = candidate.responses.length
+        const correctResponses = candidate.responses.filter(r => r.isCorrectOption).length
+        const score = totalResponses > 0 ? Math.round((correctResponses / totalResponses) * 100) : 0
+
+        // Agrupar respostas por etapa para calcular pontuação por etapa
+        const stageMap: Record<string, { id: string; name: string; correct: number; total: number }> = {}
+        
+        candidate.responses.forEach(response => {
+          if (response.stageId && response.stageName) {
+            if (!stageMap[response.stageId]) {
+              stageMap[response.stageId] = {
+                id: response.stageId,
+                name: response.stageName,
+                correct: 0,
+                total: 0
               }
             }
-          });
-          
-          // Calcular a pontuação como porcentagem
-          score = totalResponses > 0 ? Math.round((correctResponses / totalResponses) * 100) : 0;
-        }
+            
+            stageMap[response.stageId].total++
+            if (response.isCorrectOption) {
+              stageMap[response.stageId].correct++
+            }
+          }
+        })
         
-        // Converter datas para strings para evitar problemas de serialização
-        const serializedCandidate = {
-          ...candidate,
+        // Calcular porcentagem para cada etapa
+        const stageScores = Object.values(stageMap).map(stage => {
+          return {
+            ...stage,
+            percentage: stage.total > 0 ? Math.round((stage.correct / stage.total) * 100) : 0
+          }
+        })
+
+        // Formatar datas para evitar problemas de serialização
+        return {
           id: candidate.id,
           name: candidate.name,
           email: candidate.email,
           phone: candidate.phone,
           position: candidate.position,
+          status: candidate.status,
+          rating: candidate.rating,
+          observations: candidate.observations,
+          completed: candidate.completed,
           testDate: candidate.testDate ? candidate.testDate.toISOString() : null,
           interviewDate: candidate.interviewDate ? candidate.interviewDate.toISOString() : null,
-          completed: candidate.completed,
           createdAt: candidate.createdAt.toISOString(),
           updatedAt: candidate.updatedAt.toISOString(),
-          inviteExpires: candidate.inviteExpires ? candidate.inviteExpires.toISOString() : null,
-          status: candidate.status,
           inviteCode: candidate.inviteCode,
           inviteSent: candidate.inviteSent,
-          inviteAttempts: Number(candidate.inviteAttempts), // Converter possível BigInt
-          score,
-          // Remover campos que não podem ser serializados para JSON
-          responses: undefined
-        };
-        
-        return serializedCandidate;
-      });
-      
-      console.log(`Processados ${candidates.length} candidatos para exibição.`);
+          inviteAttempts: Number(candidate.inviteAttempts),
+          inviteExpires: candidate.inviteExpires ? candidate.inviteExpires.toISOString() : null,
+          instagram: candidate.instagram,
+          timeSpent: candidate.timeSpent,
+          photoUrl: candidate.photoUrl,
+          score: candidate.score || score,
+          test: candidate.test,
+          totalResponses,
+          correctResponses,
+          calculatedScore: score,
+          stageScores
+        }
+      })
 
-      // Processar os candidatos
-      const processedCandidates = Array.isArray(candidates) 
-        ? await Promise.all(
-            candidates.map(async (candidate: any) => {
-              // Se não completou o teste, retornar candidato simples
-              if (!candidate.completed) {
-                return {
-                  ...candidate,
-                  score: undefined,
-                  stageScores: []
-                };
-              }
+      return res.status(200).json(processedCandidates)
+    } else if (req.method === 'POST') {
+      const { name, email, phone, position, testId, instagram } = req.body
 
-              // Buscar pontuações por etapa
-              const stageScores = await prisma.$queryRaw`
-                SELECT 
-                  "stageId" as id, 
-                  "stageName" as name,
-                  COUNT(CASE WHEN "isCorrectOption" = true THEN 1 ELSE NULL END) as correct,
-                  COUNT(id) as total,
-                  (COUNT(CASE WHEN "isCorrectOption" = true THEN 1 ELSE NULL END)::float / COUNT(id)::float * 100)::int as percentage
-                FROM "Response" 
-                WHERE "candidateId" = ${candidate.id}
-                  AND "stageId" IS NOT NULL
-                GROUP BY "stageId", "stageName"
-                ORDER BY "stageName"
-              `;
-              
-              // Converter BigInt para Number nos resultados de stageScores
-              const convertedStageScores = Array.isArray(stageScores) 
-                ? convertBigIntToNumber(stageScores) 
-                : [];
-              
-              return {
-                ...candidate,
-                score: Math.round(candidate.score) || 0,
-                stageScores: convertedStageScores
-              };
-            })
-          )
-        : [];
-
-      // Garantir que todos os valores BigInt sejam convertidos para Number
-      const serializedCandidates = convertBigIntToNumber(processedCandidates);
-      console.log('Candidatos serializados com sucesso.');
-      
-      return res.status(200).json(serializedCandidates);
-    } catch (error) {
-      console.error('Erro ao carregar candidatos:', error);
-      // Retornar array vazio em vez de erro para não quebrar a UI
-      return res.status(200).json([]);
-    }
-  } else if (req.method === 'POST') {
-    try {
-      const { name, email, position, inviteExpires, inviteCode } = req.body;
-      
-      if (!name || !email) {
-        return res.status(400).json({ error: 'Nome e email são obrigatórios' });
+      if (!name || !email || !testId) {
+        return res.status(400).json({ error: 'Nome, email e ID do teste são obrigatórios' })
       }
-      
-      // Verificar se já existe um candidato com este email
-      const existingCandidates = await prisma.$queryRaw`
-        SELECT id FROM "Candidate" WHERE email = ${email} LIMIT 1
-      `;
-      
-      if (Array.isArray(existingCandidates) && existingCandidates.length > 0) {
-        return res.status(400).json({ error: 'Já existe um candidato com este email' });
-      }
-      
-      // Criar o candidato
-      await prisma.$executeRaw`
-        INSERT INTO "Candidate" (
-          id,
+
+      // Criar novo candidato
+      const newCandidate = await prisma.candidate.create({
+        data: {
           name,
           email,
-          position,
-          "inviteCode",
-          "inviteExpires",
-          "createdAt",
-          "updatedAt"
-        ) VALUES (
-          gen_random_uuid(),
-          ${name},
-          ${email},
-          ${position || null},
-          ${inviteCode || null},
-          ${inviteExpires ? new Date(inviteExpires) : null},
-          NOW(),
-          NOW()
-        )
-      `;
-      
-      // Buscar o candidato recém-criado
-      const newCandidates = await prisma.$queryRaw`
-        SELECT * FROM "Candidate"
-        WHERE email = ${email}
-        ORDER BY "createdAt" DESC
-        LIMIT 1
-      `;
-      
-      const newCandidate = Array.isArray(newCandidates) && newCandidates.length > 0
-        ? newCandidates[0]
-        : { name, email, position };
-      
-      return res.status(201).json(newCandidate);
-    } catch (error) {
-      console.error('Erro ao criar candidato:', error);
-      return res.status(500).json({ error: 'Erro ao criar candidato' });
+          phone: phone || null,
+          position: position || null,
+          instagram: instagram || null,
+          testId
+        }
+      })
+
+      return res.status(201).json(newCandidate)
+    } else {
+      return res.status(405).json({ error: 'Método não permitido' })
     }
-  } else {
-    res.setHeader('Allow', ['GET', 'POST']);
-    res.status(405).end(`Method ${req.method} Not Allowed`);
+  } catch (error) {
+    console.error('Erro:', error)
+    return res.status(500).json({ error: 'Erro interno do servidor', details: error.message })
+  } finally {
+    await prisma.$disconnect()
   }
 }

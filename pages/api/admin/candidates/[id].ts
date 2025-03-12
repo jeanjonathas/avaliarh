@@ -1,834 +1,325 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { PrismaClient, Prisma } from '@prisma/client'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
+import { PrismaClient, Candidate } from '@prisma/client'
 
 // Função auxiliar para converter BigInt para Number
 function convertBigIntToNumber(obj: any): any {
-  if (typeof obj === 'object' && obj !== null) {
-    for (const key in obj) {
-      if (typeof obj[key] === 'bigint') {
-        obj[key] = Number(obj[key]);
-      } else if (typeof obj[key] === 'object' && obj[key] !== null) {
-        convertBigIntToNumber(obj[key]);
-      }
-    }
+  if (obj === null || obj === undefined) {
+    return obj;
   }
+
+  if (typeof obj === 'bigint') {
+    return Number(obj);
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(convertBigIntToNumber);
+  }
+
+  if (typeof obj === 'object') {
+    const result: any = {};
+    for (const key in obj) {
+      result[key] = convertBigIntToNumber(obj[key]);
+    }
+    return result;
+  }
+
   return obj;
 }
 
-// Definir a interface para a resposta
-interface ResponseWithSnapshot {
-  id: string;
-  candidateId: string;
-  questionId: string;
-  optionId: string;
-  createdAt: Date;
-  updatedAt: Date;
-  stageName: string | null;
-  stageId: string | null;
-  isCorrectOption: boolean;
-  optionText: string;
-  questionText: string;
-  categoryName: string | null;
-  questionSnapshot: any;
-  allOptionsSnapshot: any;
-}
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const id = req.query.id as string;
-
-  if (req.method === 'GET') {
-    const session = await getServerSession(req, res, authOptions);
-    if (!session) {
-      return res.status(401).json({ message: 'Unauthorized' });
-    }
-
-    const prisma = new PrismaClient();
+  const session = await getServerSession(req, res, authOptions);
+  
+  if (!session) {
+    return res.status(401).json({ error: 'Não autorizado' });
+  }
+  
+  const prisma = new PrismaClient();
+  
+  try {
+    const { id } = req.query;
     
-    // Buscar o candidato com suas respostas
-    const candidate = await prisma.candidate.findUnique({
-      where: { id },
-      include: {
-        responses: true,
-        test: {
-          select: {
-            id: true,
-            title: true,
-            timeLimit: true,
-            TestStage: {
-              include: {
-                stage: true
-              },
-              orderBy: {
-                order: 'asc'
-              }
-            },
-            testQuestions: {
-              include: {
-                question: true,
-                stage: true
-              }
-            }
-          }
-        }
-      }
-    });
-
-    if (!candidate) {
-      return res.status(404).json({ message: 'Candidate not found' });
+    if (!id || typeof id !== 'string') {
+      return res.status(400).json({ error: 'ID do candidato é obrigatório' });
     }
-
-    // Processar as respostas, se houver
-    if (candidate.responses && candidate.responses.length > 0) {
-      console.log(`Processando ${candidate.responses.length} respostas`);
-      
-      // Criar um mapa para armazenar as respostas agrupadas por etapa
-      const responsesByStage: Record<string, any[]> = {};
-      const stageIdToNameMap: Record<string, string> = {};
-      const stageOrderMap: Record<string, number> = {};
-      
-      // Inicializar o mapa de etapas com base nas etapas do teste
-      if (candidate.test && candidate.test.TestStage) {
-        candidate.test.TestStage.forEach(testStage => {
-          const stageId = testStage.stage.id;
-          const stageName = testStage.stage.title;
-          const stageOrder = testStage.order || 0;
-          
-          // Inicializar o array de respostas para esta etapa
-          responsesByStage[stageId] = [];
-          
-          // Mapear o ID da etapa para o nome
-          stageIdToNameMap[stageId] = stageName;
-          
-          // Mapear o ID da etapa para a ordem
-          stageOrderMap[stageId] = stageOrder;
-          
-          console.log(`Mapeando etapa: ${stageName} (${stageId})`);
-        });
-      } else {
-        // Se o teste foi excluído, criar etapas virtuais baseadas nas respostas
-        console.log("Teste não encontrado ou excluído. Criando etapas virtuais baseadas nas respostas.");
-        
-        // Agrupar respostas por stageId
-        const stageGroups = new Map();
-        
-        candidate.responses.forEach(response => {
-          const typedResponse = response as unknown as ResponseWithSnapshot;
-          let stageId = typedResponse.stageId || null;
-          let stageName = typedResponse.stageName || null;
-          
-          if (stageId && stageName) {
-            if (!stageGroups.has(stageId)) {
-              stageGroups.set(stageId, {
-                id: stageId,
-                name: stageName,
-                responses: []
-              });
-              
-              // Adicionar ao mapa de etapas
-              stageIdToNameMap[stageId] = stageName;
-              stageOrderMap[stageId] = stageGroups.size; // Ordem baseada na ordem de descoberta
-              responsesByStage[stageId] = [];
-            }
-          }
-        });
-        
-        console.log(`Criadas ${stageGroups.size} etapas virtuais baseadas nas respostas do candidato.`);
-      }
-      
-      // Inicializar o objeto de respostas por etapa
-      Object.keys(stageIdToNameMap).forEach(stageId => {
-        responsesByStage[stageId] = [];
-      });
-      
-      // Processar cada resposta para adicionar informações extras
-      candidate.responses.forEach(response => {
-        // Converter a resposta para o tipo com campos adicionais
-        const typedResponse = response as unknown as ResponseWithSnapshot;
-        
-        // Criar uma cópia da resposta para processamento
-        const processedResponse: any = { ...response };
-        
-        // Verificar se a resposta tem um stageId válido
-        let stageId = typedResponse.stageId;
-        let stageName = '';
-        let stageFound = false;
-        
-        // Verificar se a etapa existe no mapa (ou seja, pertence ao teste atual)
-        if (stageId && responsesByStage[stageId]) {
-          stageName = stageIdToNameMap[stageId] || 'Etapa Desconhecida';
-          stageFound = true;
-          console.log(`Processando resposta para etapa: ${stageName} (${stageId})`);
-          console.log(`Etapa pertence ao teste atual: ${stageName}`);
-        } else if (stageId) {
-          // A etapa não pertence ao teste atual, mas temos um ID
-          console.log(`Processando resposta para etapa: ${stageIdToNameMap[stageId] || stageId} (${stageId})`);
-          console.log(`Etapa não pertence ao teste atual: ${stageIdToNameMap[stageId] || stageId}. Verificando outras fontes...`);
-          
-          // Tentar encontrar a etapa pelo nome
-          if (typedResponse.stageName) {
-            const matchingStage = Object.entries(stageIdToNameMap).find(([id, name]) => 
-              name.toLowerCase() === typedResponse.stageName?.toLowerCase()
-            );
-            
-            if (matchingStage) {
-              stageId = matchingStage[0];
-              stageName = matchingStage[1];
-              stageFound = true;
-              console.log(`Etapa encontrada pelo nome: ${stageName} (${stageId})`);
-            } else {
-              console.log(`Etapa pelo nome não pertence ao teste atual: ${typedResponse.stageName}. Verificando outras fontes...`);
-            }
-          }
-          
-          // Tentar encontrar a etapa via questionSnapshot
-          if (!stageFound && typedResponse.questionSnapshot) {
-            const questionSnapshot = typeof typedResponse.questionSnapshot === 'string'
-              ? JSON.parse(typedResponse.questionSnapshot)
-              : typedResponse.questionSnapshot;
-              
-            if (questionSnapshot && questionSnapshot.stageName) {
-              const matchingStage = Object.entries(stageIdToNameMap).find(([id, name]) => 
-                name.toLowerCase() === questionSnapshot.stageName.toLowerCase()
-              );
-              
-              if (matchingStage) {
-                stageId = matchingStage[0];
-                stageName = matchingStage[1];
-                stageFound = true;
-                console.log(`Etapa encontrada via questionSnapshot: ${stageName} (${stageId})`);
-              } else {
-                console.log(`Etapa via questionSnapshot não pertence ao teste atual: ${questionSnapshot.stageName}`);
-              }
-            }
-          }
-          
-          // Se ainda não encontrou a etapa, tentar encontrar via testQuestions
-          if (!stageFound && typedResponse.questionId) {
-            try {
-              // Encontrar a etapa atual da questão via testQuestions
-              const testQuestion = candidate.test.testQuestions.find(tq => 
-                tq.questionId === typedResponse.questionId
-              );
-              
-              if (testQuestion && testQuestion.stageId && responsesByStage[testQuestion.stageId]) {
-                stageId = testQuestion.stageId;
-                stageName = stageIdToNameMap[stageId] || 'Etapa Desconhecida';
-                stageFound = true;
-                console.log(`Usando etapa atual da questão via testQuestions: ${stageName} (${stageId})`);
-              }
-            } catch (error) {
-              console.error('Erro ao buscar etapa via testQuestions:', error);
-            }
-          }
-        } else {
-          console.log('Resposta sem etapa associada:', response.id);
-        }
-        
-        // Adicionar informações da opção a partir do snapshot
-        if (typedResponse.allOptionsSnapshot) {
-          try {
-            const allOptions = typeof typedResponse.allOptionsSnapshot === 'string'
-              ? JSON.parse(typedResponse.allOptionsSnapshot)
-              : typedResponse.allOptionsSnapshot;
-            
-            console.log(`allOptionsSnapshot para questão ${typedResponse.questionId} contém ${allOptions.length} opções: ${JSON.stringify(allOptions)}`);
-            
-            // Verificar se a opção selecionada existe no snapshot
-            const selectedOption = allOptions.find((opt: any) => opt.id === typedResponse.optionId);
-            if (selectedOption) {
-              processedResponse.optionText = selectedOption.text;
-              
-              // Verificar se a opção é correta
-              const isCorrect = selectedOption.isCorrect === true;
-              
-              // Verificar se há inconsistência entre o que foi armazenado e o que deveria ser
-              if (processedResponse.isCorrectOption !== isCorrect) {
-                console.log(`CORREÇÃO: Atualizando isCorrectOption de ${processedResponse.isCorrectOption} para ${isCorrect} para a resposta ${response.id}`);
-                processedResponse.isCorrectOption = isCorrect;
-              }
-            }
-          } catch (error) {
-            console.error('Erro ao processar allOptionsSnapshot:', error);
-          }
-        }
-        
-        if (typedResponse.isCorrectOption !== undefined) {
-          processedResponse.isCorrectOption = typedResponse.isCorrectOption;
-        }
-        
-        // Adicionar informações da questão a partir do snapshot
-        if (typedResponse.questionText) {
-          processedResponse.questionText = typedResponse.questionText;
-        }
-        
-        if (typedResponse.categoryName) {
-          processedResponse.categoryName = typedResponse.categoryName;
-        }
-        
-        // Processar o snapshot para garantir que é um objeto válido
-        if (typedResponse.allOptionsSnapshot) {
-          try {
-            // Se for uma string, tentar parsear
-            if (typeof typedResponse.allOptionsSnapshot === 'string') {
-              typedResponse.allOptionsSnapshot = JSON.parse(typedResponse.allOptionsSnapshot);
-            }
-            
-            // Verificar se é um array
-            if (!Array.isArray(typedResponse.allOptionsSnapshot)) {
-              console.error('allOptionsSnapshot não é um array:', typedResponse.allOptionsSnapshot);
-              typedResponse.allOptionsSnapshot = [];
-            } else {
-              console.log(`allOptionsSnapshot para questão ${typedResponse.questionId} contém ${typedResponse.allOptionsSnapshot.length} opções:`, 
-                JSON.stringify(typedResponse.allOptionsSnapshot));
-            }
-          } catch (error) {
-            console.error('Erro ao processar allOptionsSnapshot:', error);
-            typedResponse.allOptionsSnapshot = [];
-          }
-        } else {
-          console.log(`Nenhum allOptionsSnapshot encontrado para questão ${typedResponse.questionId}`);
-          typedResponse.allOptionsSnapshot = [];
-        }
-        
-        // Usar os snapshots para obter mais informações
-        if (typedResponse.allOptionsSnapshot) {
-          const allOptionsSnapshot = typedResponse.allOptionsSnapshot;
-            
-          console.log(`allOptionsSnapshot para questão ${typedResponse.questionId} contém ${allOptionsSnapshot.length} opções:`, JSON.stringify(allOptionsSnapshot));
-          
-          // Preservar o allOptionsSnapshot na resposta processada
-          processedResponse.allOptionsSnapshot = allOptionsSnapshot;
-          
-          // Encontrar a opção correta e a opção selecionada
-          const correctOption = allOptionsSnapshot.find((opt: any) => opt.isCorrect);
-          const selectedOption = allOptionsSnapshot.find((opt: any) => opt.id === response.optionId);
-          
-          if (correctOption) {
-            processedResponse.correctOptionId = correctOption.id;
-            processedResponse.correctOptionText = correctOption.text;
-          }
-          
-          // Adicionar informações da opção selecionada
-          if (selectedOption) {
-            if (!processedResponse.optionText && selectedOption.text) {
-              processedResponse.optionText = selectedOption.text;
-            }
-            
-            if (processedResponse.isCorrectOption === undefined && selectedOption.isCorrect !== undefined) {
-              processedResponse.isCorrectOption = selectedOption.isCorrect;
-            }
-          }
-          
-          // Garantir que isCorrectOption seja definido mesmo se selectedOption não tiver essa propriedade
-          if (processedResponse.isCorrectOption === undefined) {
-            // Verificar se a opção selecionada é a correta comparando IDs
-            if (correctOption && correctOption.id === response.optionId) {
-              processedResponse.isCorrectOption = true;
-              console.log(`Definindo isCorrectOption=true para a resposta ${response.id} baseado na comparação de IDs`);
-            } else {
-              processedResponse.isCorrectOption = false;
-              console.log(`Definindo isCorrectOption=false para a resposta ${response.id} baseado na comparação de IDs`);
-            }
-          }
-        }
-        
-        if (typedResponse.questionSnapshot) {
-          const questionSnapshot = typeof typedResponse.questionSnapshot === 'string'
-            ? JSON.parse(typedResponse.questionSnapshot)
-            : typedResponse.questionSnapshot;
-            
-          if (!processedResponse.questionText && questionSnapshot.text) {
-            processedResponse.questionText = questionSnapshot.text;
-          }
-          
-          if (!processedResponse.categoryName && questionSnapshot.categoryName) {
-            processedResponse.categoryName = questionSnapshot.categoryName;
-          }
-        }
-        
-        // Adicionar a resposta ao grupo da etapa correspondente
-        if (stageFound && stageId && responsesByStage[stageId]) {
-          responsesByStage[stageId].push(processedResponse);
-          console.log(`Adicionando resposta à etapa: ${stageName} (${stageId})`);
-        } else {
-          // Se não encontrou uma etapa válida, adicionar à primeira etapa como fallback
-          if (Object.keys(responsesByStage).length > 0) {
-            const firstStageId = Object.keys(responsesByStage)[0];
-            responsesByStage[firstStageId].push(processedResponse);
-            console.log(`Adicionando resposta à primeira etapa como fallback: ${stageIdToNameMap[firstStageId]} (${firstStageId})`);
-          } else {
-            console.log(`Não foi possível adicionar a resposta a nenhuma etapa válida.`);
-          }
-        }
-      });
-      
-      // Converter o mapa de respostas agrupadas para um array
-      const flattenedResponses = Object.values(responsesByStage).flat();
-      
-      // Substituir as respostas originais pelas processadas
-      candidate.responses = flattenedResponses;
-      
-      // Adicionar informação sobre etapas vazias
-      if (candidate.test && candidate.test.TestStage) {
-        // Criar um array para armazenar informações sobre todas as etapas
-        const allStages = [];
-        
-        // Mapear todas as etapas do teste
-        candidate.test.TestStage.forEach(testStage => {
-          const stageId = testStage.stage.id;
-          const stageName = testStage.stage.title;
-          const stageOrder = testStage.order || 0;
-          
-          // Verificar se a etapa tem respostas
-          const hasResponses = responsesByStage[stageId] && responsesByStage[stageId].length > 0;
-          
-          // Adicionar informação da etapa
-          allStages.push({
-            id: stageId,
-            name: stageName,
-            order: stageOrder,
-            hasResponses: hasResponses,
-            responsesCount: hasResponses ? responsesByStage[stageId].length : 0
-          });
-        });
-        
-        // Adicionar informações das etapas ao candidato
-        (candidate as any).testStages = allStages;
-      }
-    }
-
-    // Calcular pontuações por etapa
-    let stageScores = [];
-    let totalScore = 0;
-    let responsesToCorrect: string[] = [];
-
-    // Inicializar o mapa com todas as etapas
-    const stageMap: Record<string, {
-      id: string;
-      name: string;
-      correct: number;
-      total: number;
-      order?: number; // Adicionar campo de ordem
-    }> = {};
     
-    // Inicializar o mapa de ID para nome da etapa
-    const stageIdToNameMap: Record<string, string> = {};
-
-    // Inicializar o mapa de ID para ordem da etapa
-    const stageOrderMap: Record<string, number> = {};
-
-    // Inicializar o mapa para armazenar respostas por etapa (para estatísticas)
-    const responsesByStage: Record<string, any[]> = {};
-
-    // Verificar se o candidato tem um teste associado
-    if (candidate.test) {
-      console.log(`Candidato está associado ao teste: ${candidate.test.title}`);
-      
-      // Obter todas as etapas do teste através da relação TestStage
-      const testStages = candidate.test.TestStage || [];
-      console.log(`O teste possui ${testStages.length} etapas`);
-      
-      // Adicionar todas as etapas do teste ao mapa
-      testStages.forEach(testStage => {
-        const stage = testStage.stage;
-        stageMap[stage.id] = {
-          id: stage.id,
-          name: stage.title,
-          correct: 0,
-          total: 0,
-          order: testStage.order || 0 // Adicionar a ordem da etapa
-        };
-        stageIdToNameMap[stage.id] = stage.title;
-        stageOrderMap[stage.id] = testStage.order || 0;
-        console.log(`Etapa do teste identificada: ${stage.title} (${stage.id}), ordem: ${testStage.order || 0}`);
+    // GET - Buscar candidato por ID
+    if (req.method === 'GET') {
+      // Buscar o candidato básico
+      const candidate = await prisma.candidate.findUnique({
+        where: { id }
       });
       
-      // Obter todas as etapas do teste atual
-      const testStageIds = testStages.map(ts => ts.stageId);
-      console.log(`O teste possui ${testStageIds.length} etapas`);
+      if (!candidate) {
+        return res.status(404).json({ error: 'Candidato não encontrado' });
+      }
       
-      // Filtrar apenas as respostas que pertencem ao teste atual
-      // Isso resolve o problema de respostas de testes antigos aparecerem
-      const currentTestResponses = candidate.responses.filter(response => {
-        const typedResponse = response as unknown as ResponseWithSnapshot;
-        
-        // Verificar se a resposta tem um stageId que pertence ao teste atual
-        if (typedResponse.stageId && testStageIds.includes(typedResponse.stageId)) {
-          console.log(`Resposta ${response.id} pertence ao teste atual via stageId direto`);
-          return true;
-        }
-        
-        // Verificar via questionSnapshot
-        if (typedResponse.questionSnapshot) {
-          try {
-            const questionData = typeof typedResponse.questionSnapshot === 'string'
-              ? JSON.parse(typedResponse.questionSnapshot)
-              : typedResponse.questionSnapshot;
-              
-            if (questionData.stageId && testStageIds.includes(questionData.stageId)) {
-              console.log(`Resposta ${response.id} pertence ao teste atual via questionSnapshot`);
-              return true;
-            }
-          } catch (error) {
-            console.error('Erro ao processar questionSnapshot:', error);
-          }
-        }
-        
-        // Verificar via testQuestions - método mais confiável
-        if (typedResponse.questionId) {
-          try {
-            const testQuestion = candidate.test.testQuestions.find(tq => 
-              tq.questionId === typedResponse.questionId
-            );
-            
-            if (testQuestion) {
-              console.log(`Resposta ${response.id} pertence ao teste atual via testQuestions`);
-              return true;
-            }
-          } catch (error) {
-            console.error('Erro ao verificar testQuestions:', error);
-          }
-        }
-        
-        console.log(`Resposta ${response.id} NÃO pertence ao teste atual`);
-        return false;
+      // Buscar as respostas do candidato
+      const responses = await prisma.response.findMany({
+        where: { candidateId: id }
       });
       
-      console.log(`Processando ${currentTestResponses.length} respostas para o teste atual`);
-    } else {
-      // Se o teste foi excluído, criar etapas virtuais baseadas nas respostas
-      console.log("Teste não encontrado ou excluído. Criando etapas virtuais para cálculo de pontuação.");
+      // Verificar se o candidato completou o teste com base nas respostas
+      let candidateCompleted = candidate.completed;
+      let candidateStatus = candidate.status;
+      if (responses.length > 0 && (!candidate.completed || candidate.status === 'PENDING')) {
+        // Se há respostas mas o candidato não está marcado como completo ou está como PENDING, atualizamos
+        candidateCompleted = true;
+        candidateStatus = 'APPROVED';
+        await prisma.candidate.update({
+          where: { id },
+          data: { 
+            completed: true,
+            status: 'APPROVED'
+          }
+        });
+        console.log(`Candidato ${id} marcado como completo e aprovado com base nas respostas.`);
+      }
       
-      // Agrupar respostas por stageId
-      const stageGroups = new Map();
+      // Buscar o teste associado ao candidato
+      const test = candidate.testId 
+        ? await prisma.tests.findUnique({ where: { id: candidate.testId } })
+        : null;
       
-      // Primeiro passo: coletar todas as etapas das respostas
-      candidate.responses.forEach(response => {
-        const typedResponse = response as unknown as ResponseWithSnapshot;
-        let stageId = typedResponse.stageId || null;
-        let stageName = typedResponse.stageName || 'Etapa Desconhecida';
-        
-        if (stageId) {
-          if (!stageGroups.has(stageId)) {
-            stageGroups.set(stageId, {
+      // Calcular pontuações por etapa
+      const stageScores = [];
+      const stageMap = new Map();
+      
+      // Processar respostas para calcular pontuações por etapa
+      for (const response of responses) {
+        if (response.stageId && response.stageName) {
+          const stageId = response.stageId;
+          const stageName = response.stageName;
+          
+          if (!stageMap.has(stageId)) {
+            stageMap.set(stageId, {
               id: stageId,
               name: stageName,
-              responses: [],
-              // Tentar extrair ordem da etapa do questionSnapshot
-              order: 0
+              correct: 0,
+              total: 0
             });
-            
-            // Tentar determinar a ordem da etapa a partir dos dados disponíveis
-            if (typedResponse.questionSnapshot) {
-              try {
-                const questionData = typeof typedResponse.questionSnapshot === 'string'
-                  ? JSON.parse(typedResponse.questionSnapshot)
-                  : typedResponse.questionSnapshot;
-                
-                if (questionData.stageOrder !== undefined) {
-                  stageGroups.get(stageId).order = questionData.stageOrder;
-                }
-              } catch (error) {
-                console.error('Erro ao processar questionSnapshot para ordem:', error);
-              }
-            }
           }
           
-          stageGroups.get(stageId).responses.push(typedResponse);
+          const stageData = stageMap.get(stageId);
+          stageData.total += 1;
+          
+          if (response.isCorrectOption) {
+            stageData.correct += 1;
+          }
         }
-      });
+      }
       
-      // Segundo passo: ordenar as etapas baseado na ordem encontrada ou atribuir ordem sequencial
-      let currentOrder = 1;
-      const sortedStages = Array.from(stageGroups.values())
-        .sort((a, b) => {
-          // Se ambos têm ordem definida, usar essa ordem
-          if (a.order && b.order) {
-            return a.order - b.order;
-          }
-          // Se apenas um tem ordem definida, priorizar o que tem
-          if (a.order) return -1;
-          if (b.order) return 1;
-          
-          // Se nenhum tem ordem, ordenar pelo nome da etapa
-          return a.name.localeCompare(b.name);
+      // Converter o mapa em array e calcular percentual para cada etapa
+      stageMap.forEach(value => {
+        // Calcular o percentual de acertos para esta etapa
+        const percentage = value.total > 0 ? Math.round((value.correct / value.total) * 100) : 0;
+        
+        // Adicionar o percentual ao objeto da etapa
+        stageScores.push({
+          ...value,
+          percentage
         });
-      
-      // Terceiro passo: atribuir as etapas ordenadas aos mapas
-      sortedStages.forEach((stage, index) => {
-        const orderToUse = stage.order || currentOrder++;
-        
-        // Adicionar ao mapa de etapas
-        stageMap[stage.id] = {
-          id: stage.id,
-          name: stage.name,
-          correct: 0,
-          total: 0,
-          order: orderToUse
-        };
-        
-        // Adicionar aos mapas auxiliares
-        stageIdToNameMap[stage.id] = stage.name;
-        stageOrderMap[stage.id] = orderToUse;
-        responsesByStage[stage.id] = [];
       });
       
-      console.log(`Criadas ${stageGroups.size} etapas virtuais baseadas nas respostas do candidato.`);
+      // Calcular a pontuação total
+      let totalScore = 0;
+      if (stageScores.length > 0) {
+        const totalCorrect = stageScores.reduce((acc, stage) => acc + stage.correct, 0);
+        const totalQuestions = stageScores.reduce((acc, stage) => acc + stage.total, 0);
+        totalScore = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+      } else if (candidate && 'score' in candidate && candidate.score !== undefined && candidate.score !== null) {
+        // Se não temos stageScores mas temos um score armazenado, usamos ele
+        const candidateScore = Number(candidate.score);
+        totalScore = candidateScore > 1 ? candidateScore : Math.round(candidateScore * 100);
+      }
       
-      // Usar todas as respostas do candidato para cálculo
-      const currentTestResponses = candidate.responses;
-      console.log(`Processando ${currentTestResponses.length} respostas para o candidato.`);
-      
-      // Processar cada resposta para calcular a pontuação
-      currentTestResponses.forEach(response => {
-        const typedResponse = response as unknown as ResponseWithSnapshot;
-        
-        // Verificar se a resposta tem um stageId válido
-        if (!typedResponse.stageId) {
-          console.log('Resposta sem etapa associada:', response.id);
-          return;
-        }
-        
-        // Verificar se a etapa existe no mapa
-        if (stageMap[typedResponse.stageId]) {
-          console.log(`Analisando ID da etapa: ${typedResponse.stageId}`);
-          
-          // Incrementar o total de respostas para esta etapa
-          stageMap[typedResponse.stageId].total++;
-          
-          // Verificar se a resposta está correta
-          if (typedResponse.isCorrectOption) {
-            stageMap[typedResponse.stageId].correct++;
-            console.log(`Resposta correta para etapa ${stageMap[typedResponse.stageId].name}`);
-          } else {
-            console.log(`Resposta incorreta para etapa ${stageMap[typedResponse.stageId].name}`);
-            
-            // Verificar se há um problema de inconsistência com o optionId
-            if (typedResponse.allOptionsSnapshot) {
-              try {
-                const allOptions = typeof typedResponse.allOptionsSnapshot === 'string'
-                  ? JSON.parse(typedResponse.allOptionsSnapshot)
-                  : typedResponse.allOptionsSnapshot;
-                
-                // Verificar se a opção selecionada deveria ser correta
-                const selectedOption = allOptions.find((opt: any) => opt.id === typedResponse.optionId);
-                const correctOption = allOptions.find((opt: any) => opt.isCorrect === true);
-                
-                if (selectedOption && correctOption) {
-                  console.log(`Opção selecionada: ${selectedOption.text} (${selectedOption.id})`);
-                  console.log(`Opção correta: ${correctOption.text} (${correctOption.id})`);
-                  
-                  // Se a opção selecionada é a mesma que a correta (comparando texto), mas o isCorrectOption é falso
-                  // isso indica um problema de inconsistência
-                  if (selectedOption.id === correctOption.id || 
-                      selectedOption.text === correctOption.text) {
-                    console.log(`POSSÍVEL ERRO DE INCONSISTÊNCIA DETECTADO: A opção selecionada parece ser a correta!`);
-                    console.log(`Corrigindo a pontuação para esta resposta.`);
-                    stageMap[typedResponse.stageId].correct++;
-                    
-                    // Marcar que esta resposta deveria ser correta para atualização posterior
-                    responsesToCorrect.push(typedResponse.id);
-                    console.log(`Adicionando resposta ${typedResponse.id} à lista de correções`);
-                  }
-                }
-              } catch (error) {
-                console.error('Erro ao verificar inconsistência nas opções:', error);
-              }
-            }
-          }
-        } else {
-          console.log(`Etapa ${typedResponse.stageId} não encontrada no mapa de etapas.`);
-        }
-      });
-    }
-    
-    // Calcular as pontuações por etapa
-    stageScores = Object.values(stageMap).map(stage => {
-      const percentage = stage.total > 0 ? Math.round((stage.correct / stage.total) * 100) : 0;
-      return {
-        ...stage,
-        percentage,
-        order: stageOrderMap[stage.id] || 0 // Adicionar a ordem da etapa
+      // Formatar datas para evitar problemas de serialização
+      const formattedCandidate = {
+        ...candidate,
+        testDate: candidate.testDate ? candidate.testDate.toISOString() : null,
+        interviewDate: candidate.interviewDate ? candidate.interviewDate.toISOString() : null,
+        inviteExpires: candidate.inviteExpires ? candidate.inviteExpires.toISOString() : null,
+        createdAt: candidate.createdAt ? candidate.createdAt.toISOString() : null,
+        updatedAt: candidate.updatedAt ? candidate.updatedAt.toISOString() : null,
+        responses: responses.map(response => ({
+          ...response,
+          createdAt: response.createdAt ? response.createdAt.toISOString() : null,
+          updatedAt: response.updatedAt ? response.updatedAt.toISOString() : null
+        })),
+        test: test ? {
+          id: test.id,
+          title: test.title,
+          description: test.description,
+          createdAt: test.createdAt.toISOString(),
+          updatedAt: test.updatedAt.toISOString()
+        } : null,
+        stageScores,
+        score: totalScore, // Adicionar o score para compatibilidade com código existente
+        totalScore, // Adicionar o totalScore para o novo código
+        completed: candidateCompleted,
+        status: candidateStatus // Usar o status atualizado
       };
-    });
-    
-    // Ordenar as etapas pela ordem definida no teste
-    stageScores.sort((a, b) => a.order - b.order);
-    
-    console.log(`Calculadas ${stageScores.length} etapas de pontuação:`, JSON.stringify(stageScores));
-    
-    // Calcular a pontuação total
-    const validResponses = candidate.responses.filter(r => {
-      const typedResponse = r as unknown as ResponseWithSnapshot;
-      return stageMap[typedResponse.stageId] !== undefined;
-    });
-    
-    let totalCorrect = validResponses.filter(r => {
-      const typedResponse = r as unknown as ResponseWithSnapshot;
       
-      // Verificar se a resposta está marcada como correta
-      if (typedResponse.isCorrectOption) {
-        return true;
-      }
-      
-      // Verificar se há inconsistência (resposta correta marcada como incorreta)
-      if (typedResponse.allOptionsSnapshot) {
-        try {
-          const allOptions = typeof typedResponse.allOptionsSnapshot === 'string'
-            ? JSON.parse(typedResponse.allOptionsSnapshot)
-            : typedResponse.allOptionsSnapshot;
-          
-          // Verificar se a opção selecionada deveria ser correta
-          const selectedOption = allOptions.find((opt: any) => opt.id === typedResponse.optionId);
-          const correctOption = allOptions.find((opt: any) => opt.isCorrect === true);
-          
-          if (selectedOption && correctOption) {
-            // Se a opção selecionada é a mesma que a correta (comparando texto ou ID)
-            // isso indica um problema de inconsistência
-            if (selectedOption.id === correctOption.id || 
-                selectedOption.text === correctOption.text) {
-              console.log(`Corrigindo pontuação: resposta ${typedResponse.id} deveria ser marcada como correta`);
-              return true;
-            }
-          }
-        } catch (error) {
-          console.error('Erro ao verificar inconsistência nas opções:', error);
-        }
-      }
-      
-      return false;
-    }).length;
-    
-    totalScore = validResponses.length > 0 ? 
-      Math.round((totalCorrect / validResponses.length) * 100) : 0;
-    
-    // Atualizar as respostas que foram identificadas como incorretamente marcadas
-    if (responsesToCorrect.length > 0) {
-      console.log(`Atualizando ${responsesToCorrect.length} respostas com inconsistências...`);
-      
-      try {
-        // Atualizar cada resposta para marcar como correta
-        for (const responseId of responsesToCorrect) {
-          await prisma.response.update({
-            where: { id: responseId },
-            data: { isCorrectOption: true }
-          });
-          console.log(`Resposta ${responseId} atualizada para correta`);
-        }
-      } catch (error) {
-        console.error('Erro ao atualizar respostas com inconsistências:', error);
-      }
+      return res.status(200).json({ 
+        candidate: convertBigIntToNumber(formattedCandidate)
+      });
     }
-
-    // Formatar datas para evitar problemas de serialização
-    const formattedCandidate = {
-      ...candidate,
-      testDate: candidate.testDate ? candidate.testDate.toISOString() : null,
-      interviewDate: candidate.interviewDate ? candidate.interviewDate.toISOString() : null,
-      inviteExpires: candidate.inviteExpires ? candidate.inviteExpires.toISOString() : null,
-      createdAt: candidate.createdAt ? candidate.createdAt.toISOString() : null,
-      updatedAt: candidate.updatedAt ? candidate.updatedAt.toISOString() : null,
-      score: totalScore,
-      stageScores: stageScores
-    };
-
-    return res.status(200).json(convertBigIntToNumber(formattedCandidate));
-  }
-
-  // Implementação do método PUT para atualizar candidato
-  if (req.method === 'PUT') {
-    const session = await getServerSession(req, res, authOptions);
-    if (!session) {
-      return res.status(401).json({ message: 'Unauthorized' });
-    }
-
-    try {
-      const prisma = new PrismaClient();
-      
-      // Extrair dados do corpo da requisição
-      const {
-        name,
-        email,
-        position,
-        status,
+    
+    // PUT - Atualizar candidato
+    if (req.method === 'PUT') {
+      const { 
+        name, 
+        email, 
+        phone, 
+        position, 
         observations,
+        status,
         rating,
+        testDate,
+        interviewDate,
+        inviteCode,
+        inviteExpires,
+        instagram,
+        showResults,
+        score
       } = req.body;
       
-      // Atualizar o candidato
-      const updatedCandidate = await prisma.candidate.update({
-        where: { id },
-        data: {
-          name,
-          email,
-          position,
-          status,
-          observations,
-          rating,
-          updatedAt: new Date(),
-        },
-      });
-      
-      await prisma.$disconnect();
-      
-      return res.status(200).json(updatedCandidate);
-    } catch (error) {
-      console.error('Erro ao atualizar candidato:', error);
-      return res.status(500).json({ message: 'Erro ao atualizar candidato', error });
-    }
-  }
-
-  if (req.method === 'DELETE') {
-    const session = await getServerSession(req, res, authOptions);
-    if (!session) {
-      return res.status(401).json({ message: 'Unauthorized' });
-    }
-
-    const prisma = new PrismaClient();
-    
-    try {
       // Verificar se o candidato existe
-      const candidate = await prisma.candidate.findUnique({
-        where: { id },
-        select: { id: true, name: true }
+      const existingCandidate = await prisma.candidate.findUnique({
+        where: { id }
       });
-
-      if (!candidate) {
-        return res.status(404).json({ message: 'Candidato não encontrado' });
+      
+      if (!existingCandidate) {
+        return res.status(404).json({ error: 'Candidato não encontrado' });
       }
-
-      console.log(`Excluindo candidato: ${candidate.name} (${candidate.id})`);
-
-      // Primeiro excluir todas as respostas associadas ao candidato
+      
+      // Atualizar candidato usando uma abordagem segura com Prisma
+      try {
+        // Primeiro, atualize os campos padrão usando o Prisma
+        const updatedCandidate = await prisma.candidate.update({
+          where: { id },
+          data: {
+            name: name || undefined,
+            email: email || undefined,
+            phone: phone !== undefined ? phone : undefined,
+            position: position !== undefined ? position : undefined,
+            observations: observations !== undefined ? observations : undefined,
+            status: status || undefined,
+            rating: rating !== undefined ? Number(rating) : undefined,
+            testDate: testDate ? new Date(testDate) : undefined,
+            interviewDate: interviewDate ? new Date(interviewDate) : undefined,
+            inviteCode: inviteCode !== undefined ? inviteCode : undefined,
+            inviteExpires: inviteExpires ? new Date(inviteExpires) : undefined
+          }
+        });
+        
+        // Agora, se os campos instagram, showResults ou score foram fornecidos,
+        // atualize-os usando SQL raw para evitar problemas de tipo
+        if (instagram !== undefined || showResults !== undefined || score !== undefined) {
+          // Construir a consulta SQL dinamicamente
+          let query = 'UPDATE "Candidate" SET ';
+          const queryParams: any[] = [];
+          let paramIndex = 1;
+          
+          if (instagram !== undefined) {
+            query += `instagram = $${paramIndex}, `;
+            queryParams.push(instagram);
+            paramIndex++;
+          }
+          
+          if (showResults !== undefined) {
+            query += `"showResults" = $${paramIndex}, `;
+            queryParams.push(showResults);
+            paramIndex++;
+          }
+          
+          if (score !== undefined) {
+            query += `score = $${paramIndex}, `;
+            queryParams.push(Number(score));
+            paramIndex++;
+          }
+          
+          // Adicionar a atualização do updatedAt
+          query += `"updatedAt" = NOW() WHERE id = $${paramIndex} RETURNING *`;
+          queryParams.push(id);
+          
+          // Executar a consulta
+          const rawResult = await prisma.$queryRawUnsafe(query, ...queryParams);
+          
+          // Se houver resultado, use-o; caso contrário, use o resultado da atualização anterior
+          if (Array.isArray(rawResult) && rawResult.length > 0) {
+            const updatedCandidateRaw = rawResult[0];
+            
+            // Formatar datas para evitar problemas de serialização
+            const formattedCandidate = {
+              ...updatedCandidateRaw,
+              testDate: updatedCandidateRaw.testDate ? updatedCandidateRaw.testDate.toISOString() : null,
+              interviewDate: updatedCandidateRaw.interviewDate ? updatedCandidateRaw.interviewDate.toISOString() : null,
+              inviteExpires: updatedCandidateRaw.inviteExpires ? updatedCandidateRaw.inviteExpires.toISOString() : null,
+              createdAt: updatedCandidateRaw.createdAt ? updatedCandidateRaw.createdAt.toISOString() : null,
+              updatedAt: updatedCandidateRaw.updatedAt ? updatedCandidateRaw.updatedAt.toISOString() : null
+            };
+            
+            return res.status(200).json({ 
+              candidate: convertBigIntToNumber(formattedCandidate)
+            });
+          }
+        }
+        
+        // Se não houve atualização via SQL raw ou se ela não retornou resultados,
+        // use o resultado da atualização via Prisma
+        const formattedCandidate = {
+          ...updatedCandidate,
+          testDate: updatedCandidate.testDate ? updatedCandidate.testDate.toISOString() : null,
+          interviewDate: updatedCandidate.interviewDate ? updatedCandidate.interviewDate.toISOString() : null,
+          inviteExpires: updatedCandidate.inviteExpires ? updatedCandidate.inviteExpires.toISOString() : null,
+          createdAt: updatedCandidate.createdAt ? updatedCandidate.createdAt.toISOString() : null,
+          updatedAt: updatedCandidate.updatedAt ? updatedCandidate.updatedAt.toISOString() : null
+        };
+        
+        return res.status(200).json({ 
+          candidate: convertBigIntToNumber(formattedCandidate)
+        });
+      } catch (updateError) {
+        console.error('Erro ao atualizar candidato:', updateError);
+        return res.status(500).json({ error: 'Erro ao atualizar candidato', details: updateError.message });
+      }
+    }
+    
+    // DELETE - Excluir candidato
+    if (req.method === 'DELETE') {
+      // Verificar se o candidato existe
+      const existingCandidate = await prisma.candidate.findUnique({
+        where: { id }
+      });
+      
+      if (!existingCandidate) {
+        return res.status(404).json({ error: 'Candidato não encontrado' });
+      }
+      
+      // Excluir respostas do candidato primeiro para evitar violação de chave estrangeira
       await prisma.response.deleteMany({
         where: { candidateId: id }
       });
-
-      console.log(`Respostas do candidato excluídas com sucesso`);
-
-      // Em seguida, excluir o candidato
+      
+      // Excluir o candidato
       await prisma.candidate.delete({
         where: { id }
       });
-
-      console.log(`Candidato excluído com sucesso`);
-
+      
       return res.status(200).json({ 
-        success: true, 
-        message: 'Candidato excluído com sucesso' 
+        success: true,
+        message: 'Candidato excluído com sucesso'
       });
-    } catch (error) {
-      console.error('Erro ao excluir candidato:', error);
-      return res.status(500).json({ 
-        error: 'Erro interno do servidor',
-        details: error instanceof Error ? error.message : 'Erro desconhecido'
-      });
-    } finally {
-      await prisma.$disconnect();
     }
+    
+    // Método não suportado
+    return res.status(405).json({ error: 'Método não permitido' });
+  } catch (error) {
+    console.error('Erro na API de candidatos:', error);
+    return res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
+  } finally {
+    await prisma.$disconnect();
   }
-
-  return res.status(405).json({ message: 'Method not allowed' });
 }

@@ -11,9 +11,15 @@ interface CandidateData {
   phone?: string;
   position?: string;
   testId?: string;
-  linkedin?: string;
-  github?: string;
-  portfolio?: string;
+  instagram?: string;
+  photoUrl?: string;
+  score?: number;
+  totalQuestions?: number;
+  accuracyRate?: number;
+  observations?: string;
+  showResults?: boolean;
+  requestPhoto?: boolean;
+  rawObservations?: string;
 }
 
 interface TestData {
@@ -34,6 +40,43 @@ const Conclusao: NextPage = () => {
   const [isSaving, setIsSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
 
+  // Função para formatar os dados do candidato para exibição
+  const formatCandidateData = (data: any) => {
+    if (!data) return null;
+    
+    // Extrair dados de pontuação do campo observations se existirem
+    let scoreData = {};
+    if (data.observations) {
+      try {
+        const parsedObservations = JSON.parse(data.observations);
+        if (parsedObservations.score !== undefined && 
+            parsedObservations.totalQuestions !== undefined && 
+            parsedObservations.accuracyRate !== undefined) {
+          scoreData = {
+            score: parsedObservations.score,
+            totalQuestions: parsedObservations.totalQuestions,
+            accuracyRate: parsedObservations.accuracyRate
+          };
+        }
+      } catch (e) {
+        console.error('Erro ao analisar observations:', e);
+      }
+    }
+    
+    // Usar os campos diretos do banco de dados se disponíveis, caso contrário usar os dados do observations
+    return {
+      ...data,
+      name: data.name || 'Não informado',
+      email: data.email || 'Não informado',
+      phone: data.phone || 'Não informado',
+      position: data.position || 'Não informado',
+      instagram: data.instagram || 'Não informado',
+      score: data.score !== undefined ? data.score : (scoreData as any).score || 0,
+      totalQuestions: data.totalQuestions !== undefined ? data.totalQuestions : (scoreData as any).totalQuestions || 0,
+      accuracyRate: data.accuracyRate !== undefined ? data.accuracyRate : (scoreData as any).accuracyRate || 0
+    };
+  }
+
   useEffect(() => {
     // Verificar se há dados do candidato e do teste na sessão
     if (typeof window !== 'undefined') {
@@ -43,8 +86,30 @@ const Conclusao: NextPage = () => {
       if (storedCandidateData) {
         try {
           const parsedData = JSON.parse(storedCandidateData)
+          
+          // Não precisamos mais extrair dados do campo observations
+          // pois usaremos os campos apropriados do modelo
+          console.log('Dados do candidato carregados:', parsedData)
+          // Adicionar log detalhado para debug
+          console.log('Dados detalhados do candidato:', {
+            id: parsedData.id,
+            name: parsedData.name,
+            email: parsedData.email,
+            phone: parsedData.phone,
+            position: parsedData.position,
+            instagram: parsedData.instagram,
+            score: parsedData.score,
+            totalQuestions: parsedData.totalQuestions,
+            accuracyRate: parsedData.accuracyRate
+          })
           setCandidateData(parsedData)
-          setFormData(parsedData)
+          setFormData({
+            name: parsedData.name || '',
+            email: parsedData.email || '',
+            phone: parsedData.phone || '',
+            position: parsedData.position || '',
+            instagram: parsedData.instagram || ''
+          })
         } catch (error) {
           console.error('Erro ao carregar dados do candidato:', error)
         }
@@ -87,6 +152,28 @@ const Conclusao: NextPage = () => {
           setTestMarkedAsCompleted(true)
           setCompletionError(false)
           
+          // Atualizar os dados do candidato com as informações de desempenho
+          const data = await response.json();
+          console.log('Resposta do complete-test:', data);
+          
+          if (data.candidate) {
+            const updatedCandidateData = {
+              ...candidateData,
+              score: data.candidate.score,
+              totalQuestions: data.candidate.totalQuestions,
+              accuracyRate: data.candidate.accuracyRate,
+              completed: true
+            };
+            
+            console.log('Dados atualizados do candidato:', updatedCandidateData);
+            setCandidateData(updatedCandidateData);
+            
+            // Atualizar os dados na sessão
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem('candidateData', JSON.stringify(updatedCandidateData));
+            }
+          }
+          
           // Limpar dados de sessão para evitar acesso posterior
           if (typeof window !== 'undefined') {
             // Manter os dados do candidato para exibição, mas marcar como concluído
@@ -120,12 +207,90 @@ const Conclusao: NextPage = () => {
     if (candidateId && !testMarkedAsCompleted) {
       markTestAsCompleted()
     }
-  }, [candidateId, testMarkedAsCompleted])
+  }, [candidateId, testMarkedAsCompleted, candidateData])
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Reinicializar formData quando o modo de edição é alterado
+  useEffect(() => {
+    if (isEditMode && candidateData) {
+      console.log('Reinicializando dados do formulário:', candidateData);
+      setFormData({
+        name: candidateData.name || '',
+        email: candidateData.email || '',
+        phone: candidateData.phone || '',
+        position: candidateData.position || '',
+        instagram: candidateData.instagram || ''
+      });
+    }
+  }, [isEditMode, candidateData]);
+
+  // Buscar dados do candidato diretamente do banco de dados
+  useEffect(() => {
+    const fetchCandidateData = async () => {
+      if (candidateId) {
+        try {
+          console.log(`Buscando dados atualizados do candidato ${candidateId}...`);
+          
+          const response = await fetch(`/api/candidates/${candidateId}`);
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('Dados do candidato obtidos da API:', data.candidate);
+            
+            if (data.candidate) {
+              // Formatar os dados do candidato antes de atualizar o estado
+              const formattedData = formatCandidateData(data.candidate);
+              console.log('Dados formatados do candidato:', formattedData);
+              
+              // Atualizar os dados do candidato no estado e na sessão
+              setCandidateData(formattedData);
+              
+              // Inicializar o formulário com os dados formatados
+              setFormData({
+                name: formattedData.name || '',
+                email: formattedData.email || '',
+                phone: formattedData.phone || '',
+                position: formattedData.position || '',
+                instagram: formattedData.instagram || ''
+              });
+              
+              // Atualizar os dados na sessão
+              if (typeof window !== 'undefined') {
+                sessionStorage.setItem('candidateData', JSON.stringify(formattedData));
+              }
+            }
+          } else {
+            console.error('Erro ao buscar dados do candidato:', await response.text());
+          }
+        } catch (error) {
+          console.error('Erro ao buscar dados do candidato:', error);
+        }
+      }
+    };
+    
+    fetchCandidateData();
+  }, [candidateId]);
+
+  // Função para manipular a mudança nos campos do formulário
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
   }
+
+  // Debug: Mostrar os dados do candidato no console
+  useEffect(() => {
+    if (candidateData) {
+      console.log('Dados do candidato para exibição:', {
+        name: candidateData.name,
+        email: candidateData.email,
+        phone: candidateData.phone,
+        position: candidateData.position,
+        instagram: candidateData.instagram
+      })
+    }
+  }, [candidateData])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -236,16 +401,68 @@ const Conclusao: NextPage = () => {
                 Sua avaliação foi concluída com sucesso. Agradecemos sua participação no processo seletivo.
               </p>
               
+              {/* Seção de desempenho do candidato - só exibir se showResults for true */}
+              {(!candidateData || candidateData.showResults !== false) && (
+                <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm text-left">
+                  <h3 className="text-lg font-semibold text-secondary-800 mb-4">Seu desempenho</h3>
+                  
+                  <div className="flex flex-col items-center justify-center mb-4">
+                    <div className="relative w-40 h-40 mb-3">
+                      <svg viewBox="0 0 36 36" className="w-full h-full">
+                        <path
+                          d="M18 2.0845
+                            a 15.9155 15.9155 0 0 1 0 31.831
+                            a 15.9155 15.9155 0 0 1 0 -31.831"
+                          fill="none"
+                          stroke="#eee"
+                          strokeWidth="3"
+                          strokeDasharray="100, 100"
+                        />
+                        <path
+                          d="M18 2.0845
+                            a 15.9155 15.9155 0 0 1 0 31.831
+                            a 15.9155 15.9155 0 0 1 0 -31.831"
+                          fill="none"
+                          stroke={formatCandidateData(candidateData)?.accuracyRate >= 80 ? "#10b981" : 
+                                  formatCandidateData(candidateData)?.accuracyRate >= 60 ? "#f59e0b" : "#ef4444"}
+                          strokeWidth="3"
+                          strokeDasharray={`${formatCandidateData(candidateData)?.accuracyRate || 0}, 100`}
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-center">
+                          <span className="text-3xl font-bold">{formatCandidateData(candidateData)?.accuracyRate || 0}%</span>
+                          <p className="text-sm text-gray-500">Acertos</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600 mb-1">
+                        Você acertou <span className="font-semibold">{formatCandidateData(candidateData)?.score || 0}</span> de <span className="font-semibold">{formatCandidateData(candidateData)?.totalQuestions || 0}</span> questões
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Obrigado por participar do nosso processo seletivo!
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               {/* Seção de dados de contato */}
-              <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm text-left">
+              <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm text-left mb-6">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-semibold text-secondary-800">Seus dados de contato</h3>
                   
                   {!isEditMode && (
-                    <button 
+                    <button
+                      type="button"
                       onClick={() => setIsEditMode(true)}
-                      className="text-sm px-3 py-1 bg-primary-50 hover:bg-primary-100 text-primary-700 rounded border border-primary-200 transition-colors"
+                      className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded flex items-center"
                     >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
                       Corrigir dados
                     </button>
                   )}
@@ -311,41 +528,15 @@ const Conclusao: NextPage = () => {
                       </div>
                       
                       <div>
-                        <label htmlFor="linkedin" className="block text-sm font-medium text-gray-700 mb-1">LinkedIn</label>
+                        <label htmlFor="instagram" className="block text-sm font-medium text-gray-700 mb-1">Instagram</label>
                         <input
-                          type="url"
-                          id="linkedin"
-                          name="linkedin"
-                          value={formData.linkedin || ''}
+                          type="text"
+                          id="instagram"
+                          name="instagram"
+                          value={formData.instagram || ''}
                           onChange={handleInputChange}
                           className="w-full p-2 border border-gray-300 rounded focus:ring-primary-500 focus:border-primary-500"
-                          placeholder="https://linkedin.com/in/seu-perfil"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label htmlFor="github" className="block text-sm font-medium text-gray-700 mb-1">GitHub</label>
-                        <input
-                          type="url"
-                          id="github"
-                          name="github"
-                          value={formData.github || ''}
-                          onChange={handleInputChange}
-                          className="w-full p-2 border border-gray-300 rounded focus:ring-primary-500 focus:border-primary-500"
-                          placeholder="https://github.com/seu-usuario"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label htmlFor="portfolio" className="block text-sm font-medium text-gray-700 mb-1">Portfolio</label>
-                        <input
-                          type="url"
-                          id="portfolio"
-                          name="portfolio"
-                          value={formData.portfolio || ''}
-                          onChange={handleInputChange}
-                          className="w-full p-2 border border-gray-300 rounded focus:ring-primary-500 focus:border-primary-500"
-                          placeholder="https://seu-portfolio.com"
+                          placeholder="@seu-usuario"
                         />
                       </div>
                     </div>
@@ -354,9 +545,18 @@ const Conclusao: NextPage = () => {
                       <button
                         type="button"
                         onClick={() => {
-                          setIsEditMode(false)
-                          setFormData(candidateData || {})
-                          setSaveSuccess(false)
+                          setIsEditMode(false);
+                          // Reinicializar o formulário com os dados atuais do candidato
+                          if (candidateData) {
+                            setFormData({
+                              name: candidateData.name || '',
+                              email: candidateData.email || '',
+                              phone: candidateData.phone || '',
+                              position: candidateData.position || '',
+                              instagram: candidateData.instagram || ''
+                            });
+                          }
+                          setSaveSuccess(false);
                         }}
                         className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded"
                         disabled={isSaving}
@@ -384,65 +584,39 @@ const Conclusao: NextPage = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-gray-500">Nome</p>
-                      <p className="font-medium">{candidateData?.name || '-'}</p>
+                      <p className="font-medium">{formatCandidateData(candidateData)?.name}</p>
                     </div>
                     
                     <div>
                       <p className="text-sm text-gray-500">Email</p>
-                      <p className="font-medium">{candidateData?.email || '-'}</p>
+                      <p className="font-medium">{formatCandidateData(candidateData)?.email}</p>
                     </div>
                     
                     <div>
                       <p className="text-sm text-gray-500">Telefone</p>
-                      <p className="font-medium">{candidateData?.phone || '-'}</p>
+                      <p className="font-medium">{formatCandidateData(candidateData)?.phone}</p>
                     </div>
                     
                     <div>
                       <p className="text-sm text-gray-500">Cargo</p>
-                      <p className="font-medium">{candidateData?.position || '-'}</p>
+                      <p className="font-medium">{formatCandidateData(candidateData)?.position}</p>
                     </div>
                     
-                    {candidateData?.linkedin && (
-                      <div>
-                        <p className="text-sm text-gray-500">LinkedIn</p>
+                    <div>
+                      <p className="text-sm text-gray-500">Instagram</p>
+                      {formatCandidateData(candidateData)?.instagram && formatCandidateData(candidateData)?.instagram !== 'Não informado' ? (
                         <a 
-                          href={candidateData.linkedin} 
+                          href={`https://instagram.com/${formatCandidateData(candidateData)?.instagram.replace('@', '')}`} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           className="text-primary-600 hover:underline font-medium"
                         >
-                          {candidateData.linkedin}
+                          {formatCandidateData(candidateData)?.instagram}
                         </a>
-                      </div>
-                    )}
-                    
-                    {candidateData?.github && (
-                      <div>
-                        <p className="text-sm text-gray-500">GitHub</p>
-                        <a 
-                          href={candidateData.github} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-primary-600 hover:underline font-medium"
-                        >
-                          {candidateData.github}
-                        </a>
-                      </div>
-                    )}
-                    
-                    {candidateData?.portfolio && (
-                      <div>
-                        <p className="text-sm text-gray-500">Portfolio</p>
-                        <a 
-                          href={candidateData.portfolio} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-primary-600 hover:underline font-medium"
-                        >
-                          {candidateData.portfolio}
-                        </a>
-                      </div>
-                    )}
+                      ) : (
+                        <p className="font-medium">Não informado</p>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

@@ -51,12 +51,14 @@ model Candidate {
   inviteSent     Boolean         @default(false)
   inviteAttempts Int             @default(0)
   inviteExpires  DateTime?
-  github         String?
-  linkedin       String?
-  portfolio      String?
+  instagram      String?
   resumeUrl      String?
   testId         String?
   timeSpent      Int?            @default(0)
+  photoUrl       String?         // Campo para armazenar a URL da foto do candidato
+  score          Int?            @default(0) // Campo para armazenar a pontuação do candidato
+  requestPhoto   Boolean         @default(true) // Controla se deve solicitar foto do candidato
+  showResults    Boolean         @default(true) // Controla se deve mostrar resultados ao final
   test           tests?          @relation(fields: [testId], references: [id])
   candidateTests CandidateTest[]
   responses      Response[]
