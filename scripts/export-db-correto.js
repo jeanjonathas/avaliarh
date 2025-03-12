@@ -74,6 +74,7 @@ TRUNCATE TABLE "Candidate" CASCADE;
 TRUNCATE TABLE "Category" CASCADE;
 TRUNCATE TABLE "Admin" CASCADE;
 TRUNCATE TABLE "User" CASCADE;
+TRUNCATE TABLE "CandidateTest" CASCADE;
 
 `;
 
@@ -153,9 +154,17 @@ TRUNCATE TABLE "User" CASCADE;
     sqlContent += await generateInsert('Candidate', 
       ['id', 'name', 'email', 'phone', 'position', 'testDate', 'completed', 'createdAt', 'updatedAt', 
        'infoJobsLink', 'interviewDate', 'observations', 'rating', 'resumeFile', 'socialMediaUrl', 
-       'status', 'inviteCode', 'inviteSent', 'inviteAttempts', 'inviteExpires', 'github', 'linkedin',
-       'portfolio', 'resumeUrl', 'testId'], 
+       'status', 'inviteCode', 'inviteSent', 'inviteAttempts', 'inviteExpires', 'instagram',
+       'resumeUrl', 'testId', 'timeSpent', 'photoUrl', 'score', 'requestPhoto', 'showResults'], 
       candidates);
+
+    // Exportar testes de candidatos
+    console.log('Exportando testes de candidatos...');
+    const candidateTests = await prisma.candidateTest.findMany();
+    sqlContent += await generateInsert('CandidateTest', 
+      ['id', 'candidateId', 'testId', 'inviteCode', 'inviteExpires', 'inviteSent', 
+       'inviteAttempts', 'completed', 'createdAt', 'updatedAt'], 
+      candidateTests);
 
     // Exportar códigos de convite usados
     console.log('Exportando códigos de convite usados...');
@@ -168,7 +177,9 @@ TRUNCATE TABLE "User" CASCADE;
     console.log('Exportando respostas...');
     const responses = await prisma.response.findMany();
     sqlContent += await generateInsert('Response', 
-      ['id', 'candidateId', 'questionId', 'optionId', 'createdAt', 'updatedAt'], 
+      ['id', 'candidateId', 'questionId', 'optionId', 'createdAt', 'updatedAt',
+       'questionText', 'optionText', 'isCorrectOption', 'allOptionsSnapshot', 
+       'questionSnapshot', 'categoryName', 'stageName', 'stageId', 'timeSpent'], 
       responses);
 
     // Reabilitar restrições de chave estrangeira

@@ -13,9 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       email, 
       phone, 
       position, 
-      linkedin, 
-      github, 
-      portfolio 
+      instagram 
     } = req.body;
     
     if (!candidateId) {
@@ -39,9 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         email = ${email || candidate.email},
         phone = ${phone || candidate.phone},
         position = ${position || candidate.position},
-        linkedin = ${linkedin || candidate.linkedin},
-        github = ${github || candidate.github},
-        portfolio = ${portfolio || candidate.portfolio},
+        instagram = ${instagram || candidate.instagram},
         "updatedAt" = NOW()
       WHERE id = ${candidateId}
       RETURNING *
