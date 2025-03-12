@@ -81,9 +81,44 @@ export default async function handler(
           // Converter as respostas para o tipo personalizado
           const typedResponses = candidate.responses as unknown as ResponseWithSnapshot[];
           
-          // Usar o campo isCorrectOption que está armazenado diretamente na resposta
-          const correctResponses = typedResponses.filter(response => response.isCorrectOption).length;
-          score = (correctResponses / typedResponses.length) * 100;
+          // Contar respostas corretas, verificando também inconsistências
+          let correctResponses = 0;
+          let totalResponses = typedResponses.length;
+          
+          typedResponses.forEach(response => {
+            // Verificar se a resposta está marcada como correta
+            if (response.isCorrectOption) {
+              correctResponses++;
+              return;
+            }
+            
+            // Verificar se há inconsistência (resposta correta marcada como incorreta)
+            if (response.allOptionsSnapshot) {
+              try {
+                const allOptions = typeof response.allOptionsSnapshot === 'string'
+                  ? JSON.parse(response.allOptionsSnapshot)
+                  : response.allOptionsSnapshot;
+                
+                // Verificar se a opção selecionada deveria ser correta
+                const selectedOption = allOptions.find((opt: any) => opt.id === response.optionId);
+                const correctOption = allOptions.find((opt: any) => opt.isCorrect === true);
+                
+                if (selectedOption && correctOption) {
+                  // Se a opção selecionada é a mesma que a correta (comparando texto ou ID)
+                  if (selectedOption.id === correctOption.id || 
+                      selectedOption.text === correctOption.text) {
+                    console.log(`Corrigindo inconsistência: Resposta ${response.id} deveria ser marcada como correta`);
+                    correctResponses++;
+                  }
+                }
+              } catch (error) {
+                console.error('Erro ao verificar inconsistência nas opções:', error);
+              }
+            }
+          });
+          
+          // Calcular a pontuação como porcentagem
+          score = totalResponses > 0 ? Math.round((correctResponses / totalResponses) * 100) : 0;
         }
         
         // Converter datas para strings para evitar problemas de serialização

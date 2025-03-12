@@ -17,6 +17,12 @@ export default async function handler(
         return res.status(400).json({ error: 'Dados inválidos' })
       }
 
+      // Log detalhado das respostas recebidas
+      console.log(`Recebidas ${responses.length} respostas para processamento:`)
+      responses.forEach((response, index) => {
+        console.log(`[${index + 1}/${responses.length}] questionId=${response.questionId}, optionId=${response.optionId}`)
+      })
+
       // Verificar se o candidato existe
       const candidate = await prisma.candidate.findUnique({
         where: {
@@ -42,7 +48,8 @@ export default async function handler(
       
       // Atualizar o tempo total gasto pelo candidato
       if (timeSpent && typeof timeSpent === 'number') {
-        const currentTimeSpent = candidate.timeSpent || 0;
+        // Verificar se o candidato tem a propriedade timeSpent
+        const currentTimeSpent = (candidate as any).timeSpent || 0;
         console.log(`Atualizando tempo gasto pelo candidato. Anterior: ${currentTimeSpent}s, Adicionando: ${timeSpent}s`);
         const updatedTimeSpent = currentTimeSpent + timeSpent;
         

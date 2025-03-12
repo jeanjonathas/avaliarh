@@ -139,7 +139,8 @@ const TestStage: NextPage = () => {
   // Efeito para inicializar o contador de tempo
   useEffect(() => {
     // Inicializar o tempo de início
-    setStartTime(Date.now());
+    const initialStartTime = Date.now();
+    setStartTime(initialStartTime);
     
     // Carregar o tempo salvo do localStorage
     if (typeof window !== 'undefined' && candidateId) {
@@ -149,14 +150,75 @@ const TestStage: NextPage = () => {
         if (savedTime.remainingTime !== null) {
           setTimeRemaining(savedTime.remainingTime);
         }
-        setTimeSpent(savedTime.spentTime || 0);
+        if (savedTime.spentTime) {
+          setTimeSpent(savedTime.spentTime);
+        }
       }
     }
   }, [candidateId, stageId]); // Recarregar quando o candidato ou a etapa mudar
 
+  // Contador de tempo para testes com limite de tempo (regressivo)
+  useEffect(() => {
+    // Só executar se tiver limite de tempo
+    if (timeRemaining === null || timeRemaining <= 0) return;
+    
+    console.log("Iniciando contador regressivo...");
+    
+    const timerInterval = setInterval(() => {
+      setTimeRemaining(prev => {
+        if (prev === null || prev <= 0) {
+          clearInterval(timerInterval);
+          return 0;
+        }
+        return prev - 1;
+      });
+      
+      // Também incrementar o tempo gasto
+      setTimeSpent(prev => {
+        const newTimeSpent = prev + 1;
+        // Salvar o tempo a cada 5 segundos
+        if (newTimeSpent % 5 === 0) {
+          saveTimeToLocalStorage(timeRemaining, newTimeSpent);
+        }
+        return newTimeSpent;
+      });
+    }, 1000);
+    
+    return () => {
+      console.log("Limpando timer regressivo");
+      clearInterval(timerInterval);
+    };
+  }, [timeRemaining]);
+
+  // Contador de tempo para testes sem limite de tempo (progressivo)
+  useEffect(() => {
+    // Só executar se não tiver limite de tempo
+    if (timeRemaining !== null) return;
+    
+    console.log("Iniciando contador progressivo simples...");
+    
+    // Contador simples que incrementa 1 segundo por segundo
+    const timerInterval = setInterval(() => {
+      setTimeSpent(prev => {
+        const newTimeSpent = prev + 1;
+        // Salvar o tempo a cada 5 segundos
+        if (newTimeSpent % 5 === 0) {
+          saveTimeToLocalStorage(null, newTimeSpent);
+        }
+        return newTimeSpent;
+      });
+    }, 1000);
+    
+    return () => {
+      console.log("Limpando timer progressivo");
+      clearInterval(timerInterval);
+    };
+  }, [timeRemaining]);
+
   // Referências para valores atuais
   const timeRemainingRef = useRef(timeRemaining);
   const timeSpentRef = useRef(timeSpent);
+  const startTimeRef = useRef(startTime);
 
   // Atualizar as referências quando os valores mudarem
   useEffect(() => {
@@ -166,60 +228,10 @@ const TestStage: NextPage = () => {
   useEffect(() => {
     timeSpentRef.current = timeSpent;
   }, [timeSpent]);
-
-  // Contador de tempo (regressivo ou progressivo dependendo do tipo de teste)
+  
   useEffect(() => {
-    console.log("Iniciando contador de tempo...");
-    
-    // Criar um único timer para ambos os tipos de contagem
-    const timerInterval = setInterval(() => {
-      // Sempre incrementar o tempo gasto
-      setTimeSpent(prevTimeSpent => prevTimeSpent + 1);
-      
-      // Se temos um limite de tempo, decrementar o tempo restante
-      if (timeRemainingRef.current !== null) {
-        setTimeRemaining(prevTimeRemaining => {
-          if (prevTimeRemaining !== null && prevTimeRemaining > 0) {
-            // Ainda tem tempo restante
-            return prevTimeRemaining - 1;
-          }
-          return 0; // Tempo esgotado
-        });
-      }
-      
-      // Salvar o tempo a cada 5 segundos
-      const currentTimeSpent = timeSpentRef.current;
-      if (currentTimeSpent % 5 === 0) {
-        saveTimeToLocalStorage(timeRemainingRef.current, currentTimeSpent);
-      }
-    }, 1000);
-    
-    // Limpar o timer quando o componente for desmontado
-    return () => {
-      console.log("Limpando timer de tempo");
-      clearInterval(timerInterval);
-    };
-  }, []); // Sem dependências para garantir que o timer seja criado apenas uma vez
-
-  // Formatar o tempo restante
-  const formatTimeRemaining = () => {
-    if (timeRemaining === null) return '';
-    
-    const hours = Math.floor(timeRemaining / 3600);
-    const minutes = Math.floor((timeRemaining % 3600) / 60);
-    const seconds = timeRemaining % 60;
-    
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  };
-
-  // Formatar o tempo gasto
-  const formatTimeSpent = () => {
-    const hours = Math.floor(timeSpent / 3600);
-    const minutes = Math.floor((timeSpent % 3600) / 60);
-    const seconds = timeSpent % 60;
-    
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  };
+    startTimeRef.current = startTime;
+  }, [startTime]);
 
   // Monitorar estado da conexão
   useEffect(() => {
@@ -355,17 +367,34 @@ const TestStage: NextPage = () => {
   const handleSubmit = async (values: Record<string, string>) => {
     try {
       console.log('Enviando respostas:', values);
+      console.log('Última pergunta:', questions[questions.length - 1]?.id);
+      console.log('Resposta da última pergunta:', values[questions[questions.length - 1]?.id]);
+      
+      // Verificar se todas as perguntas têm respostas
+      const missingResponses = questions.filter(q => !values[q.id]);
+      if (missingResponses.length > 0) {
+        console.warn(`Atenção: ${missingResponses.length} perguntas sem resposta:`, 
+          missingResponses.map(q => q.id));
+        showToast('Por favor, responda todas as questões antes de prosseguir.', 'error');
+        return false;
+      }
       
       // Calcular o tempo gasto em segundos
       const timeSpentSeconds = Math.floor((Date.now() - startTime) / 1000);
       console.log(`Tempo gasto nesta etapa: ${timeSpentSeconds} segundos`);
       
       // Converter o objeto de valores para o formato de array esperado pela API
-      const formattedResponses = Object.entries(values).map(([questionId, optionId]) => ({
-        questionId,
-        optionId,
-        timeSpent: timeSpentSeconds // Adicionar o tempo gasto para cada resposta
-      }));
+      // Garantir que todas as perguntas estejam incluídas na ordem correta
+      const formattedResponses = questions.map(question => {
+        const optionId = values[question.id];
+        console.log(`Resposta para questão ${question.id}: optionId=${optionId}`);
+        
+        return {
+          questionId: question.id,
+          optionId: optionId,
+          timeSpent: timeSpentSeconds
+        };
+      });
       
       console.log('Respostas formatadas:', formattedResponses);
       
@@ -622,13 +651,25 @@ const TestStage: NextPage = () => {
     }
   };
 
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      setTimeSpent(Date.now() - startTime);
-    }, 1000);
+  // Formatar o tempo restante
+  const formatTimeRemaining = () => {
+    if (timeRemaining === null) return '';
+    
+    const hours = Math.floor(timeRemaining / 3600);
+    const minutes = Math.floor((timeRemaining % 3600) / 60);
+    const seconds = timeRemaining % 60;
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
 
-    return () => clearInterval(intervalId);
-  }, [startTime]);
+  // Formatar o tempo gasto
+  const formatTimeSpent = () => {
+    const hours = Math.floor(timeSpent / 3600);
+    const minutes = Math.floor((timeSpent % 3600) / 60);
+    const seconds = timeSpent % 60;
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
 
   if (loading) {
     return (
@@ -837,6 +878,15 @@ const TestStage: NextPage = () => {
                                 name={question.id}
                                 value={option.id}
                                 className="mt-1 mr-3"
+                                onClick={() => {
+                                  // Log para depuração
+                                  console.log(`Selecionada opção ${option.id} para pergunta ${question.id} (${index + 1}/${questions.length})`);
+                                  
+                                  // Verificar se é a última pergunta
+                                  if (index === questions.length - 1) {
+                                    console.log(`Esta é a última pergunta (${index + 1}/${questions.length})`);
+                                  }
+                                }}
                               />
                               <span className="text-secondary-700">{option.text}</span>
                             </label>
@@ -919,22 +969,35 @@ const TestStage: NextPage = () => {
                             onClick={(e) => {
                               e.preventDefault();
                               if (checkAllQuestionsAnswered(values)) {
-                                // Primeiro marcar a etapa como concluída
-                                fetch('/api/responses/mark-stage-completed', {
-                                  method: 'POST',
-                                  headers: {
-                                    'Content-Type': 'application/json',
-                                  },
-                                  body: JSON.stringify({
-                                    stageId: stageId as string,
-                                    candidateId
-                                  }),
-                                }).then(() => {
-                                  // Depois finalizar o teste
-                                  finalizeTest();
+                                setIsSubmitting(true);
+                                // Primeiro enviar as respostas
+                                handleSubmit(values).then(success => {
+                                  if (success) {
+                                    // Depois marcar a etapa como concluída
+                                    fetch('/api/responses/mark-stage-completed', {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({
+                                        stageId: stageId as string,
+                                        candidateId
+                                      }),
+                                    }).then(() => {
+                                      // Finalmente finalizar o teste
+                                      finalizeTest();
+                                    }).catch(error => {
+                                      console.error('Erro ao marcar etapa como concluída:', error);
+                                      showToast('Erro ao finalizar teste. Por favor, tente novamente.', 'error');
+                                      setIsSubmitting(false);
+                                    });
+                                  } else {
+                                    setIsSubmitting(false);
+                                  }
                                 }).catch(error => {
-                                  console.error('Erro ao marcar etapa como concluída:', error);
-                                  showToast('Erro ao finalizar teste. Por favor, tente novamente.', 'error');
+                                  console.error('Erro ao enviar respostas:', error);
+                                  showToast('Erro ao enviar respostas. Por favor, tente novamente.', 'error');
+                                  setIsSubmitting(false);
                                 });
                               }
                             }}

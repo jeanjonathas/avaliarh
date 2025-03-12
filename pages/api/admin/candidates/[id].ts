@@ -198,8 +198,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
         
         // Adicionar informações da opção a partir do snapshot
-        if (typedResponse.optionText) {
-          processedResponse.optionText = typedResponse.optionText;
+        if (typedResponse.allOptionsSnapshot) {
+          try {
+            const allOptions = typeof typedResponse.allOptionsSnapshot === 'string'
+              ? JSON.parse(typedResponse.allOptionsSnapshot)
+              : typedResponse.allOptionsSnapshot;
+            
+            console.log(`allOptionsSnapshot para questão ${typedResponse.questionId} contém ${allOptions.length} opções: ${JSON.stringify(allOptions)}`);
+            
+            // Verificar se a opção selecionada existe no snapshot
+            const selectedOption = allOptions.find((opt: any) => opt.id === typedResponse.optionId);
+            if (selectedOption) {
+              processedResponse.optionText = selectedOption.text;
+              
+              // Verificar se a opção é correta
+              const isCorrect = selectedOption.isCorrect === true;
+              
+              // Verificar se há inconsistência entre o que foi armazenado e o que deveria ser
+              if (processedResponse.isCorrectOption !== isCorrect) {
+                console.log(`CORREÇÃO: Atualizando isCorrectOption de ${processedResponse.isCorrectOption} para ${isCorrect} para a resposta ${response.id}`);
+                processedResponse.isCorrectOption = isCorrect;
+              }
+            }
+          } catch (error) {
+            console.error('Erro ao processar allOptionsSnapshot:', error);
+          }
         }
         
         if (typedResponse.isCorrectOption !== undefined) {
@@ -350,6 +373,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Calcular pontuações por etapa
     let stageScores = [];
     let totalScore = 0;
+    let responsesToCorrect: string[] = [];
 
     // Verificar se o candidato tem um teste associado
     if (candidate.test) {
@@ -464,6 +488,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             console.log(`Resposta correta para etapa ${stageMap[typedResponse.stageId].name}`);
           } else {
             console.log(`Resposta incorreta para etapa ${stageMap[typedResponse.stageId].name}`);
+            
+            // Verificar se há um problema de inconsistência com o optionId
+            if (typedResponse.allOptionsSnapshot) {
+              try {
+                const allOptions = typeof typedResponse.allOptionsSnapshot === 'string'
+                  ? JSON.parse(typedResponse.allOptionsSnapshot)
+                  : typedResponse.allOptionsSnapshot;
+                
+                // Verificar se a opção selecionada deveria ser correta
+                const selectedOption = allOptions.find((opt: any) => opt.id === typedResponse.optionId);
+                const correctOption = allOptions.find((opt: any) => opt.isCorrect === true);
+                
+                if (selectedOption && correctOption) {
+                  console.log(`Opção selecionada: ${selectedOption.text} (${selectedOption.id})`);
+                  console.log(`Opção correta: ${correctOption.text} (${correctOption.id})`);
+                  
+                  // Se a opção selecionada é a mesma que a correta (comparando texto), mas o isCorrectOption é falso
+                  // isso indica um problema de inconsistência
+                  if (selectedOption.id === correctOption.id || 
+                      selectedOption.text === correctOption.text) {
+                    console.log(`POSSÍVEL ERRO DE INCONSISTÊNCIA DETECTADO: A opção selecionada parece ser a correta!`);
+                    console.log(`Corrigindo a pontuação para esta resposta.`);
+                    stageMap[typedResponse.stageId].correct++;
+                    
+                    // Marcar que esta resposta deveria ser correta para atualização posterior
+                    responsesToCorrect.push(typedResponse.id);
+                    console.log(`Adicionando resposta ${typedResponse.id} à lista de correções`);
+                  }
+                }
+              } catch (error) {
+                console.error('Erro ao verificar inconsistência nas opções:', error);
+              }
+            }
           }
         } else {
           // Tentar encontrar a etapa por outros meios
@@ -488,6 +545,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 console.log(`Resposta correta para etapa ${stageMap[stageId].name}`);
               } else {
                 console.log(`Resposta incorreta para etapa ${stageMap[stageId].name}`);
+                
+                // Verificar se há um problema de inconsistência com o optionId
+                if (typedResponse.allOptionsSnapshot) {
+                  try {
+                    const allOptions = typeof typedResponse.allOptionsSnapshot === 'string'
+                      ? JSON.parse(typedResponse.allOptionsSnapshot)
+                      : typedResponse.allOptionsSnapshot;
+                    
+                    // Verificar se a opção selecionada deveria ser correta
+                    const selectedOption = allOptions.find((opt: any) => opt.id === typedResponse.optionId);
+                    const correctOption = allOptions.find((opt: any) => opt.isCorrect === true);
+                    
+                    if (selectedOption && correctOption) {
+                      console.log(`Opção selecionada: ${selectedOption.text} (${selectedOption.id})`);
+                      console.log(`Opção correta: ${correctOption.text} (${correctOption.id})`);
+                      
+                      // Se a opção selecionada é a mesma que a correta (comparando texto), mas o isCorrectOption é falso
+                      // isso indica um problema de inconsistência
+                      if (selectedOption.id === correctOption.id || 
+                          selectedOption.text === correctOption.text) {
+                        console.log(`POSSÍVEL ERRO DE INCONSISTÊNCIA DETECTADO: A opção selecionada parece ser a correta!`);
+                        console.log(`Corrigindo a pontuação para esta resposta.`);
+                        stageMap[stageId].correct++;
+                        
+                        // Marcar que esta resposta deveria ser correta para atualização posterior
+                        responsesToCorrect.push(typedResponse.id);
+                        console.log(`Adicionando resposta ${typedResponse.id} à lista de correções`);
+                      }
+                    }
+                  } catch (error) {
+                    console.error('Erro ao verificar inconsistência nas opções:', error);
+                  }
+                }
               }
             }
           }
@@ -511,13 +601,62 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return stageMap[typedResponse.stageId] !== undefined;
       });
       
-      const totalCorrect = validResponses.filter(r => {
+      let totalCorrect = validResponses.filter(r => {
         const typedResponse = r as unknown as ResponseWithSnapshot;
-        return typedResponse.isCorrectOption;
+        
+        // Verificar se a resposta está marcada como correta
+        if (typedResponse.isCorrectOption) {
+          return true;
+        }
+        
+        // Verificar se há inconsistência (resposta correta marcada como incorreta)
+        if (typedResponse.allOptionsSnapshot) {
+          try {
+            const allOptions = typeof typedResponse.allOptionsSnapshot === 'string'
+              ? JSON.parse(typedResponse.allOptionsSnapshot)
+              : typedResponse.allOptionsSnapshot;
+            
+            // Verificar se a opção selecionada deveria ser correta
+            const selectedOption = allOptions.find((opt: any) => opt.id === typedResponse.optionId);
+            const correctOption = allOptions.find((opt: any) => opt.isCorrect === true);
+            
+            if (selectedOption && correctOption) {
+              // Se a opção selecionada é a mesma que a correta (comparando texto ou ID)
+              // isso indica um problema de inconsistência
+              if (selectedOption.id === correctOption.id || 
+                  selectedOption.text === correctOption.text) {
+                console.log(`Corrigindo pontuação: resposta ${typedResponse.id} deveria ser marcada como correta`);
+                return true;
+              }
+            }
+          } catch (error) {
+            console.error('Erro ao verificar inconsistência nas opções:', error);
+          }
+        }
+        
+        return false;
       }).length;
       
       totalScore = validResponses.length > 0 ? 
         Math.round((totalCorrect / validResponses.length) * 100) : 0;
+      
+      // Atualizar as respostas que foram identificadas como incorretamente marcadas
+      if (responsesToCorrect.length > 0) {
+        console.log(`Atualizando ${responsesToCorrect.length} respostas com inconsistências...`);
+        
+        try {
+          // Atualizar cada resposta para marcar como correta
+          for (const responseId of responsesToCorrect) {
+            await prisma.response.update({
+              where: { id: responseId },
+              data: { isCorrectOption: true }
+            });
+            console.log(`Resposta ${responseId} atualizada para correta`);
+          }
+        } catch (error) {
+          console.error('Erro ao atualizar respostas com inconsistências:', error);
+        }
+      }
     }
 
     // Formatar datas para evitar problemas de serialização
