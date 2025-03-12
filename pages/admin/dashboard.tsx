@@ -1280,7 +1280,7 @@ const Dashboard: NextPage = () => {
 // Este useEffect foi removido porque estava duplicado, causando o erro:
 // "Rendered more hooks than during the previous render"
 // A mesma funcionalidade já existe em outro lugar do código
-  // Dados para o gráfico de comparação (candidato vs média)
+  // Dados para o gráfico de comparação (candidato vs média)    
   const comparisonOptions = {
     responsive: true,
     maintainAspectRatio: false,
