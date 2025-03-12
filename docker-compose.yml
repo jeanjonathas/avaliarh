@@ -51,8 +51,7 @@ services:
     networks:
       - avaliarh_network
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
     deploy:
       replicas: 1
       restart_policy:
@@ -85,8 +84,7 @@ services:
     networks:
       - avaliarh_network
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
     deploy:
       replicas: 1
       restart_policy:
