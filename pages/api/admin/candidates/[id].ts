@@ -672,7 +672,52 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
 
     return res.status(200).json(convertBigIntToNumber(formattedCandidate));
-  } else if (req.method === 'DELETE') {
+  }
+
+  // Implementação do método PUT para atualizar candidato
+  if (req.method === 'PUT') {
+    const session = await getServerSession(req, res, authOptions);
+    if (!session) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    try {
+      const prisma = new PrismaClient();
+      
+      // Extrair dados do corpo da requisição
+      const {
+        name,
+        email,
+        position,
+        status,
+        observations,
+        rating,
+      } = req.body;
+      
+      // Atualizar o candidato
+      const updatedCandidate = await prisma.candidate.update({
+        where: { id },
+        data: {
+          name,
+          email,
+          position,
+          status,
+          observations,
+          rating,
+          updatedAt: new Date(),
+        },
+      });
+      
+      await prisma.$disconnect();
+      
+      return res.status(200).json(updatedCandidate);
+    } catch (error) {
+      console.error('Erro ao atualizar candidato:', error);
+      return res.status(500).json({ message: 'Erro ao atualizar candidato', error });
+    }
+  }
+
+  if (req.method === 'DELETE') {
     const session = await getServerSession(req, res, authOptions);
     if (!session) {
       return res.status(401).json({ message: 'Unauthorized' });

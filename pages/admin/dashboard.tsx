@@ -1221,7 +1221,7 @@ const Dashboard: NextPage = () => {
   
   // Dados para o gráfico de radar (desempenho por etapa)
   const radarData = {
-    labels: idealProfileData.labels,
+    labels: selectedCandidate?.stageScores?.map(stage => stage.name) || idealProfileData.labels,
     datasets: [
       {
         label: 'Desempenho por Etapa (%)',

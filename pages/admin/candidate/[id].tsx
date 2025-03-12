@@ -606,7 +606,7 @@ const CandidateDetails = () => {
         beginAtZero: true,
         // Definir o máximo com base no maior número de questões nas etapas
         max: candidate?.stageScores ? 
-          Math.max(...candidate.stageScores.map(score => score.total), 10) : 10,
+        Math.max(...candidate.stageScores.map(score => score.total)) : 5,
         ticks: {
           stepSize: 1,
         },
@@ -1785,18 +1785,12 @@ const CandidateDetails = () => {
                     </div>
                   </div>
                   
-                  <div className="flex justify-end">
+                  <div className="flex space-x-4 mt-6 justify-end">
                     <button
                       onClick={handleSave}
-                      className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+                      className="px-6 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors duration-200 font-medium shadow-sm"
                     >
                       Salvar Alterações
-                    </button>
-                    <button
-                      onClick={handleShare}
-                      className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
-                    >
-                      Compartilhar Convite
                     </button>
                   </div>
                 </div>

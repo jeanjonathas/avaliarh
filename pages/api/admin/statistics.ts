@@ -57,6 +57,8 @@ export default async function handler(
         LEFT JOIN "Question" q ON q."stageId" = s.id
         LEFT JOIN "Response" r ON r."questionId" = q.id
         LEFT JOIN "Option" o ON r."optionId" = o.id
+        LEFT JOIN "tests" t ON s."testId" = t.id
+        WHERE t.active = true OR t.active IS NULL
         GROUP BY s.id, s.title, s.order
         ORDER BY s.order
       `;
@@ -65,11 +67,13 @@ export default async function handler(
       const candidateStats = await prisma.$queryRaw`
         SELECT 
           COUNT(*)::int as total,
-          COUNT(CASE WHEN completed = true THEN 1 ELSE NULL END)::int as completed,
-          COUNT(CASE WHEN status = 'APPROVED' THEN 1 ELSE NULL END)::int as approved,
-          COUNT(CASE WHEN status = 'REJECTED' THEN 1 ELSE NULL END)::int as rejected,
-          COUNT(CASE WHEN status = 'PENDING' THEN 1 ELSE NULL END)::int as pending
-        FROM "Candidate"
+          COUNT(CASE WHEN c.completed = true THEN 1 ELSE NULL END)::int as completed,
+          COUNT(CASE WHEN c.status = 'APPROVED' THEN 1 ELSE NULL END)::int as approved,
+          COUNT(CASE WHEN c.status = 'REJECTED' THEN 1 ELSE NULL END)::int as rejected,
+          COUNT(CASE WHEN c.status = 'PENDING' THEN 1 ELSE NULL END)::int as pending
+        FROM "Candidate" c
+        LEFT JOIN "tests" t ON c."testId" = t.id
+        WHERE t.active = true OR t.active IS NULL
       `;
       
       // Log para debug
