@@ -144,28 +144,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         updatedAt: candidate.updatedAt ? candidate.updatedAt.toISOString() : null,
       };
       
-      // Adicionar respostas e teste ao formattedCandidate
-      formattedCandidate.responses = responses.map(response => ({
-        ...response,
-        createdAt: response.createdAt ? response.createdAt.toISOString() : null,
-        updatedAt: response.updatedAt ? response.updatedAt.toISOString() : null
-      }));
-      formattedCandidate.test = test ? {
-        id: test.id,
-        title: test.title,
-        description: test.description,
-        createdAt: test.createdAt.toISOString(),
-        updatedAt: test.updatedAt.toISOString()
-      } : null;
-      formattedCandidate.stageScores = stageScores;
-      formattedCandidate.score = totalScore; // Adicionar o score para compatibilidade com código existente
-      formattedCandidate.totalScore = totalScore; // Adicionar o totalScore para o novo código
-      formattedCandidate.completed = candidateCompleted;
-      formattedCandidate.status = candidateStatus; // Usar o status atualizado
-      
-      return res.status(200).json({ 
-        candidate: convertBigIntToNumber(formattedCandidate)
-      });
+      // Garantir que todas as respostas tenham os campos necessários
+      if (candidate) {
+        const candidateResponses = await prisma.response.findMany({
+          where: { candidateId: id }
+        });
+        
+        if (candidateResponses.length > 0) {
+          const formattedResponses = candidateResponses.map(async (response) => {
+            // Formatar datas para evitar problemas de serialização
+            return {
+              ...response,
+              createdAt: response.createdAt ? response.createdAt.toISOString() : null,
+              updatedAt: response.updatedAt ? response.updatedAt.toISOString() : null
+            };
+          });
+          
+          // Adicionar respostas e teste ao formattedCandidate
+          formattedCandidate.responses = await Promise.all(formattedResponses);
+        } else {
+          // Se não houver respostas, adicionar um array vazio
+          formattedCandidate.responses = [];
+        }
+        
+        formattedCandidate.test = test ? {
+          id: test.id,
+          title: test.title,
+          description: test.description,
+          createdAt: test.createdAt.toISOString(),
+          updatedAt: test.updatedAt.toISOString()
+        } : null;
+        formattedCandidate.stageScores = stageScores;
+        formattedCandidate.score = totalScore; // Adicionar o score para compatibilidade com código existente
+        formattedCandidate.totalScore = totalScore; // Adicionar o totalScore para o novo código
+        formattedCandidate.completed = candidateCompleted;
+        formattedCandidate.status = candidateStatus; // Usar o status atualizado
+        
+        return res.status(200).json({ 
+          candidate: convertBigIntToNumber(formattedCandidate)
+        });
+      }
     }
     
     // PUT - Atualizar candidato
