@@ -121,28 +121,7 @@ const Dashboard: NextPage = () => {
     status: 'PENDING',
     observations: '',
     rating: '0',
-  })
-  const [trendData, setTrendData] = useState({
-    labels: [],
-    datasets: [
-      {
-        label: 'Candidatos Aprovados',
-        data: [],
-        borderColor: 'rgba(75, 192, 192, 1)',
-        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-        tension: 0.4,
-        fill: true,
-      },
-      {
-        label: 'Candidatos Rejeitados',
-        data: [],
-        borderColor: 'rgba(255, 99, 132, 1)',
-        backgroundColor: 'rgba(255, 99, 132, 0.2)',
-        tension: 0.4,
-        fill: true,
-      }
-    ]
-  })
+  })  
   const [stageDistributionData, setStageDistributionData] = useState({
     labels: [],
     datasets: [
@@ -271,16 +250,14 @@ const Dashboard: NextPage = () => {
         label: 'Taxa Real',
         data: [],
         backgroundColor: 'rgba(54, 162, 235, 0.7)',
-        borderColor: 'rgba(54, 162, 235, 1)',
-        borderWidth: 1,
+        borderWidth: 0,
         borderRadius: 4,
       },
       {
         label: 'Taxa Esperada',
         data: [],
         backgroundColor: 'rgba(255, 99, 132, 0.7)',
-        borderColor: 'rgba(255, 99, 132, 1)',
-        borderWidth: 1,
+        borderWidth: 0,
         borderRadius: 4,
       }
     ]
@@ -313,8 +290,6 @@ const Dashboard: NextPage = () => {
         backgroundColor: 'rgba(54, 162, 235, 0.7)',
         borderWidth: 0,
         borderRadius: 4,
-        barPercentage: 0.6,
-        categoryPercentage: 0.7,
       },
       {
         label: 'Média Geral',
@@ -322,8 +297,6 @@ const Dashboard: NextPage = () => {
         backgroundColor: 'rgba(75, 192, 192, 0.7)',
         borderWidth: 0,
         borderRadius: 4,
-        barPercentage: 0.6,
-        categoryPercentage: 0.7,
       }
     ]
   })
@@ -371,30 +344,8 @@ const Dashboard: NextPage = () => {
         
         approvedCounts.push(approved);
         rejectedCounts.push(rejected);
-      }
-      
-      // Atualizar o gráfico de tendências
-      setTrendData({
-        labels: months,
-        datasets: [
-          {
-            label: 'Candidatos Aprovados',
-            data: approvedCounts,
-            borderColor: 'rgba(75, 192, 192, 1)',
-            backgroundColor: 'rgba(75, 192, 192, 0.2)',
-            tension: 0.4,
-            fill: true,
-          },
-          {
-            label: 'Candidatos Rejeitados',
-            data: rejectedCounts,
-            borderColor: 'rgba(255, 99, 132, 1)',
-            backgroundColor: 'rgba(255, 99, 132, 0.2)',
-            tension: 0.4,
-            fill: true,
-          }
-        ]
-      });
+      }     
+
     }
   }, [candidates])
   
@@ -404,7 +355,7 @@ const Dashboard: NextPage = () => {
       try {
         setLoading(true)
         console.log('Dashboard: Iniciando carregamento de candidatos...')
-        const response = await fetch('/api/admin/candidates')
+        const response = await fetch('/api/admin/candidates?activeOnly=true')
         
         if (!response.ok) {
           throw new Error(`Erro ao carregar os candidatos: ${response.status} ${response.statusText}`)
@@ -437,12 +388,37 @@ const Dashboard: NextPage = () => {
         }
         
         const data = await response.json()
+        console.log('Estatísticas recebidas:', data);
+        
+        // Log detalhado para depuração
+        if (data) {
+          console.log('averageSuccessRate:', data.averageSuccessRate);
+          console.log('expectedSuccessRate:', data.expectedSuccessRate);
+          console.log('stageStats:', data.stageStats);
+          if (data.stageStats && Array.isArray(data.stageStats)) {
+            console.log('Número de etapas:', data.stageStats.length);
+            data.stageStats.forEach((stage, index) => {
+              console.log(`Etapa ${index + 1}:`, stage);
+            });
+          }
+        }
+        
         // Garantir que todos os valores numéricos estejam formatados corretamente
         if (data.stageStats) {
           data.stageStats = data.stageStats.map(stage => ({
             ...stage,
-            successRate: parseFloat(parseFloat(stage.successRate).toFixed(1))
+            successRate: parseFloat((stage.successRate || 0).toString()),
+            totalResponses: parseInt((stage.totalResponses || 0).toString()),
+            correctResponses: parseInt((stage.correctResponses || 0).toString())
           }));
+        }
+        
+        if (data.averageSuccessRate !== undefined) {
+          data.averageSuccessRate = parseFloat((data.averageSuccessRate || 0).toString());
+        }
+        
+        if (data.expectedSuccessRate !== undefined) {
+          data.expectedSuccessRate = parseFloat((data.expectedSuccessRate || 0).toString());
         }
         
         setStatistics(data)
@@ -455,62 +431,125 @@ const Dashboard: NextPage = () => {
           const stageNames = data.stageStats.map(stage => stage.name);
           
           // Atualizar gráfico de taxa de sucesso por categoria
-          setCategorySuccessData({
-            labels: stageNames,
-            datasets: [{
-              label: 'Taxa de Sucesso (%)',
-              data: data.stageStats.map(stage => {
-                // Garantir que o valor seja um número válido com uma casa decimal
-                const rate = parseFloat(stage.successRate) || 0;
-                return parseFloat(rate.toFixed(1));
-              }),
-              backgroundColor: [
-                'rgba(255, 99, 132, 0.7)',
-                'rgba(54, 162, 235, 0.7)',
-                'rgba(255, 206, 86, 0.7)',
-                'rgba(75, 192, 192, 0.7)',
-                'rgba(153, 102, 255, 0.7)',
-                'rgba(255, 159, 64, 0.7)'
-              ],
-              borderColor: [
-                'rgba(255, 99, 132, 1)',
-                'rgba(54, 162, 235, 1)',
-                'rgba(255, 206, 86, 1)',
-                'rgba(75, 192, 192, 1)',
-                'rgba(153, 102, 255, 1)',
-                'rgba(255, 159, 64, 1)'
-              ],
-              borderWidth: 1,
-              borderRadius: 4,
-            }]
-          });
-
+          if (data.stageStats && Array.isArray(data.stageStats) && data.stageStats.length > 0) {
+            // Verificar se há dados válidos para exibir
+            const hasValidData = data.stageStats.some(stage => 
+              parseFloat(stage.successRate) > 0 || stage.totalResponses > 0
+            );
+            
+            if (hasValidData) {
+              setCategorySuccessData({
+                labels: stageNames,
+                datasets: [{
+                  label: 'Taxa de Sucesso (%)',
+                  data: data.stageStats.map(stage => {
+                    // Garantir que o valor seja um número válido com uma casa decimal
+                    const rate = parseFloat(stage.successRate) || 0;
+                    return parseFloat(rate.toFixed(1));
+                  }),
+                  backgroundColor: [
+                    'rgba(255, 99, 132, 0.7)',
+                    'rgba(54, 162, 235, 0.7)',
+                    'rgba(255, 206, 86, 0.7)',
+                    'rgba(75, 192, 192, 0.7)',
+                    'rgba(153, 102, 255, 0.7)',
+                    'rgba(255, 159, 64, 0.7)'
+                  ],
+                  borderColor: [
+                    'rgba(255, 99, 132, 1)',
+                    'rgba(54, 162, 235, 1)',
+                    'rgba(255, 206, 86, 1)',
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(153, 102, 255, 1)',
+                    'rgba(255, 159, 64, 1)'
+                  ],
+                  borderWidth: 1,
+                  borderRadius: 4,
+                }]
+              });
+            } else {
+              // Se não houver dados válidos, exibir um gráfico vazio com mensagem
+              setCategorySuccessData({
+                labels: ['Sem dados disponíveis'],
+                datasets: [{
+                  label: 'Taxa de Sucesso (%)',
+                  data: [0],
+                  backgroundColor: ['rgba(200, 200, 200, 0.7)'],
+                  borderColor: ['rgba(200, 200, 200, 1)'],
+                  borderWidth: 1,
+                  borderRadius: 4,
+                }]
+              });
+            }
+          } else {
+            // Se não houver etapas, exibir um gráfico vazio com mensagem
+            setCategorySuccessData({
+              labels: ['Sem dados disponíveis'],
+              datasets: [{
+                label: 'Taxa de Sucesso (%)',
+                data: [0],
+                backgroundColor: ['rgba(200, 200, 200, 0.7)'],
+                borderColor: ['rgba(200, 200, 200, 1)'],
+                borderWidth: 1,
+                borderRadius: 4,
+              }]
+            });
+          }
+          
           // Atualizar gráfico de comparação real vs esperado
-          setRealVsExpectedData({
-            labels: stageNames,
-            datasets: [
-              {
-                label: 'Taxa Real',
-                data: data.stageStats.map(stage => {
-                  // Garantir que o valor seja um número válido com uma casa decimal
-                  const rate = parseFloat(stage.successRate) || 0;
-                  return parseFloat(rate.toFixed(1));
-                }),
-                backgroundColor: 'rgba(54, 162, 235, 0.7)',
-                borderColor: 'rgba(54, 162, 235, 1)',
-                borderWidth: 1,
-                borderRadius: 4,
-              },
-              {
-                label: 'Taxa Esperada',
-                data: Array(stageNames.length).fill(parseFloat(data.expectedSuccessRate.toFixed(1)) || 70),
-                backgroundColor: 'rgba(255, 99, 132, 0.7)',
-                borderColor: 'rgba(255, 99, 132, 1)',
-                borderWidth: 1,
-                borderRadius: 4,
-              }
-            ]
-          });
+          if (data && data.stageStats && Array.isArray(data.stageStats)) {
+            // Verificar se há dados válidos para exibir
+            const hasValidData = data.stageStats.some(stage => 
+              parseFloat(stage.successRate) > 0 || stage.totalResponses > 0
+            );
+            
+            if (hasValidData) {
+              setRealVsExpectedData({
+                labels: stageNames,
+                datasets: [
+                  {
+                    label: 'Taxa Real',
+                    data: data.stageStats.map(stage => {
+                      // Garantir que o valor seja um número válido com uma casa decimal
+                      const rate = parseFloat(stage.successRate) || 0;
+                      return parseFloat(rate.toFixed(1));
+                    }),
+                    backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                    borderWidth: 0,
+                    borderRadius: 4,
+                  },
+                  {
+                    label: 'Taxa Esperada',
+                    data: data.stageStats.map(() => parseFloat(data.expectedSuccessRate.toFixed(1))),
+                    backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                    borderWidth: 0,
+                    borderRadius: 4,
+                  }
+                ]
+              });
+            } else {
+              // Se não houver dados válidos, exibir um gráfico vazio com mensagem
+              setRealVsExpectedData({
+                labels: ['Sem dados disponíveis'],
+                datasets: [
+                  {
+                    label: 'Taxa Real',
+                    data: [0],
+                    backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                    borderWidth: 0,
+                    borderRadius: 4,
+                  },
+                  {
+                    label: 'Taxa Esperada',
+                    data: [0],
+                    backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                    borderWidth: 0,
+                    borderRadius: 4,
+                  }
+                ]
+              });
+            }
+          }
           
           // Atualizar gráfico de radar (desempenho por etapa)
           setIdealProfileData({
@@ -588,8 +627,6 @@ const Dashboard: NextPage = () => {
                 backgroundColor: 'rgba(54, 162, 235, 0.7)',
                 borderWidth: 0,
                 borderRadius: 4,
-                barPercentage: 0.6,
-                categoryPercentage: 0.7,
               },
               {
                 label: 'Média Geral',
@@ -597,36 +634,50 @@ const Dashboard: NextPage = () => {
                 backgroundColor: 'rgba(75, 192, 192, 0.7)',
                 borderWidth: 0,
                 borderRadius: 4,
-                barPercentage: 0.6,
-                categoryPercentage: 0.7,
               }
             ]
           });
         }
 
         // Atualizar gráfico de desempenho geral
-        if (data && data.candidateStats) {
-          setOverallPerformanceData({
-            labels: ['Aprovados', 'Reprovados', 'Pendentes'],
-            datasets: [{
-              data: [
-                parseInt(data.candidateStats.approved) || 0,
-                parseInt(data.candidateStats.rejected) || 0,
-                parseInt(data.candidateStats.pending) || 0
-              ],
-              backgroundColor: [
-                'rgba(75, 192, 192, 0.7)',
-                'rgba(255, 99, 132, 0.7)',
-                'rgba(255, 206, 86, 0.7)'
-              ],
-              borderColor: [
-                'rgba(75, 192, 192, 1)',
-                'rgba(255, 99, 132, 1)',
-                'rgba(255, 206, 86, 1)'
-              ],
-              borderWidth: 1,
-            }]
-          });
+        if (data.candidateStats) {
+          const approved = parseInt(data.candidateStats.approved) || 0;
+          const rejected = parseInt(data.candidateStats.rejected) || 0;
+          const pending = parseInt(data.candidateStats.pending) || 0;
+          
+          console.log('Dados para gráfico de distribuição:', { approved, rejected, pending });
+          
+          // Verificar se há dados para exibir
+          if (approved > 0 || rejected > 0 || pending > 0) {
+            setOverallPerformanceData({
+              labels: ['Aprovados', 'Reprovados', 'Pendentes'],
+              datasets: [{
+                data: [approved, rejected, pending],
+                backgroundColor: [
+                  'rgba(75, 192, 192, 0.7)',
+                  'rgba(255, 99, 132, 0.7)',
+                  'rgba(255, 206, 86, 0.7)'
+                ],
+                borderColor: [
+                  'rgba(75, 192, 192, 1)',
+                  'rgba(255, 99, 132, 1)',
+                  'rgba(255, 206, 86, 1)'
+                ],
+                borderWidth: 1,
+              }]
+            });
+          } else {
+            // Se não houver dados, exibir mensagem
+            setOverallPerformanceData({
+              labels: ['Sem dados disponíveis'],
+              datasets: [{
+                data: [1],
+                backgroundColor: ['rgba(200, 200, 200, 0.7)'],
+                borderColor: ['rgba(200, 200, 200, 1)'],
+                borderWidth: 1,
+              }]
+            });
+          }
         }
       } catch (error) {
         console.error('Erro ao carregar estatísticas:', error)
@@ -714,11 +765,26 @@ const Dashboard: NextPage = () => {
         const data = await response.json();
         console.log('Estatísticas recebidas:', data);
         
+        // Log detalhado para depuração
+        if (data) {
+          console.log('averageSuccessRate:', data.averageSuccessRate);
+          console.log('expectedSuccessRate:', data.expectedSuccessRate);
+          console.log('stageStats:', data.stageStats);
+          if (data.stageStats && Array.isArray(data.stageStats)) {
+            console.log('Número de etapas:', data.stageStats.length);
+            data.stageStats.forEach((stage, index) => {
+              console.log(`Etapa ${index + 1}:`, stage);
+            });
+          }
+        }
+        
         // Garantir que todos os valores numéricos estejam formatados corretamente
         if (data.stageStats && Array.isArray(data.stageStats)) {
           data.stageStats = data.stageStats.map(stage => ({
             ...stage,
-            successRate: parseFloat(parseFloat(stage.successRate).toFixed(1))
+            successRate: parseFloat((stage.successRate || 0).toString()),
+            totalResponses: parseInt((stage.totalResponses || 0).toString()),
+            correctResponses: parseInt((stage.correctResponses || 0).toString())
           }));
           
           // Ordenar as etapas pela ordem definida no teste
@@ -730,6 +796,14 @@ const Dashboard: NextPage = () => {
             // Caso contrário, ordenar pelo nome
             return a.name.localeCompare(b.name);
           });
+        }
+        
+        if (data.averageSuccessRate !== undefined) {
+          data.averageSuccessRate = parseFloat((data.averageSuccessRate || 0).toString());
+        }
+        
+        if (data.expectedSuccessRate !== undefined) {
+          data.expectedSuccessRate = parseFloat((data.expectedSuccessRate || 0).toString());
         }
         
         setStatistics(data);
@@ -756,62 +830,125 @@ const Dashboard: NextPage = () => {
     const stageNames = data.stageStats.map(stage => stage.name);
     
     // Atualizar gráfico de taxa de sucesso por categoria
-    setCategorySuccessData({
-      labels: stageNames,
-      datasets: [{
-        label: 'Taxa de Sucesso (%)',
-        data: data.stageStats.map(stage => {
-          // Garantir que o valor seja um número válido com uma casa decimal
-          const rate = parseFloat(stage.successRate) || 0;
-          return parseFloat(rate.toFixed(1));
-        }),
-        backgroundColor: [
-          'rgba(255, 99, 132, 0.7)',
-          'rgba(54, 162, 235, 0.7)',
-          'rgba(255, 206, 86, 0.7)',
-          'rgba(75, 192, 192, 0.7)',
-          'rgba(153, 102, 255, 0.7)',
-          'rgba(255, 159, 64, 0.7)'
-        ],
-        borderColor: [
-          'rgba(255, 99, 132, 1)',
-          'rgba(54, 162, 235, 1)',
-          'rgba(255, 206, 86, 1)',
-          'rgba(75, 192, 192, 1)',
-          'rgba(153, 102, 255, 1)',
-          'rgba(255, 159, 64, 1)'
-        ],
-        borderWidth: 1,
-        borderRadius: 4,
-      }]
-    });
-
+    if (data.stageStats && Array.isArray(data.stageStats) && data.stageStats.length > 0) {
+      // Verificar se há dados válidos para exibir
+      const hasValidData = data.stageStats.some(stage => 
+        parseFloat(stage.successRate) > 0 || stage.totalResponses > 0
+      );
+      
+      if (hasValidData) {
+        setCategorySuccessData({
+          labels: stageNames,
+          datasets: [{
+            label: 'Taxa de Sucesso (%)',
+            data: data.stageStats.map(stage => {
+              // Garantir que o valor seja um número válido com uma casa decimal
+              const rate = parseFloat(stage.successRate) || 0;
+              return parseFloat(rate.toFixed(1));
+            }),
+            backgroundColor: [
+              'rgba(255, 99, 132, 0.7)',
+              'rgba(54, 162, 235, 0.7)',
+              'rgba(255, 206, 86, 0.7)',
+              'rgba(75, 192, 192, 0.7)',
+              'rgba(153, 102, 255, 0.7)',
+              'rgba(255, 159, 64, 0.7)'
+            ],
+            borderColor: [
+              'rgba(255, 99, 132, 1)',
+              'rgba(54, 162, 235, 1)',
+              'rgba(255, 206, 86, 1)',
+              'rgba(75, 192, 192, 1)',
+              'rgba(153, 102, 255, 1)',
+              'rgba(255, 159, 64, 1)'
+            ],
+            borderWidth: 1,
+            borderRadius: 4,
+          }]
+        });
+      } else {
+        // Se não houver dados válidos, exibir um gráfico vazio com mensagem
+        setCategorySuccessData({
+          labels: ['Sem dados disponíveis'],
+          datasets: [{
+            label: 'Taxa de Sucesso (%)',
+            data: [0],
+            backgroundColor: ['rgba(200, 200, 200, 0.7)'],
+            borderColor: ['rgba(200, 200, 200, 1)'],
+            borderWidth: 1,
+            borderRadius: 4,
+          }]
+        });
+      }
+    } else {
+      // Se não houver etapas, exibir um gráfico vazio com mensagem
+      setCategorySuccessData({
+        labels: ['Sem dados disponíveis'],
+        datasets: [{
+          label: 'Taxa de Sucesso (%)',
+          data: [0],
+          backgroundColor: ['rgba(200, 200, 200, 0.7)'],
+          borderColor: ['rgba(200, 200, 200, 1)'],
+          borderWidth: 1,
+          borderRadius: 4,
+        }]
+      });
+    }
+    
     // Atualizar gráfico de comparação real vs esperado
-    setRealVsExpectedData({
-      labels: stageNames,
-      datasets: [
-        {
-          label: 'Taxa Real',
-          data: data.stageStats.map(stage => {
-            // Garantir que o valor seja um número válido com uma casa decimal
-            const rate = parseFloat(stage.successRate) || 0;
-            return parseFloat(rate.toFixed(1));
-          }),
-          backgroundColor: 'rgba(54, 162, 235, 0.7)',
-          borderColor: 'rgba(54, 162, 235, 1)',
-          borderWidth: 1,
-          borderRadius: 4,
-        },
-        {
-          label: 'Taxa Esperada',
-          data: Array(stageNames.length).fill(parseFloat(data.expectedSuccessRate.toFixed(1)) || 70),
-          backgroundColor: 'rgba(255, 99, 132, 0.7)',
-          borderColor: 'rgba(255, 99, 132, 1)',
-          borderWidth: 1,
-          borderRadius: 4,
-        }
-      ]
-    });
+    if (data && data.stageStats && Array.isArray(data.stageStats)) {
+      // Verificar se há dados válidos para exibir
+      const hasValidData = data.stageStats.some(stage => 
+        parseFloat(stage.successRate) > 0 || stage.totalResponses > 0
+      );
+      
+      if (hasValidData) {
+        setRealVsExpectedData({
+          labels: stageNames,
+          datasets: [
+            {
+              label: 'Taxa Real',
+              data: data.stageStats.map(stage => {
+                // Garantir que o valor seja um número válido com uma casa decimal
+                const rate = parseFloat(stage.successRate) || 0;
+                return parseFloat(rate.toFixed(1));
+              }),
+              backgroundColor: 'rgba(54, 162, 235, 0.7)',
+              borderWidth: 0,
+              borderRadius: 4,
+            },
+            {
+              label: 'Taxa Esperada',
+              data: data.stageStats.map(() => parseFloat(data.expectedSuccessRate.toFixed(1))),
+              backgroundColor: 'rgba(255, 99, 132, 0.7)',
+              borderWidth: 0,
+              borderRadius: 4,
+            }
+          ]
+        });
+      } else {
+        // Se não houver dados válidos, exibir um gráfico vazio com mensagem
+        setRealVsExpectedData({
+          labels: ['Sem dados disponíveis'],
+          datasets: [
+            {
+              label: 'Taxa Real',
+              data: [0],
+              backgroundColor: 'rgba(54, 162, 235, 0.7)',
+              borderWidth: 0,
+              borderRadius: 4,
+            },
+            {
+              label: 'Taxa Esperada',
+              data: [0],
+              backgroundColor: 'rgba(255, 99, 132, 0.7)',
+              borderWidth: 0,
+              borderRadius: 4,
+            }
+          ]
+        });
+      }
+    }
     
     // Atualizar gráfico de radar (desempenho por etapa)
     setIdealProfileData({
@@ -850,27 +987,43 @@ const Dashboard: NextPage = () => {
     
     // Atualizar gráfico de desempenho geral
     if (data.candidateStats) {
-      setOverallPerformanceData({
-        labels: ['Aprovados', 'Reprovados', 'Pendentes'],
-        datasets: [{
-          data: [
-            parseInt(data.candidateStats.approved) || 0,
-            parseInt(data.candidateStats.rejected) || 0,
-            parseInt(data.candidateStats.pending) || 0
-          ],
-          backgroundColor: [
-            'rgba(75, 192, 192, 0.7)',
-            'rgba(255, 99, 132, 0.7)',
-            'rgba(255, 206, 86, 0.7)'
-          ],
-          borderColor: [
-            'rgba(75, 192, 192, 1)',
-            'rgba(255, 99, 132, 1)',
-            'rgba(255, 206, 86, 1)'
-          ],
-          borderWidth: 1,
-        }]
-      });
+      const approved = parseInt(data.candidateStats.approved) || 0;
+      const rejected = parseInt(data.candidateStats.rejected) || 0;
+      const pending = parseInt(data.candidateStats.pending) || 0;
+      
+      console.log('Dados para gráfico de distribuição:', { approved, rejected, pending });
+      
+      // Verificar se há dados para exibir
+      if (approved > 0 || rejected > 0 || pending > 0) {
+        setOverallPerformanceData({
+          labels: ['Aprovados', 'Reprovados', 'Pendentes'],
+          datasets: [{
+            data: [approved, rejected, pending],
+            backgroundColor: [
+              'rgba(75, 192, 192, 0.7)',
+              'rgba(255, 99, 132, 0.7)',
+              'rgba(255, 206, 86, 0.7)'
+            ],
+            borderColor: [
+              'rgba(75, 192, 192, 1)',
+              'rgba(255, 99, 132, 1)',
+              'rgba(255, 206, 86, 1)'
+            ],
+            borderWidth: 1,
+          }]
+        });
+      } else {
+        // Se não houver dados, exibir mensagem
+        setOverallPerformanceData({
+          labels: ['Sem dados disponíveis'],
+          datasets: [{
+            data: [1],
+            backgroundColor: ['rgba(200, 200, 200, 0.7)'],
+            borderColor: ['rgba(200, 200, 200, 1)'],
+            borderWidth: 1,
+          }]
+        });
+      }
     }
   };
   
@@ -983,7 +1136,7 @@ const Dashboard: NextPage = () => {
       return;
     }
     
-    // Obter nomes das etapas
+    // Obter nomes das etapas para usar como labels em todos os gráficos
     const stageNames = statistics.stageStats.map(stage => stage.name);
     
     // Cabeçalhos do CSV
@@ -1615,25 +1768,6 @@ const Dashboard: NextPage = () => {
     },
   };
 
-  // Componente para o gráfico de tendências
-  const renderTrendChart = () => {
-    return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-secondary-700">Tendências de Desempenho</h3>
-        </div>
-        <div className="h-80">
-          <Line 
-            data={trendData}
-            options={trendOptions}
-          />
-        </div>
-        <div className="mt-4 text-sm text-gray-500">
-          <p>Este gráfico mostra a evolução da pontuação média e taxa de aprovação dos candidatos nos últimos 6 meses.</p>
-        </div>
-      </div>
-    );
-  };
 
 // Renderização do componente principal
 return (
@@ -1907,11 +2041,7 @@ return (
               </tbody>
             </table>
           </div>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow-md p-6 mt-6">
-          {renderTrendChart()}
-        </div>
+        </div>      
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
           <div className="bg-white rounded-lg shadow-md p-6">
@@ -1945,31 +2075,76 @@ return (
                   <div className="p-4 border rounded-lg bg-blue-50">
                     <h4 className="font-medium text-blue-700 mb-2">Taxa Média de Sucesso</h4>
                     <p className="text-blue-600">
-                      A taxa média de sucesso dos candidatos é de <span className="font-bold">{statistics.averageSuccessRate?.toFixed(1)}%</span>, 
-                      {statistics.averageSuccessRate > statistics.expectedSuccessRate 
-                        ? ' acima da taxa esperada de ' 
-                        : ' abaixo da taxa esperada de '}
-                      <span className="font-bold">{statistics.expectedSuccessRate}%</span>.
+                      {(() => {
+                        console.log('Renderizando card de Taxa Média de Sucesso:', {
+                          averageSuccessRate: statistics.averageSuccessRate,
+                          expectedSuccessRate: statistics.expectedSuccessRate,
+                          tipo_avg: typeof statistics.averageSuccessRate,
+                          tipo_exp: typeof statistics.expectedSuccessRate
+                        });
+                        
+                        if (statistics.averageSuccessRate !== undefined) {
+                          return (
+                            <>
+                              A taxa média de sucesso dos candidatos é de <span className="font-bold">{parseFloat((statistics.averageSuccessRate || 0).toFixed(1))}%</span>, 
+                              {parseFloat((statistics.averageSuccessRate || 0).toString()) > parseFloat((statistics.expectedSuccessRate || 0).toString()) 
+                                ? ' acima da taxa esperada de ' 
+                                : ' abaixo da taxa esperada de '}
+                              <span className="font-bold">{parseFloat((statistics.expectedSuccessRate || 0).toFixed(1))}%</span>.
+                            </>
+                          );
+                        } else {
+                          return <>Não há dados suficientes para calcular a taxa média de sucesso.</>;
+                        }
+                      })()}
                     </p>
                   </div>
                   
                   <div className="p-4 border rounded-lg bg-green-50">
                     <h4 className="font-medium text-green-700 mb-2">Categoria com Melhor Desempenho</h4>
-                    {statistics.stageStats && statistics.stageStats.length > 0 && (
+                    {statistics.stageStats && Array.isArray(statistics.stageStats) && (
                       <p className="text-green-600">
                         {(() => {
                           // Filtrar apenas etapas com pelo menos uma resposta
-                          const validStages = statistics.stageStats.filter(stage => stage.totalResponses > 0);
+                          const validStages = statistics.stageStats.filter(stage => 
+                            stage && stage.totalResponses && parseInt(stage.totalResponses.toString()) > 0
+                          );
                           
-                          if (validStages.length === 0) {
+                          console.log('Etapas válidas para melhor desempenho:', validStages);
+                          
+                          if (!validStages || validStages.length === 0) {
                             return <span>Nenhuma etapa com respostas suficientes para análise.</span>;
                           }
                           
-                          const bestStage = [...validStages].sort((a, b) => b.successRate - a.successRate)[0];
+                          // Se só temos uma etapa, mostrar mensagem específica para o card de melhor desempenho
+                          if (validStages.length === 1) {
+                            const stage = validStages[0];
+                            const successRate = parseFloat((stage.successRate || 0).toString());
+                            
+                            return (
+                              <>
+                                <span className="font-bold">{stage.name}</span> apresenta excelente desempenho 
+                                com taxa de sucesso de <span className="font-bold">{successRate.toFixed(1)}%</span>.
+                                {successRate > 90 ? ' Parabéns pela alta taxa de acertos!' : ''}
+                              </>
+                            );
+                          }
+                          
+                          // Ordenar por taxa de sucesso (maior para menor)
+                          const bestStage = [...validStages].sort((a, b) => {
+                            const rateA = parseFloat((a.successRate || 0).toString());
+                            const rateB = parseFloat((b.successRate || 0).toString());
+                            return rateB - rateA;
+                          })[0];
+                          
+                          if (!bestStage) {
+                            return <span>Nenhuma etapa com respostas suficientes para análise.</span>;
+                          }
+                          
                           return (
                             <>
                               <span className="font-bold">{bestStage.name}</span> é a categoria com melhor desempenho, 
-                              com taxa de sucesso de <span className="font-bold">{bestStage.successRate.toFixed(1)}%</span>.
+                              com taxa de sucesso de <span className="font-bold">{parseFloat((bestStage.successRate || 0).toString()).toFixed(1)}%</span>.
                             </>
                           );
                         })()}
@@ -1979,21 +2154,50 @@ return (
                   
                   <div className="p-4 border rounded-lg bg-red-50">
                     <h4 className="font-medium text-red-700 mb-2">Categoria com Maior Desafio</h4>
-                    {statistics.stageStats && statistics.stageStats.length > 0 && (
+                    {statistics.stageStats && Array.isArray(statistics.stageStats) && (
                       <p className="text-red-600">
                         {(() => {
                           // Filtrar apenas etapas com pelo menos uma resposta
-                          const validStages = statistics.stageStats.filter(stage => stage.totalResponses > 0);
+                          const validStages = statistics.stageStats.filter(stage => 
+                            stage && stage.totalResponses && parseInt(stage.totalResponses.toString()) > 0
+                          );
                           
-                          if (validStages.length === 0) {
+                          console.log('Etapas válidas para maior desafio:', validStages);
+                          
+                          if (!validStages || validStages.length === 0) {
                             return <span>Nenhuma etapa com respostas suficientes para análise.</span>;
                           }
                           
-                          const worstStage = [...validStages].sort((a, b) => a.successRate - b.successRate)[0];
+                          // Se só temos uma etapa, mostrar mensagem específica para o card de maior desafio
+                          if (validStages.length === 1) {
+                            const stage = validStages[0];
+                            const successRate = parseFloat((stage.successRate || 0).toString());
+                            
+                            return (
+                              <>
+                                <span className="font-bold">{stage.name}</span> é a única categoria avaliada. 
+                                {successRate < 50 
+                                  ? ` Com taxa de sucesso de apenas ${successRate.toFixed(1)}%, representa um desafio para os candidatos.` 
+                                  : ` Com taxa de sucesso de ${successRate.toFixed(1)}%, não representa um desafio significativo.`}
+                              </>
+                            );
+                          }
+                          
+                          // Ordenar por taxa de sucesso (menor para maior)
+                          const worstStage = [...validStages].sort((a, b) => {
+                            const rateA = parseFloat((a.successRate || 0).toString());
+                            const rateB = parseFloat((b.successRate || 0).toString());
+                            return rateA - rateB;
+                          })[0];
+                          
+                          if (!worstStage) {
+                            return <span>Nenhuma etapa com respostas suficientes para análise.</span>;
+                          }
+                          
                           return (
                             <>
                               <span className="font-bold">{worstStage.name}</span> é a categoria com maior dificuldade, 
-                              com taxa de sucesso de apenas <span className="font-bold">{worstStage.successRate.toFixed(1)}%</span>.
+                              com taxa de sucesso de apenas <span className="font-bold">{parseFloat((worstStage.successRate || 0).toString()).toFixed(1)}%</span>.
                             </>
                           );
                         })()}

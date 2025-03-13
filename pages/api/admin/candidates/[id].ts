@@ -44,7 +44,10 @@ type ResponseWithRelations = {
   stageName?: string;
   categoryId?: string;
   categoryName?: string;
+  questionSnapshot?: any;
+  allOptionsSnapshot?: any;
   question?: {
+    id: string;
     text: string;
     stageId: string;
     categoryId: string;
@@ -56,8 +59,14 @@ type ResponseWithRelations = {
       id: string;
       name: string;
     };
+    options?: {
+      id: string;
+      text: string;
+      isCorrect: boolean;
+    }[];
   };
   option?: {
+    id: string;
     text: string;
     isCorrect: boolean;
   };
@@ -79,6 +88,10 @@ type ProcessedResponse = {
   createdAt: Date;
   updatedAt: Date;
   timeSpent: number;
+  questionSnapshot?: any;
+  allOptionsSnapshot?: any;
+  question?: any;
+  option?: any;
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -110,29 +123,52 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       
       // Buscar as respostas do candidato com informações completas
       const responses = await prisma.response.findMany({
-        where: { candidateId: id },
-        include: {
-          candidate: true
-        }
+        where: { candidateId: id }
       });
       
       // Mapear as respostas para incluir informações da etapa e categoria
-      const processedResponses: ProcessedResponse[] = responses.map(response => ({
-        id: response.id,
-        candidateId: response.candidateId,
-        questionId: response.questionId,
-        optionId: response.optionId,
-        questionText: response.questionText || '',
-        optionText: response.optionText || '',
-        isCorrectOption: response.isCorrectOption || false,
-        stageId: response.stageId || '',
-        stageName: response.stageName || '',
-        categoryId: '',
-        categoryName: response.categoryName || '',
-        createdAt: response.createdAt,
-        updatedAt: response.updatedAt,
-        timeSpent: response.timeSpent || 0
-      }));
+      const processedResponses: ProcessedResponse[] = responses.map(response => {
+        // Processar o snapshot da questão
+        let questionSnapshot = null;
+        let allOptionsSnapshot = null;
+        
+        try {
+          // Se temos o questionSnapshot como string, converter para objeto
+          if (response.questionSnapshot && typeof response.questionSnapshot === 'string') {
+            questionSnapshot = JSON.parse(response.questionSnapshot);
+          } else {
+            questionSnapshot = response.questionSnapshot;
+          }
+          
+          // Se temos o allOptionsSnapshot como string, converter para objeto
+          if (response.allOptionsSnapshot && typeof response.allOptionsSnapshot === 'string') {
+            allOptionsSnapshot = JSON.parse(response.allOptionsSnapshot);
+          } else {
+            allOptionsSnapshot = response.allOptionsSnapshot;
+          }
+        } catch (e) {
+          console.error('Erro ao processar snapshots:', e);
+        }
+        
+        return {
+          id: response.id,
+          candidateId: response.candidateId,
+          questionId: response.questionId,
+          optionId: response.optionId,
+          questionText: response.questionText || '',
+          optionText: response.optionText || '',
+          isCorrectOption: response.isCorrectOption || false,
+          stageId: response.stageId || '',
+          stageName: response.stageName || '',
+          categoryId: response.categoryName ? response.categoryName.split(':')[0] || '' : '',
+          categoryName: response.categoryName || '',
+          createdAt: response.createdAt,
+          updatedAt: response.updatedAt,
+          timeSpent: response.timeSpent || 0,
+          questionSnapshot: questionSnapshot,
+          allOptionsSnapshot: allOptionsSnapshot
+        };
+      });
       
       // Verificar se o candidato completou o teste com base nas respostas
       let candidateCompleted = candidate.completed;
@@ -141,14 +177,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Se há respostas mas o candidato não está marcado como completo ou está como PENDING, atualizamos
         candidateCompleted = true;
         candidateStatus = 'APPROVED';
-        await prisma.candidate.update({
-          where: { id },
-          data: { 
-            completed: true,
-            status: 'APPROVED'
-          }
-        });
-        console.log(`Candidato ${id} marcado como completo e aprovado com base nas respostas.`);
       }
       
       // Buscar o teste associado ao candidato
@@ -174,11 +202,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       
       // Processar respostas para calcular pontuações por etapa
       for (const response of processedResponses) {
+        // Obter informações da etapa do snapshot ou dos campos diretos
+        let stageId = response.stageId;
+        let stageName = response.stageName;
+        
+        // Se não temos o stageId ou stageName diretamente, tentar obter do snapshot
+        if ((!stageId || !stageName) && response.questionSnapshot) {
+          try {
+            const snapshot = response.questionSnapshot;
+            if (snapshot.stageId) stageId = snapshot.stageId;
+            if (snapshot.stageName) stageName = snapshot.stageName;
+          } catch (e) {
+            console.error('Erro ao acessar snapshot para obter stageId:', e);
+          }
+        }
+        
         // Verificar se a etapa pertence ao teste do candidato
-        if (response.stageId && response.stageName && testStageIds.includes(response.stageId)) {
-          const stageId = response.stageId;
-          const stageName = response.stageName;
-          
+        if (stageId && stageName && testStageIds.includes(stageId)) {
+          // Se a etapa não existe no mapa, criar uma entrada
           if (!stageMap.has(stageId)) {
             stageMap.set(stageId, {
               id: stageId,
@@ -188,21 +229,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             });
           }
           
+          // Incrementar contadores
           const stageData = stageMap.get(stageId);
           stageData.total += 1;
           
           if (response.isCorrectOption) {
             stageData.correct += 1;
           }
+          
+          stageMap.set(stageId, stageData);
         }
-      }
-      
-      // Obter a ordem das etapas do teste
-      const stageOrder = {};
-      if (test && test.TestStage) {
-        test.TestStage.forEach((ts, index) => {
-          stageOrder[ts.stageId] = index;
-        });
       }
       
       // Converter o mapa em array e calcular percentual para cada etapa
@@ -214,7 +250,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return {
           ...value,
           percentage,
-          order: stageOrder[value.id] || 999 // Usar 999 como valor padrão para etapas sem ordem definida
+          order: test?.TestStage?.findIndex(ts => ts.stageId === value.id) || 999 // Usar 999 como valor padrão para etapas sem ordem definida
         };
       });
       
@@ -242,43 +278,53 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       });
       
-      // Adicionar respostas e teste ao formattedCandidate
-      const formattedCandidate: any = {
-        ...candidate,
-        testDate: candidate.testDate ? candidate.testDate.toISOString() : null,
-        interviewDate: candidate.interviewDate ? candidate.interviewDate.toISOString() : null,
-        inviteExpires: candidate.inviteExpires ? candidate.inviteExpires.toISOString() : null,
-        createdAt: candidate.createdAt ? candidate.createdAt.toISOString() : null,
-        updatedAt: candidate.updatedAt ? candidate.updatedAt.toISOString() : null,
-        responses: processedResponses.map(response => {
+      // Garantir que todas as respostas tenham os campos necessários
+      if (candidate) {
+        const formattedResponses = processedResponses.map(response => {
           // Formatar datas para evitar problemas de serialização
           return {
             ...response,
             createdAt: response.createdAt ? response.createdAt.toISOString() : null,
             updatedAt: response.updatedAt ? response.updatedAt.toISOString() : null
           };
-        }),
-        test: test ? {
-          id: test.id,
-          title: test.title,
-          description: test.description,
-          TestStage: test.TestStage.map(ts => ({
-            stageId: ts.stageId,
-            stage: {
-              id: ts.stage.id,
-              title: ts.stage.title
-            }
-          })),
-          createdAt: test.createdAt.toISOString(),
-          updatedAt: test.updatedAt.toISOString()
-        } : null,
-        stageScores: sortedStageScores,
-        score: percentageScore
-      };
-      
-      return res.status(200).json({ 
-        candidate: convertBigIntToNumber(formattedCandidate)
-      });
+        });
+        
+        // Adicionar respostas e teste ao formattedCandidate
+        const formattedCandidate: any = {
+          ...candidate,
+          testDate: candidate.testDate ? candidate.testDate.toISOString() : null,
+          interviewDate: candidate.interviewDate ? candidate.interviewDate.toISOString() : null,
+          inviteExpires: candidate.inviteExpires ? candidate.inviteExpires.toISOString() : null,
+          createdAt: candidate.createdAt ? candidate.createdAt.toISOString() : null,
+          updatedAt: candidate.updatedAt ? candidate.updatedAt.toISOString() : null,
+          responses: formattedResponses,
+          test: test ? {
+            id: test.id,
+            title: test.title,
+            description: test.description,
+            TestStage: test.TestStage?.map(ts => ({
+              id: ts.id,
+              stageId: ts.stageId,
+              stage: ts.stage,
+              order: ts.order
+            })),
+            createdAt: test.createdAt.toISOString(),
+            updatedAt: test.updatedAt.toISOString()
+          } : null,
+          stageScores: sortedStageScores,
+          score: {
+            correct: totalCorrect,
+            total: totalQuestions,
+            percentage: percentageScore
+          },
+          completed: candidateCompleted,
+          status: candidateStatus // Usar o status atualizado
+        };
+        
+        return res.status(200).json({ 
+          candidate: convertBigIntToNumber(formattedCandidate)
+        });
+      }
     }
     
     // PUT - Atualizar candidato

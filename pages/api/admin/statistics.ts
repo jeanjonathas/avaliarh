@@ -46,8 +46,8 @@ export default async function handler(
           s.id,
           s.title as name,
           ts."order" as "order",
-          COUNT(DISTINCT r.id) as totalResponses,
-          SUM(CASE WHEN r."isCorrectOption" = true THEN 1 ELSE 0 END) as correctResponses,
+          COUNT(DISTINCT r.id) as "totalResponses",
+          SUM(CASE WHEN r."isCorrectOption" = true THEN 1 ELSE 0 END) as "correctResponses",
           CASE 
             WHEN COUNT(DISTINCT r.id) > 0 
             THEN ROUND(SUM(CASE WHEN r."isCorrectOption" = true THEN 1 ELSE 0 END) * 100.0 / COUNT(DISTINCT r.id), 1)
@@ -55,12 +55,16 @@ export default async function handler(
           END as "successRate"
         FROM "Stage" s
         JOIN "TestStage" ts ON s.id = ts."stageId"
-        JOIN "Test" t ON ts."testId" = t.id AND t.active = true
+        JOIN "tests" t ON ts."testId" = t.id AND t.active = true
         LEFT JOIN "Question" q ON q."stageId" = s.id
-        LEFT JOIN "Response" r ON r."questionId" = q.id
+        LEFT JOIN "Response" r ON r."questionId" = q.id AND r."candidateId" IN (
+          SELECT c.id FROM "Candidate" c WHERE c."testId" = t.id
+        )
         GROUP BY s.id, s.title, ts."order"
         ORDER BY ts."order", s.title
       `;
+      
+      console.log('Estatísticas de etapas:', stageStats);
 
       // Buscar estatísticas de candidatos
       const candidateStats = await prisma.$queryRaw`
@@ -74,7 +78,7 @@ export default async function handler(
             CASE WHEN c.score > 1 THEN c.score ELSE c.score * 100 END
             ELSE NULL END), 1) as "averageScore"
         FROM "Candidate" c
-        JOIN "Test" t ON c."testId" = t.id
+        JOIN "tests" t ON c."testId" = t.id
         WHERE t.active = true
       `;
       
@@ -86,41 +90,41 @@ export default async function handler(
       
       // Calcular taxa de sucesso média real
       const totalCorrect = Array.isArray(stageStats) ? 
-        stageStats.reduce((sum: number, stage: any) => sum + Number(stage.correctResponses), 0) : 0;
+        stageStats.reduce((sum: number, stage: any) => sum + Number(stage.correctResponses || 0), 0) : 0;
       
       const totalResponses = Array.isArray(stageStats) ? 
-        stageStats.reduce((sum: number, stage: any) => sum + Number(stage.totalResponses), 0) : 0;
+        stageStats.reduce((sum: number, stage: any) => sum + Number(stage.totalResponses || 0), 0) : 0;
       
-      const averageSuccessRate = totalResponses > 0 ? (totalCorrect / totalResponses) * 100 : 0;
+      const averageSuccessRate = totalResponses > 0 ? 
+        parseFloat(((totalCorrect / totalResponses) * 100).toFixed(1)) : 0;
+      
+      console.log('Cálculo de taxa de sucesso:', { 
+        totalCorrect, 
+        totalResponses, 
+        averageSuccessRate,
+        expectedSuccessRate
+      });
       
       // Calcular pontuações médias por etapa
       const averageStageScores = Array.isArray(stageStats) ? 
         stageStats.map((stage: any) => Number(stage.successRate)) : [];
 
-      // Formatar resposta
-      const statistics = {
-        stageStats: Array.isArray(stageStats) ? convertBigIntToNumber(stageStats) : [],
+      // Processar os dados antes de retornar
+      const processedStageStats = Array.isArray(stageStats) ? stageStats.map((stage: any) => ({
+        ...stage,
+        totalResponses: Number(stage.totalResponses || 0),
+        correctResponses: Number(stage.correctResponses || 0),
+        successRate: Number(stage.successRate || 0)
+      })) : [];
+
+      // Retornar estatísticas
+      return res.status(200).json(convertBigIntToNumber({
+        stageStats: processedStageStats,
+        candidateStats: candidateStats[0],
         expectedSuccessRate,
         averageSuccessRate,
-        candidateStats: Array.isArray(candidateStats) && candidateStats.length > 0 ? {
-          total: Number(candidateStats[0].total),
-          completed: Number(candidateStats[0].completed),
-          approved: Number(candidateStats[0].approved),
-          rejected: Number(candidateStats[0].rejected),
-          pending: Number(candidateStats[0].pending),
-          averageScore: Number(candidateStats[0].averageScore)
-        } : {
-          total: 0,
-          completed: 0,
-          approved: 0,
-          rejected: 0,
-          pending: 0,
-          averageScore: 0
-        },
         averageStageScores
-      };
-
-      return res.status(200).json(statistics);
+      }))
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
       // Retornar dados vazios em vez de erro para não quebrar a UI

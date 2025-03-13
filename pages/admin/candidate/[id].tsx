@@ -999,7 +999,7 @@ const CandidateDetails = () => {
                 >
                   <div className="flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-1.707-.707L12 7 8.707 4.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4a1 1 0 010-1.414l-4-4a1 1 0 00-1.414 0z" clipRule="evenodd" />
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-1.707-.707L12 7 8.707 4.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4a1 1 0 00-1.414-1.414L11 6H7a1 1 0 00-1 1v2a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 00-1-1H7a1 1 0 00-1 1v2a1 1 0 001 1h2a1 1 0 001-1v-2z" />
                     </svg>
                     <div className="ml-4">
                       <h4 className="text-sm font-medium text-secondary-500">Respostas</h4>
@@ -1016,7 +1016,7 @@ const CandidateDetails = () => {
                 >
                   <div className="flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                      <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" />
                     </svg>
                     <div className="ml-4">
                       <h4 className="text-sm font-medium text-secondary-500">Informações Pessoais</h4>
@@ -1146,13 +1146,18 @@ const CandidateDetails = () => {
                                         if (response.questionSnapshot) {
                                           // Verificar se já é um objeto ou se precisa ser parseado
                                           if (typeof response.questionSnapshot === 'string') {
-                                            questionSnapshot = JSON.parse(response.questionSnapshot);
+                                            try {
+                                              questionSnapshot = JSON.parse(response.questionSnapshot);
+                                            } catch (e) {
+                                              console.error('Erro ao parsear questionSnapshot como string:', e);
+                                              questionSnapshot = response.questionSnapshot;
+                                            }
                                           } else {
-                                            questionSnapshot = response.questionSnapshot as any;
+                                            questionSnapshot = response.questionSnapshot;
                                           }
                                           
                                           // Se ainda não temos o texto da questão, usar o do snapshot
-                                          if (!questionText && questionSnapshot.text) {
+                                          if (!questionText && questionSnapshot && questionSnapshot.text) {
                                             questionText = questionSnapshot.text;
                                           }
                                         }
@@ -1161,13 +1166,18 @@ const CandidateDetails = () => {
                                         if (response.allOptionsSnapshot) {
                                           // Verificar se já é um array ou se precisa ser parseado
                                           if (typeof response.allOptionsSnapshot === 'string') {
-                                            allOptionsSnapshot = JSON.parse(response.allOptionsSnapshot);
-                                          } else {
-                                            allOptionsSnapshot = response.allOptionsSnapshot as any;
+                                            try {
+                                              allOptionsSnapshot = JSON.parse(response.allOptionsSnapshot);
+                                            } catch (e) {
+                                              console.error('Erro ao parsear allOptionsSnapshot como string:', e);
+                                              allOptionsSnapshot = [];
+                                            }
+                                          } else if (Array.isArray(response.allOptionsSnapshot)) {
+                                            allOptionsSnapshot = response.allOptionsSnapshot;
                                           }
                                           
                                           // Se ainda não temos o texto da opção selecionada, procurar no snapshot
-                                          if (!selectedOptionText && allOptionsSnapshot.length > 0) {
+                                          if (!selectedOptionText && allOptionsSnapshot && allOptionsSnapshot.length > 0) {
                                             const selectedOption = allOptionsSnapshot.find(opt => opt.id === response.optionId);
                                             if (selectedOption) {
                                               selectedOptionText = selectedOption.text;
@@ -1177,21 +1187,41 @@ const CandidateDetails = () => {
                                             }
                                           }
                                         }
+                                        
+                                        // Se não temos opções do snapshot, tentar obter da relação question.options
+                                        if ((!allOptionsSnapshot || allOptionsSnapshot.length === 0) && response.question && response.question.options && response.question.options.length > 0) {
+                                          allOptionsSnapshot = response.question.options.map(opt => ({
+                                            id: opt.id,
+                                            text: opt.text,
+                                            isCorrect: opt.isCorrect
+                                          }));
+                                          
+                                          // Se ainda não temos o texto da opção selecionada, procurar nas opções da questão
+                                          if (!selectedOptionText) {
+                                            const selectedOption = response.question.options.find(opt => opt.id === response.optionId);
+                                            if (selectedOption) {
+                                              selectedOptionText = selectedOption.text;
+                                              if (isCorrect === false && selectedOption.isCorrect !== undefined) {
+                                                isCorrect = selectedOption.isCorrect;
+                                              }
+                                            }
+                                          }
+                                        }
                                       } catch (error) {
-                                        console.error('Erro ao acessar snapshot:', error);
+                                        console.error('Erro ao processar resposta:', error);
                                       }
                                       
                                       return (
                                         <div key={response.id} className="p-4">
                                           <div className="mb-3">
-                                          <p className="font-medium text-secondary-700">
-  {index + 1}. {questionText || (questionSnapshot && questionSnapshot.text) || 'Pergunta não disponível'}
-</p>
-{(questionSnapshot && questionSnapshot.categoryName || response.categoryName) && (
-  <span className="inline-block mt-1 px-2 py-0.5 text-xs bg-secondary-100 text-secondary-600 rounded">
-    {(questionSnapshot && questionSnapshot.categoryName) || response.categoryName}
-  </span>
-)}
+                                            <p className="font-medium text-secondary-700">
+                                              {index + 1}. {questionText || (questionSnapshot && questionSnapshot.text) || 'Pergunta não disponível'}
+                                            </p>
+                                            {(questionSnapshot && questionSnapshot.categoryName || response.categoryName) && (
+                                              <span className="inline-block mt-1 px-2 py-0.5 text-xs bg-secondary-100 text-secondary-600 rounded">
+                                                {(questionSnapshot && questionSnapshot.categoryName) || response.categoryName}
+                                              </span>
+                                            )}
                                           </div>
                                           
                                           <div className="ml-4 space-y-2">
@@ -1245,7 +1275,7 @@ const CandidateDetails = () => {
                                                     <div className="ml-2">
                                                       <p className={`text-sm ${
                                                         shouldHighlightAsSelected 
-                                                          ? (shouldMarkAsCorrect ? 'text-green-700' : 'text-red-700') 
+                                                          ? (shouldMarkAsCorrect ? 'text-green-700 font-medium' : 'text-red-700 font-medium') 
                                                           : (optionIsCorrect ? 'text-green-600/80 font-medium' : 'text-secondary-600')
                                                       }`}>
                                                         {option.text}
@@ -1253,14 +1283,14 @@ const CandidateDetails = () => {
                                                       {shouldHighlightAsSelected && (
                                                         <p className="text-xs mt-1">
                                                           {shouldMarkAsCorrect ? (
-                                                            <span className="text-green-600">Resposta correta</span>
+                                                            <span className="text-green-600">Escolhida (Correta)</span>
                                                           ) : (
-                                                            <span className="text-red-600">Resposta incorreta</span>
+                                                            <span className="text-red-600">Escolhida (Incorreta)</span>
                                                           )}
                                                         </p>
                                                       )}
                                                       {!shouldHighlightAsSelected && optionIsCorrect && (
-                                                        <p className="text-xs mt-1 text-green-600/80">Resposta correta</p>
+                                                        <p className="text-xs mt-1 text-green-600/80">Alternativa correta</p>
                                                       )}
                                                     </div>
                                                   </div>
@@ -1269,7 +1299,7 @@ const CandidateDetails = () => {
                                             ) : (
                                               <div className="p-2">
                                                 <p className="text-sm text-secondary-600">
-                                                  <strong>Resposta selecionada:</strong> {selectedOptionText || response.optionText || response.option?.text || 'Não disponível'}
+                                                  <strong>Resposta escolhida:</strong> {selectedOptionText || response.optionText || (response.option && response.option.text) || 'Não disponível'}
                                                 </p>
                                                 <p className="text-xs mt-1">
                                                   {isCorrect ? (

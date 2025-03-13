@@ -60,7 +60,7 @@ export default async function handler(
 
   try {
     if (req.method === 'GET') {
-      const { status, search, testId } = req.query
+      const { status, search, testId, activeOnly } = req.query
 
       // Construir o filtro base
       let whereClause: any = {}
@@ -73,6 +73,13 @@ export default async function handler(
       // Adicionar filtro por testId, se fornecido
       if (testId) {
         whereClause.testId = testId
+      }
+
+      // Filtrar apenas candidatos de testes ativos, se solicitado
+      if (activeOnly === 'true') {
+        whereClause.test = {
+          active: true
+        }
       }
 
       // Adicionar filtro de busca, se fornecido
