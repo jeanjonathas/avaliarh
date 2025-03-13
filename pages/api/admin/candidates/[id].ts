@@ -126,7 +126,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Converter o mapa em array e calcular percentual para cada etapa
       stageMap.forEach(value => {
         // Calcular o percentual de acertos para esta etapa
-        const percentage = value.total > 0 ? Math.round((value.correct / value.total) * 100) : 0;
+        const percentage = value.total > 0 ? parseFloat((value.correct / value.total * 100).toFixed(1)) : 0;
         
         // Adicionar o percentual ao objeto da etapa
         stageScores.push({
@@ -140,11 +140,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (stageScores.length > 0) {
         const totalCorrect = stageScores.reduce((acc, stage) => acc + stage.correct, 0);
         const totalQuestions = stageScores.reduce((acc, stage) => acc + stage.total, 0);
-        totalScore = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+        totalScore = totalQuestions > 0 ? parseFloat((totalCorrect / totalQuestions * 100).toFixed(1)) : 0;
       } else if (candidate && 'score' in candidate && candidate.score !== undefined && candidate.score !== null) {
         // Se não temos stageScores mas temos um score armazenado, usamos ele
         const candidateScore = Number(candidate.score);
-        totalScore = candidateScore > 1 ? candidateScore : Math.round(candidateScore * 100);
+        totalScore = candidateScore > 1 ? parseFloat(candidateScore.toFixed(1)) : parseFloat((candidateScore * 100).toFixed(1));
       }
       
       // Formatar datas para evitar problemas de serialização

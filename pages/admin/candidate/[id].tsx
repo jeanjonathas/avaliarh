@@ -880,7 +880,7 @@ const CandidateDetails = () => {
                           {(() => {
                             const totalCorrect = candidate.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0;
                             const totalQuestions = candidate.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0;
-                            const percentage = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+                            const percentage = totalQuestions > 0 ? parseFloat((totalCorrect / totalQuestions * 100).toFixed(1)) : 0;
                             return `${percentage}%`;
                           })()}
                         </span>
@@ -1210,7 +1210,7 @@ const CandidateDetails = () => {
                       <div className="flex items-center">
                         <div className="p-3 rounded-full bg-primary-100 text-primary-600">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 00-2-2h-2a2 2 0 00-2 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
                           </svg>
                         </div>
                         <div className="ml-4">
@@ -1220,7 +1220,7 @@ const CandidateDetails = () => {
                               {(() => {
                                 const totalCorrect = candidate.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0;
                                 const totalQuestions = candidate.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0;
-                                const percentage = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+                                const percentage = totalQuestions > 0 ? parseFloat((totalCorrect / totalQuestions * 100).toFixed(1)) : 0;
                                 return `${percentage}%`;
                               })()}
                             </span>
@@ -1366,7 +1366,7 @@ const CandidateDetails = () => {
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500">
                                   <div className="flex items-center">
-                                    <span className="mr-2">{stage.percentage}%</span>
+                                    <span className="mr-2">{parseFloat(stage.percentage.toFixed(1))}%</span>
                                     <div className="w-24 bg-secondary-200 rounded-full h-2.5">
                                       <div 
                                         className={`h-2.5 rounded-full ${
@@ -1417,7 +1417,7 @@ const CandidateDetails = () => {
                                   {(() => {
                                     const totalCorrect = candidate.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0;
                                     const totalQuestions = candidate.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0;
-                                    const percentage = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+                                    const percentage = totalQuestions > 0 ? parseFloat((totalCorrect / totalQuestions * 100).toFixed(1)) : 0;
                                     return (
                                       <>
                                         <span className="mr-2">{percentage}%</span>
@@ -1443,7 +1443,7 @@ const CandidateDetails = () => {
                                 ) : (() => {
                                   const totalCorrect = candidate.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0;
                                   const totalQuestions = candidate.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0;
-                                  const percentage = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+                                  const percentage = totalQuestions > 0 ? parseFloat((totalCorrect / totalQuestions * 100).toFixed(1)) : 0;
                                   
                                   if (percentage >= 80) {
                                     return (
@@ -1488,7 +1488,7 @@ const CandidateDetails = () => {
                         // Calcular a porcentagem geral com base nos acertos e total de questões
                         const totalCorrect = candidate.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0;
                         const totalQuestions = candidate.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0;
-                        const percentage = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+                        const percentage = totalQuestions > 0 ? parseFloat((totalCorrect / totalQuestions * 100).toFixed(1)) : 0;
                         
                         if (percentage >= 80) {
                           return (
@@ -1777,7 +1777,7 @@ const CandidateDetails = () => {
                                 {(() => {
                                   const totalCorrect = candidate.stageScores.reduce((acc, stage) => acc + stage.correct, 0);
                                   const totalQuestions = candidate.stageScores.reduce((acc, stage) => acc + stage.total, 0);
-                                  const percentage = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+                                  const percentage = totalQuestions > 0 ? parseFloat((totalCorrect / totalQuestions * 100).toFixed(1)) : 0;
                                   return `${percentage.toFixed(1)}%`;
                                 })()}
                               </p>

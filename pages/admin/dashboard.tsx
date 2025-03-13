@@ -437,6 +437,14 @@ const Dashboard: NextPage = () => {
         }
         
         const data = await response.json()
+        // Garantir que todos os valores numéricos estejam formatados corretamente
+        if (data.stageStats) {
+          data.stageStats = data.stageStats.map(stage => ({
+            ...stage,
+            successRate: parseFloat(parseFloat(stage.successRate).toFixed(1))
+          }));
+        }
+        
         setStatistics(data)
 
         console.log('Estatísticas recebidas:', data);
@@ -790,6 +798,14 @@ const Dashboard: NextPage = () => {
         }
         
         const data = await response.json()
+        // Garantir que todos os valores numéricos estejam formatados corretamente
+        if (data.stageStats) {
+          data.stageStats = data.stageStats.map(stage => ({
+            ...stage,
+            successRate: parseFloat(parseFloat(stage.successRate).toFixed(1))
+          }));
+        }
+        
         setStatistics(data)
 
         console.log('Estatísticas recebidas:', data);

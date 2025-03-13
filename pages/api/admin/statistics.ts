@@ -40,40 +40,40 @@ export default async function handler(
 
   if (req.method === 'GET') {
     try {
-      // Buscar estatísticas por etapa usando SQL raw
+      // Buscar estatísticas de etapas
       const stageStats = await prisma.$queryRaw`
         SELECT 
           s.id,
           s.title as name,
-          s.order,
-          COALESCE(COUNT(CASE WHEN o."isCorrect" = true THEN 1 ELSE NULL END), 0) as "correctResponses",
-          COALESCE(COUNT(r.id), 0) as "totalResponses",
+          COUNT(r.id) as totalResponses,
+          SUM(CASE WHEN r."isCorrectOption" = true THEN 1 ELSE 0 END) as correctResponses,
           CASE 
-            WHEN COUNT(r.id) > 0 THEN 
-              (COUNT(CASE WHEN o."isCorrect" = true THEN 1 ELSE NULL END)::float / COUNT(r.id)::float * 100)
+            WHEN COUNT(r.id) > 0 
+            THEN ROUND(SUM(CASE WHEN r."isCorrectOption" = true THEN 1 ELSE 0 END) * 100.0 / COUNT(r.id), 1)
             ELSE 0 
           END as "successRate"
         FROM "Stage" s
-        LEFT JOIN "TestStage" ts ON ts."stageId" = s.id
-        LEFT JOIN "tests" tt ON ts."testId" = tt.id
+        JOIN "TestStage" ts ON s.id = ts."stageId"
+        JOIN "Test" t ON ts."testId" = t.id
         LEFT JOIN "Question" q ON q."stageId" = s.id
         LEFT JOIN "Response" r ON r."questionId" = q.id
-        LEFT JOIN "Option" o ON r."optionId" = o.id
-        WHERE tt.active = true
-        GROUP BY s.id, s.title, s.order
-        ORDER BY s.order
+        WHERE t.active = true
+        GROUP BY s.id, s.title
+        ORDER BY s.title
       `;
 
       // Buscar estatísticas de candidatos
       const candidateStats = await prisma.$queryRaw`
         SELECT 
-          COUNT(*)::int as total,
-          COUNT(CASE WHEN c.completed = true THEN 1 ELSE NULL END)::int as completed,
-          COUNT(CASE WHEN c.status = 'APPROVED' THEN 1 ELSE NULL END)::int as approved,
-          COUNT(CASE WHEN c.status = 'REJECTED' THEN 1 ELSE NULL END)::int as rejected,
-          COUNT(CASE WHEN c.status = 'PENDING' THEN 1 ELSE NULL END)::int as pending
+          COUNT(*) as total,
+          SUM(CASE WHEN c.status = 'APPROVED' THEN 1 ELSE 0 END) as approved,
+          SUM(CASE WHEN c.status = 'REJECTED' THEN 1 ELSE 0 END) as rejected,
+          SUM(CASE WHEN c.status = 'PENDING' THEN 1 ELSE 0 END) as pending,
+          ROUND(AVG(CASE WHEN c.score IS NOT NULL THEN 
+            CASE WHEN c.score > 1 THEN c.score ELSE c.score * 100 END
+            ELSE 0 END), 1) as "averageScore"
         FROM "Candidate" c
-        LEFT JOIN "tests" t ON c."testId" = t.id
+        JOIN "Test" t ON c."testId" = t.id
         WHERE t.active = true
       `;
       
@@ -103,16 +103,16 @@ export default async function handler(
         averageSuccessRate,
         candidateStats: Array.isArray(candidateStats) && candidateStats.length > 0 ? {
           total: Number(candidateStats[0].total),
-          completed: Number(candidateStats[0].completed),
           approved: Number(candidateStats[0].approved),
           rejected: Number(candidateStats[0].rejected),
-          pending: Number(candidateStats[0].pending)
+          pending: Number(candidateStats[0].pending),
+          averageScore: Number(candidateStats[0].averageScore)
         } : {
           total: 0,
-          completed: 0,
-          approved: 0, 
+          approved: 0,
           rejected: 0,
-          pending: 0
+          pending: 0,
+          averageScore: 0
         },
         averageStageScores
       };
@@ -127,10 +127,10 @@ export default async function handler(
         averageSuccessRate: 0,
         candidateStats: {
           total: 0,
-          completed: 0,
           approved: 0,
           rejected: 0,
-          pending: 0
+          pending: 0,
+          averageScore: 0
         },
         averageStageScores: []
       });
