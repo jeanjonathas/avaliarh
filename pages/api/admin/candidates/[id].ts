@@ -112,15 +112,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const responses = await prisma.response.findMany({
         where: { candidateId: id },
         include: {
-          question: {
-            include: {
-              Stage: true,
-              Category: true
-            }
-          },
-          option: true
+          candidate: true
         }
-      }) as unknown as ResponseWithRelations[];
+      });
       
       // Mapear as respostas para incluir informações da etapa e categoria
       const processedResponses: ProcessedResponse[] = responses.map(response => ({
@@ -128,13 +122,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         candidateId: response.candidateId,
         questionId: response.questionId,
         optionId: response.optionId,
-        questionText: response.questionText || response.question?.text || '',
-        optionText: response.optionText || response.option?.text || '',
-        isCorrectOption: response.isCorrectOption || response.option?.isCorrect || false,
-        stageId: response.question?.stageId || response.stageId || '',
-        stageName: response.question?.Stage?.title || response.stageName || '',
-        categoryId: response.question?.categoryId || '',
-        categoryName: response.question?.Category?.name || '',
+        questionText: response.questionText || '',
+        optionText: response.optionText || '',
+        isCorrectOption: response.isCorrectOption || false,
+        stageId: response.stageId || '',
+        stageName: response.stageName || '',
+        categoryId: '',
+        categoryName: response.categoryName || '',
         createdAt: response.createdAt,
         updatedAt: response.updatedAt,
         timeSpent: response.timeSpent || 0
@@ -212,34 +206,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
       
       // Converter o mapa em array e calcular percentual para cada etapa
-      stageMap.forEach(value => {
+      const stageScoresArray = Array.from(stageMap.values()).map(value => {
         // Calcular o percentual de acertos para esta etapa
         const percentage = value.total > 0 ? parseFloat((value.correct / value.total * 100).toFixed(1)) : 0;
         
-        // Adicionar o percentual ao objeto da etapa
-        stageScores.push({
+        // Adicionar o percentual e a ordem ao objeto da etapa
+        return {
           ...value,
           percentage,
           order: stageOrder[value.id] || 999 // Usar 999 como valor padrão para etapas sem ordem definida
-        });
+        };
       });
       
       // Ordenar as etapas conforme a ordem definida no teste
-      stageScores.sort((a, b) => a.order - b.order);
+      const sortedStageScores = [...stageScoresArray].sort((a, b) => a.order - b.order);
       
-      // Calcular a pontuação total
-      let totalScore = 0;
-      if (stageScores.length > 0) {
-        const totalCorrect = stageScores.reduce((acc, stage) => acc + stage.correct, 0);
-        const totalQuestions = stageScores.reduce((acc, stage) => acc + stage.total, 0);
-        totalScore = totalQuestions > 0 ? parseFloat((totalCorrect / totalQuestions * 100).toFixed(1)) : 0;
-      } else if (candidate && 'score' in candidate && candidate.score !== undefined && candidate.score !== null) {
-        // Se não temos stageScores mas temos um score armazenado, usamos ele
-        const candidateScore = Number(candidate.score);
-        totalScore = candidateScore > 1 ? parseFloat(candidateScore.toFixed(1)) : parseFloat((candidateScore * 100).toFixed(1));
-      }
+      // Calcular pontuação total
+      const totalCorrect = stageScoresArray.reduce((acc, stage) => acc + stage.correct, 0);
+      const totalQuestions = stageScoresArray.reduce((acc, stage) => acc + stage.total, 0);
       
-      // Formatar datas para evitar problemas de serialização
+      // Calcular percentual com uma casa decimal
+      const percentageScore = totalQuestions > 0 
+        ? parseFloat((totalCorrect * 100 / totalQuestions).toFixed(1)) 
+        : 0;
+      
+      console.log(`Pontuação total calculada: ${totalCorrect}/${totalQuestions} (${percentageScore}%)`);
+      
+      // Atualizar o candidato com a pontuação calculada
+      await prisma.candidate.update({
+        where: { id },
+        data: {
+          score: percentageScore,
+          completed: candidateCompleted,
+          status: candidateStatus
+        }
+      });
+      
+      // Adicionar respostas e teste ao formattedCandidate
       const formattedCandidate: any = {
         ...candidate,
         testDate: candidate.testDate ? candidate.testDate.toISOString() : null,
@@ -247,23 +250,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         inviteExpires: candidate.inviteExpires ? candidate.inviteExpires.toISOString() : null,
         createdAt: candidate.createdAt ? candidate.createdAt.toISOString() : null,
         updatedAt: candidate.updatedAt ? candidate.updatedAt.toISOString() : null,
-      };
-      
-      // Garantir que todas as respostas tenham os campos necessários
-      if (candidate) {
-        const formattedResponses = processedResponses.map(response => {
+        responses: processedResponses.map(response => {
           // Formatar datas para evitar problemas de serialização
           return {
             ...response,
             createdAt: response.createdAt ? response.createdAt.toISOString() : null,
             updatedAt: response.updatedAt ? response.updatedAt.toISOString() : null
           };
-        });
-        
-        // Adicionar respostas e teste ao formattedCandidate
-        formattedCandidate.responses = formattedResponses;
-        
-        formattedCandidate.test = test ? {
+        }),
+        test: test ? {
           id: test.id,
           title: test.title,
           description: test.description,
@@ -276,17 +271,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           })),
           createdAt: test.createdAt.toISOString(),
           updatedAt: test.updatedAt.toISOString()
-        } : null;
-        formattedCandidate.stageScores = stageScores;
-        formattedCandidate.score = totalScore; // Adicionar o score para compatibilidade com código existente
-        formattedCandidate.totalScore = totalScore; // Adicionar o totalScore para o novo código
-        formattedCandidate.completed = candidateCompleted;
-        formattedCandidate.status = candidateStatus; // Usar o status atualizado
-        
-        return res.status(200).json({ 
-          candidate: convertBigIntToNumber(formattedCandidate)
-        });
-      }
+        } : null,
+        stageScores: sortedStageScores,
+        score: percentageScore
+      };
+      
+      return res.status(200).json({ 
+        candidate: convertBigIntToNumber(formattedCandidate)
+      });
     }
     
     // PUT - Atualizar candidato
