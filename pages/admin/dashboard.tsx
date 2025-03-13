@@ -703,359 +703,176 @@ const Dashboard: NextPage = () => {
     }
   }, [status, router])
   
-  // Atualizar dados de tendências com base nos candidatos
   useEffect(() => {
-    if (candidates.length > 0) {
-      // Obter os últimos 6 meses
-      const today = new Date();
-      const months = [];
-      const approvedCounts = [];
-      const rejectedCounts = [];
-      
-      // Gerar os últimos 6 meses
-      for (let i = 5; i >= 0; i--) {
-        const month = new Date(today.getFullYear(), today.getMonth() - i, 1);
-        const monthName = month.toLocaleString('pt-BR', { month: 'short' }).charAt(0).toUpperCase() + 
-                         month.toLocaleString('pt-BR', { month: 'short' }).slice(1, 3);
-        months.push(monthName);
-        
-        // Filtrar candidatos para este mês
-        const monthCandidates = candidates.filter(candidate => {
-          const candidateDate = new Date(candidate.createdAt);
-          return candidateDate.getMonth() === month.getMonth() && 
-                 candidateDate.getFullYear() === month.getFullYear();
-        });
-        
-        // Contar aprovados e rejeitados
-        const approved = monthCandidates.filter(c => c.status === 'APPROVED').length;
-        const rejected = monthCandidates.filter(c => c.status === 'REJECTED').length;
-        
-        approvedCounts.push(approved);
-        rejectedCounts.push(rejected);
-      }
-      
-      // Atualizar o gráfico de tendências
-      setTrendData({
-        labels: months,
-        datasets: [
-          {
-            label: 'Candidatos Aprovados',
-            data: approvedCounts,
-            borderColor: 'rgba(75, 192, 192, 1)',
-            backgroundColor: 'rgba(75, 192, 192, 0.2)',
-            tension: 0.4,
-            fill: true,
-          },
-          {
-            label: 'Candidatos Rejeitados',
-            data: rejectedCounts,
-            borderColor: 'rgba(255, 99, 132, 1)',
-            backgroundColor: 'rgba(255, 99, 132, 0.2)',
-            tension: 0.4,
-            fill: true,
-          }
-        ]
-      });
-    }
-  }, [candidates])
-  
-  useEffect(() => {
-    // Carregar a lista de candidatos
-    const fetchCandidates = async () => {
-      try {
-        setLoading(true)
-        console.log('Dashboard: Iniciando carregamento de candidatos...')
-        const response = await fetch('/api/admin/candidates')
-        
-        if (!response.ok) {
-          throw new Error(`Erro ao carregar os candidatos: ${response.status} ${response.statusText}`)
-        }
-        
-        const data = await response.json()
-        console.log(`Dashboard: Candidatos carregados com sucesso. Total: ${data.length}`)
-        
-        if (Array.isArray(data)) {
-          setCandidates(data)
-        } else {
-          console.error('Dashboard: Dados de candidatos não são um array:', data)
-          setCandidates([])
-        }
-      } catch (error) {
-        console.error('Dashboard: Erro ao carregar candidatos:', error)
-        setError('Não foi possível carregar os candidatos. Por favor, tente novamente.')
-      } finally {
-        setLoading(false)
-      }
-    }
-    
-    // Carregar estatísticas para os gráficos
     const fetchStatistics = async () => {
       try {
-        const response = await fetch('/api/admin/statistics')
-        
+        const response = await fetch('/api/admin/statistics');
         if (!response.ok) {
-          throw new Error('Erro ao carregar estatísticas')
+          throw new Error(`Erro ao buscar estatísticas: ${response.status}`);
         }
         
-        const data = await response.json()
+        const data = await response.json();
+        console.log('Estatísticas recebidas:', data);
+        
         // Garantir que todos os valores numéricos estejam formatados corretamente
-        if (data.stageStats) {
+        if (data.stageStats && Array.isArray(data.stageStats)) {
           data.stageStats = data.stageStats.map(stage => ({
             ...stage,
             successRate: parseFloat(parseFloat(stage.successRate).toFixed(1))
           }));
+          
+          // Ordenar as etapas pela ordem definida no teste
+          data.stageStats.sort((a, b) => {
+            // Se tiver campo order, usar ele
+            if (a.order !== undefined && b.order !== undefined) {
+              return a.order - b.order;
+            }
+            // Caso contrário, ordenar pelo nome
+            return a.name.localeCompare(b.name);
+          });
         }
         
-        setStatistics(data)
-
-        console.log('Estatísticas recebidas:', data);
-
+        setStatistics(data);
+        
         // Atualizar dados dos gráficos com os dados estatísticos
-        if (data && data.stageStats && Array.isArray(data.stageStats)) {
-          // Obter os nomes das etapas para usar como labels em todos os gráficos
-          const stageNames = data.stageStats.map(stage => stage.name);
-          
-          // Atualizar gráfico de taxa de sucesso por categoria
-          setCategorySuccessData({
-            labels: stageNames,
-            datasets: [{
-              label: 'Taxa de Sucesso (%)',
-              data: data.stageStats.map(stage => {
-                // Garantir que o valor seja um número válido com uma casa decimal
-                const rate = parseFloat(stage.successRate) || 0;
-                return parseFloat(rate.toFixed(1));
-              }),
-              backgroundColor: [
-                'rgba(255, 99, 132, 0.7)',
-                'rgba(54, 162, 235, 0.7)',
-                'rgba(255, 206, 86, 0.7)',
-                'rgba(75, 192, 192, 0.7)',
-                'rgba(153, 102, 255, 0.7)',
-                'rgba(255, 159, 64, 0.7)'
-              ],
-              borderColor: [
-                'rgba(255, 99, 132, 1)',
-                'rgba(54, 162, 235, 1)',
-                'rgba(255, 206, 86, 1)',
-                'rgba(75, 192, 192, 1)',
-                'rgba(153, 102, 255, 1)',
-                'rgba(255, 159, 64, 1)'
-              ],
-              borderWidth: 1,
-              borderRadius: 4,
-            }]
-          });
-
-          // Atualizar gráfico de comparação real vs esperado
-          setRealVsExpectedData({
-            labels: stageNames,
-            datasets: [
-              {
-                label: 'Taxa Real',
-                data: data.stageStats.map(stage => {
-                  // Garantir que o valor seja um número válido com uma casa decimal
-                  const rate = parseFloat(stage.successRate) || 0;
-                  return parseFloat(rate.toFixed(1));
-                }),
-                backgroundColor: 'rgba(54, 162, 235, 0.7)',
-                borderColor: 'rgba(54, 162, 235, 1)',
-                borderWidth: 1,
-                borderRadius: 4,
-              },
-              {
-                label: 'Taxa Esperada',
-                data: Array(stageNames.length).fill(parseFloat(data.expectedSuccessRate.toFixed(1)) || 70),
-                backgroundColor: 'rgba(255, 99, 132, 0.7)',
-                borderColor: 'rgba(255, 99, 132, 1)',
-                borderWidth: 1,
-                borderRadius: 4,
-              }
-            ]
-          });
-          
-          // Atualizar gráfico de radar (desempenho por etapa)
-          setIdealProfileData({
-            labels: stageNames,
-            datasets: [
-              {
-                label: 'Candidato',
-                data: Array(stageNames.length).fill(0), // Será atualizado quando um candidato for selecionado
-                backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                borderColor: 'rgba(54, 162, 235, 1)',
-                borderWidth: 2,
-                pointBackgroundColor: 'rgba(54, 162, 235, 1)',
-                pointBorderColor: '#fff',
-                pointHoverBackgroundColor: '#fff',
-                pointHoverBorderColor: 'rgba(54, 162, 235, 1)',
-                pointRadius: 4,
-                pointHoverRadius: 6,
-                fill: true
-              },
-              {
-                label: 'Perfil Ideal',
-                data: Array(stageNames.length).fill(75), // Valor padrão para o perfil ideal
-                backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                borderColor: 'rgba(255, 99, 132, 1)',
-                borderWidth: 2,
-                pointBackgroundColor: 'rgba(255, 99, 132, 1)',
-                pointBorderColor: '#fff',
-                pointHoverBackgroundColor: '#fff',
-                pointHoverBorderColor: 'rgba(255, 99, 132, 1)',
-                pointRadius: 4,
-                pointHoverRadius: 6,
-                fill: true
-              }
-            ]
-          });
-          
-          // Atualizar os perfis ideais para cada cargo
-          const updatedProfiles: Record<string, number[]> = {};
-          Object.keys(idealProfiles).forEach(profile => {
-            updatedProfiles[profile] = Array(stageNames.length).fill(75); // Valor padrão
-          });
-          setIdealProfiles(updatedProfiles);
-          setEditableProfiles(updatedProfiles);
-          
-          // Atualizar gráfico de distribuição por etapa
-          const stageLabels = ['0-20%', '21-40%', '41-60%', '61-80%', '81-100%'];
-          const updatedDatasets = stageNames.map((name, index) => ({
-            label: name,
-            data: Array(5).fill(0), // Inicializar com zeros
-            backgroundColor: [
-              'rgba(255, 99, 132, 0.7)',
-              'rgba(54, 162, 235, 0.7)',
-              'rgba(255, 206, 86, 0.7)',
-              'rgba(75, 192, 192, 0.7)',
-              'rgba(153, 102, 255, 0.7)',
-              'rgba(255, 159, 64, 0.7)'
-            ][index % 6], // Usar cores cíclicas
-            borderWidth: 0,
-            borderRadius: 4,
-            stack: 'Stack ' + index
-          }));
-          
-          setStageDistributionData({
-            labels: stageLabels,
-            datasets: updatedDatasets
-          });
-          
-          // Atualizar gráfico de comparação (candidato vs média)
-          setComparisonData({
-            labels: stageNames,
-            datasets: [
-              {
-                label: 'Candidato',
-                data: Array(stageNames.length).fill(0),
-                backgroundColor: 'rgba(54, 162, 235, 0.7)',
-                borderWidth: 0,
-                borderRadius: 4,
-                barPercentage: 0.6,
-                categoryPercentage: 0.7,
-              },
-              {
-                label: 'Média Geral',
-                data: data.stageStats.map(stage => parseFloat(stage.successRate.toFixed(1)) || 0),
-                backgroundColor: 'rgba(75, 192, 192, 0.7)',
-                borderWidth: 0,
-                borderRadius: 4,
-                barPercentage: 0.6,
-                categoryPercentage: 0.7,
-              }
-            ]
-          });
-        }
-
-        // Atualizar gráfico de desempenho geral
-        if (data && data.candidateStats) {
-          setOverallPerformanceData({
-            labels: ['Aprovados', 'Reprovados', 'Pendentes'],
-            datasets: [{
-              data: [
-                parseInt(data.candidateStats.approved) || 0,
-                parseInt(data.candidateStats.rejected) || 0,
-                parseInt(data.candidateStats.pending) || 0
-              ],
-              backgroundColor: [
-                'rgba(75, 192, 192, 0.7)',
-                'rgba(255, 99, 132, 0.7)',
-                'rgba(255, 206, 86, 0.7)'
-              ],
-              borderColor: [
-                'rgba(75, 192, 192, 1)',
-                'rgba(255, 99, 132, 1)',
-                'rgba(255, 206, 86, 1)'
-              ],
-              borderWidth: 1,
-            }]
-          });
+        if (data && data.stageStats && Array.isArray(data.stageStats) && data.stageStats.length > 0) {
+          updateCharts(data);
+        } else {
+          console.warn('Não há dados de estatísticas de etapas disponíveis');
         }
       } catch (error) {
-        console.error('Erro ao carregar estatísticas:', error)
-        // Não definir erro global para não bloquear a visualização dos candidatos
+        console.error('Erro ao buscar estatísticas:', error);
       }
-    }
-    
+    };
+
     if (status === 'authenticated') {
-      fetchCandidates()
-      fetchStatistics()
+      fetchStatistics();
     }
-  }, [status])
+  }, [status]);
   
-  useEffect(() => {
-    // Calcular distribuição de pontuação por etapa
-    if (candidates.length > 0 && statistics && statistics.stageStats) {
-      const stageCount = statistics.stageStats.length;
-      
-      // Inicializar arrays para contagem com base no número real de etapas
-      const stageCounts = Array(stageCount).fill(0).map(() => Array(5).fill(0));
-      
-      // Mapear IDs de etapas para índices
-      const stageIdToIndex = {};
-      statistics.stageStats.forEach((stage, index) => {
-        stageIdToIndex[stage.id] = index;
-      });
-      
-      // Contar candidatos em cada faixa de pontuação por etapa
-      candidates.forEach(candidate => {
-        if (candidate.stageScores) {
-          candidate.stageScores.forEach(score => {
-            // Verificar se a etapa existe nas estatísticas
-            if (stageIdToIndex.hasOwnProperty(score.id)) {
-              const stageIndex = stageIdToIndex[score.id];
-              // Determinar a faixa de pontuação (0-20%, 21-40%, etc.)
-              const scoreRange = Math.min(Math.floor(score.percentage / 20), 4);
-              stageCounts[stageIndex][scoreRange]++;
-            }
-          });
-        }
-      });
-      
-      // Atualizar dados do gráfico
-      setStageDistributionData(prevData => {
-        // Criar novos datasets com base nas etapas reais
-        const newDatasets = statistics.stageStats.map((stage, index) => ({
-          label: stage.name,
-          data: stageCounts[index],
-          backgroundColor: [
-            'rgba(255, 99, 132, 0.7)',
-            'rgba(54, 162, 235, 0.7)',
-            'rgba(255, 206, 86, 0.7)',
-            'rgba(75, 192, 192, 0.7)',
-            'rgba(153, 102, 255, 0.7)',
-            'rgba(255, 159, 64, 0.7)'
-          ][index % 6], // Usar cores cíclicas
-          borderWidth: 0,
+  // Função para atualizar todos os gráficos com os dados estatísticos
+  const updateCharts = (data) => {
+    // Obter os nomes das etapas para usar como labels em todos os gráficos
+    const stageNames = data.stageStats.map(stage => stage.name);
+    
+    // Atualizar gráfico de taxa de sucesso por categoria
+    setCategorySuccessData({
+      labels: stageNames,
+      datasets: [{
+        label: 'Taxa de Sucesso (%)',
+        data: data.stageStats.map(stage => {
+          // Garantir que o valor seja um número válido com uma casa decimal
+          const rate = parseFloat(stage.successRate) || 0;
+          return parseFloat(rate.toFixed(1));
+        }),
+        backgroundColor: [
+          'rgba(255, 99, 132, 0.7)',
+          'rgba(54, 162, 235, 0.7)',
+          'rgba(255, 206, 86, 0.7)',
+          'rgba(75, 192, 192, 0.7)',
+          'rgba(153, 102, 255, 0.7)',
+          'rgba(255, 159, 64, 0.7)'
+        ],
+        borderColor: [
+          'rgba(255, 99, 132, 1)',
+          'rgba(54, 162, 235, 1)',
+          'rgba(255, 206, 86, 1)',
+          'rgba(75, 192, 192, 1)',
+          'rgba(153, 102, 255, 1)',
+          'rgba(255, 159, 64, 1)'
+        ],
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    });
+
+    // Atualizar gráfico de comparação real vs esperado
+    setRealVsExpectedData({
+      labels: stageNames,
+      datasets: [
+        {
+          label: 'Taxa Real',
+          data: data.stageStats.map(stage => {
+            // Garantir que o valor seja um número válido com uma casa decimal
+            const rate = parseFloat(stage.successRate) || 0;
+            return parseFloat(rate.toFixed(1));
+          }),
+          backgroundColor: 'rgba(54, 162, 235, 0.7)',
+          borderColor: 'rgba(54, 162, 235, 1)',
+          borderWidth: 1,
           borderRadius: 4,
-          stack: 'Stack ' + index
-        }));
-        
-        return {
-          labels: ['0-20%', '21-40%', '41-60%', '61-80%', '81-100%'],
-          datasets: newDatasets
-        };
+        },
+        {
+          label: 'Taxa Esperada',
+          data: Array(stageNames.length).fill(parseFloat(data.expectedSuccessRate.toFixed(1)) || 70),
+          backgroundColor: 'rgba(255, 99, 132, 0.7)',
+          borderColor: 'rgba(255, 99, 132, 1)',
+          borderWidth: 1,
+          borderRadius: 4,
+        }
+      ]
+    });
+    
+    // Atualizar gráfico de radar (desempenho por etapa)
+    setIdealProfileData({
+      labels: stageNames,
+      datasets: [
+        {
+          label: 'Candidato',
+          data: Array(stageNames.length).fill(0), // Será atualizado quando um candidato for selecionado
+          backgroundColor: 'rgba(54, 162, 235, 0.2)',
+          borderColor: 'rgba(54, 162, 235, 1)',
+          borderWidth: 2,
+          pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+          pointBorderColor: '#fff',
+          pointHoverBackgroundColor: '#fff',
+          pointHoverBorderColor: 'rgba(54, 162, 235, 1)',
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          fill: true
+        },
+        {
+          label: 'Perfil Ideal',
+          data: Array(stageNames.length).fill(75), // Valor padrão para o perfil ideal
+          backgroundColor: 'rgba(255, 99, 132, 0.2)',
+          borderColor: 'rgba(255, 99, 132, 1)',
+          borderWidth: 2,
+          pointBackgroundColor: 'rgba(255, 99, 132, 1)',
+          pointBorderColor: '#fff',
+          pointHoverBackgroundColor: '#fff',
+          pointHoverBorderColor: 'rgba(255, 99, 132, 1)',
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          fill: true
+        }
+      ]
+    });
+    
+    // Atualizar gráfico de desempenho geral
+    if (data.candidateStats) {
+      setOverallPerformanceData({
+        labels: ['Aprovados', 'Reprovados', 'Pendentes'],
+        datasets: [{
+          data: [
+            parseInt(data.candidateStats.approved) || 0,
+            parseInt(data.candidateStats.rejected) || 0,
+            parseInt(data.candidateStats.pending) || 0
+          ],
+          backgroundColor: [
+            'rgba(75, 192, 192, 0.7)',
+            'rgba(255, 99, 132, 0.7)',
+            'rgba(255, 206, 86, 0.7)'
+          ],
+          borderColor: [
+            'rgba(75, 192, 192, 1)',
+            'rgba(255, 99, 132, 1)',
+            'rgba(255, 206, 86, 1)'
+          ],
+          borderWidth: 1,
+        }]
       });
     }
-  }, [candidates, statistics]); // Adicionado statistics como dependência
+  };
   
   useEffect(() => {
     // Função para atualizar o gráfico de perfil ideal quando um candidato é selecionado

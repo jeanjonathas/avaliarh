@@ -104,7 +104,11 @@ interface Candidate {
       }
     }[]
   }
-  score?: number
+  score?: number | {
+    correct: number;
+    total: number;
+    percentage: number;
+  }
   timeSpent?: number
   createdAt: string
   updatedAt: string
@@ -115,6 +119,7 @@ interface Candidate {
     correct: number
     total: number
     percentage: number
+    order?: number
   }[]
   photoUrl?: string
 }
@@ -774,6 +779,101 @@ const CandidateDetails = () => {
     }
   }, [candidate]);
 
+  // Ordenar as etapas para exibição na tabela de desempenho detalhado e nas respostas
+  useEffect(() => {
+    if (candidate && candidate.test && candidate.test.TestStage) {
+      // Criar um mapa de ordem das etapas
+      const stageOrderMap = {};
+      candidate.test.TestStage.forEach((testStage, index) => {
+        stageOrderMap[testStage.stageId] = index;
+      });
+      
+      // Ordenar as etapas na tabela de desempenho detalhado
+      if (candidate.stageScores) {
+        const orderedStageScores = [...candidate.stageScores].sort((a, b) => {
+          const orderA = stageOrderMap[a.id] !== undefined ? stageOrderMap[a.id] : 999;
+          const orderB = stageOrderMap[b.id] !== undefined ? stageOrderMap[b.id] : 999;
+          return orderA - orderB;
+        });
+        
+        // Atualizar os dados do candidato com as etapas ordenadas
+        setCandidate(prev => ({
+          ...prev,
+          stageScores: orderedStageScores
+        }));
+      }
+      
+      // Ordenar as respostas por etapa
+      if (candidate.responses) {
+        // Agrupar respostas por etapa
+        const responsesByStage = {};
+        candidate.responses.forEach(response => {
+          if (response.stageId) {
+            if (!responsesByStage[response.stageId]) {
+              responsesByStage[response.stageId] = [];
+            }
+            responsesByStage[response.stageId].push(response);
+          }
+        });
+        
+        // Ordenar as etapas e depois concatenar todas as respostas
+        const orderedResponses = Object.keys(responsesByStage)
+          .sort((a, b) => {
+            const orderA = stageOrderMap[a] !== undefined ? stageOrderMap[a] : 999;
+            const orderB = stageOrderMap[b] !== undefined ? stageOrderMap[b] : 999;
+            return orderA - orderB;
+          })
+          .flatMap(stageId => responsesByStage[stageId]);
+        
+        // Atualizar os dados do candidato com as respostas ordenadas
+        setCandidate(prev => ({
+          ...prev,
+          responses: orderedResponses
+        }));
+      }
+    }
+  }, [candidate?.test]);
+
+  useEffect(() => {
+    if (candidate && candidate.stageScores) {
+      // Ordenar as etapas conforme a ordem definida no teste
+      const orderedStageScores = [...candidate.stageScores].sort((a, b) => {
+        // Se tiver campo order, usar ele
+        if (a.order !== undefined && b.order !== undefined) {
+          return a.order - b.order;
+        }
+        // Caso contrário, ordenar pelo nome
+        return a.name.localeCompare(b.name);
+      });
+
+      // Calcular pontuação total com precisão de uma casa decimal
+      const totalCorrect = orderedStageScores.reduce((acc, stage) => acc + stage.correct, 0);
+      const totalQuestions = orderedStageScores.reduce((acc, stage) => acc + stage.total, 0);
+      
+      // Garantir que estamos usando o número correto de casas decimais
+      const percentage = totalQuestions > 0 
+        ? parseFloat((totalCorrect * 100 / totalQuestions).toFixed(1)) 
+        : 0;
+      
+      // Atualizar o score como um objeto
+      const scoreObject = {
+        correct: totalCorrect,
+        total: totalQuestions,
+        percentage
+      };
+      
+      setCandidate(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          score: scoreObject
+        };
+      });
+      
+      console.log(`Pontuação total calculada: ${totalCorrect}/${totalQuestions} (${percentage}%)`);
+    }
+  }, [candidate?.stageScores]);
+
   if (status === 'loading' || loading) {
     return (
       <div className="min-h-screen bg-secondary-50 flex justify-center items-center">
@@ -870,22 +970,20 @@ const CandidateDetails = () => {
                   <div className="flex items-center">
                     <div className="p-3 rounded-full bg-primary-100 text-primary-600">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 00-2-2h-2a2 2 0 00-2 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
                       </svg>
                     </div>
                     <div className="ml-4">
                       <h4 className="text-sm font-medium text-secondary-500">Pontuação Geral</h4>
                       <div className="flex items-baseline">
                         <span className="text-2xl font-semibold text-secondary-900">
-                          {(() => {
-                            const totalCorrect = candidate.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0;
-                            const totalQuestions = candidate.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0;
-                            const percentage = totalQuestions > 0 ? parseFloat((totalCorrect / totalQuestions * 100).toFixed(1)) : 0;
-                            return `${percentage}%`;
-                          })()}
-                        </span>
+                          {typeof candidate.score === 'object' 
+                            ? candidate.score.percentage 
+                            : parseFloat((candidate.score || 0).toFixed(1))}%</span>
                         <span className="ml-2 text-sm text-secondary-500">
-                          ({candidate.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0}/{candidate.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0})
+                          ({typeof candidate.score === 'object' 
+                            ? `${candidate.score.correct}/${candidate.score.total}` 
+                            : '0/0'})
                         </span>
                       </div>
                     </div>
@@ -1217,15 +1315,13 @@ const CandidateDetails = () => {
                           <h4 className="text-sm font-medium text-secondary-500">Pontuação Geral</h4>
                           <div className="flex items-baseline">
                             <span className="text-2xl font-semibold text-secondary-900">
-                              {(() => {
-                                const totalCorrect = candidate.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0;
-                                const totalQuestions = candidate.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0;
-                                const percentage = totalQuestions > 0 ? parseFloat((totalCorrect / totalQuestions * 100).toFixed(1)) : 0;
-                                return `${percentage}%`;
-                              })()}
-                            </span>
+                              {typeof candidate.score === 'object' 
+                                ? candidate.score.percentage 
+                                : parseFloat((candidate.score || 0).toFixed(1))}%</span>
                             <span className="ml-2 text-sm text-secondary-500">
-                              ({candidate.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0}/{candidate.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0})
+                              ({typeof candidate.score === 'object' 
+                                ? `${candidate.score.correct}/${candidate.score.total}` 
+                                : '0/0'})
                             </span>
                           </div>
                         </div>
@@ -1246,7 +1342,7 @@ const CandidateDetails = () => {
                               {!candidate.completed ? 'Pendente' : (() => {
                                 const totalCorrect = candidate.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0;
                                 const totalQuestions = candidate.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0;
-                                const percentage = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+                                const percentage = totalQuestions > 0 ? parseFloat((totalCorrect / totalQuestions * 100).toFixed(1)) : 0;
                                 
                                 if (percentage >= 80) return 'Aprovado';
                                 if (percentage >= 60) return 'Consideração';
@@ -1774,13 +1870,9 @@ const CandidateDetails = () => {
                             <div>
                               <span className="text-sm text-secondary-600">Pontuação Geral:</span>
                               <p className="font-medium">
-                                {(() => {
-                                  const totalCorrect = candidate.stageScores.reduce((acc, stage) => acc + stage.correct, 0);
-                                  const totalQuestions = candidate.stageScores.reduce((acc, stage) => acc + stage.total, 0);
-                                  const percentage = totalQuestions > 0 ? parseFloat((totalCorrect / totalQuestions * 100).toFixed(1)) : 0;
-                                  return `${percentage.toFixed(1)}%`;
-                                })()}
-                              </p>
+                                {typeof candidate.score === 'object' 
+                                  ? candidate.score.percentage 
+                                  : parseFloat((candidate.score || 0).toFixed(1))}%</p>
                             </div>
                           )}
                         </div>

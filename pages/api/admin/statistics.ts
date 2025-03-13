@@ -45,33 +45,34 @@ export default async function handler(
         SELECT 
           s.id,
           s.title as name,
-          COUNT(r.id) as totalResponses,
+          ts."order" as "order",
+          COUNT(DISTINCT r.id) as totalResponses,
           SUM(CASE WHEN r."isCorrectOption" = true THEN 1 ELSE 0 END) as correctResponses,
           CASE 
-            WHEN COUNT(r.id) > 0 
-            THEN ROUND(SUM(CASE WHEN r."isCorrectOption" = true THEN 1 ELSE 0 END) * 100.0 / COUNT(r.id), 1)
+            WHEN COUNT(DISTINCT r.id) > 0 
+            THEN ROUND(SUM(CASE WHEN r."isCorrectOption" = true THEN 1 ELSE 0 END) * 100.0 / COUNT(DISTINCT r.id), 1)
             ELSE 0 
           END as "successRate"
         FROM "Stage" s
         JOIN "TestStage" ts ON s.id = ts."stageId"
-        JOIN "Test" t ON ts."testId" = t.id
+        JOIN "Test" t ON ts."testId" = t.id AND t.active = true
         LEFT JOIN "Question" q ON q."stageId" = s.id
         LEFT JOIN "Response" r ON r."questionId" = q.id
-        WHERE t.active = true
-        GROUP BY s.id, s.title
-        ORDER BY s.title
+        GROUP BY s.id, s.title, ts."order"
+        ORDER BY ts."order", s.title
       `;
 
       // Buscar estatísticas de candidatos
       const candidateStats = await prisma.$queryRaw`
         SELECT 
           COUNT(*) as total,
+          SUM(CASE WHEN c.completed = true THEN 1 ELSE 0 END) as completed,
           SUM(CASE WHEN c.status = 'APPROVED' THEN 1 ELSE 0 END) as approved,
           SUM(CASE WHEN c.status = 'REJECTED' THEN 1 ELSE 0 END) as rejected,
           SUM(CASE WHEN c.status = 'PENDING' THEN 1 ELSE 0 END) as pending,
-          ROUND(AVG(CASE WHEN c.score IS NOT NULL THEN 
+          ROUND(AVG(CASE WHEN c.score IS NOT NULL AND c.completed = true THEN 
             CASE WHEN c.score > 1 THEN c.score ELSE c.score * 100 END
-            ELSE 0 END), 1) as "averageScore"
+            ELSE NULL END), 1) as "averageScore"
         FROM "Candidate" c
         JOIN "Test" t ON c."testId" = t.id
         WHERE t.active = true
@@ -103,12 +104,14 @@ export default async function handler(
         averageSuccessRate,
         candidateStats: Array.isArray(candidateStats) && candidateStats.length > 0 ? {
           total: Number(candidateStats[0].total),
+          completed: Number(candidateStats[0].completed),
           approved: Number(candidateStats[0].approved),
           rejected: Number(candidateStats[0].rejected),
           pending: Number(candidateStats[0].pending),
           averageScore: Number(candidateStats[0].averageScore)
         } : {
           total: 0,
+          completed: 0,
           approved: 0,
           rejected: 0,
           pending: 0,
@@ -127,6 +130,7 @@ export default async function handler(
         averageSuccessRate: 0,
         candidateStats: {
           total: 0,
+          completed: 0,
           approved: 0,
           rejected: 0,
           pending: 0,

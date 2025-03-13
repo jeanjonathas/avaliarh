@@ -28,6 +28,59 @@ function convertBigIntToNumber(obj: any): any {
   return obj;
 }
 
+// Definir tipos personalizados para as respostas com relacionamentos incluídos
+type ResponseWithRelations = {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  timeSpent: number;
+  candidateId: string;
+  questionId: string;
+  optionId: string;
+  questionText: string;
+  optionText: string;
+  isCorrectOption: boolean;
+  stageId?: string;
+  stageName?: string;
+  categoryId?: string;
+  categoryName?: string;
+  question?: {
+    text: string;
+    stageId: string;
+    categoryId: string;
+    Stage?: {
+      id: string;
+      title: string;
+    };
+    Category?: {
+      id: string;
+      name: string;
+    };
+  };
+  option?: {
+    text: string;
+    isCorrect: boolean;
+  };
+};
+
+// Tipo para o resultado processado
+type ProcessedResponse = {
+  id: string;
+  candidateId: string;
+  questionId: string;
+  optionId: string;
+  questionText: string;
+  optionText: string;
+  isCorrectOption: boolean;
+  stageId: string;
+  stageName: string;
+  categoryId: string;
+  categoryName: string;
+  createdAt: Date;
+  updatedAt: Date;
+  timeSpent: number;
+};
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
   
@@ -55,15 +108,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(404).json({ error: 'Candidato não encontrado' });
       }
       
-      // Buscar as respostas do candidato
+      // Buscar as respostas do candidato com informações completas
       const responses = await prisma.response.findMany({
-        where: { candidateId: id }
-      });
+        where: { candidateId: id },
+        include: {
+          question: {
+            include: {
+              Stage: true,
+              Category: true
+            }
+          },
+          option: true
+        }
+      }) as unknown as ResponseWithRelations[];
+      
+      // Mapear as respostas para incluir informações da etapa e categoria
+      const processedResponses: ProcessedResponse[] = responses.map(response => ({
+        id: response.id,
+        candidateId: response.candidateId,
+        questionId: response.questionId,
+        optionId: response.optionId,
+        questionText: response.questionText || response.question?.text || '',
+        optionText: response.optionText || response.option?.text || '',
+        isCorrectOption: response.isCorrectOption || response.option?.isCorrect || false,
+        stageId: response.question?.stageId || response.stageId || '',
+        stageName: response.question?.Stage?.title || response.stageName || '',
+        categoryId: response.question?.categoryId || '',
+        categoryName: response.question?.Category?.name || '',
+        createdAt: response.createdAt,
+        updatedAt: response.updatedAt,
+        timeSpent: response.timeSpent || 0
+      }));
       
       // Verificar se o candidato completou o teste com base nas respostas
       let candidateCompleted = candidate.completed;
       let candidateStatus = candidate.status;
-      if (responses.length > 0 && (!candidate.completed || candidate.status === 'PENDING')) {
+      if (processedResponses.length > 0 && (!candidate.completed || candidate.status === 'PENDING')) {
         // Se há respostas mas o candidato não está marcado como completo ou está como PENDING, atualizamos
         candidateCompleted = true;
         candidateStatus = 'APPROVED';
@@ -99,7 +179,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const stageMap = new Map();
       
       // Processar respostas para calcular pontuações por etapa
-      for (const response of responses) {
+      for (const response of processedResponses) {
         // Verificar se a etapa pertence ao teste do candidato
         if (response.stageId && response.stageName && testStageIds.includes(response.stageId)) {
           const stageId = response.stageId;
@@ -123,6 +203,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
       
+      // Obter a ordem das etapas do teste
+      const stageOrder = {};
+      if (test && test.TestStage) {
+        test.TestStage.forEach((ts, index) => {
+          stageOrder[ts.stageId] = index;
+        });
+      }
+      
       // Converter o mapa em array e calcular percentual para cada etapa
       stageMap.forEach(value => {
         // Calcular o percentual de acertos para esta etapa
@@ -131,9 +219,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Adicionar o percentual ao objeto da etapa
         stageScores.push({
           ...value,
-          percentage
+          percentage,
+          order: stageOrder[value.id] || 999 // Usar 999 como valor padrão para etapas sem ordem definida
         });
       });
+      
+      // Ordenar as etapas conforme a ordem definida no teste
+      stageScores.sort((a, b) => a.order - b.order);
       
       // Calcular a pontuação total
       let totalScore = 0;
@@ -159,26 +251,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       
       // Garantir que todas as respostas tenham os campos necessários
       if (candidate) {
-        const candidateResponses = await prisma.response.findMany({
-          where: { candidateId: id }
+        const formattedResponses = processedResponses.map(response => {
+          // Formatar datas para evitar problemas de serialização
+          return {
+            ...response,
+            createdAt: response.createdAt ? response.createdAt.toISOString() : null,
+            updatedAt: response.updatedAt ? response.updatedAt.toISOString() : null
+          };
         });
         
-        if (candidateResponses.length > 0) {
-          const formattedResponses = candidateResponses.map(async (response) => {
-            // Formatar datas para evitar problemas de serialização
-            return {
-              ...response,
-              createdAt: response.createdAt ? response.createdAt.toISOString() : null,
-              updatedAt: response.updatedAt ? response.updatedAt.toISOString() : null
-            };
-          });
-          
-          // Adicionar respostas e teste ao formattedCandidate
-          formattedCandidate.responses = await Promise.all(formattedResponses);
-        } else {
-          // Se não houver respostas, adicionar um array vazio
-          formattedCandidate.responses = [];
-        }
+        // Adicionar respostas e teste ao formattedCandidate
+        formattedCandidate.responses = formattedResponses;
         
         formattedCandidate.test = test ? {
           id: test.id,
