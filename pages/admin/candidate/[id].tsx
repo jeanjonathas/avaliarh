@@ -47,6 +47,7 @@ interface Response {
   optionText: string
   isCorrectOption: boolean
   stageName?: string
+  stageId?: string
   categoryName?: string
   questionSnapshot?: string | any
   allOptionsSnapshot?: string | any
@@ -91,6 +92,18 @@ interface Candidate {
   inviteSent?: boolean
   inviteAttempts?: number
   testId?: string
+  test?: {
+    id: string
+    title: string
+    description?: string
+    TestStage?: {
+      stageId: string
+      stage: {
+        id: string
+        title: string
+      }
+    }[]
+  }
   score?: number
   timeSpent?: number
   createdAt: string
@@ -657,8 +670,18 @@ const CandidateDetails = () => {
       if (candidate.responses && candidate.responses.length > 0) {
         console.log('Processando respostas:', candidate.responses.length);
         
+        // Obter os IDs das etapas do teste atual do candidato
+        const testStageIds = candidate.test?.TestStage?.map(ts => ts.stageId) || [];
+        
+        // Filtrar apenas as respostas que pertencem às etapas do teste atual
+        const filteredResponses = candidate.test 
+          ? candidate.responses.filter(response => 
+              response.stageId && testStageIds.includes(response.stageId)
+            )
+          : candidate.responses;
+        
         // Ordenar as respostas por ID de etapa para garantir que apareçam na ordem correta
-        const sortedResponses = [...candidate.responses].sort((a, b) => {
+        const sortedResponses = [...filteredResponses].sort((a, b) => {
           const stageA = a.question?.Stage?.id || '';
           const stageB = b.question?.Stage?.id || '';
           return stageA.localeCompare(stageB);
@@ -935,15 +958,25 @@ const CandidateDetails = () => {
                           <div className="space-y-6">
                             {/* Agrupar respostas por etapa */}
                             {(() => {
-                              // Agrupar respostas por etapa
-                              const stageResponses: Record<string, Response[]> = {};
+                              // Obter os IDs das etapas do teste atual do candidato
+                              const testStageIds = candidate.test?.TestStage?.map(ts => ts.stageId) || [];
                               
-                              // Primeiro, vamos ordenar as respostas por ID de etapa para garantir que apareçam na ordem correta
-                              const sortedResponses = [...candidate.responses].sort((a, b) => {
+                              // Filtrar apenas as respostas que pertencem às etapas do teste atual
+                              const filteredResponses = candidate.test 
+                                ? candidate.responses.filter(response => 
+                                    response.stageId && testStageIds.includes(response.stageId)
+                                  )
+                                : candidate.responses;
+                              
+                              // Ordenar as respostas por ID de etapa para garantir que apareçam na ordem correta
+                              const sortedResponses = [...filteredResponses].sort((a, b) => {
                                 const stageA = a.question?.Stage?.id || '';
                                 const stageB = b.question?.Stage?.id || '';
                                 return stageA.localeCompare(stageB);
                               });
+                              
+                              // Agrupar respostas por etapa
+                              const stageResponses: Record<string, Response[]> = {};
                               
                               sortedResponses.forEach(response => {
                                 let stageName = 'Etapa não identificada';
@@ -972,6 +1005,8 @@ const CandidateDetails = () => {
                                 }
                                 stageResponses[stageName].push(response);
                               });
+                              
+                              console.log('Respostas agrupadas por etapa:', Object.keys(stageResponses));
                               
                               return Object.entries(stageResponses).map(([stageName, responses]: [string, any[]]) => (
                                 <div key={stageName} className="border border-secondary-200 rounded-lg overflow-hidden mb-6">

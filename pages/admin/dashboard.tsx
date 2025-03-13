@@ -451,7 +451,11 @@ const Dashboard: NextPage = () => {
             labels: stageNames,
             datasets: [{
               label: 'Taxa de Sucesso (%)',
-              data: data.stageStats.map(stage => parseFloat(stage.successRate) || 0),
+              data: data.stageStats.map(stage => {
+                // Garantir que o valor seja um número válido com uma casa decimal
+                const rate = parseFloat(stage.successRate) || 0;
+                return parseFloat(rate.toFixed(1));
+              }),
               backgroundColor: [
                 'rgba(255, 99, 132, 0.7)',
                 'rgba(54, 162, 235, 0.7)',
@@ -479,7 +483,11 @@ const Dashboard: NextPage = () => {
             datasets: [
               {
                 label: 'Taxa Real',
-                data: data.stageStats.map(stage => parseFloat(stage.successRate) || 0),
+                data: data.stageStats.map(stage => {
+                  // Garantir que o valor seja um número válido com uma casa decimal
+                  const rate = parseFloat(stage.successRate) || 0;
+                  return parseFloat(rate.toFixed(1));
+                }),
                 backgroundColor: 'rgba(54, 162, 235, 0.7)',
                 borderColor: 'rgba(54, 162, 235, 1)',
                 borderWidth: 1,
@@ -487,7 +495,7 @@ const Dashboard: NextPage = () => {
               },
               {
                 label: 'Taxa Esperada',
-                data: Array(stageNames.length).fill(data.expectedSuccessRate || 70),
+                data: Array(stageNames.length).fill(parseFloat(data.expectedSuccessRate.toFixed(1)) || 70),
                 backgroundColor: 'rgba(255, 99, 132, 0.7)',
                 borderColor: 'rgba(255, 99, 132, 1)',
                 borderWidth: 1,
@@ -577,7 +585,7 @@ const Dashboard: NextPage = () => {
               },
               {
                 label: 'Média Geral',
-                data: data.stageStats.map(stage => parseFloat(stage.successRate) || 0),
+                data: data.stageStats.map(stage => parseFloat(stage.successRate.toFixed(1)) || 0),
                 backgroundColor: 'rgba(75, 192, 192, 0.7)',
                 borderWidth: 0,
                 borderRadius: 4,
@@ -796,7 +804,11 @@ const Dashboard: NextPage = () => {
             labels: stageNames,
             datasets: [{
               label: 'Taxa de Sucesso (%)',
-              data: data.stageStats.map(stage => parseFloat(stage.successRate) || 0),
+              data: data.stageStats.map(stage => {
+                // Garantir que o valor seja um número válido com uma casa decimal
+                const rate = parseFloat(stage.successRate) || 0;
+                return parseFloat(rate.toFixed(1));
+              }),
               backgroundColor: [
                 'rgba(255, 99, 132, 0.7)',
                 'rgba(54, 162, 235, 0.7)',
@@ -824,7 +836,11 @@ const Dashboard: NextPage = () => {
             datasets: [
               {
                 label: 'Taxa Real',
-                data: data.stageStats.map(stage => parseFloat(stage.successRate) || 0),
+                data: data.stageStats.map(stage => {
+                  // Garantir que o valor seja um número válido com uma casa decimal
+                  const rate = parseFloat(stage.successRate) || 0;
+                  return parseFloat(rate.toFixed(1));
+                }),
                 backgroundColor: 'rgba(54, 162, 235, 0.7)',
                 borderColor: 'rgba(54, 162, 235, 1)',
                 borderWidth: 1,
@@ -832,7 +848,7 @@ const Dashboard: NextPage = () => {
               },
               {
                 label: 'Taxa Esperada',
-                data: Array(stageNames.length).fill(data.expectedSuccessRate || 70),
+                data: Array(stageNames.length).fill(parseFloat(data.expectedSuccessRate.toFixed(1)) || 70),
                 backgroundColor: 'rgba(255, 99, 132, 0.7)',
                 borderColor: 'rgba(255, 99, 132, 1)',
                 borderWidth: 1,
@@ -922,7 +938,7 @@ const Dashboard: NextPage = () => {
               },
               {
                 label: 'Média Geral',
-                data: data.stageStats.map(stage => parseFloat(stage.successRate) || 0),
+                data: data.stageStats.map(stage => parseFloat(stage.successRate.toFixed(1)) || 0),
                 backgroundColor: 'rgba(75, 192, 192, 0.7)',
                 borderWidth: 0,
                 borderRadius: 4,
@@ -2109,7 +2125,14 @@ return (
                     {statistics.stageStats && statistics.stageStats.length > 0 && (
                       <p className="text-green-600">
                         {(() => {
-                          const bestStage = [...statistics.stageStats].sort((a, b) => b.successRate - a.successRate)[0];
+                          // Filtrar apenas etapas com pelo menos uma resposta
+                          const validStages = statistics.stageStats.filter(stage => stage.totalResponses > 0);
+                          
+                          if (validStages.length === 0) {
+                            return <span>Nenhuma etapa com respostas suficientes para análise.</span>;
+                          }
+                          
+                          const bestStage = [...validStages].sort((a, b) => b.successRate - a.successRate)[0];
                           return (
                             <>
                               <span className="font-bold">{bestStage.name}</span> é a categoria com melhor desempenho, 
@@ -2126,7 +2149,14 @@ return (
                     {statistics.stageStats && statistics.stageStats.length > 0 && (
                       <p className="text-red-600">
                         {(() => {
-                          const worstStage = [...statistics.stageStats].sort((a, b) => a.successRate - b.successRate)[0];
+                          // Filtrar apenas etapas com pelo menos uma resposta
+                          const validStages = statistics.stageStats.filter(stage => stage.totalResponses > 0);
+                          
+                          if (validStages.length === 0) {
+                            return <span>Nenhuma etapa com respostas suficientes para análise.</span>;
+                          }
+                          
+                          const worstStage = [...validStages].sort((a, b) => a.successRate - b.successRate)[0];
                           return (
                             <>
                               <span className="font-bold">{worstStage.name}</span> é a categoria com maior dificuldade, 

@@ -54,11 +54,12 @@ export default async function handler(
             ELSE 0 
           END as "successRate"
         FROM "Stage" s
+        LEFT JOIN "TestStage" ts ON ts."stageId" = s.id
+        LEFT JOIN "tests" tt ON ts."testId" = tt.id
         LEFT JOIN "Question" q ON q."stageId" = s.id
         LEFT JOIN "Response" r ON r."questionId" = q.id
         LEFT JOIN "Option" o ON r."optionId" = o.id
-        LEFT JOIN "tests" t ON s."testId" = t.id
-        WHERE t.active = true OR t.active IS NULL
+        WHERE tt.active = true
         GROUP BY s.id, s.title, s.order
         ORDER BY s.order
       `;
@@ -73,7 +74,7 @@ export default async function handler(
           COUNT(CASE WHEN c.status = 'PENDING' THEN 1 ELSE NULL END)::int as pending
         FROM "Candidate" c
         LEFT JOIN "tests" t ON c."testId" = t.id
-        WHERE t.active = true OR t.active IS NULL
+        WHERE t.active = true
       `;
       
       // Log para debug

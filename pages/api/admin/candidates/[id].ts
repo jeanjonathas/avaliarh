@@ -79,8 +79,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       
       // Buscar o teste associado ao candidato
       const test = candidate.testId 
-        ? await prisma.tests.findUnique({ where: { id: candidate.testId } })
+        ? await prisma.tests.findUnique({ 
+            where: { id: candidate.testId },
+            include: {
+              TestStage: {
+                include: {
+                  stage: true
+                }
+              }
+            }
+          })
         : null;
+      
+      // Obter os IDs das etapas que pertencem ao teste do candidato
+      const testStageIds = test?.TestStage?.map(ts => ts.stageId) || [];
       
       // Calcular pontuações por etapa
       const stageScores = [];
@@ -88,7 +100,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       
       // Processar respostas para calcular pontuações por etapa
       for (const response of responses) {
-        if (response.stageId && response.stageName) {
+        // Verificar se a etapa pertence ao teste do candidato
+        if (response.stageId && response.stageName && testStageIds.includes(response.stageId)) {
           const stageId = response.stageId;
           const stageName = response.stageName;
           
@@ -171,6 +184,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           id: test.id,
           title: test.title,
           description: test.description,
+          TestStage: test.TestStage.map(ts => ({
+            stageId: ts.stageId,
+            stage: {
+              id: ts.stage.id,
+              title: ts.stage.title
+            }
+          })),
           createdAt: test.createdAt.toISOString(),
           updatedAt: test.updatedAt.toISOString()
         } : null;

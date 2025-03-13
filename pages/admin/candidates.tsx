@@ -651,7 +651,7 @@ const CandidatesPage: NextPage = () => {
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500">
                         {candidate.score !== undefined ? 
-                          `${candidate.score > 1 ? candidate.score : Math.round(candidate.score * 100)}%` 
+                          `${(candidate.score > 1 ? candidate.score : candidate.score * 100).toFixed(1)}%` 
                           : '-'}
                       </td>
                       <td className="px-6 py-4">
