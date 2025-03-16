@@ -335,13 +335,13 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 
     // Busca estatísticas de planos
     const companiesByPlan = await prisma.$queryRaw`
-      SELECT "plan", COUNT(*) as count 
+      SELECT "planType", COUNT(*) as count 
       FROM "Company" 
-      GROUP BY "plan"
+      GROUP BY "planType"
     `.then((results) => 
       Array.isArray(results) 
         ? results.map((row: any) => ({ 
-            plan: row.plan, 
+            plan: row.planType, 
             count: Number(row.count) 
           }))
         : []

@@ -537,3 +537,13 @@ model GlobalAccess {
   testId          String?
   createdAt       DateTime      @default(now())
 }
+
+model CompanyBackup {
+  id              String           @id @default(uuid())
+  companyId       String           // ID da empresa original
+  data            Json             // Dados da empresa e relacionamentos em formato JSON
+  deletedAt       DateTime         @default(now()) // Data da exclusão
+  
+  // Índice para facilitar buscas pelo ID da empresa original
+  @@index([companyId])
+}

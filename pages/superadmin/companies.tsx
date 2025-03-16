@@ -1,20 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import { GetServerSideProps } from 'next';
 import { getSession } from 'next-auth/react';
-import { Company } from '@prisma/client';
 import SuperAdminLayout from '../../components/SuperAdminLayout';
 import CompanyList from '../../components/superadmin/CompanyList';
 import CompanyForm from '../../components/superadmin/CompanyForm';
 import CompanyDetails from '../../components/superadmin/CompanyDetails';
+import DeleteConfirmationAlerts from '../../components/superadmin/DeleteConfirmationAlerts';
 import { PrismaClient } from '@prisma/client';
 
+// Definir interfaces localmente em vez de importar diretamente do Prisma
+interface Company {
+  id: string;
+  name: string;
+  cnpj: string | null;
+  planType: string; 
+  plan?: string; 
+  isActive: boolean;
+  maxUsers: number;
+  maxCandidates: number;
+  lastPaymentDate: Date | null;
+  trialEndDate: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 interface CompanyWithRelations extends Company {
-  _count: {
+  _count?: {
     users: number;
     candidates: number;
     tests: number;
     processes: number;
   };
+  userCount?: number;
+  candidateCount?: number;
+  testCount?: number;
+  processCount?: number;
 }
 
 interface CompaniesPageProps {
@@ -28,6 +48,8 @@ const CompaniesPage: React.FC<CompaniesPageProps> = ({ initialCompanies }) => {
   const [viewingCompany, setViewingCompany] = useState<CompanyWithRelations | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [companyToDelete, setCompanyToDelete] = useState<CompanyWithRelations | null>(null);
+  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
 
   const loadCompanies = async () => {
     setIsLoading(true);
@@ -74,11 +96,58 @@ const CompaniesPage: React.FC<CompaniesPageProps> = ({ initialCompanies }) => {
     }
   };
 
-  const handleDeleteCompany = async (companyId: string) => {
-    if (!window.confirm('Tem certeza que deseja excluir esta empresa? Esta ação não pode ser desfeita.')) {
-      return;
-    }
+  const handleDeleteClick = (company: CompanyWithRelations) => {
+    setCompanyToDelete(company);
+    setShowDeleteAlert(true);
+  };
 
+  const handleDeleteConfirm = async () => {
+    if (!companyToDelete) return;
+    
+    await deleteCompany(companyToDelete.id);
+    setShowDeleteAlert(false);
+    setCompanyToDelete(null);
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteAlert(false);
+    setCompanyToDelete(null);
+  };
+
+  // Função para desativar uma empresa
+  const handleDeactivateCompany = async () => {
+    if (!companyToDelete) return;
+    
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/superadmin/companies/${companyToDelete.id}`, {
+        method: 'PATCH',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Falha ao desativar empresa');
+      }
+
+      // Atualiza a empresa na lista para mostrar como desativada
+      setCompanies(companies.map(company => 
+        company.id === companyToDelete.id 
+          ? { ...company, isActive: false } 
+          : company
+      ));
+      
+      setError(null);
+      setShowDeleteAlert(false);
+      setCompanyToDelete(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao desativar empresa. Por favor, tente novamente.');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteCompany = async (companyId: string) => {
     setIsLoading(true);
     try {
       const response = await fetch(`/api/superadmin/companies/${companyId}`, {
@@ -86,14 +155,15 @@ const CompaniesPage: React.FC<CompaniesPageProps> = ({ initialCompanies }) => {
       });
 
       if (!response.ok) {
-        throw new Error('Falha ao excluir empresa');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Falha ao excluir empresa');
       }
 
       // Atualiza a lista de empresas após a exclusão
       setCompanies(companies.filter(company => company.id !== companyId));
       setError(null);
     } catch (err) {
-      setError('Erro ao excluir empresa. Por favor, tente novamente.');
+      setError(err instanceof Error ? err.message : 'Erro ao excluir empresa. Por favor, tente novamente.');
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -170,6 +240,15 @@ const CompaniesPage: React.FC<CompaniesPageProps> = ({ initialCompanies }) => {
           </div>
         )}
 
+        {showDeleteAlert && companyToDelete && (
+          <DeleteConfirmationAlerts
+            companyName={companyToDelete.name}
+            onConfirm={handleDeleteConfirm}
+            onCancel={handleDeleteCancel}
+            onDeactivate={handleDeactivateCompany}
+          />
+        )}
+
         {isFormOpen ? (
           <CompanyForm
             company={selectedCompany}
@@ -185,7 +264,7 @@ const CompaniesPage: React.FC<CompaniesPageProps> = ({ initialCompanies }) => {
           <CompanyList
             companies={companies}
             onEdit={handleEditCompany}
-            onDelete={handleDeleteCompany}
+            onDelete={handleDeleteClick}
             onView={handleViewCompany}
           />
         )}
@@ -198,7 +277,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   const session = await getSession(context);
 
   // Verifica se o usuário está autenticado e é um SUPER_ADMIN
-  if (!session || session.user.role !== 'SUPER_ADMIN') {
+  if (!session || (session.user.role as string) !== 'SUPER_ADMIN') {
     return {
       redirect: {
         destination: '/admin/login',
@@ -211,30 +290,30 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   const prisma = new PrismaClient();
   
   try {
-    const companies = await prisma.company.findMany({
-      orderBy: {
-        name: 'asc',
-      },
-      include: {
-        _count: {
-          select: {
-            users: true,
-            candidates: true,
-            tests: true,
-            processes: true,
-          },
-        },
-      },
-    });
+    // Usando $queryRaw para evitar problemas com o modelo Company no Prisma
+    const companies = await prisma.$queryRaw`
+      SELECT c.*, 
+        (SELECT COUNT(*) FROM "User" WHERE "companyId" = c.id) as "userCount",
+        (SELECT COUNT(*) FROM "Candidate" WHERE "companyId" = c.id) as "candidateCount",
+        (SELECT COUNT(*) FROM "Test" WHERE "companyId" = c.id) as "testCount",
+        (SELECT COUNT(*) FROM "SelectionProcess" WHERE "companyId" = c.id) as "processCount"
+      FROM "Company" c
+      ORDER BY c.name ASC
+    `;
 
     // Serializa as datas para JSON
-    const serializedCompanies = companies.map(company => ({
+    const serializedCompanies = Array.isArray(companies) ? companies.map(company => ({
       ...company,
-      createdAt: company.createdAt.toISOString(),
-      updatedAt: company.updatedAt.toISOString(),
+      createdAt: company.createdAt ? company.createdAt.toISOString() : null,
+      updatedAt: company.updatedAt ? company.updatedAt.toISOString() : null,
       lastPaymentDate: company.lastPaymentDate ? company.lastPaymentDate.toISOString() : null,
       trialEndDate: company.trialEndDate ? company.trialEndDate.toISOString() : null,
-    }));
+      // Converter valores bigint para number
+      userCount: company.userCount ? Number(company.userCount) : 0,
+      candidateCount: company.candidateCount ? Number(company.candidateCount) : 0,
+      testCount: company.testCount ? Number(company.testCount) : 0,
+      processCount: company.processCount ? Number(company.processCount) : 0
+    })) : [];
 
     return {
       props: {

@@ -1,16 +1,50 @@
 import React from 'react';
-import { Company, User, Candidate, Test } from '@prisma/client';
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
+interface Candidate {
+  id: string;
+  name: string;
+}
+
+interface Test {
+  id: string;
+  name: string;
+}
+
+interface Company {
+  id: string;
+  name: string;
+  cnpj: string | null;
+  planType: string;
+  plan?: string;
+  isActive: boolean;
+  maxUsers: number;
+  maxCandidates: number;
+  lastPaymentDate: Date | null;
+  trialEndDate: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 interface CompanyWithRelations extends Company {
-  users: User[];
-  candidates: Candidate[];
-  tests: Test[];
+  users?: User[];
+  candidates?: Candidate[];
+  tests?: Test[];
   _count?: {
     users: number;
     candidates: number;
     tests: number;
     processes: number;
   };
+  userCount?: number;
+  candidateCount?: number;
+  testCount?: number;
+  processCount?: number;
 }
 
 interface CompanyDetailsProps {
@@ -75,14 +109,14 @@ const CompanyDetails: React.FC<CompanyDetailsProps> = ({ company, onClose }) => 
               <div className="flex justify-between items-center mb-1">
                 <p className="text-sm font-medium text-gray-500">Usuários</p>
                 <p className="text-sm font-medium text-gray-900">
-                  {company._count?.users || company.users?.length || 0} / {company.maxUsers}
+                  {company.userCount || company._count?.users || company.users?.length || 0} / {company.maxUsers}
                 </p>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div 
                   className="bg-purple-600 h-2 rounded-full" 
                   style={{ 
-                    width: `${Math.min(100, ((company._count?.users || company.users?.length || 0) / company.maxUsers) * 100)}%` 
+                    width: `${Math.min(100, ((company.userCount || company._count?.users || company.users?.length || 0) / company.maxUsers) * 100)}%` 
                   }}
                 ></div>
               </div>
@@ -92,14 +126,14 @@ const CompanyDetails: React.FC<CompanyDetailsProps> = ({ company, onClose }) => 
               <div className="flex justify-between items-center mb-1">
                 <p className="text-sm font-medium text-gray-500">Candidatos</p>
                 <p className="text-sm font-medium text-gray-900">
-                  {company._count?.candidates || company.candidates?.length || 0} / {company.maxCandidates}
+                  {company.candidateCount || company._count?.candidates || company.candidates?.length || 0} / {company.maxCandidates}
                 </p>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div 
                   className="bg-purple-600 h-2 rounded-full" 
                   style={{ 
-                    width: `${Math.min(100, ((company._count?.candidates || company.candidates?.length || 0) / company.maxCandidates) * 100)}%` 
+                    width: `${Math.min(100, ((company.candidateCount || company._count?.candidates || company.candidates?.length || 0) / company.maxCandidates) * 100)}%` 
                   }}
                 ></div>
               </div>
@@ -110,11 +144,11 @@ const CompanyDetails: React.FC<CompanyDetailsProps> = ({ company, onClose }) => 
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-gray-50 p-4 rounded-lg">
               <p className="text-sm font-medium text-gray-500">Testes</p>
-              <p className="mt-1 text-2xl font-semibold text-gray-900">{company._count?.tests || company.tests?.length || 0}</p>
+              <p className="mt-1 text-2xl font-semibold text-gray-900">{company.testCount || company._count?.tests || company.tests?.length || 0}</p>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg">
               <p className="text-sm font-medium text-gray-500">Processos</p>
-              <p className="mt-1 text-2xl font-semibold text-gray-900">{company._count?.processes || 0}</p>
+              <p className="mt-1 text-2xl font-semibold text-gray-900">{company.processCount || company._count?.processes || 0}</p>
             </div>
           </div>
         </div>

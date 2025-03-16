@@ -1,10 +1,25 @@
 import React, { useState } from 'react';
-import { Company } from '@prisma/client';
+
+// Definindo a interface Company localmente para evitar problemas de importação
+interface Company {
+  id: string;
+  name: string;
+  cnpj?: string | null;
+  plan?: string;
+  planType?: string;
+  isActive: boolean;
+  maxUsers: number;
+  maxCandidates: number;
+  lastPaymentDate?: Date | null;
+  trialEndDate?: Date | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
 
 interface CompanyListProps {
   companies: Company[];
   onEdit: (company: Company) => void;
-  onDelete: (companyId: string) => void;
+  onDelete: (company: Company) => void;
   onView: (companyId: string) => void;
 }
 
@@ -112,7 +127,7 @@ const CompanyList: React.FC<CompanyListProps> = ({
                       Editar
                     </button>
                     <button
-                      onClick={() => onDelete(company.id)}
+                      onClick={() => onDelete(company)}
                       className="text-red-600 hover:text-red-900"
                     >
                       Excluir

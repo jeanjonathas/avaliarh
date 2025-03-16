@@ -26,42 +26,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 // GET - Listar todas as empresas
 async function getCompanies(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const companies = await prisma.company.findMany({
-      orderBy: {
-        name: 'asc',
-      },
-      include: {
-        _count: {
-          select: {
-            users: true,
-            candidates: true,
-            tests: true,
-            processes: true,
-          },
-        },
-        plan: true,
-        subscription: true,
-      },
-    });
+    // Usando $queryRaw para evitar problemas com o modelo Company no Prisma
+    const companies = await prisma.$queryRaw`
+      SELECT c.*, 
+        (SELECT COUNT(*) FROM "User" WHERE "companyId" = c.id) as "userCount",
+        (SELECT COUNT(*) FROM "Candidate" WHERE "companyId" = c.id) as "candidateCount",
+        (SELECT COUNT(*) FROM "Test" WHERE "companyId" = c.id) as "testCount",
+        (SELECT COUNT(*) FROM "SelectionProcess" WHERE "companyId" = c.id) as "processCount"
+      FROM "Company" c
+      ORDER BY c.name ASC
+    `;
 
-    // Formatar a resposta para incluir informações sobre plano e assinatura
-    const formattedCompanies = companies.map(company => ({
-      id: company.id,
-      name: company.name,
-      isActive: company.isActive,
-      planId: company.planId,
-      planName: company.plan?.name || 'Sem plano',
-      subscriptionStatus: company.subscription?.status || 'PENDING',
-      subscriptionEndDate: company.subscription?.endDate || null,
-      userCount: company._count.users,
-      candidateCount: company._count.candidates,
-      testCount: company._count.tests,
-      processCount: company._count.processes,
-      createdAt: company.createdAt,
-      updatedAt: company.updatedAt,
-    }));
-
-    return res.status(200).json(formattedCompanies);
+    return res.status(200).json(companies);
   } catch (error) {
     console.error('Error fetching companies:', error);
     return res.status(500).json({ message: 'Erro ao buscar empresas' });
@@ -74,7 +50,7 @@ async function createCompany(req: NextApiRequest, res: NextApiResponse) {
     const {
       name,
       cnpj,
-      plan,
+      planType,
       isActive,
       maxUsers,
       maxCandidates,
@@ -83,36 +59,46 @@ async function createCompany(req: NextApiRequest, res: NextApiResponse) {
     } = req.body;
 
     // Validação básica
-    if (!name || !plan) {
+    if (!name || !planType) {
       return res.status(400).json({ message: 'Nome e plano são obrigatórios' });
     }
 
     // Verifica se já existe uma empresa com o mesmo CNPJ
     if (cnpj) {
-      const existingCompany = await prisma.company.findUnique({
-        where: { cnpj },
-      });
+      const existingCompany = await prisma.$queryRaw`
+        SELECT * FROM "Company" WHERE cnpj = ${cnpj}
+      `;
 
-      if (existingCompany) {
+      if (existingCompany && Array.isArray(existingCompany) && existingCompany.length > 0) {
         return res.status(400).json({ message: 'Já existe uma empresa com este CNPJ' });
       }
     }
 
-    // Cria a nova empresa
-    const newCompany = await prisma.company.create({
-      data: {
-        name,
-        cnpj: cnpj || null,
-        plan,
-        isActive: isActive !== undefined ? isActive : true,
-        maxUsers: maxUsers || 10,
-        maxCandidates: maxCandidates || 100,
-        lastPaymentDate: lastPaymentDate ? new Date(lastPaymentDate) : null,
-        trialEndDate: trialEndDate ? new Date(trialEndDate) : null,
-      },
-    });
+    // Cria a nova empresa usando $executeRaw
+    await prisma.$executeRaw`
+      INSERT INTO "Company" (
+        id, name, cnpj, "planType", "isActive", "maxUsers", "maxCandidates", 
+        "lastPaymentDate", "trialEndDate", "createdAt", "updatedAt"
+      ) VALUES (
+        gen_random_uuid(), ${name}, ${cnpj || null}, ${planType}, 
+        ${isActive !== undefined ? isActive : true}, 
+        ${maxUsers || 10}, 
+        ${maxCandidates || 100},
+        ${lastPaymentDate ? new Date(lastPaymentDate) : null},
+        ${trialEndDate ? new Date(trialEndDate) : null},
+        NOW(), NOW()
+      )
+    `;
 
-    return res.status(201).json(newCompany);
+    // Busca a empresa recém-criada
+    const newCompany = await prisma.$queryRaw`
+      SELECT * FROM "Company" 
+      WHERE name = ${name}
+      ORDER BY "createdAt" DESC
+      LIMIT 1
+    `;
+
+    return res.status(201).json(Array.isArray(newCompany) ? newCompany[0] : newCompany);
   } catch (error) {
     console.error('Error creating company:', error);
     return res.status(500).json({ message: 'Erro ao criar empresa' });

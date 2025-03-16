@@ -1,5 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Company } from '@prisma/client';
+
+// Definindo a interface Company localmente para evitar problemas de importação
+interface Company {
+  id: string;
+  name: string;
+  cnpj?: string | null;
+  planId?: string | null;
+  planType: string;
+  plan?: string;
+  isActive: boolean;
+  maxUsers: number;
+  maxCandidates: number;
+  lastPaymentDate?: Date | null;
+  trialEndDate?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 interface CompanyFormProps {
   company?: Company | null;
@@ -38,18 +54,46 @@ const CompanyForm: React.FC<CompanyFormProps> = ({
     }
   }, [company]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target as HTMLInputElement;
     
-    if (type === 'checkbox') {
+    // Aplicar formatação de CNPJ quando o campo for cnpj
+    if (name === 'cnpj') {
+      // Remove todos os caracteres não numéricos para processar
+      const numericValue = value.replace(/\D/g, '');
+      // Aplica a máscara e atualiza o estado
+      setFormData(prev => ({ ...prev, [name]: formatCNPJ(numericValue) }));
+    } else if (type === 'checkbox') {
       const checked = (e.target as HTMLInputElement).checked;
       setFormData(prev => ({ ...prev, [name]: checked }));
     } else if (type === 'number') {
-      setFormData(prev => ({ ...prev, [name]: parseInt(value) }));
+      setFormData(prev => ({ ...prev, [name]: value ? parseInt(value) : null }));
     } else if (type === 'date') {
       setFormData(prev => ({ ...prev, [name]: value ? new Date(value) : null }));
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
+    }
+  };
+
+  // Função para formatar CNPJ no padrão XX.XXX.XXX/XXXX-XX
+  const formatCNPJ = (value: string): string => {
+    // Remove todos os caracteres não numéricos
+    const numericValue = value.replace(/\D/g, '');
+    
+    // Limita a 14 dígitos (tamanho do CNPJ)
+    const limitedValue = numericValue.slice(0, 14);
+    
+    // Aplica a máscara de acordo com o tamanho da string
+    if (limitedValue.length <= 2) {
+      return limitedValue;
+    } else if (limitedValue.length <= 5) {
+      return `${limitedValue.slice(0, 2)}.${limitedValue.slice(2)}`;
+    } else if (limitedValue.length <= 8) {
+      return `${limitedValue.slice(0, 2)}.${limitedValue.slice(2, 5)}.${limitedValue.slice(5)}`;
+    } else if (limitedValue.length <= 12) {
+      return `${limitedValue.slice(0, 2)}.${limitedValue.slice(2, 5)}.${limitedValue.slice(5, 8)}/${limitedValue.slice(8)}`;
+    } else {
+      return `${limitedValue.slice(0, 2)}.${limitedValue.slice(2, 5)}.${limitedValue.slice(5, 8)}/${limitedValue.slice(8, 12)}-${limitedValue.slice(12)}`;
     }
   };
 
@@ -227,7 +271,7 @@ const CompanyForm: React.FC<CompanyFormProps> = ({
                 id="isActive"
                 name="isActive"
                 checked={formData.isActive}
-                onChange={(e) => setFormData(prev => ({ ...prev, isActive: e.target.checked }))}
+                onChange={handleChange}
                 className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
               />
               <label htmlFor="isActive" className="ml-2 block text-sm text-gray-700">
