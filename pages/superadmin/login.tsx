@@ -63,8 +63,8 @@ export default function SuperAdminLogin() {
               <Image 
                 src="/logo.png" 
                 alt="AvaliaRH Logo" 
-                layout="fill"
-                objectFit="contain"
+                fill
+                style={{ objectFit: "contain" }}
                 priority
               />
             </div>

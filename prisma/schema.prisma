@@ -63,6 +63,28 @@ enum InviteStatus {
   CANCELED    // Convite revogado
 }
 
+enum SubscriptionStatus {
+  ACTIVE      // Assinatura ativa
+  PENDING     // Aguardando pagamento
+  EXPIRED     // Assinatura expirada
+  CANCELED    // Assinatura cancelada
+}
+
+enum PaymentMethod {
+  CREDIT_CARD  // Cartão de crédito
+  BANK_SLIP    // Boleto bancário
+  BANK_TRANSFER // Transferência bancária
+  PIX          // Pagamento via PIX
+  MANUAL       // Pagamento manual (registrado pelo admin)
+}
+
+enum PaymentStatus {
+  PENDING      // Aguardando pagamento
+  PAID         // Pagamento confirmado
+  FAILED       // Pagamento falhou
+  REFUNDED     // Pagamento reembolsado
+}
+
 // =======================================================
 // Models
 // =======================================================
@@ -71,7 +93,9 @@ model Company {
   id              String        @id @default(uuid())
   name            String        // Nome da empresa
   cnpj            String?       @unique // CNPJ único
-  plan            String        // Tipo de plano (Free, Pro, Enterprise)
+  plan            Plan?         @relation(fields: [planId], references: [id])
+  planId          String?       // Plano atual
+  planType        String        @default("Free") // Tipo de plano (Free, Pro, Enterprise)
   isActive        Boolean       @default(true) // Conta ativa
   maxUsers        Int           @default(10) // Limite de usuários
   maxCandidates   Int           @default(100) // Limite de candidatos
@@ -92,6 +116,8 @@ model Company {
   usedInviteCodes UsedInviteCode[]
   students        Student[]
   candidateProgress CandidateProgress[]
+  subscription    Subscription?
+  paymentHistory  PaymentHistory[]
 }
 
 model User {
@@ -384,6 +410,82 @@ model Category {
   updatedAt   DateTime   @updatedAt
   questions   Question[]
   options     Option[]
+}
+
+model Plan {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  price       Float
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relacionamentos
+  companies   Company[]
+  features    PlanFeature[]
+  subscriptions Subscription[]
+}
+
+model PlanFeature {
+  id          String   @id @default(uuid())
+  planId      String
+  featureId   String
+  isIncluded  Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relacionamentos
+  plan        Plan     @relation(fields: [planId], references: [id])
+  feature     Feature  @relation(fields: [featureId], references: [id])
+
+  @@unique([planId, featureId])
+}
+
+model Feature {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relacionamentos
+  planFeatures PlanFeature[]
+}
+
+model Subscription {
+  id              String            @id @default(uuid())
+  company         Company           @relation(fields: [companyId], references: [id])
+  companyId       String            @unique
+  plan            Plan              @relation(fields: [planId], references: [id])
+  planId          String
+  status          SubscriptionStatus @default(PENDING)
+  startDate       DateTime
+  endDate         DateTime?
+  lastPaymentDate DateTime?
+  nextPaymentDate DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relacionamentos
+  paymentHistory  PaymentHistory[]
+}
+
+model PaymentHistory {
+  id              String        @id @default(uuid())
+  subscription    Subscription  @relation(fields: [subscriptionId], references: [id])
+  subscriptionId  String
+  company         Company       @relation(fields: [companyId], references: [id])
+  companyId       String
+  amount          Float
+  paymentDate     DateTime
+  paymentMethod   PaymentMethod
+  status          PaymentStatus
+  transactionId   String?
+  invoiceUrl      String?
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
 model GlobalTest {

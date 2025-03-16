@@ -8,7 +8,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const session = await getSession({ req });
 
   // Verifica se o usuário está autenticado e é um SUPER_ADMIN
-  if (!session || session.user.role !== 'SUPER_ADMIN') {
+  if (!session || (session.user.role as string) !== 'SUPER_ADMIN') {
     return res.status(401).json({ message: 'Não autorizado' });
   }
 
@@ -39,10 +39,29 @@ async function getCompanies(req: NextApiRequest, res: NextApiResponse) {
             processes: true,
           },
         },
+        plan: true,
+        subscription: true,
       },
     });
 
-    return res.status(200).json(companies);
+    // Formatar a resposta para incluir informações sobre plano e assinatura
+    const formattedCompanies = companies.map(company => ({
+      id: company.id,
+      name: company.name,
+      isActive: company.isActive,
+      planId: company.planId,
+      planName: company.plan?.name || 'Sem plano',
+      subscriptionStatus: company.subscription?.status || 'PENDING',
+      subscriptionEndDate: company.subscription?.endDate || null,
+      userCount: company._count.users,
+      candidateCount: company._count.candidates,
+      testCount: company._count.tests,
+      processCount: company._count.processes,
+      createdAt: company.createdAt,
+      updatedAt: company.updatedAt,
+    }));
+
+    return res.status(200).json(formattedCompanies);
   } catch (error) {
     console.error('Error fetching companies:', error);
     return res.status(500).json({ message: 'Erro ao buscar empresas' });
