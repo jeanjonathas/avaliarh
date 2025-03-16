@@ -5,7 +5,6 @@ interface Company {
   id: string;
   name: string;
   cnpj?: string | null;
-  plan?: string;
   planType?: string;
   isActive: boolean;
   maxUsers: number;
@@ -34,7 +33,7 @@ const CompanyList: React.FC<CompanyListProps> = ({
   const filteredCompanies = companies.filter(company => 
     company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     company.cnpj?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    company.plan.toLowerCase().includes(searchTerm.toLowerCase())
+    company.planType?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -93,7 +92,7 @@ const CompanyList: React.FC<CompanyListProps> = ({
                     <div className="text-sm text-gray-500">{company.cnpj || '-'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">{company.plan}</div>
+                    <div className="text-sm text-gray-500">{company.planType}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${

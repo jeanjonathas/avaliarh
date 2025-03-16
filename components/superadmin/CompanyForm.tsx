@@ -7,7 +7,6 @@ interface Company {
   cnpj?: string | null;
   planId?: string | null;
   planType: string;
-  plan?: string;
   isActive: boolean;
   maxUsers: number;
   maxCandidates: number;
@@ -31,7 +30,7 @@ const CompanyForm: React.FC<CompanyFormProps> = ({
   const [formData, setFormData] = useState<Partial<Company>>({
     name: '',
     cnpj: '',
-    plan: 'Free',
+    planType: 'Free',
     isActive: true,
     maxUsers: 10,
     maxCandidates: 100,
@@ -44,7 +43,7 @@ const CompanyForm: React.FC<CompanyFormProps> = ({
       setFormData({
         name: company.name,
         cnpj: company.cnpj || '',
-        plan: company.plan,
+        planType: company.planType,
         isActive: company.isActive,
         maxUsers: company.maxUsers,
         maxCandidates: company.maxCandidates,
@@ -108,8 +107,8 @@ const CompanyForm: React.FC<CompanyFormProps> = ({
       newErrors.cnpj = 'CNPJ inválido. Use o formato XX.XXX.XXX/XXXX-XX';
     }
     
-    if (!formData.plan) {
-      newErrors.plan = 'O plano é obrigatório';
+    if (!formData.planType) {
+      newErrors.planType = 'O plano é obrigatório';
     }
     
     if (formData.maxUsers !== undefined && (formData.maxUsers < 1 || formData.maxUsers > 1000)) {
@@ -182,19 +181,19 @@ const CompanyForm: React.FC<CompanyFormProps> = ({
               Plano *
             </label>
             <select
-              name="plan"
-              value={formData.plan}
+              name="planType"
+              value={formData.planType}
               onChange={handleChange}
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                errors.plan ? 'border-red-500' : 'border-gray-300'
+                errors.planType ? 'border-red-500' : 'border-gray-300'
               }`}
             >
               <option value="Free">Free</option>
               <option value="Pro">Pro</option>
               <option value="Enterprise">Enterprise</option>
             </select>
-            {errors.plan && (
-              <p className="mt-1 text-sm text-red-500">{errors.plan}</p>
+            {errors.planType && (
+              <p className="mt-1 text-sm text-red-500">{errors.planType}</p>
             )}
           </div>
           

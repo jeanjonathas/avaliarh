@@ -124,7 +124,7 @@ export default async function handler(
         // Criar a associação entre teste e seção
         await prisma.$executeRaw`
           INSERT INTO "TestSection" (id, "testId", "sectionId", order, "createdAt", "updatedAt")
-          VALUES (gen_random_uuid(), ${testId}, ${sectionId}, ${maxOrder + 1}, NOW(), NOW())
+          VALUES (uuid_generate_v4(), ${testId}, ${sectionId}, ${maxOrder + 1}, NOW(), NOW())
         `;
         
         // Buscar a associação recém-criada

@@ -80,7 +80,7 @@ async function createCompany(req: NextApiRequest, res: NextApiResponse) {
         id, name, cnpj, "planType", "isActive", "maxUsers", "maxCandidates", 
         "lastPaymentDate", "trialEndDate", "createdAt", "updatedAt"
       ) VALUES (
-        gen_random_uuid(), ${name}, ${cnpj || null}, ${planType}, 
+        uuid_generate_v4(), ${name}, ${cnpj || null}, ${planType}, 
         ${isActive !== undefined ? isActive : true}, 
         ${maxUsers || 10}, 
         ${maxCandidates || 100},

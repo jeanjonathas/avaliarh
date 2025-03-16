@@ -76,7 +76,7 @@ export default async function handler(
             "createdAt", 
             "updatedAt"
           ) VALUES (
-            gen_random_uuid(), 
+            uuid_generate_v4(), 
             ${title}, 
             ${description || null}, 
             NOW(), 
@@ -120,7 +120,7 @@ export default async function handler(
               "createdAt", 
               "updatedAt"
             ) VALUES (
-              gen_random_uuid(), 
+              uuid_generate_v4(), 
               ${title}, 
               ${description || null}, 
               ${maxOrder + 1},

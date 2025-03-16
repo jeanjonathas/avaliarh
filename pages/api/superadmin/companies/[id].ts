@@ -79,7 +79,7 @@ async function updateCompany(req: NextApiRequest, res: NextApiResponse, id: stri
     const {
       name,
       cnpj,
-      plan,
+      planType,
       isActive,
       maxUsers,
       maxCandidates,
@@ -88,7 +88,7 @@ async function updateCompany(req: NextApiRequest, res: NextApiResponse, id: stri
     } = req.body;
 
     // Validação básica
-    if (!name || !plan) {
+    if (!name || !planType) {
       return res.status(400).json({ message: 'Nome e plano são obrigatórios' });
     }
 
@@ -118,7 +118,7 @@ async function updateCompany(req: NextApiRequest, res: NextApiResponse, id: stri
       SET 
         name = ${name},
         cnpj = ${cnpj || null},
-        "planType" = ${plan},
+        "planType" = ${planType},
         "isActive" = ${isActive !== undefined ? isActive : true},
         "maxUsers" = ${maxUsers || 10},
         "maxCandidates" = ${maxCandidates || 100},
@@ -190,8 +190,8 @@ async function deleteCompany(req: NextApiRequest, res: NextApiResponse, id: stri
     // Opção 1: Salvar em uma tabela de backup (se existir)
     try {
       await prisma.$executeRaw`
-        INSERT INTO "CompanyBackup" ("companyId", "data", "deletedAt")
-        VALUES (${id}, ${JSON.stringify(backupData)}, NOW())
+        INSERT INTO "CompanyBackup" (id, "companyId", "data", "deletedAt")
+        VALUES (uuid_generate_v4(), ${id}, ${JSON.stringify(backupData)}, NOW())
       `;
     } catch (backupError) {
       // Se a tabela não existir, registra o erro mas continua com a exclusão

@@ -19,7 +19,7 @@ export default async function handler(
       try {
         await prisma.$executeRawUnsafe(`
           CREATE TABLE IF NOT EXISTS "Stage" (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
             title VARCHAR(255) NOT NULL,
             description TEXT,
             "order" INTEGER,
@@ -74,7 +74,7 @@ export default async function handler(
       try {
         await prisma.$executeRawUnsafe(`
           CREATE TABLE IF NOT EXISTS "Stage" (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
             title VARCHAR(255) NOT NULL,
             description TEXT,
             "order" INTEGER,
@@ -128,7 +128,7 @@ export default async function handler(
         try {
           await prisma.$executeRawUnsafe(`
             CREATE TABLE IF NOT EXISTS "TestStage" (
-              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
               "testId" UUID NOT NULL,
               "stageId" UUID NOT NULL,
               "order" INTEGER NOT NULL,
@@ -144,7 +144,7 @@ export default async function handler(
         }
         
         // Gerar um UUID para a nova etapa
-        const uuidResult = await prisma.$queryRaw`SELECT gen_random_uuid() as uuid`;
+        const uuidResult = await prisma.$queryRaw`SELECT uuid_generate_v4() as uuid`;
         if (!Array.isArray(uuidResult) || uuidResult.length === 0) {
           throw new Error('Falha ao gerar UUID para nova etapa');
         }
@@ -207,7 +207,7 @@ export default async function handler(
                 "createdAt",
                 "updatedAt"
               ) VALUES (
-                gen_random_uuid(),
+                uuid_generate_v4(),
                 '${testId}'::uuid,
                 '${newStageId}'::uuid,
                 ${orderValue},

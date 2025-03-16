@@ -44,7 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Criar nova categoria global
       await prisma.$executeRaw`
         INSERT INTO "GlobalCategory" (id, name, description, "createdAt", "updatedAt")
-        VALUES (gen_random_uuid(), ${name}, ${description || null}, NOW(), NOW())
+        VALUES (uuid_generate_v4(), ${name}, ${description || null}, NOW(), NOW())
       `;
       
       // Buscar a categoria recém-criada

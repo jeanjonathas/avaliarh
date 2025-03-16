@@ -58,7 +58,7 @@ export default async function handler(
       try {
         await prisma.$executeRawUnsafe(`
           CREATE TABLE IF NOT EXISTS "TestStage" (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
             "testId" UUID NOT NULL REFERENCES "tests"(id) ON DELETE CASCADE,
             "stageId" VARCHAR(255) NOT NULL,
             "order" INTEGER NOT NULL DEFAULT 0,

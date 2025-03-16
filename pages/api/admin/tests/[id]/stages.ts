@@ -79,7 +79,7 @@ export default async function handler(
               "createdAt",
               "updatedAt"
             ) VALUES (
-              gen_random_uuid(),
+              uuid_generate_v4(),
               ${id}::uuid,
               ${stageId},
               ${order || 0},
@@ -109,7 +109,7 @@ export default async function handler(
               "createdAt",
               "updatedAt"
             ) VALUES (
-              gen_random_uuid(),
+              uuid_generate_v4(),
               ${title},
               ${description || null},
               0,
@@ -135,7 +135,7 @@ export default async function handler(
               "createdAt",
               "updatedAt"
             ) VALUES (
-              gen_random_uuid(),
+              uuid_generate_v4(),
               ${id}::uuid,
               ${stageId},
               0,
@@ -227,7 +227,7 @@ export default async function handler(
                   "createdAt",
                   "updatedAt"
                 ) VALUES (
-                  gen_random_uuid(),
+                  uuid_generate_v4(),
                   ${id},
                   ${stage.stageId},
                   ${stage.order || 0},

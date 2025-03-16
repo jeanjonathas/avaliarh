@@ -304,7 +304,7 @@ export default async function handler(
             // Criar uma etapa padrão
             console.log('Criando nova etapa padrão');
             // Gerar um UUID manualmente para a etapa
-            const uuid = await prisma.$queryRaw`SELECT gen_random_uuid() as uuid`;
+            const uuid = await prisma.$queryRaw`SELECT uuid_generate_v4() as uuid`;
             const newUuid = Array.isArray(uuid) && uuid.length > 0 ? uuid[0].uuid : null;
             
             if (!newUuid) {
@@ -389,7 +389,7 @@ export default async function handler(
         const newQuestionId = await prisma.$queryRaw`
           INSERT INTO "Question" (id, text, "stageId", "categoryId", "createdAt", "updatedAt")
           VALUES (
-            gen_random_uuid(), 
+            uuid_generate_v4(), 
             ${text}, 
             ${finalStageId}, 
             ${finalCategoryId}, 
@@ -414,7 +414,7 @@ export default async function handler(
           const newOptionId = await prisma.$queryRaw`
             INSERT INTO "Option" (id, text, "isCorrect", "questionId", "createdAt", "updatedAt")
             VALUES (
-              gen_random_uuid(), 
+              uuid_generate_v4(), 
               ${option.text}, 
               ${option.isCorrect}, 
               ${questionId}, 

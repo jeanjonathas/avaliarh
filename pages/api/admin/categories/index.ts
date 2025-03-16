@@ -21,7 +21,7 @@ export default async function handler(
       try {
         await prisma.$executeRaw`
           CREATE TABLE IF NOT EXISTS "Category" (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
             name TEXT NOT NULL,
             description TEXT,
             "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -131,7 +131,7 @@ export default async function handler(
         // Verificar se a tabela Category existe
         await prisma.$executeRaw`
           CREATE TABLE IF NOT EXISTS "Category" (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
             name TEXT NOT NULL,
             description TEXT,
             "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -148,7 +148,7 @@ export default async function handler(
             "createdAt",
             "updatedAt"
           ) VALUES (
-            gen_random_uuid(),
+            uuid_generate_v4(),
             ${name},
             ${description || null},
             CURRENT_TIMESTAMP,
