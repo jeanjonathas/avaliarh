@@ -15,19 +15,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     // GET - Listar todas as categorias globais
     if (req.method === 'GET') {
-      // Buscar categorias com contagem de questões
+      // Buscar categorias globais com contagem de questões
       const categories = await prisma.$queryRaw`
         SELECT 
-          c.id, 
-          c.name, 
-          c.description, 
-          c."createdAt", 
-          c."updatedAt",
-          COUNT(DISTINCT qc."A") as "questionsCount"
-        FROM "Category" c
-        LEFT JOIN "_CategoryToQuestion" qc ON c.id = qc."B"
-        GROUP BY c.id
-        ORDER BY c.name ASC
+          gc.id, 
+          gc.name, 
+          gc.description, 
+          gc."createdAt", 
+          gc."updatedAt",
+          COUNT(DISTINCT gcq."A") as "questionsCount"
+        FROM "GlobalCategory" gc
+        LEFT JOIN "_GlobalCategoryToGlobalQuestion" gcq ON gc.id = gcq."B"
+        GROUP BY gc.id
+        ORDER BY gc.name ASC
       `;
 
       return res.status(200).json(categories);
@@ -41,20 +41,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ message: 'Nome da categoria é obrigatório' });
       }
 
-      const newCategory = await prisma.category.create({
-        data: {
-          name,
-          description: description || null,
-        },
-      });
+      // Criar nova categoria global
+      await prisma.$executeRaw`
+        INSERT INTO "GlobalCategory" (id, name, description, "createdAt", "updatedAt")
+        VALUES (gen_random_uuid(), ${name}, ${description || null}, NOW(), NOW())
+      `;
+      
+      // Buscar a categoria recém-criada
+      const newCategory = await prisma.$queryRaw`
+        SELECT * FROM "GlobalCategory" 
+        WHERE name = ${name}
+        ORDER BY "createdAt" DESC
+        LIMIT 1
+      `;
 
-      return res.status(201).json(newCategory);
+      return res.status(201).json(Array.isArray(newCategory) ? newCategory[0] : newCategory);
     }
 
     // Método não permitido
     return res.status(405).json({ message: 'Método não permitido' });
   } catch (error) {
-    console.error('Erro na API de categorias:', error);
+    console.error('Erro na API de categorias globais:', error);
     return res.status(500).json({ message: 'Erro interno do servidor' });
   } finally {
     await prisma.$disconnect();
