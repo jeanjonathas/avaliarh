@@ -8,163 +8,372 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
-  password  String
-  role      Role     @default(ADMIN)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// =======================================================
+// Enums
+// =======================================================
+
+enum Role {
+  SUPER_ADMIN     // Dono do sistema com acesso total
+  COMPANY_ADMIN   // Administrador de uma empresa
+  INSTRUCTOR      // Criador/gerenciador de conteúdos
+  STUDENT         // Usuário convertido de candidato
+  USER            // Usuário básico
 }
 
-model Admin {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
-  password  String
-  company   String?
-  position  String?
-  phone     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+enum Status {
+  PENDING         // Aguardando ação
+  APPROVED        // Aprovado oficialmente
+  REJECTED        // Rejeitado definitivamente
+}
+
+enum ProcessStageStatus {
+  PENDING         // Etapa não iniciada
+  IN_PROGRESS     // Etapa em andamento
+  COMPLETED       // Etapa finalizada
+}
+
+enum ApprovalStatus {
+  PENDING_EVALUATION  // Aguardando avaliação
+  APPROVED_FOR_HIRING // Aprovado para contratação
+  ON_HOLD             // Em espera/banco de talentos
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE     // Questão com resposta correta
+  OPINION_MULTIPLE    // Questão opinativa categorizada
+}
+
+enum DifficultyLevel {
+  EASY        // Questão simples
+  MEDIUM      // Questão moderada
+  HARD        // Questão complexa
+}
+
+enum TestType {
+  SELECTION    // Teste para processo seletivo
+  COURSE_PRE   // Teste diagnóstico pré-curso
+  COURSE_POST  // Teste final de curso
+}
+
+enum InviteStatus {
+  PENDING     // Convite não enviado
+  SENT        // Convite enviado
+  EXPIRED     // Convite expirado
+  COMPLETED   // Teste finalizado
+  CANCELED    // Convite revogado
+}
+
+// =======================================================
+// Models
+// =======================================================
+
+model Company {
+  id              String        @id @default(uuid())
+  name            String        // Nome da empresa
+  cnpj            String?       @unique // CNPJ único
+  plan            String        // Tipo de plano (Free, Pro, Enterprise)
+  isActive        Boolean       @default(true) // Conta ativa
+  maxUsers        Int           @default(10) // Limite de usuários
+  maxCandidates   Int           @default(100) // Limite de candidatos
+  lastPaymentDate DateTime?     // Data do último pagamento
+  trialEndDate    DateTime?     // Fim do período de teste
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relacionamentos
+  users           User[]
+  tests           Test[]
+  candidates      Candidate[]
+  processes       SelectionProcess[]
+  globalAccess    GlobalAccess[]
+  questions       Question[]
+  responses       Response[]
+  testInvitations TestInvitation[]
+  usedInviteCodes UsedInviteCode[]
+  students        Student[]
+  candidateProgress CandidateProgress[]
+}
+
+model User {
+  id              String        @id @default(uuid())
+  name            String        // Nome completo
+  email           String        @unique // E-mail único
+  password        String        // Senha criptografada
+  role            Role          @default(USER)
+  companyId       String?       // Empresa vinculada
+  company         Company?      @relation(fields: [companyId], references: [id])
+  studentProfile  Student?      // Perfil de aluno se convertido
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  candidateProgress CandidateProgress[]
 }
 
 model Candidate {
-  id             String          @id @default(uuid())
-  name           String
-  email          String
-  phone          String?
-  position       String?
-  testDate       DateTime        @default(now())
-  completed      Boolean         @default(false)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  infoJobsLink   String?
-  interviewDate  DateTime?
-  observations   String?
-  rating         Float?
-  resumeFile     String?
-  socialMediaUrl String?
-  status         Status          @default(PENDING)
-  inviteCode     String?         @unique
-  inviteSent     Boolean         @default(false)
-  inviteAttempts Int             @default(0)
-  inviteExpires  DateTime?
-  instagram      String?
-  resumeUrl      String?
-  testId         String?
-  timeSpent      Int?            @default(0)
-  photoUrl       String?         // Campo para armazenar a URL da foto do candidato
-  score          Int?            @default(0) // Campo para armazenar a pontuação do candidato
-  requestPhoto   Boolean         @default(true) // Controla se deve solicitar foto do candidato
-  showResults    Boolean         @default(true) // Controla se deve mostrar resultados ao final
-  test           tests?          @relation(fields: [testId], references: [id])
-  candidateTests CandidateTest[]
-  responses      Response[]
+  id              String        @id @default(uuid())
+  // Dados Pessoais
+  name            String        
+  email           String        
+  phone           String?       
+  position        String?       // Cargo pretendido
+  photoUrl        String?       // URL da foto do perfil
+  instagram       String?       // Perfil do Instagram
+  socialMediaUrl  String?       // Outras redes sociais
+  
+  // Configurações do Teste
+  requestPhoto    Boolean       @default(true) // Solicitar foto
+  showResults     Boolean       @default(true) // Mostrar resultados após teste
+  
+  // Processo Seletivo
+  testDate        DateTime?     // Data agendada para teste
+  completed       Boolean       @default(false)
+  score           Int?          @default(0) // Pontuação final
+  timeSpent       Int?          @default(0) // Tempo total gasto (segundos)
+  
+  // Convites
+  inviteCode      String?       @unique // Código único do convite
+  inviteSent      Boolean       @default(false)
+  inviteAttempts  Int           @default(0) // Tentativas de acesso
+  inviteExpires   DateTime?     // Validade do convite
+  
+  // Documentos
+  resumeUrl       String?       // URL do currículo
+  resumeFile      String?       // Arquivo físico do currículo
+  infoJobsLink    String?       // Link de plataforma externa
+  
+  // Avaliação
+  rating          Float?        // Nota geral (0-10)
+  observations    String?       // Anotações do recrutador
+  interviewDate   DateTime?     // Data da entrevista
+  
+  // Status
+  status          Status        @default(PENDING)
+  overallStatus   ApprovalStatus @default(PENDING_EVALUATION)
+  
+  // Relacionamentos
+  company         Company       @relation(fields: [companyId], references: [id])
+  companyId       String        
+  test            Test?         @relation(fields: [testId], references: [id])
+  testId          String?       
+  process         SelectionProcess? @relation(fields: [processId], references: [id])
+  processId       String?       
+  responses       Response[]    
+  testInvites     TestInvitation[]
+  inviteHistory   UsedInviteCode[]
+  convertedTo     Student?      // Registro de conversão para aluno
+  progresses      CandidateProgress[] 
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
-model Question {
-  id             String          @id @default(uuid())
-  text           String
-  stageId        String
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  categoryId     String?
-  options        Option[]
-  Category       Category?       @relation(fields: [categoryId], references: [id])
-  Stage          Stage           @relation(fields: [stageId], references: [id], onDelete: Cascade)
-  // Removendo a relação direta com Response para permitir exclusão de perguntas
-  // responses      Response[]
-  stageQuestions StageQuestion[]
-  testQuestions  TestQuestion[]
+model SelectionProcess {
+  id              String        @id @default(uuid())
+  name            String        // Nome do processo (ex: "Desenvolvedor Front-end 2024")
+  description     String?       // Descrição detalhada
+  cutoffScore     Int?          // Nota mínima para aprovação
+  expectedProfile Json?         // Perfil esperado (JSON)
+  evaluationType  String        @default("SCORE_BASED") // Tipo de avaliação
+  
+  // Relacionamentos
+  company         Company       @relation(fields: [companyId], references: [id])
+  companyId       String        
+  stages          ProcessStage[] // Etapas do processo
+  candidates      Candidate[]   // Candidatos participantes
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
-model Option {
-  id         String     @id @default(uuid())
-  text       String
-  isCorrect  Boolean    @default(false)
-  questionId String
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
-  question   Question   @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  // Removendo a relação direta com Response para permitir exclusão de opções
-  // responses  Response[]
+model ProcessStage {
+  id              String        @id @default(uuid())
+  name            String        // Nome da etapa (ex: "Entrevista Técnica")
+  description     String?       // Instruções detalhadas
+  order           Int           // Ordem de execução (1,2,3...)
+  type            String        @default("TEST") // Tipo de etapa
+  duration        Int?          // Duração estimada (minutos)
+  requestPhoto    Boolean       @default(false) // Exigir foto nesta etapa
+  
+  // Relacionamentos
+  process         SelectionProcess @relation(fields: [processId], references: [id])
+  processId       String        
+  progresses      CandidateProgress[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([order])
 }
 
-model Response {
-  id                 String    @id @default(uuid())
-  candidateId        String
-  questionId         String
-  optionId           String
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  questionText       String
-  optionText         String
-  isCorrectOption    Boolean
-  allOptionsSnapshot Json?
-  questionSnapshot   Json?
-  categoryName       String?
-  stageName          String?
-  stageId            String?
-  timeSpent          Int?      @default(0) // Tempo gasto em segundos para responder esta questão
-  candidate          Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-  // Removendo a relação direta com Option para permitir exclusão de opções
-  // option             Option    @relation(fields: [optionId], references: [id])
-  // Removendo a relação direta com Question para permitir exclusão de perguntas
-  // question           Question  @relation(fields: [questionId], references: [id])
-
-  @@unique([candidateId, questionId])
+model CandidateProgress {
+  id              String        @id @default(uuid())
+  // Resultados
+  testScore       Int?          // Pontuação obtida
+  interviewScore  Int?          // Nota da entrevista (0-10)
+  interviewNotes  String?       // Observações da entrevista
+  
+  // Status
+  status          ProcessStageStatus @default(PENDING)
+  finalDecision   ApprovalStatus @default(PENDING_EVALUATION)
+  
+  // Relacionamentos
+  candidate       Candidate     @relation(fields: [candidateId], references: [id])
+  candidateId     String        
+  stage           ProcessStage  @relation(fields: [stageId], references: [id])
+  stageId         String        
+  interviewer     User?         @relation(fields: [interviewerId], references: [id])
+  interviewerId   String?       
+  company         Company       @relation(fields: [companyId], references: [id])
+  companyId       String        
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
-model UsedInviteCode {
-  id        String   @id @default(uuid())
-  code      String   @unique
-  usedAt    DateTime @default(now())
-  expiresAt DateTime
+model Test {
+  id              String        @id @default(uuid())
+  title           String        // Título do teste
+  description     String?       // Descrição/instruções
+  timeLimit       Int?          // Limite de tempo em minutos
+  cutoffScore     Int?          // Nota mínima para aprovação
+  expectedProfile Json?         // Perfil esperado (JSON)
+  active          Boolean       @default(true) // Teste ativo/inativo
+  showResults     Boolean       @default(true) // Exibir resultados aos candidatos
+  
+  // Relacionamentos
+  company         Company       @relation(fields: [companyId], references: [id])
+  companyId       String        
+  stages          Stage[]       // Etapas do teste
+  candidates      Candidate[]   
+  globalVersions  GlobalAccess[] // Versões globais vinculadas
+  testInvitations TestInvitation[]
+  usedInviteCodes UsedInviteCode[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
 model Stage {
-  id             String          @id
-  title          String
-  description    String?
-  order          Int
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime
-  testId         String?
-  Question       Question[]
-  test           tests?          @relation(fields: [testId], references: [id])
-  stageQuestions StageQuestion[]
-  testQuestions  TestQuestion[]
-  TestStage      TestStage[]
+  id              String        @id @default(uuid())
+  title           String        // Título da etapa
+  description     String?       // Descrição detalhada
+  order           Int           // Ordem no teste
+  requestPhoto    Boolean       @default(false) // Solicitar foto
+  
+  // Relacionamentos
+  test            Test?         @relation(fields: [testId], references: [id])
+  testId          String?       
+  questions       Question[]    
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
-model TestStage {
-  id        String   @id @default(uuid())
-  testId    String
-  stageId   String
-  order     Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  stage     Stage    @relation(fields: [stageId], references: [id], onDelete: Cascade)
-  test      tests    @relation(fields: [testId], references: [id], onDelete: Cascade)
-
-  @@unique([testId, stageId])
+model Question {
+  id              String        @id @default(uuid())
+  text            String        // Enunciado da questão
+  type            QuestionType  @default(MULTIPLE_CHOICE)
+  difficulty      DifficultyLevel @default(MEDIUM)
+  showResults     Boolean       @default(true) // Mostrar resultado ao candidato
+  
+  // Relacionamentos
+  stage           Stage         @relation(fields: [stageId], references: [id])
+  stageId         String        
+  options         Option[]      
+  categories      Category[]    
+  globalQuestion  GlobalQuestion? @relation(fields: [globalQuestionId], references: [id])
+  globalQuestionId String?      
+  company         Company?      @relation(fields: [companyId], references: [id])
+  companyId       String?       
+  responses       Response[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
-model tests {
-  id             String          @id @default(uuid())
-  title          String
-  description    String?
-  timeLimit      Int?
-  active         Boolean         @default(true)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  candidates     Candidate[]
-  candidateTests CandidateTest[]
-  stages         Stage[]
-  testQuestions  TestQuestion[]
-  TestStage      TestStage[]
+model Option {
+  id              String        @id @default(uuid())
+  text            String        // Texto da opção
+  isCorrect       Boolean       @default(false) // Resposta correta
+  weight          Int?          @default(0) // Peso para questões opinativas
+  
+  // Relacionamentos
+  question        Question      @relation(fields: [questionId], references: [id])
+  questionId      String        
+  category        Category?     @relation(fields: [categoryId], references: [id])
+  categoryId      String?       
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model Response {
+  id              String        @id @default(uuid())
+  // Dados congelados
+  questionText    String        // Enunciado no momento da resposta
+  optionText      String        // Opção selecionada
+  isCorrect       Boolean       // Se a resposta está correta
+  allOptions      Json?         // Snapshopt das opções disponíveis
+  
+  // Métricas
+  timeSpent       Int           @default(0) // Tempo gasto (segundos)
+  
+  // Relacionamentos
+  candidate       Candidate     @relation(fields: [candidateId], references: [id])
+  candidateId     String        
+  question        Question      @relation(fields: [questionId], references: [id])
+  questionId      String        
+  company         Company       @relation(fields: [companyId], references: [id])
+  companyId       String        
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([candidateId, questionId]) // Garante uma resposta por questão
+}
+
+model TestInvitation {
+  id              String        @id @default(uuid())
+  code            String        @unique // Código único
+  expiresAt       DateTime      // Data de expiração
+  sentAt          DateTime?     // Data de envio
+  attempts        Int           @default(0) // Tentativas de uso
+  status          InviteStatus  @default(PENDING)
+  
+  // Relacionamentos
+  test            Test          @relation(fields: [testId], references: [id])
+  testId          String        
+  candidate       Candidate     @relation(fields: [candidateId], references: [id])
+  candidateId     String        
+  company         Company       @relation(fields: [companyId], references: [id])
+  companyId       String        
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([candidateId, testId]) // Um convite por teste/candidato
+  @@index([code])
+}
+
+model UsedInviteCode {
+  id              String        @id @default(uuid())
+  code            String        @unique // Código utilizado
+  usedAt          DateTime      // Data/hora do uso
+  
+  // Relacionamentos
+  test            Test          @relation(fields: [testId], references: [id])
+  testId          String        
+  candidate       Candidate     @relation(fields: [candidateId], references: [id])
+  candidateId     String        
+  company         Company       @relation(fields: [companyId], references: [id])
+  companyId       String        
+  createdAt       DateTime      @default(now())
+}
+
+model Student {
+  id              String        @id @default(uuid())
+  // Dados Acadêmicos
+  enrollmentDate  DateTime      @default(now()) // Data de matrícula
+  progress        Float         @default(0) // Progresso geral
+  
+  // Relacionamentos
+  user            User          @relation(fields: [userId], references: [id])
+  userId          String        @unique
+  convertedFrom   Candidate?    @relation(fields: [convertedFromId], references: [id])
+  convertedFromId String?       @unique
+  company         Company       @relation(fields: [companyId], references: [id])
+  companyId       String        
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
 model Category {
@@ -174,67 +383,43 @@ model Category {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   questions   Question[]
+  options     Option[]
 }
 
-model StageQuestion {
-  id         String   @id @default(uuid())
-  stageId    String
-  questionId String
-  order      Int      @default(0)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  stage      Stage    @relation(fields: [stageId], references: [id], onDelete: Cascade)
-
-  @@unique([stageId, questionId])
-  @@index([stageId])
-  @@index([questionId])
+model GlobalTest {
+  id              String        @id @default(uuid())
+  title           String        // Título padrão
+  description     String?       // Descrição genérica
+  isActive        Boolean       @default(true) // Disponível para empresas
+  
+  // Relacionamentos
+  questions       GlobalQuestion[] 
+  companies       GlobalAccess[] // Empresas com acesso
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
-model TestQuestion {
-  id         String   @id @default(uuid())
-  testId     String
-  questionId String
-  stageId    String
-  order      Int      @default(0)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  question   Question @relation(fields: [questionId], references: [id])
-  stage      Stage    @relation(fields: [stageId], references: [id], onDelete: Cascade)
-  test       tests    @relation(fields: [testId], references: [id], onDelete: Cascade)
-
-  @@unique([testId, stageId, questionId])
-  @@index([testId])
-  @@index([questionId])
-  @@index([stageId])
+model GlobalQuestion {
+  id              String        @id @default(uuid())
+  text            String        // Enunciado padrão
+  type            QuestionType  @default(MULTIPLE_CHOICE)
+  difficulty      DifficultyLevel @default(MEDIUM)
+  
+  // Relacionamentos
+  tests           GlobalTest[]  
+  questions       Question[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
-model CandidateTest {
-  id             String    @id @default(uuid())
-  candidateId    String
-  testId         String
-  inviteCode     String    @unique
-  inviteExpires  DateTime?
-  inviteSent     Boolean   @default(false)
-  inviteAttempts Int       @default(0)
-  completed      Boolean   @default(false)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  candidate      Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-  test           tests     @relation(fields: [testId], references: [id], onDelete: Cascade)
-
-  @@unique([candidateId, testId])
-  @@index([candidateId])
-  @@index([testId])
-}
-
-enum Role {
-  ADMIN
-  USER
-}
-
-enum Status {
-  PENDING
-  APPROVED
-  REJECTED
+model GlobalAccess {
+  id              String        @id @default(uuid())
+  // Relacionamentos
+  company         Company       @relation(fields: [companyId], references: [id])
+  companyId       String        
+  globalTest      GlobalTest?   @relation(fields: [globalTestId], references: [id])
+  globalTestId    String?       
+  test            Test?         @relation(fields: [testId], references: [id])
+  testId          String?
+  createdAt       DateTime      @default(now())
 }
