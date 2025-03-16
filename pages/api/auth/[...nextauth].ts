@@ -1,8 +1,76 @@
 import NextAuth, { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Role } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
+// Interface para a empresa
+interface CompanyData {
+  id: string
+  name: string
+  plan: string
+  isActive: boolean
+}
+
+// Interface para o usuário com base no modelo Prisma
+interface PrismaUser {
+  id: string
+  name: string
+  email: string
+  password: string
+  role: Role
+  companyId: string | null
+  createdAt: Date
+  updatedAt: Date
+}
+
+// Interface para a empresa com base no modelo Prisma
+interface PrismaCompany {
+  id: string
+  name: string
+  plan: string
+  isActive: boolean
+  cnpj: string | null
+  maxUsers: number
+  maxCandidates: number
+  lastPaymentDate: Date | null
+  trialEndDate: Date | null
+  createdAt: Date
+  updatedAt: Date
+}
+
+// Estendendo os tipos do NextAuth para incluir nossos campos personalizados
+declare module "next-auth" {
+  interface User {
+    id: string
+    name: string
+    email: string
+    role: Role
+    companyId?: string | null
+    company?: CompanyData | null
+  }
+
+  interface Session {
+    user: {
+      id: string
+      name: string
+      email: string
+      role: Role
+      companyId?: string | null
+      company?: CompanyData | null
+    }
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    id: string
+    role: Role
+    companyId?: string | null
+    company?: CompanyData | null
+  }
+}
+
+// Inicializando o cliente Prisma
 const prisma = new PrismaClient()
 
 export const authOptions: NextAuthOptions = {
@@ -19,39 +87,12 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          // Primeiro, tenta autenticar usando o novo modelo Admin
-          const admin = await prisma.admin.findUnique({
-            where: {
-              email: credentials.email,
-            },
-          })
-
-          if (admin) {
-            const isPasswordValid = await bcrypt.compare(
-              credentials.password,
-              admin.password
-            )
-
-            if (isPasswordValid) {
-              return {
-                id: admin.id,
-                name: admin.name,
-                email: admin.email,
-                role: 'ADMIN',
-                company: admin.company,
-                position: admin.position,
-                phone: admin.phone,
-                isNewModel: true, // Indica que está usando o novo modelo
-              }
-            }
-          }
-
-          // Se não encontrar no modelo Admin, tenta o modelo User legado
+          // Primeiro, busca o usuário pelo email
           const user = await prisma.user.findUnique({
             where: {
               email: credentials.email,
             },
-          })
+          }) as PrismaUser | null
 
           if (!user) {
             return null
@@ -66,13 +107,43 @@ export const authOptions: NextAuthOptions = {
             return null
           }
 
-          return {
+          // Se o usuário tiver uma empresa associada, busca os dados da empresa
+          let companyData: CompanyData | null = null
+          
+          if (user.companyId) {
+            try {
+              // Usando prisma.$queryRaw para evitar problemas de tipagem
+              const companyRecords = await prisma.$queryRaw`
+                SELECT id, name, plan, "isActive" 
+                FROM "Company" 
+                WHERE id = ${user.companyId}
+              ` as any[]
+              
+              if (companyRecords && companyRecords.length > 0) {
+                const companyRecord = companyRecords[0]
+                companyData = {
+                  id: companyRecord.id,
+                  name: companyRecord.name,
+                  plan: companyRecord.plan,
+                  isActive: companyRecord.isActive
+                }
+              }
+            } catch (error) {
+              console.error('Erro ao buscar empresa:', error)
+            }
+          }
+
+          // Construir o objeto de usuário para autenticação
+          const authUser = {
             id: user.id,
             name: user.name,
             email: user.email,
             role: user.role,
-            isNewModel: false, // Indica que está usando o modelo legado
+            companyId: user.companyId,
+            company: companyData
           }
+
+          return authUser
         } catch (error) {
           console.error('Erro na autenticação:', error)
           return null
@@ -85,29 +156,17 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id
         token.role = user.role
-        
-        // Adiciona os novos campos do modelo Admin ao token
-        if (user.isNewModel) {
-          token.company = user.company
-          token.position = user.position
-          token.phone = user.phone
-          token.isNewModel = true
-        }
+        token.companyId = user.companyId
+        token.company = user.company
       }
       return token
     },
     async session({ session, token }) {
       if (token) {
-        session.user.id = token.id as string
-        session.user.role = token.role as string
-        
-        // Adiciona os novos campos do modelo Admin à sessão
-        if (token.isNewModel) {
-          session.user.company = token.company as string
-          session.user.position = token.position as string
-          session.user.phone = token.phone as string
-          session.user.isNewModel = true
-        }
+        session.user.id = token.id
+        session.user.role = token.role
+        session.user.companyId = token.companyId
+        session.user.company = token.company
       }
       return session
     },
