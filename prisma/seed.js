@@ -97,12 +97,12 @@ function main() {
                     if (!(stageCount === 0)) return [3 /*break*/, 16];
                     const now = new Date();
                     stages = [
-                        { title: 'Raciocínio Lógico', description: 'Testes de padrões, sequências e dedução lógica', order: 1, updatedAt: now },
-                        { title: 'Matemática Básica e Resolução de Problemas', description: 'Cálculo mental, proporções e análise de dados', order: 2, updatedAt: now },
-                        { title: 'Compreensão Verbal', description: 'Interpretação de texto, sinônimos, analogias', order: 3, updatedAt: now },
-                        { title: 'Aptidão Espacial', description: 'Questões envolvendo rotação mental e padrões visuais', order: 4, updatedAt: now },
-                        { title: 'Raciocínio Abstrato', description: 'Questões que exigem encontrar relações não óbvias', order: 5, updatedAt: now },
-                        { title: 'Tomada de Decisão e Solução de Problemas', description: 'Situações hipotéticas e a melhor resposta', order: 6, updatedAt: now },
+                        { id: 'stage-1', title: 'Raciocínio Lógico', description: 'Testes de padrões, sequências e dedução lógica', order: 1, updatedAt: now },
+                        { id: 'stage-2', title: 'Matemática Básica e Resolução de Problemas', description: 'Cálculo mental, proporções e análise de dados', order: 2, updatedAt: now },
+                        { id: 'stage-3', title: 'Compreensão Verbal', description: 'Interpretação de texto, sinônimos, analogias', order: 3, updatedAt: now },
+                        { id: 'stage-4', title: 'Aptidão Espacial', description: 'Questões envolvendo rotação mental e padrões visuais', order: 4, updatedAt: now },
+                        { id: 'stage-5', title: 'Raciocínio Abstrato', description: 'Questões que exigem encontrar relações não óbvias', order: 5, updatedAt: now },
+                        { id: 'stage-6', title: 'Tomada de Decisão e Solução de Problemas', description: 'Situações hipotéticas e a melhor resposta', order: 6, updatedAt: now },
                     ];
                     _i = 0, stages_1 = stages;
                     _a.label = 12;
