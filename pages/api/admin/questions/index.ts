@@ -1,3 +1,4 @@
+/// <reference types="next" />
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
@@ -392,10 +393,15 @@ export default async function handler(
           data: {
             text,
             stageId: finalStageId,
-            categoryId: finalCategoryId,
             type: (type || 'MULTIPLE_CHOICE') as any,
             difficulty: (difficulty || 'MEDIUM') as any,
             showResults: showResults !== undefined ? showResults : true,
+            ...(finalCategoryId ? {
+              // Se tiver categoria, conectar usando o campo categories
+              categories: {
+                connect: [{ id: finalCategoryId }]
+              }
+            } : {})
           }
         });
 
@@ -420,10 +426,9 @@ export default async function handler(
         const questionWithRelations = await prisma.question.findUnique({
           where: { id: newQuestion.id },
           include: {
-            stage: true,
             options: true,
-            company: true,
-            categories: true,
+            stage: true,
+            categories: true
           }
         });
         
@@ -437,7 +442,7 @@ export default async function handler(
           id: questionWithRelations.id.toString(),
           text: questionWithRelations.text,
           stageId: questionWithRelations.stageId,
-          categoryId: questionWithRelations.categoryId,
+          categoryId: questionWithRelations.categories.length > 0 ? questionWithRelations.categories[0].id : null,
           createdAt: new Date(questionWithRelations.createdAt).toISOString(),
           updatedAt: new Date(questionWithRelations.updatedAt).toISOString(),
           options: Array.isArray(questionWithRelations.options) ? questionWithRelations.options.map((option: any) => ({
@@ -453,10 +458,10 @@ export default async function handler(
             description: questionWithRelations.stage.description || '',
             order: questionWithRelations.stage.order,
           },
-          category: questionWithRelations.categoryId && questionWithRelations.categories.length > 0 ? {
-            id: questionWithRelations.categoryId,
-            name: questionWithRelations.categories[0]?.name || '',
-            description: questionWithRelations.categories[0]?.description || '',
+          category: questionWithRelations.categories.length > 0 ? {
+            id: questionWithRelations.categories[0].id,
+            name: questionWithRelations.categories[0].name || '',
+            description: questionWithRelations.categories[0].description || '',
           } : null,
         };
 
