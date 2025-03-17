@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { Formik, Form, Field, ErrorMessage } from 'formik'
 import * as Yup from 'yup'
-import Navbar from '../../components/admin/Navbar'
+import AdminLayout from '../../components/admin/AdminLayout'
 import { useNotificationSystem } from '../../hooks/useNotificationSystem';
 
 interface Category {
@@ -148,10 +148,10 @@ const Categories: NextPage = () => {
   
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-primary-50">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-secondary-700">Carregando...</p>
+          <p className="mt-4 text-gray-600">Carregando...</p>
         </div>
       </div>
     )
@@ -162,9 +162,7 @@ const Categories: NextPage = () => {
   }
   
   return (
-    <div className="min-h-screen bg-secondary-50">
-      <Navbar />
-
+    <AdminLayout>
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-secondary-800">Gerenciar Categorias de Perguntas</h1>
@@ -181,7 +179,7 @@ const Categories: NextPage = () => {
             {successMessage}
           </div>
         )}
-
+        
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-1">
             <div className="bg-white shadow-md rounded-lg p-6">
@@ -322,7 +320,7 @@ const Categories: NextPage = () => {
           </div>
         </div>
       </div>
-    </div>
+    </AdminLayout>
   )
 }
 

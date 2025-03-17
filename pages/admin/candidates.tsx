@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { Rating } from '@mui/material'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import Navbar from '../../components/admin/Navbar'
+import AdminLayout from '../../components/admin/AdminLayout'
 
 interface Candidate {
   id: string
@@ -511,211 +511,207 @@ const CandidatesPage: NextPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
+    <AdminLayout>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Gerenciar Candidatos</h1>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="btn-primary"
+          >
+            Adicionar Candidato
+          </button>
+        </div>
 
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-4 sm:px-0">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">Gerenciar Candidatos</h1>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="btn-primary"
-            >
-              Adicionar Candidato
-            </button>
+        {error && !isSuccessModalOpen && (
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+            {error}
           </div>
+        )}
 
-          {error && !isSuccessModalOpen && (
-            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
-              {error}
-            </div>
-          )}
-
-          {/* Filtros */}
-          <div className="bg-white rounded-lg shadow mb-6">
-            <div className="p-4">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">Filtros</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Buscar
-                  </label>
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Nome, email ou cargo"
-                    className="input-field"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Status
-                  </label>
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="select-field"
-                  >
-                    <option value="ALL">Todos</option>
-                    <option value="PENDING">Pendentes</option>
-                    <option value="APPROVED">Aprovados</option>
-                    <option value="REJECTED">Reprovados</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Avaliação
-                  </label>
-                  <select
-                    value={ratingFilter}
-                    onChange={(e) => setRatingFilter(e.target.value)}
-                    className="select-field"
-                  >
-                    <option value="ALL">Todas</option>
-                    <option value="RATED">Avaliados</option>
-                    <option value="UNRATED">Não avaliados</option>
-                    <option value="HIGH">Alta (4-5 estrelas)</option>
-                    <option value="MEDIUM">Média (2.5-3.5 estrelas)</option>
-                    <option value="LOW">Baixa (0.5-2 estrelas)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Pontuação
-                  </label>
-                  <select
-                    value={scoreFilter}
-                    onChange={(e) => setScoreFilter(e.target.value)}
-                    className="select-field"
-                  >
-                    <option value="ALL">Todas</option>
-                    <option value="HIGH">Alta (≥80%)</option>
-                    <option value="MEDIUM">Média (60-79%)</option>
-                    <option value="LOW">Baixa (≤59%)</option>
-                  </select>
-                </div>
+        {/* Filtros */}
+        <div className="bg-white rounded-lg shadow mb-6">
+          <div className="p-4">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Filtros</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Buscar
+                </label>
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Nome, email ou cargo"
+                  className="input-field"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status
+                </label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="select-field"
+                >
+                  <option value="ALL">Todos</option>
+                  <option value="PENDING">Pendentes</option>
+                  <option value="APPROVED">Aprovados</option>
+                  <option value="REJECTED">Reprovados</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Avaliação
+                </label>
+                <select
+                  value={ratingFilter}
+                  onChange={(e) => setRatingFilter(e.target.value)}
+                  className="select-field"
+                >
+                  <option value="ALL">Todas</option>
+                  <option value="RATED">Avaliados</option>
+                  <option value="UNRATED">Não avaliados</option>
+                  <option value="HIGH">Alta (4-5 estrelas)</option>
+                  <option value="MEDIUM">Média (2.5-3.5 estrelas)</option>
+                  <option value="LOW">Baixa (0.5-2 estrelas)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Pontuação
+                </label>
+                <select
+                  value={scoreFilter}
+                  onChange={(e) => setScoreFilter(e.target.value)}
+                  className="select-field"
+                >
+                  <option value="ALL">Todas</option>
+                  <option value="HIGH">Alta (≥80%)</option>
+                  <option value="MEDIUM">Média (60-79%)</option>
+                  <option value="LOW">Baixa (≤59%)</option>
+                </select>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Lista de Candidatos */}
-          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Nome/Email
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Cargo
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Pontuação
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Avaliação
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Convite
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ações
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredCandidates.map((candidate) => (
-                    <tr key={candidate.id}>
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">{candidate.name}</div>
-                        <div className="text-sm text-gray-500">{candidate.email}</div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
-                        {candidate.position || '-'}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          candidate.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
-                          candidate.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
-                          'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {candidate.status === 'APPROVED' ? 'Aprovado' :
-                           candidate.status === 'REJECTED' ? 'Reprovado' : 'Pendente'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
-                        {candidate.score !== undefined ? 
-                          `${(candidate.score > 1 ? candidate.score : candidate.score * 100).toFixed(1)}%` 
-                          : '-'}
-                      </td>
-                      <td className="px-6 py-4">
-                        <Rating
-                          value={candidate.rating || 0}
-                          readOnly
-                          precision={0.5}
-                          size="small"
-                        />
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        {candidate.inviteCode ? (
-                          <div>
-                            <div className="font-medium text-gray-900">{candidate.inviteCode}</div>
-                            {candidate.inviteExpires && (
-                              <div className="text-xs text-gray-500">
-                                Expira: {format(new Date(candidate.inviteExpires), "dd/MM/yyyy", { locale: ptBR })}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => handleGenerateInvite(candidate.id)}
-                            className="px-2 py-1 bg-green-50 text-green-600 rounded-md hover:bg-green-100 transition-colors duration-200 text-xs font-medium flex items-center justify-center"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-                            </svg>
-                            Gerar Convite
-                          </button>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-right text-sm font-medium">
-                        <div className="flex flex-col space-y-1.5 items-end">
-                          <Link
-                            href={`/admin/candidate/${candidate.id}`}
-                            className="px-2 py-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors duration-200 text-xs font-medium flex items-center w-24 justify-center"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                              <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                            </svg>
-                            Detalhes
-                          </Link>
-                          <button
-                            onClick={() => handleOpenDeleteModal(candidate)}
-                            className="px-2 py-1 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors duration-200 text-xs font-medium flex items-center w-24 justify-center"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                            </svg>
-                            Excluir
-                          </button>
+        {/* Lista de Candidatos */}
+        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Nome/Email
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Cargo
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Pontuação
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Avaliação
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Convite
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Ações
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredCandidates.map((candidate) => (
+                  <tr key={candidate.id}>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-medium text-gray-900">{candidate.name}</div>
+                      <div className="text-sm text-gray-500">{candidate.email}</div>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500">
+                      {candidate.position || '-'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        candidate.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
+                        candidate.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {candidate.status === 'APPROVED' ? 'Aprovado' :
+                         candidate.status === 'REJECTED' ? 'Reprovado' : 'Pendente'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500">
+                      {candidate.score !== undefined ? 
+                        `${(candidate.score > 1 ? candidate.score : candidate.score * 100).toFixed(1)}%` 
+                        : '-'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <Rating
+                        value={candidate.rating || 0}
+                        readOnly
+                        precision={0.5}
+                        size="small"
+                      />
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      {candidate.inviteCode ? (
+                        <div>
+                          <div className="font-medium text-gray-900">{candidate.inviteCode}</div>
+                          {candidate.inviteExpires && (
+                            <div className="text-xs text-gray-500">
+                              Expira: {format(new Date(candidate.inviteExpires), "dd/MM/yyyy", { locale: ptBR })}
+                            </div>
+                          )}
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      ) : (
+                        <button
+                          onClick={() => handleGenerateInvite(candidate.id)}
+                          className="px-2 py-1 bg-green-50 text-green-600 rounded-md hover:bg-green-100 transition-colors duration-200 text-xs font-medium flex items-center justify-center"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 01-1 1h-3a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                          </svg>
+                          Gerar Convite
+                        </button>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right text-sm font-medium">
+                      <div className="flex flex-col space-y-1.5 items-end">
+                        <Link
+                          href={`/admin/candidate/${candidate.id}`}
+                          className="px-2 py-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors duration-200 text-xs font-medium flex items-center w-24 justify-center"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                            <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                          </svg>
+                          Detalhes
+                        </Link>
+                        <button
+                          onClick={() => handleOpenDeleteModal(candidate)}
+                          className="px-2 py-1 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors duration-200 text-xs font-medium flex items-center w-24 justify-center"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                          Excluir
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
-      </main>
-
+      </div>
+      
       {/* Modal de confirmação de exclusão */}
       {showDeleteModal && candidateToDelete && (
         <div className="fixed z-10 inset-0 overflow-y-auto">
@@ -1150,7 +1146,7 @@ const CandidatesPage: NextPage = () => {
           </div>
         </div>
       )}
-    </div>
+    </AdminLayout>
   )
 }
 

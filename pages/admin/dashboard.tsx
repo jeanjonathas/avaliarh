@@ -20,7 +20,7 @@ import {
 } from 'chart.js'
 import { Bar, Pie, Line, Radar, Doughnut } from 'react-chartjs-2'
 import { Rating } from '@mui/material'
-import Navbar from '../../components/admin/Navbar'
+import AdminLayout from '../../components/admin/AdminLayout'
 
 // Registrar componentes do Chart.js
 ChartJS.register(
@@ -1771,11 +1771,7 @@ const Dashboard: NextPage = () => {
 
 // Renderização do componente principal
 return (
-  <div className="min-h-screen bg-secondary-50">
-    <header className="sticky top-0 z-50 bg-white shadow-sm">
-      <Navbar />
-    </header>
-    
+  <AdminLayout>
     <main className="container mx-auto px-4 py-8 relative z-10">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold text-secondary-900">Dashboard de Avaliação</h1>
@@ -2217,7 +2213,7 @@ return (
           />
         )}
       </main>
-    </div>
+    </AdminLayout>
   )
 }
 

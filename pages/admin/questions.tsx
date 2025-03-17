@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
-import Navbar from '../../components/admin/Navbar'
+import AdminLayout from '../../components/admin/AdminLayout'
 import QuestionForm from '../../components/admin/QuestionForm'
 import { Formik, Form, Field, ErrorMessage, FieldArray } from 'formik'
 import * as Yup from 'yup'
@@ -649,12 +649,13 @@ const Questions: NextPage = () => {
     setCurrentQuestion(null)
   }
 
+  // Componente de carregamento para evitar piscadas de tela
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-primary-50">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-secondary-700">Carregando...</p>
+          <p className="mt-4 text-gray-600">Carregando...</p>
         </div>
       </div>
     )
@@ -665,26 +666,23 @@ const Questions: NextPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-secondary-50">
-      <Navbar />
-
-      <main className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold text-secondary-900">Gerenciar Perguntas</h1>
+    <AdminLayout>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-secondary-800">Gerenciar Perguntas</h1>
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-6">
+          <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-md">
             {error}
           </div>
         )}
 
         {successMessage && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md mb-6">
+          <div className="mb-6 p-4 bg-green-100 border border-green-400 text-green-700 rounded-md">
             {successMessage}
           </div>
         )}
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Formulário de Pergunta */}
           <QuestionForm
@@ -903,7 +901,7 @@ const Questions: NextPage = () => {
             )}
           </div>
         </div>
-      </main>
+      </div>
 
       {/* Diálogo de confirmação para associar a pergunta ao teste */}
       <Dialog
@@ -997,7 +995,7 @@ const Questions: NextPage = () => {
           )}
         </DialogActions>
       </Dialog>
-    </div>
+    </AdminLayout>
   )
 }
 

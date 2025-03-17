@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { Formik, Form, Field, ErrorMessage } from 'formik'
 import * as Yup from 'yup'
-import Navbar from '../../components/admin/Navbar'
+import AdminLayout from '../../components/admin/AdminLayout'
 import { useNotificationSystem } from '../../hooks/useNotificationSystem';
 
 interface Test {
@@ -198,9 +198,7 @@ const Tests: NextPage = () => {
   }
   
   return (
-    <div className="min-h-screen bg-secondary-50">
-      <Navbar />
-
+    <AdminLayout>
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-secondary-800">Gerenciar Testes</h1>
@@ -438,7 +436,7 @@ const Tests: NextPage = () => {
           </div>
         </div>
       </div>
-    </div>
+    </AdminLayout>
   )
 }
 
