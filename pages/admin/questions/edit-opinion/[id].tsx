@@ -74,6 +74,8 @@ const EditOpinionQuestionPage = () => {
         options: data.options.map((option: any) => ({
           id: option.id,
           text: option.text,
+          category: option.categoryName,
+          categoryNameUuid: option.categoryNameUuid,
           weight: option.weight || 1,
           isCorrect: true
         })),
