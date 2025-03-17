@@ -18,228 +18,143 @@ export default async function handler(
     try {
       console.log('Iniciando busca de perguntas');
       let questions = [];
+      
       const { stageId, testId, categoryId, ids } = req.query;
       
       console.log('Parâmetros de busca:', { stageId, testId, categoryId, ids });
       
       try {
-        // Consulta simplificada sem o JOIN com Category
-        if (categoryId && categoryId !== 'all') {
-          console.log('Buscando perguntas por categoria:', categoryId);
-          questions = await prisma.$queryRaw`
-            SELECT 
-              q.id, 
-              q.text, 
-              q."stageId",
-              q."categoryId",
-              q."createdAt", 
-              q."updatedAt",
-              s.title as "stageTitle", 
-              s.description as "stageDescription",
-              s.order as "stageOrder",
-              c.name as "categoryName",
-              c.description as "categoryDescription",
-              'MEDIUM' as difficulty
-            FROM "Question" q
-            LEFT JOIN "Stage" s ON q."stageId" = s.id
-            LEFT JOIN "Category" c ON q."categoryId" = c.id
-            WHERE q."categoryId" = ${categoryId}
-            ORDER BY COALESCE(s.order, 0) ASC, q."createdAt" DESC
-          `;
-        } else if (stageId && stageId !== 'all' && testId && testId !== 'all') {
-          console.log('Buscando perguntas por teste e etapa:', { testId, stageId });
-          questions = await prisma.$queryRaw`
-            SELECT 
-              q.id, 
-              q.text, 
-              q."stageId",
-              q."categoryId",
-              q."createdAt", 
-              q."updatedAt",
-              s.title as "stageTitle", 
-              s.order as "stageOrder",
-              c.name as "categoryName",
-              c.description as "categoryDescription",
-              'MEDIUM' as difficulty
-            FROM "Question" q
-            LEFT JOIN "Stage" s ON q."stageId" = s.id
-            LEFT JOIN "TestStage" ts ON s.id = ts."stageId"
-            LEFT JOIN "Category" c ON q."categoryId" = c.id
-            WHERE q."stageId" = ${stageId} AND ts."testId" = ${testId}
-            ORDER BY COALESCE(s.order, 0) ASC, q."createdAt" DESC
-          `;
-        } else if (stageId && stageId !== 'all') {
-          console.log('Buscando perguntas por etapa:', stageId);
-          questions = await prisma.$queryRaw`
-            SELECT 
-              q.id, 
-              q.text, 
-              q."stageId",
-              q."categoryId",
-              s.title as "stageTitle", 
-              s.order as "stageOrder",
-              q."createdAt", 
-              q."updatedAt",
-              c.name as "categoryName",
-              c.description as "categoryDescription",
-              'MEDIUM' as difficulty
-            FROM "Question" q
-            LEFT JOIN "Stage" s ON q."stageId" = s.id
-            LEFT JOIN "Category" c ON q."categoryId" = c.id
-            WHERE q."stageId" = ${stageId}
-            ORDER BY COALESCE(s.order, 0) ASC, q."createdAt" DESC
-          `;
-        } else if (testId && testId !== 'all') {
-          console.log('Buscando perguntas por teste:', testId);
-          questions = await prisma.$queryRaw`
-            SELECT 
-              q.id,
-              q.text,
-              q."stageId",
-              q."categoryId",
-              q."createdAt",
-              q."updatedAt",
-              s.title as "stageTitle",
-              s.description as "stageDescription",
-              s.order as "stageOrder",
-              c.name as "categoryName",
-              c.description as "categoryDescription",
-              'MEDIUM' as difficulty
-            FROM "Question" q
-            LEFT JOIN "Stage" s ON q."stageId" = s.id
-            LEFT JOIN "TestStage" ts ON s.id = ts."stageId"
-            LEFT JOIN "Category" c ON q."categoryId" = c.id
-            WHERE ts."testId" = ${testId}
-            ORDER BY COALESCE(s.order, 0) ASC, q."createdAt" DESC
-          `;
-        } else if (ids) {
-          // Buscar perguntas por IDs específicos
-          console.log('Buscando perguntas por IDs específicos:', ids);
-          
-          // Converter string de IDs separados por vírgula em um array
-          const questionIds = typeof ids === 'string' ? ids.split(',') : Array.isArray(ids) ? ids : [];
-          
-          if (questionIds.length === 0) {
-            return res.status(400).json({ error: 'IDs de perguntas inválidos' });
-          }
-          
-          // Construir a consulta SQL com os IDs
-          const placeholders = questionIds.map((_, i) => `$${i + 1}`).join(', ');
-          
-          // Executar a consulta usando $queryRawUnsafe para passar os IDs como parâmetros
-          const query = `
-            SELECT 
-              q.id, 
-              q.text, 
-              q."stageId",
-              q."categoryId",
-              q."createdAt", 
-              q."updatedAt",
-              s.title as "stageTitle", 
-              s.description as "stageDescription",
-              s.order as "stageOrder",
-              c.name as "categoryName",
-              c.description as "categoryDescription",
-              'MEDIUM' as difficulty
-            FROM "Question" q
-            LEFT JOIN "Stage" s ON q."stageId" = s.id
-            LEFT JOIN "Category" c ON q."categoryId" = c.id
-            WHERE q.id IN (${placeholders})
-            ORDER BY COALESCE(s.order, 0) ASC, q."createdAt" DESC
-          `;
-          
-          questions = await prisma.$queryRawUnsafe(query, ...questionIds);
+        if (stageId) {
+          console.log(`Buscando perguntas para a etapa ${stageId}`);
+          // Buscar perguntas de uma etapa específica
+          questions = await prisma.question.findMany({
+            where: {
+              stageId: stageId
+            },
+            include: {
+              stage: true,
+              categories: true,
+              options: true
+            },
+            orderBy: [
+              { 
+                stage: {
+                  order: 'asc'
+                }
+              },
+              { createdAt: 'desc' }
+            ]
+          });
+        } else if (testId) {
+          console.log(`Buscando perguntas para o teste ${testId}`);
+          // Buscar perguntas de um teste específico
+          // Implementar lógica específica para testes quando necessário
+          questions = [];
+        } else if (categoryId) {
+          console.log(`Buscando perguntas para a categoria ${categoryId}`);
+          // Buscar perguntas de uma categoria específica
+          questions = await prisma.question.findMany({
+            where: {
+              categories: {
+                some: {
+                  id: categoryId
+                }
+              }
+            },
+            include: {
+              stage: true,
+              categories: true,
+              options: true
+            },
+            orderBy: [
+              { 
+                stage: {
+                  order: 'asc'
+                }
+              },
+              { createdAt: 'desc' }
+            ]
+          });
+        } else if (ids && ids.length > 0) {
+          console.log(`Buscando perguntas específicas: ${ids.join(', ')}`);
+          // Buscar perguntas específicas por IDs
+          questions = await prisma.question.findMany({
+            where: {
+              id: {
+                in: ids
+              }
+            },
+            include: {
+              stage: true,
+              categories: true,
+              options: true
+            },
+            orderBy: [
+              { 
+                stage: {
+                  order: 'asc'
+                }
+              },
+              { createdAt: 'desc' }
+            ]
+          });
         } else {
           console.log('Buscando todas as perguntas');
           // Obter todas as perguntas
-          questions = await prisma.$queryRaw`
-            SELECT 
-              q.id, 
-              q.text, 
-              q."stageId",
-              q."categoryId",
-              q."createdAt", 
-              q."updatedAt",
-              s.title as "stageTitle", 
-              s.description as "stageDescription",
-              s.order as "stageOrder",
-              c.name as "categoryName",
-              c.description as "categoryDescription",
-              'MEDIUM' as difficulty
-            FROM "Question" q
-            LEFT JOIN "Stage" s ON q."stageId" = s.id
-            LEFT JOIN "Category" c ON q."categoryId" = c.id
-            ORDER BY COALESCE(s.order, 0) ASC, q."createdAt" DESC
-          `;
+          questions = await prisma.question.findMany({
+            include: {
+              stage: true,
+              categories: true,
+              options: true
+            },
+            orderBy: [
+              { 
+                stage: {
+                  order: 'asc'
+                }
+              },
+              { createdAt: 'desc' }
+            ]
+          });
         }
-        console.log(`Encontradas ${Array.isArray(questions) ? questions.length : 0} perguntas`);
+        console.log(`Encontradas ${questions.length} perguntas`);
       } catch (error) {
-        console.error('Erro ao buscar perguntas (tabela pode não existir):', error);
-        // Se a tabela não existir, retornar array vazio
+        console.error('Erro ao buscar perguntas:', error);
+        // Se ocorrer um erro, retornar array vazio
         return res.status(200).json([]);
       }
 
       // Formatar os resultados
       console.log('Formatando resultados das perguntas');
-      const formattedQuestions = await Promise.all(
-        questions.map(async (question: any) => {
-          // Buscar opções para a pergunta
-          let options = [];
-          try {
-            options = await prisma.$queryRaw`
-              SELECT id, text, "isCorrect" FROM "Option" WHERE "questionId" = ${question.id}
-            `;
-            console.log(`Encontradas ${Array.isArray(options) ? options.length : 0} opções para a pergunta ${question.id}`);
-          } catch (error) {
-            console.error(`Erro ao buscar opções para a pergunta ${question.id}:`, error);
-            // Se houver erro, continuar com array vazio
-          }
-
-          // Buscar categoria da pergunta (se existir)
-          let categoryName = 'Sem categoria';
-          try {
-            // Verificar se a coluna categoryId existe na tabela Question
-            const checkColumn = await prisma.$queryRaw`
-              SELECT column_name 
-              FROM information_schema.columns 
-              WHERE table_name = 'Question' AND column_name = 'categoryId'
-            `;
-            
-            if (Array.isArray(checkColumn) && checkColumn.length > 0) {
-              const category = await prisma.$queryRaw`
-                SELECT 
-                  c.id,
-                  c.name,
-                  c.description,
-                  COUNT(q.id) as "questionCount"
-                FROM "Category" c
-                LEFT JOIN "Question" q ON q."categoryId" = c.id
-                WHERE c.id = ${question.categoryId}
-                GROUP BY c.id, c.name, c.description
-              `;
-              if (Array.isArray(category) && category.length > 0) {
-                categoryName = category[0].name;
-              }
-            }
-          } catch (error) {
-            console.error(`Erro ao buscar categoria para a pergunta ${question.id}:`, error);
-            // Se houver erro, continuar com o valor padrão
-          }
-
-          return {
-            ...question,
-            options: Array.isArray(options) ? options : [],
-            categoryName: categoryName,
-            stage: {
-              title: question.stageTitle || 'Sem etapa',
-              order: question.stageOrder || 0
-            },
-            createdAt: question.createdAt,
-            updatedAt: question.updatedAt
-          };
-        })
-      );
-
+      const formattedQuestions = questions.map((question: any) => {
+        return {
+          id: question.id,
+          text: question.text,
+          stageId: question.stageId,
+          categoryId: question.categories.length > 0 ? question.categories[0].id : null,
+          createdAt: new Date(question.createdAt).toISOString(),
+          updatedAt: new Date(question.updatedAt).toISOString(),
+          stage: {
+            id: question.stageId,
+            title: question.stage?.title || '',
+            description: question.stage?.description || '',
+            order: question.stage?.order || 0
+          },
+          category: question.categories.length > 0 ? {
+            id: question.categories[0].id,
+            name: question.categories[0].name || '',
+            description: question.categories[0].description || ''
+          } : null,
+          options: question.options.map((option: any) => ({
+            id: option.id,
+            text: option.text,
+            isCorrect: option.isCorrect
+          })),
+          difficulty: question.difficulty || 'MEDIUM',
+          type: question.type || 'MULTIPLE_CHOICE'
+        };
+      });
+      
       console.log(`Retornando ${formattedQuestions.length} perguntas formatadas`);
       return res.status(200).json(formattedQuestions);
     } catch (error) {
