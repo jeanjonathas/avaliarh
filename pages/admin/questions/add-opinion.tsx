@@ -27,6 +27,7 @@ const AddOpinionQuestionPage = () => {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Adicionar esta opção para enviar cookies de autenticação
         body: JSON.stringify(values),
       });
 

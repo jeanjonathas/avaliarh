@@ -25,6 +25,22 @@ interface OpinionGroup {
   }[];
 }
 
+interface CategoryField {
+  id: string;
+  name: string;
+  description?: string;
+  uuid: string;
+}
+
+interface OptionField {
+  id?: string;
+  text: string;
+  categoryNameUuid: string;
+  category: string;
+  weight: number;
+  position: number;
+}
+
 interface OpinionQuestionWizardProps {
   onSubmit: (data: any) => void;
   initialData?: any;
@@ -43,6 +59,10 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
   const [groupsLoaded, setGroupsLoaded] = useState(false); 
   const [systemCategories, setSystemCategories] = useState<SystemCategory[]>([]);
   const router = useRouter();
+
+  const [categoriesModified, setCategoriesModified] = useState(false);
+  const [originalCategories, setOriginalCategories] = useState<{[key: string]: string}>({});
+  const [originalCategoryCount, setOriginalCategoryCount] = useState(0);
 
   const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     defaultValues: initialData || {
@@ -73,7 +93,9 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
       if (!groupsLoaded) {
         setIsLoading(true);
         try {
-          const response = await fetch('/api/admin/opinion-groups');
+          const response = await fetch('/api/admin/opinion-groups', {
+            credentials: 'include'
+          });
           if (response.ok) {
             const data = await response.json();
             setOpinionGroups(data);
@@ -117,20 +139,55 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
   const handleSelectGroup = (groupId: string) => {
     const group = opinionGroups.find(g => g.id === groupId);
     if (group) {
+      console.log('Grupo selecionado:', group.name);
+      
+      // Limpar categorias e opções existentes
+      while (categoryFields.length > 0) {
+        removeCategory(0);
+      }
+      
+      while (optionFields.length > 0) {
+        removeOption(0);
+      }
+      
+      // Adicionar categorias do grupo
+      group.categories.forEach(category => {
+        appendCategory({
+          id: category.id,
+          name: category.name,
+          description: category.description || '',
+          uuid: category.uuid || generateUUID()
+        });
+      });
+      
+      // Adicionar opções para cada categoria
+      group.categories.forEach((category, index) => {
+        appendOption({
+          text: '',
+          categoryNameUuid: category.uuid || generateUUID(),
+          category: category.name,
+          weight: 1,
+          position: index
+        });
+      });
+      
+      // Salvar as categorias originais para posterior comparação
+      const origCats: {[key: string]: string} = {};
+      group.categories.forEach(category => {
+        if (category.uuid) {
+          origCats[category.uuid] = category.name;
+        }
+      });
+      setOriginalCategories(origCats);
+      
+      // Salvar a quantidade original de categorias
+      setOriginalCategoryCount(group.categories.length);
+      
+      // Resetar o flag de modificação
+      setCategoriesModified(false);
+      
+      // Definir o grupo selecionado após configurar os campos
       setSelectedGroup(group);
-      
-      // Preencher categorias do grupo selecionado
-      setValue('categories', group.categories);
-      
-      // Criar opções vazias para cada categoria
-      const newOptions = group.categories.map(category => ({
-        text: '',
-        categoryNameUuid: category.uuid || generateUUID(),
-        category: category.name,
-        weight: 5,
-        position: 0
-      }));
-      setValue('options', newOptions);
     }
   };
 
@@ -145,45 +202,11 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
   }, [initialData]);
 
   useEffect(() => {
-    if (!selectedGroup) return;
-    
-    console.log(`Aplicando grupo selecionado: ${selectedGroup.name}`);
-    
-    while (categoryFields.length > 0) {
-      removeCategory(0);
-    }
-
-    selectedGroup.categories.forEach(category => {
-      appendCategory({
-        id: category.id,
-        name: category.name,
-        description: category.description || '',
-        uuid: category.uuid || generateUUID()
-      });
-    });
-
-    const currentOptions = watch('options');
-    if (currentOptions.length === 0 || currentOptions.length !== selectedGroup.categories.length) {
-      while (optionFields.length > 0) {
-        removeOption(0);
-      }
-
-      selectedGroup.categories.forEach((category, index) => {
-        appendOption({
-          text: '',
-          categoryNameUuid: category.uuid || generateUUID(),
-          category: category.name,
-          weight: 1,
-          position: index
-        });
-      });
-    }
-  }, [selectedGroup]); 
-
-  useEffect(() => {
     const fetchSystemCategories = async () => {
       try {
-        const response = await fetch('/api/admin/categories');
+        const response = await fetch('/api/admin/categories', {
+          credentials: 'include'
+        });
         if (response.ok) {
           const data = await response.json();
           setSystemCategories(data);
@@ -204,6 +227,11 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
       uuid: categoryUuid
     });
     
+    // Se um grupo foi selecionado, marcar como modificado quando adicionar nova categoria
+    if (selectedGroup) {
+      setCategoriesModified(true);
+    }
+    
     appendOption({
       text: '',
       categoryNameUuid: categoryUuid,
@@ -219,16 +247,41 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
   };
 
   const handleNextStep = () => {
-    const categories = watch('categories');
-    const options = watch('options');
-    
-    options.forEach((option, index) => {
-      if (categories[index]) {
-        setValue(`options.${index}.categoryId`, categories[index].id || `temp-${index}`);
+    if (step === 1) {
+      // Se as categorias foram modificadas, resetar a seleção de grupo
+      if (categoriesModified) {
+        setSelectedGroup(null);
       }
-    });
-    
-    setStep(2);
+      
+      // Verificar se o número de opções corresponde ao número de categorias
+      const currentCategories = watch('categories');
+      const currentOptions = watch('options');
+      
+      // Se o número de opções não corresponder ao número de categorias, ajustar
+      if (currentOptions.length !== currentCategories.length) {
+        console.log(`Ajustando opções: de ${currentOptions.length} para ${currentCategories.length} opções`);
+        
+        // Limpar opções existentes
+        while (optionFields.length > 0) {
+          removeOption(0);
+        }
+        
+        // Adicionar uma opção para cada categoria
+        currentCategories.forEach((category, index) => {
+          appendOption({
+            text: '',
+            categoryNameUuid: category.uuid || generateUUID(),
+            category: category.name,
+            weight: 1,
+            position: index
+          });
+        });
+      }
+      
+      setStep(2);
+    } else if (step === 2) {
+      setStep(3);
+    }
   };
 
   const handlePrevStep = () => {
@@ -257,6 +310,33 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
     
     onSubmit(formData);
   };
+
+  // Função para verificar se uma categoria foi modificada
+  const handleCategoryChange = (index: number, field: string, value: string) => {
+    if (!selectedGroup) return;
+    
+    const category = watch(`categories.${index}`);
+    const categoryUuid = category.uuid;
+    
+    if (categoryUuid && originalCategories[categoryUuid]) {
+      // Comparar o valor original com o novo valor
+      if (field === 'name' && originalCategories[categoryUuid] !== value) {
+        console.log(`Categoria modificada: ${originalCategories[categoryUuid]} -> ${value}`);
+        setCategoriesModified(true);
+      }
+    }
+  };
+
+  // Verificar se a quantidade de categorias mudou
+  useEffect(() => {
+    if (selectedGroup && originalCategoryCount > 0) {
+      // Se a quantidade atual de categorias for diferente da original
+      if (categoryFields.length !== originalCategoryCount) {
+        console.log(`Quantidade de categorias modificada: de ${originalCategoryCount} para ${categoryFields.length}`);
+        setCategoriesModified(true);
+      }
+    }
+  }, [categoryFields.length, selectedGroup, originalCategoryCount]);
 
   return (
     <div className="w-full max-w-4xl mx-auto">
@@ -324,82 +404,128 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
               </div>
             </div>
 
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {categoryFields.map((field, index) => (
-                  <div key={field.id} className="p-3 border border-gray-200 rounded-lg">
-                    <div className="flex justify-between items-center mb-2">
-                      <h3 className="text-sm font-medium">CATEGORIA {index + 1}</h3>
-                      <button
-                        type="button"
-                        onClick={() => removeCategory(index)}
-                        className="text-red-500 hover:text-red-700 text-xs"
-                      >
-                        X
-                      </button>
+            {(selectedGroup || categoryFields.length > 0) && (
+              <div className="space-y-4">
+                <div className="border-t pt-4">
+                  <h3 className="text-lg font-medium mb-2">
+                    {selectedGroup ? 'Categorias do grupo selecionado' : 'Defina suas categorias'}
+                  </h3>
+                  
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {categoryFields.map((field, index) => (
+                        <div key={field.id} className="p-3 border border-gray-200 rounded-lg">
+                          <div className="flex justify-between items-center mb-2">
+                            <h3 className="text-sm font-medium">CATEGORIA {index + 1}</h3>
+                            {index > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  removeCategory(index);
+                                  // Se um grupo foi selecionado, marcar como modificado quando remover categoria
+                                  if (selectedGroup) {
+                                    setCategoriesModified(true);
+                                  }
+                                }}
+                                className="text-red-500 hover:text-red-700 text-xs"
+                              >
+                                X
+                              </button>
+                            )}
+                          </div>
+                          
+                          <div className="mb-2">
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Nome
+                            </label>
+                            <Controller
+                              name={`categories.${index}.name`}
+                              control={control}
+                              rules={{ required: "Nome da categoria é obrigatório" }}
+                              render={({ field }) => (
+                                <input 
+                                  {...field}
+                                  type="text" 
+                                  className="w-full p-1.5 text-sm border border-gray-300 rounded-md"
+                                  placeholder="Ex: Introvertido, Extrovertido..."
+                                  onChange={(e) => {
+                                    field.onChange(e);
+                                    handleCategoryChange(index, 'name', e.target.value);
+                                  }}
+                                />
+                              )}
+                            />
+                            {errors.categories?.[index]?.name && (
+                              <p className="text-red-500 text-xs mt-0.5">{errors.categories[index].name.message}</p>
+                            )}
+                          </div>
+                          
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Descrição
+                            </label>
+                            <Controller
+                              name={`categories.${index}.description`}
+                              control={control}
+                              render={({ field }) => (
+                                <textarea 
+                                  {...field}
+                                  rows={2}
+                                  className="w-full p-1.5 text-sm border border-gray-300 rounded-md"
+                                  placeholder="Descrição breve da categoria..."
+                                  onChange={(e) => {
+                                    field.onChange(e);
+                                    handleCategoryChange(index, 'description', e.target.value);
+                                  }}
+                                />
+                              )}
+                            />
+                          </div>
+                        </div>
+                      ))}
                     </div>
                     
-                    <div className="mb-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Nome
-                      </label>
-                      <Controller
-                        name={`categories.${index}.name`}
-                        control={control}
-                        rules={{ required: "Nome da categoria é obrigatório" }}
-                        render={({ field }) => (
-                          <input 
-                            {...field}
-                            type="text" 
-                            className="w-full p-1.5 text-sm border border-gray-300 rounded-md"
-                            placeholder="Ex: Introvertido, Extrovertido..."
-                          />
-                        )}
-                      />
-                      {errors.categories?.[index]?.name && (
-                        <p className="text-red-500 text-xs mt-0.5">{errors.categories[index].name.message}</p>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Descrição
-                      </label>
-                      <Controller
-                        name={`categories.${index}.description`}
-                        control={control}
-                        render={({ field }) => (
-                          <textarea 
-                            {...field}
-                            rows={2}
-                            className="w-full p-1.5 text-sm border border-gray-300 rounded-md"
-                            placeholder="Descrição breve da categoria..."
-                          />
-                        )}
-                      />
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const categoryUuid = generateUUID();
+                        appendCategory({
+                          name: '',
+                          description: '',
+                          uuid: categoryUuid
+                        });
+                        setCategoriesModified(true);
+                      }}
+                      className="mt-2 inline-flex items-center px-3 py-1.5 border border-primary-300 text-sm rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      Adicionar Categoria
+                    </button>
                   </div>
-                ))}
+                </div>
               </div>
-              
-              <div className="flex justify-center">
-                <Button 
-                  type="button" 
-                  variant="secondary" 
-                  size="sm"
-                  onClick={handleAddCategory}
-                  className="flex items-center"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg> Adicionar Categoria
-                </Button>
-              </div>
-            </div>
+            )}
 
-            <div className="flex justify-end mt-4">
-              <Button 
-                type="button" 
+            {categoriesModified && selectedGroup && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mt-4">
+                <p className="text-yellow-800 text-sm">
+                  <span className="font-medium">Atenção:</span> Você modificou uma ou mais categorias do grupo original. 
+                  Ao salvar, um novo grupo de opinião será criado com essas alterações.
+                </p>
+              </div>
+            )}
+            
+            <div className="flex justify-end space-x-3 pt-4">
+              <Button
+                variant="secondary"
+                onClick={() => router.push('/admin/questions')}
+              >
+                Cancelar
+              </Button>
+              
+              <Button
                 variant="primary"
                 onClick={handleNextStep}
                 disabled={categoryFields.length === 0}
