@@ -113,27 +113,33 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
   }, [groupsLoaded]);
 
   const handleCreateNewGroup = () => {
+    // Limpar a seleção de grupo
     setSelectedGroup(null);
     
-    // Limpar categorias existentes
+    // Limpar categorias e opções existentes usando setValue
     setValue('categories', []);
     setValue('options', []);
     
     // Adicionar uma categoria vazia
-    appendCategory({
+    setValue('categories', [{
       name: '',
       description: '',
       uuid: generateUUID()
-    });
+    }]);
     
-    const categoryUuid = generateUUID();
-    appendOption({
+    // Adicionar uma opção vazia
+    setValue('options', [{
       text: '',
-      categoryNameUuid: categoryUuid,
+      categoryNameUuid: generateUUID(),
       category: '',
       weight: 1,
-      position: optionFields.length
-    });
+      position: 0
+    }]);
+    
+    // Resetar o flag de modificação
+    setCategoriesModified(false);
+    setOriginalCategories({});
+    setOriginalCategoryCount(0);
   };
 
   const handleSelectGroup = (groupId: string) => {
@@ -141,35 +147,33 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
     if (group) {
       console.log('Grupo selecionado:', group.name);
       
-      // Limpar categorias e opções existentes
-      while (categoryFields.length > 0) {
-        removeCategory(0);
-      }
-      
-      while (optionFields.length > 0) {
-        removeOption(0);
-      }
+      // Criar arrays para as novas categorias e opções
+      const newCategories = [];
+      const newOptions = [];
       
       // Adicionar categorias do grupo
       group.categories.forEach(category => {
-        appendCategory({
+        const uuid = category.uuid || generateUUID();
+        newCategories.push({
           id: category.id,
           name: category.name,
           description: category.description || '',
-          uuid: category.uuid || generateUUID()
+          uuid: uuid
+        });
+        
+        // Adicionar opções para cada categoria
+        newOptions.push({
+          text: '',
+          categoryNameUuid: uuid,
+          category: category.name,
+          weight: 1,
+          position: newOptions.length
         });
       });
       
-      // Adicionar opções para cada categoria
-      group.categories.forEach((category, index) => {
-        appendOption({
-          text: '',
-          categoryNameUuid: category.uuid || generateUUID(),
-          category: category.name,
-          weight: 1,
-          position: index
-        });
-      });
+      // Definir categorias e opções de uma vez
+      setValue('categories', newCategories);
+      setValue('options', newOptions);
       
       // Salvar as categorias originais para posterior comparação
       const origCats: {[key: string]: string} = {};
@@ -221,29 +225,33 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
 
   const handleAddCategory = () => {
     const categoryUuid = generateUUID();
-    appendCategory({
+    setValue('categories', [...watch('categories'), {
       name: '',
       description: '',
       uuid: categoryUuid
-    });
+    }]);
     
     // Se um grupo foi selecionado, marcar como modificado quando adicionar nova categoria
     if (selectedGroup) {
       setCategoriesModified(true);
     }
     
-    appendOption({
+    setValue('options', [...watch('options'), {
       text: '',
       categoryNameUuid: categoryUuid,
       category: '',
       weight: 1,
-      position: optionFields.length
-    });
+      position: watch('options').length
+    }]);
   };
 
   const handleRemoveCategory = (index: number) => {
-    removeCategory(index);
-    removeOption(index);
+    const categories = watch('categories');
+    const options = watch('options');
+    categories.splice(index, 1);
+    options.splice(index, 1);
+    setValue('categories', categories);
+    setValue('options', options);
   };
 
   const handleNextStep = () => {
@@ -333,12 +341,12 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
   useEffect(() => {
     if (selectedGroup && originalCategoryCount > 0) {
       // Se a quantidade atual de categorias for diferente da original
-      if (categoryFields.length !== originalCategoryCount) {
-        console.log(`Quantidade de categorias modificada: de ${originalCategoryCount} para ${categoryFields.length}`);
+      if (watch('categories').length !== originalCategoryCount) {
+        console.log(`Quantidade de categorias modificada: de ${originalCategoryCount} para ${watch('categories').length}`);
         setCategoriesModified(true);
       }
     }
-  }, [categoryFields.length, selectedGroup, originalCategoryCount]);
+  }, [watch('categories').length, selectedGroup, originalCategoryCount]);
 
   return (
     <div className="w-full max-w-4xl mx-auto">
@@ -406,7 +414,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
               </div>
             </div>
 
-            {(selectedGroup || categoryFields.length > 0) && (
+            {(selectedGroup || watch('categories').length > 0) && (
               <div className="space-y-4">
                 <div className="border-t pt-4">
                   <h3 className="text-lg font-medium mb-2">
@@ -415,20 +423,14 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
                   
                   <div className="space-y-3">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {categoryFields.map((field, index) => (
-                        <div key={field.id} className="p-3 border border-gray-200 rounded-lg">
+                      {watch('categories').map((category, index) => (
+                        <div key={category.uuid} className="p-3 border border-gray-200 rounded-lg">
                           <div className="flex justify-between items-center mb-2">
                             <h3 className="text-sm font-medium">CATEGORIA {index + 1}</h3>
                             {index > 0 && (
                               <button
                                 type="button"
-                                onClick={() => {
-                                  removeCategory(index);
-                                  // Se um grupo foi selecionado, marcar como modificado quando remover categoria
-                                  if (selectedGroup) {
-                                    setCategoriesModified(true);
-                                  }
-                                }}
+                                onClick={() => handleRemoveCategory(index)}
                                 className="text-red-500 hover:text-red-700 text-xs"
                               >
                                 X
@@ -489,15 +491,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
                     
                     <button
                       type="button"
-                      onClick={() => {
-                        const categoryUuid = generateUUID();
-                        appendCategory({
-                          name: '',
-                          description: '',
-                          uuid: categoryUuid
-                        });
-                        setCategoriesModified(true);
-                      }}
+                      onClick={handleAddCategory}
                       className="mt-2 inline-flex items-center px-3 py-1.5 border border-primary-300 text-sm rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -530,7 +524,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
               <Button
                 variant="primary"
                 onClick={handleNextStep}
-                disabled={categoryFields.length === 0}
+                disabled={watch('categories').length === 0}
               >
                 Próximo
               </Button>
@@ -582,7 +576,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
                 </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {optionFields.map((field, index) => {
+                  {watch('options').map((option, index) => {
                     const category = watch(`categories.${index}`);
                     // Cores diferentes para cada categoria
                     const categoryColors = [
@@ -598,7 +592,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
                     const colorClass = categoryColors[index % categoryColors.length];
                     
                     return (
-                      <div key={field.id} className={`p-3 border rounded-lg ${colorClass}`}>
+                      <div key={option.id} className={`p-3 border rounded-lg ${colorClass}`}>
                         <h4 className="font-medium text-sm mb-1 capitalize">
                           {category?.name || `CATEGORIA ${index + 1}`}
                         </h4>
