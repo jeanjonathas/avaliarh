@@ -56,6 +56,20 @@ const LeftBar: React.FC<LeftBarProps> = ({ activeSection }) => {
               </Link>
               
               <Link 
+                href="/admin/processes"
+                className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
+                  isActive('/admin/processes')
+                    ? "bg-primary-100 text-primary-700"
+                    : "text-secondary-700 hover:bg-primary-50 hover:text-primary-700"
+                }`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+                Processos Seletivos
+              </Link>
+              
+              <Link 
                 href="/admin/tests"
                 className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
                   isActive('/admin/tests')
