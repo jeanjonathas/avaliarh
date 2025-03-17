@@ -54,7 +54,9 @@ const CompaniesPage: React.FC<CompaniesPageProps> = ({ initialCompanies }) => {
   const loadCompanies = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/superadmin/companies');
+      const response = await fetch('/api/superadmin/companies', {
+        credentials: 'include',
+      });
       if (!response.ok) {
         throw new Error('Falha ao carregar empresas');
       }
@@ -82,7 +84,9 @@ const CompaniesPage: React.FC<CompaniesPageProps> = ({ initialCompanies }) => {
   const handleViewCompany = async (companyId: string) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/superadmin/companies/${companyId}`);
+      const response = await fetch(`/api/superadmin/companies/${companyId}`, {
+        credentials: 'include',
+      });
       if (!response.ok) {
         throw new Error('Falha ao carregar detalhes da empresa');
       }
@@ -122,6 +126,7 @@ const CompaniesPage: React.FC<CompaniesPageProps> = ({ initialCompanies }) => {
     try {
       const response = await fetch(`/api/superadmin/companies/${companyToDelete.id}`, {
         method: 'PATCH',
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -152,6 +157,7 @@ const CompaniesPage: React.FC<CompaniesPageProps> = ({ initialCompanies }) => {
     try {
       const response = await fetch(`/api/superadmin/companies/${companyId}`, {
         method: 'DELETE',
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -184,10 +190,13 @@ const CompaniesPage: React.FC<CompaniesPageProps> = ({ initialCompanies }) => {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', 
         body: JSON.stringify(companyData),
       });
 
       if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error('Resposta do servidor:', response.status, errorData);
         throw new Error(`Falha ao ${selectedCompany ? 'atualizar' : 'criar'} empresa`);
       }
 

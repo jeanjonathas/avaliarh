@@ -1,7 +1,7 @@
 import { NextPage } from 'next'
 import { useState } from 'react'
 import { useRouter } from 'next/router'
-import { signIn } from 'next-auth/react'
+import { signIn, getSession } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Formik, Form, Field, ErrorMessage } from 'formik'
@@ -30,7 +30,15 @@ const Login: NextPage = () => {
       if (result?.error) {
         setError('Email ou senha inválidos')
       } else {
-        router.push('/admin/dashboard')
+        // Obter a sessão para verificar o papel do usuário
+        const session = await getSession()
+        
+        // Redirecionar com base no papel do usuário
+        if (session?.user.role === 'SUPER_ADMIN') {
+          router.push('/superadmin/dashboard')
+        } else {
+          router.push('/admin/dashboard')
+        }
       }
     } catch (error) {
       console.error('Erro de login:', error)
