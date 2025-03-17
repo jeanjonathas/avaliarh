@@ -295,95 +295,6 @@ export default async function handler(
           categoryId: finalCategoryId
         });
 
-        // Para perguntas opinativas, verificar se já existe um grupo de emoções com as mesmas categorias
-        let emotionGroupId = null;
-        if (type === 'OPINION_MULTIPLE' && options && options.length > 0) {
-          // Extrair UUIDs de categorias/emoções das opções
-          const categoryUuids = options
-            .filter(opt => opt.categoryNameUuid)
-            .map(opt => opt.categoryNameUuid)
-            .sort(); // Ordenar para garantir comparação consistente
-          
-          if (categoryUuids.length > 0) {
-            console.log('Verificando se já existe um grupo de emoções com as mesmas categorias:', categoryUuids);
-            
-            try {
-              // Verificar se o modelo EmotionGroup está disponível
-              if (!prisma.emotionGroup) {
-                console.log('Modelo EmotionGroup não disponível no Prisma Client');
-                throw new Error('Modelo EmotionGroup não disponível');
-              }
-              
-              // Buscar todas as perguntas opinativas com seus grupos de emoções
-              const existingQuestions = await prisma.question.findMany({
-                where: {
-                  type: 'OPINION_MULTIPLE',
-                  emotionGroupId: { not: null }
-                },
-                include: {
-                  options: true,
-                  emotionGroup: true
-                }
-              });
-              
-              // Verificar se alguma pergunta existente tem exatamente as mesmas categorias
-              for (const question of existingQuestions) {
-                if (question.emotionGroup) {
-                  const questionCategoryUuids = question.options
-                    .filter(opt => opt.categoryNameUuid)
-                    .map(opt => opt.categoryNameUuid)
-                    .sort();
-                  
-                  // Verificar se os arrays de UUIDs são idênticos
-                  const isMatch = 
-                    categoryUuids.length === questionCategoryUuids.length && 
-                    categoryUuids.every((uuid, index) => uuid === questionCategoryUuids[index]);
-                  
-                  if (isMatch) {
-                    emotionGroupId = question.emotionGroup.id;
-                    console.log('Encontrado grupo de emoções existente:', emotionGroupId);
-                    break;
-                  }
-                }
-              }
-            } catch (error) {
-              console.error('Erro ao buscar perguntas existentes:', error);
-              // Continuar o fluxo mesmo com erro na busca
-            }
-            
-            // Se não encontrou um grupo existente, criar um novo
-            if (!emotionGroupId) {
-              try {
-                // Verificar se o modelo EmotionGroup está disponível
-                if (!prisma.emotionGroup) {
-                  console.log('Modelo EmotionGroup não disponível no Prisma Client para criar novo grupo');
-                  // Continuar sem criar grupo de emoções
-                } else {
-                  // Extrair nomes de categorias das opções
-                  const categoryNames = options
-                    .filter(opt => opt.category)
-                    .map(opt => opt.category);
-                  
-                  const groupName = `Grupo: ${categoryNames.join(', ')}`;
-                  
-                  const newEmotionGroup = await prisma.emotionGroup.create({
-                    data: {
-                      name: groupName,
-                      description: `Grupo de emoções/personalidades: ${categoryNames.join(', ')}`
-                    }
-                  });
-                  
-                  emotionGroupId = newEmotionGroup.id;
-                  console.log('Criado novo grupo de emoções:', emotionGroupId);
-                }
-              } catch (error) {
-                console.error('Erro ao criar grupo de emoções:', error);
-                // Continuar sem grupo de emoções
-              }
-            }
-          }
-        }
-
         // Criar pergunta usando o Prisma Client em vez de SQL raw
         const newQuestion = await prisma.question.create({
           data: {
@@ -397,17 +308,12 @@ export default async function handler(
               categories: {
                 connect: [{ id: finalCategoryId }]
               }
-            } : {}),
-            // Associar ao grupo de emoções se for uma pergunta opinativa
-            ...(emotionGroupId ? {
-              emotionGroupId
             } : {})
           },
           include: {
             categories: true,
             stage: true,
-            options: true,
-            ...(type === 'OPINION_MULTIPLE' ? { emotionGroup: true } : {})
+            options: true
           }
         });
 
@@ -435,7 +341,6 @@ export default async function handler(
                 categoryName: option.category || null,
                 categoryNameUuid: option.categoryNameUuid || null,
                 explanation: option.explanation || null,
-                emotionGroupId: emotionGroupId || null,
                 position: option.position || 0
               });
             } else if (option.categoryId) {
@@ -465,8 +370,7 @@ export default async function handler(
           include: {
             options: true,
             stage: true,
-            categories: true,
-            ...(type === 'OPINION_MULTIPLE' ? { emotionGroup: true } : {})
+            categories: true
           }
         });
         
@@ -502,14 +406,7 @@ export default async function handler(
             id: questionWithRelations.categories[0].id,
             name: questionWithRelations.categories[0].name || '',
             description: questionWithRelations.categories[0].description || '',
-          } : null,
-          ...(questionWithRelations.emotionGroup ? {
-            emotionGroup: {
-              id: questionWithRelations.emotionGroup.id,
-              name: questionWithRelations.emotionGroup.name,
-              description: questionWithRelations.emotionGroup.description
-            }
-          } : {})
+          } : null
         };
 
         return res.status(201).json(serializedQuestion);
