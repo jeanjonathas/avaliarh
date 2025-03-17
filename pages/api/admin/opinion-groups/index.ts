@@ -37,46 +37,40 @@ export default async function handler(
           }
         });
 
-        // Agrupar perguntas por conjuntos de opiniões
-        const opinionGroups: { [key: string]: string[] } = {};
+        // Criar grupos de opiniões no formato necessário para o componente OpinionQuestionWizard
+        const opinionGroups = [];
         
         // Processar perguntas para identificar grupos
         questions.forEach(question => {
-          // Extrair opiniões desta pergunta
-          const opinions = question.options
-            .map(option => option.category)
-            .filter(Boolean) as string[];
+          // Extrair categorias desta pergunta
+          const categories = question.options
+            .map(option => ({
+              id: option.id,
+              name: option.category || '',
+              description: option.explanation || ''
+            }))
+            .filter(cat => cat.name); // Filtrar categorias vazias
             
-          if (opinions.length > 0) {
-            // Ordenar opiniões para garantir consistência na comparação
-            const sortedOpinions = [...opinions].sort();
-            
-            // Usar o hash das opiniões como identificador do grupo
-            const groupKey = sortedOpinions.join('|');
-            
+          if (categories.length > 0) {
             // Verificar se este grupo já existe
-            let groupFound = false;
-            for (const [groupName, groupOpinions] of Object.entries(opinionGroups)) {
-              // Comparar se os arrays têm o mesmo conteúdo
-              if (
-                groupOpinions.length === sortedOpinions.length && 
-                groupOpinions.every((opinion, index) => opinion === sortedOpinions[index])
-              ) {
-                groupFound = true;
-                break;
-              }
-            }
+            const existingGroupIndex = opinionGroups.findIndex(group => 
+              group.categories.length === categories.length && 
+              group.categories.every((cat, idx) => 
+                cat.name === categories[idx].name
+              )
+            );
             
             // Se não encontrou grupo similar, criar um novo
-            if (!groupFound) {
-              // Usar o texto da pergunta como nome do grupo (limitado a 30 caracteres)
-              const groupName = `Grupo ${Object.keys(opinionGroups).length + 1}: ${
-                question.text.length > 30 
-                  ? question.text.substring(0, 27) + '...' 
-                  : question.text
-              }`;
-              
-              opinionGroups[groupName] = sortedOpinions;
+            if (existingGroupIndex === -1) {
+              opinionGroups.push({
+                id: `group-${opinionGroups.length + 1}`,
+                name: `Grupo ${opinionGroups.length + 1}: ${
+                  question.text.length > 30 
+                    ? question.text.substring(0, 27) + '...' 
+                    : question.text
+                }`,
+                categories: categories
+              });
             }
           }
         });
@@ -88,10 +82,10 @@ export default async function handler(
       }
     } else if (req.method === 'POST') {
       try {
-        const { name, opinions } = req.body;
+        const { name, categories } = req.body;
         
-        if (!name || !opinions || !Array.isArray(opinions) || opinions.length === 0) {
-          return res.status(400).json({ message: 'Nome e opiniões são obrigatórios' });
+        if (!name || !categories || !Array.isArray(categories) || categories.length === 0) {
+          return res.status(400).json({ message: 'Nome e categorias são obrigatórios' });
         }
 
         // Aqui poderíamos salvar o grupo em uma tabela específica
@@ -99,8 +93,9 @@ export default async function handler(
         
         return res.status(201).json({ 
           message: 'Grupo de opiniões adicionado com sucesso',
+          id: `group-${Date.now()}`,
           name,
-          opinions
+          categories
         });
       } catch (error) {
         console.error('Erro ao adicionar grupo de opiniões:', error);
@@ -110,7 +105,7 @@ export default async function handler(
       return res.status(405).json({ message: 'Método não permitido' });
     }
   } catch (error) {
-    console.error('Erro na API de grupos de opiniões:', error);
+    console.error('Erro no handler de grupos de opiniões:', error);
     return res.status(500).json({ message: 'Erro interno do servidor' });
   }
 }

@@ -1,27 +1,40 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, ReactNode } from 'react';
 
 interface ModalProps {
   isOpen: boolean;
   title: string;
-  message: string;
+  children?: ReactNode;
+  message?: string;
   confirmText?: string;
   cancelText?: string;
   type?: 'info' | 'warning' | 'error' | 'success' | 'confirm';
-  onConfirm: () => void;
-  onCancel: () => void;
+  onConfirm?: () => void;
+  onCancel?: () => void;
+  onClose?: () => void;
 }
 
 const Modal: React.FC<ModalProps> = ({
   isOpen,
   title,
+  children,
   message,
   confirmText = 'Confirmar',
   cancelText = 'Cancelar',
   type = 'confirm',
   onConfirm,
-  onCancel
+  onCancel,
+  onClose
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
+  
+  // Função para lidar com o fechamento do modal
+  const handleClose = () => {
+    if (onClose) {
+      onClose();
+    } else if (onCancel) {
+      onCancel();
+    }
+  };
 
   useEffect(() => {
     // Focar no modal quando aberto para acessibilidade
@@ -32,7 +45,7 @@ const Modal: React.FC<ModalProps> = ({
     // Adicionar listener para tecla Escape
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
-        onCancel();
+        handleClose();
       }
     };
 
@@ -47,12 +60,12 @@ const Modal: React.FC<ModalProps> = ({
       document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = 'auto';
     };
-  }, [isOpen, onCancel]);
+  }, [isOpen, handleClose]);
 
   // Fechar o modal se clicar fora dele
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) {
-      onCancel();
+      handleClose();
     }
   };
 
@@ -122,31 +135,57 @@ const Modal: React.FC<ModalProps> = ({
         className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 transform transition-all duration-300 ease-in-out"
         tabIndex={-1}
       >
-        <div className="flex items-center mb-4">
-          <div className="mr-4">
-            {styles.icon}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center">
+            {type !== 'confirm' && styles.icon && (
+              <div className="mr-4">
+                {styles.icon}
+              </div>
+            )}
+            <h3 className="text-xl font-semibold text-secondary-800">{title}</h3>
           </div>
-          <h3 className="text-xl font-semibold text-secondary-800">{title}</h3>
-        </div>
-        
-        <div className="mb-6 text-secondary-600">
-          {message}
-        </div>
-        
-        <div className="flex justify-end space-x-3">
           <button
-            onClick={onCancel}
-            className="px-4 py-2 text-sm text-secondary-600 border border-secondary-300 rounded-md hover:bg-secondary-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary-500"
+            onClick={handleClose}
+            className="text-gray-400 hover:text-gray-500 focus:outline-none"
           >
-            {cancelText}
-          </button>
-          <button
-            onClick={onConfirm}
-            className={`px-4 py-2 text-sm text-white ${styles.confirmBg} rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500`}
-          >
-            {confirmText}
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
+        
+        {message && (
+          <div className="mb-6 text-secondary-600">
+            {message}
+          </div>
+        )}
+        
+        {children && (
+          <div className="mb-6">
+            {children}
+          </div>
+        )}
+        
+        {(onConfirm || onCancel) && (
+          <div className="flex justify-end space-x-3">
+            {onCancel && (
+              <button
+                onClick={onCancel}
+                className="px-4 py-2 text-sm text-secondary-600 border border-secondary-300 rounded-md hover:bg-secondary-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary-500"
+              >
+                {cancelText}
+              </button>
+            )}
+            {onConfirm && (
+              <button
+                onClick={onConfirm}
+                className={`px-4 py-2 text-sm text-white ${styles.confirmBg} rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500`}
+              >
+                {confirmText}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
