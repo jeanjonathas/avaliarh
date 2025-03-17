@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { GetServerSideProps } from 'next';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '../api/auth/[...nextauth]';
+import { useSession } from 'next-auth/react';
 import SuperAdminLayout from '../../components/SuperAdminLayout';
 import { PrismaClient } from '@prisma/client';
 
@@ -31,6 +33,7 @@ interface UsersPageProps {
 }
 
 const UsersPage: React.FC<UsersPageProps> = ({ initialUsers, companies }) => {
+  const { data: session } = useSession();
   const [users, setUsers] = useState<UserWithCompany[]>(initialUsers);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -524,10 +527,10 @@ const UsersPage: React.FC<UsersPageProps> = ({ initialUsers, companies }) => {
 };
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
-  const session = await getSession(context);
+  const session = await getServerSession(context.req, context.res, authOptions);
 
   // Verifica se o usuário está autenticado e é um SUPER_ADMIN
-  if (!session || (session.user.role as string) !== 'SUPER_ADMIN') {
+  if (!session || (session.user?.role as string) !== 'SUPER_ADMIN') {
     return {
       redirect: {
         destination: '/superadmin/login',
