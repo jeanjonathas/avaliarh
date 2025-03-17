@@ -198,16 +198,20 @@ model Question {
 }
 
 model Option {
-  id         String    @id @default(uuid())
-  text       String
-  isCorrect  Boolean   @default(false)
-  questionId String
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  categoryId String?
-  weight     Int?      @default(0)
-  category   Category? @relation(fields: [categoryId], references: [id])
-  question   Question  @relation(fields: [questionId], references: [id])
+  id              String    @id @default(uuid())
+  text            String
+  isCorrect       Boolean   @default(false)
+  questionId      String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  categoryId      String?
+  weight          Int?      @default(0)
+  position        Int?      @default(0)
+  categoryName    String?   // Nome da categoria/personalidade
+  categoryNameUuid String?  // UUID único para a categoria/personalidade
+  explanation     String?   // Explicação sobre esta opção/personalidade
+  category        Category? @relation(fields: [categoryId], references: [id])
+  question        Question  @relation(fields: [questionId], references: [id])
 }
 
 model Response {

@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '../../../../lib/auth';
 import { prisma } from '../../../../lib/prisma';
 
 export default async function handler(
@@ -7,78 +8,91 @@ export default async function handler(
   res: NextApiResponse
 ) {
   try {
-    const session = await getSession({ req });
+    const session = await getServerSession(req, res, authOptions);
 
     // Verificar autenticação
-    if (!session || !session.user) {
+    if (!session) {
       return res.status(401).json({ message: 'Não autorizado' });
-    }
-
-    // Verificar se o usuário é administrador
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email as string },
-      select: { role: true },
-    });
-
-    if (!user || user.role !== 'ADMIN') {
-      return res.status(403).json({ message: 'Acesso negado' });
     }
 
     // Lidar com diferentes métodos HTTP
     if (req.method === 'GET') {
       try {
-        // Buscar todas as perguntas do tipo opinião
+        console.log('Buscando grupos de categorias de perguntas opinativas...');
+        
+        // Buscar todas as perguntas do tipo opinião com suas opções
         const questions = await prisma.question.findMany({
           where: {
             type: 'OPINION_MULTIPLE'
           },
           include: {
+            categories: true,
             options: true
           }
         });
 
-        // Criar grupos de opiniões no formato necessário para o componente OpinionQuestionWizard
+        console.log(`Encontradas ${questions.length} perguntas opinativas`);
+
+        // Criar grupos de categorias
         const opinionGroups = [];
+        const processedQuestionIds = new Set();
         
-        // Processar perguntas para identificar grupos
-        questions.forEach(question => {
-          // Extrair categorias desta pergunta
-          const categories = question.options
-            .map(option => ({
-              id: option.id,
-              name: option.category || '',
-              description: option.explanation || ''
-            }))
-            .filter(cat => cat.name); // Filtrar categorias vazias
+        // Processar perguntas para identificar grupos únicos de categorias
+        for (const question of questions) {
+          // Pular perguntas já processadas
+          if (processedQuestionIds.has(question.id)) continue;
+          
+          // Extrair categorias das opções
+          const categoriesFromOptions = [];
+          const optionsByCategory = {};
+          
+          // Agrupar opções por categoria
+          for (const option of question.options) {
+            if (option.category) {
+              if (!optionsByCategory[option.category]) {
+                optionsByCategory[option.category] = [];
+                categoriesFromOptions.push({
+                  id: `cat-${option.category.replace(/\s+/g, '-').toLowerCase()}`,
+                  name: option.category,
+                  description: ''
+                });
+              }
+              optionsByCategory[option.category].push(option);
+            }
+          }
+          
+          // Se encontrou categorias nas opções, criar um grupo
+          if (categoriesFromOptions.length > 0) {
+            processedQuestionIds.add(question.id);
             
-          if (categories.length > 0) {
-            // Verificar se este grupo já existe
+            // Verificar se já existe um grupo similar
             const existingGroupIndex = opinionGroups.findIndex(group => 
-              group.categories.length === categories.length && 
+              group.categories.length === categoriesFromOptions.length && 
               group.categories.every((cat, idx) => 
-                cat.name === categories[idx].name
+                cat.name === categoriesFromOptions[idx].name
               )
             );
             
             // Se não encontrou grupo similar, criar um novo
             if (existingGroupIndex === -1) {
+              const groupName = `Grupo: ${categoriesFromOptions.map(c => c.name).join(', ')}`;
+              
               opinionGroups.push({
                 id: `group-${opinionGroups.length + 1}`,
-                name: `Grupo ${opinionGroups.length + 1}: ${
-                  question.text.length > 30 
-                    ? question.text.substring(0, 27) + '...' 
-                    : question.text
-                }`,
-                categories: categories
+                name: groupName,
+                categories: categoriesFromOptions
               });
+              
+              console.log(`Adicionado grupo de categorias: ${groupName}`);
             }
           }
-        });
+        }
 
+        console.log(`Retornando ${opinionGroups.length} grupos de categorias`);
         return res.status(200).json(opinionGroups);
       } catch (error) {
-        console.error('Erro ao buscar grupos de opiniões:', error);
-        return res.status(500).json({ message: 'Erro ao buscar grupos de opiniões' });
+        console.error('Erro ao buscar grupos de categorias:', error);
+        return res.status(500).json({ message: 'Erro ao buscar grupos de categorias' });
       }
     } else if (req.method === 'POST') {
       try {
@@ -105,7 +119,7 @@ export default async function handler(
       return res.status(405).json({ message: 'Método não permitido' });
     }
   } catch (error) {
-    console.error('Erro no handler de grupos de opiniões:', error);
+    console.error('Erro no handler de grupos de categorias:', error);
     return res.status(500).json({ message: 'Erro interno do servidor' });
   }
 }

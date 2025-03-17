@@ -3,6 +3,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
 import { prisma } from '../../../../lib/prisma'
+import crypto from 'crypto';
 
 export default async function handler(
   req: NextApiRequest,
@@ -342,6 +343,12 @@ export default async function handler(
               text: option.text,
               isCorrect: option.isCorrect,
               questionId: newQuestion.id,
+              weight: option.weight || 0,
+              position: option.position || 0,
+              categoryId: option.categoryId && !option.categoryId.startsWith('temp-') ? option.categoryId : null,
+              categoryName: option.category || null,
+              categoryNameUuid: option.categoryNameUuid || (option.category ? crypto.randomUUID() : null),
+              explanation: option.explanation || null
             }
           });
           createdOptions.push(newOption);
