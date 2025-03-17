@@ -85,10 +85,14 @@ export default async function handler(
       console.log(`Tentando excluir categoria com ID: ${id}`);
       
       try {
-        // Verificar se existem questões associadas
+        // Verificar se existem questões associadas usando a relação many-to-many correta
         const questionsCount = await prisma.question.count({
           where: {
-            categoryId: id
+            categories: {
+              some: {
+                id: id
+              }
+            }
           }
         });
         

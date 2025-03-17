@@ -91,7 +91,11 @@ export default async function handler(
       try {
         const questionsCount = await prisma.question.count({
           where: {
-            categoryId: id
+            categories: {
+              some: {
+                id: id
+              }
+            }
           }
         });
         
