@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { QuestionType, QuestionDifficulty } from '../../types/questions';
 import Link from 'next/link';
 import { useNotification } from '../../contexts/NotificationContext';
+import QuestionPreview from './QuestionPreview';
 
 interface Question {
   id: string;
@@ -34,6 +35,8 @@ const QuestionList: React.FC = () => {
   const [filterTest, setFilterTest] = useState<string>('all');
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [tests, setTests] = useState<{ id: string; title: string }[]>([]);
+  const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   useEffect(() => {
     fetchQuestions();
@@ -200,6 +203,25 @@ const QuestionList: React.FC = () => {
         );
       default:
         return null;
+    }
+  };
+
+  const fetchQuestionDetails = async (id: string) => {
+    try {
+      setLoadingPreview(true);
+      const response = await fetch(`/api/admin/questions/${id}`);
+      
+      if (!response.ok) {
+        throw new Error('Erro ao carregar detalhes da pergunta');
+      }
+      
+      const data = await response.json();
+      setPreviewQuestion(data);
+    } catch (err) {
+      console.error('Erro ao buscar detalhes da pergunta:', err);
+      showToast('Erro ao carregar detalhes da pergunta. Tente novamente.', 'error');
+    } finally {
+      setLoadingPreview(false);
     }
   };
 
@@ -375,6 +397,12 @@ const QuestionList: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
+                      onClick={() => fetchQuestionDetails(question.id)}
+                      className="text-indigo-600 hover:text-indigo-900 mr-4"
+                    >
+                      Visualizar
+                    </button>
+                    <button
                       onClick={() => handleEdit(question.id, question.type)}
                       className="text-primary-600 hover:text-primary-900 mr-4"
                     >
@@ -391,6 +419,24 @@ const QuestionList: React.FC = () => {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      
+      {/* Modal de visualização da pergunta */}
+      {previewQuestion && (
+        <QuestionPreview
+          question={previewQuestion}
+          onClose={() => setPreviewQuestion(null)}
+        />
+      )}
+      
+      {/* Indicador de carregamento para visualização */}
+      {loadingPreview && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 flex items-center space-x-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"></div>
+            <p className="text-gray-700">Carregando detalhes da pergunta...</p>
+          </div>
         </div>
       )}
     </div>
