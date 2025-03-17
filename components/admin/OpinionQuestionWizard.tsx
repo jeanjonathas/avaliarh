@@ -261,14 +261,12 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
       if (currentOptions.length !== currentCategories.length) {
         console.log(`Ajustando opções: de ${currentOptions.length} para ${currentCategories.length} opções`);
         
-        // Limpar opções existentes
-        while (optionFields.length > 0) {
-          removeOption(0);
-        }
+        // Criar um novo array de opções em vez de manipular diretamente o optionFields
+        const newOptions = [];
         
         // Adicionar uma opção para cada categoria
         currentCategories.forEach((category, index) => {
-          appendOption({
+          newOptions.push({
             text: '',
             categoryNameUuid: category.uuid || generateUUID(),
             category: category.name,
@@ -276,8 +274,12 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
             position: index
           });
         });
+        
+        // Definir todas as opções de uma vez
+        setValue('options', newOptions);
       }
       
+      // Avançar para o próximo passo
       setStep(2);
     } else if (step === 2) {
       setStep(3);
