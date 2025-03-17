@@ -15,53 +15,48 @@ export default async function handler(
 
   if (req.method === 'GET') {
     try {
-      // Buscar todos os testes
-      const tests = await prisma.$queryRaw`
-        SELECT 
-          id, 
-          title, 
-          description, 
-          "timeLimit", 
-          active, 
-          "createdAt", 
-          "updatedAt"
-        FROM "tests"
-        ORDER BY "createdAt" DESC
-      `;
-
-      // Converter para array se não for
-      const testsArray = Array.isArray(tests) ? tests : [];
+      // Buscar todos os testes usando Prisma Client em vez de SQL raw
+      const tests = await prisma.test.findMany({
+        orderBy: {
+          createdAt: 'desc'
+        },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          timeLimit: true,
+          active: true,
+          createdAt: true,
+          updatedAt: true
+        }
+      });
       
       // Para cada teste, buscar a contagem de etapas e perguntas
       const testsWithCounts = await Promise.all(
-        testsArray.map(async (test) => {
+        tests.map(async (test) => {
           try {
-            // Contar etapas (stages) - considerando tanto as diretamente associadas quanto via TestStage
-            const stagesCountResult = await prisma.$queryRaw`
-              SELECT COUNT(DISTINCT s.id) as count
-              FROM "Stage" s
-              LEFT JOIN "TestStage" ts ON s.id = ts."stageId"
-              WHERE s."testId" = ${test.id} OR ts."testId" = ${test.id}
-            `;
+            // Contar etapas (stages) usando Prisma
+            const stagesCount = await prisma.stage.count({
+              where: {
+                OR: [
+                  { testId: test.id },
+                  { TestStage: { some: { testId: test.id } } }
+                ]
+              },
+              distinct: ['id']
+            });
             
-            const sectionsCount = Array.isArray(stagesCountResult) && stagesCountResult.length > 0
-              ? Number(stagesCountResult[0].count)
-              : 0;
+            // Contar perguntas em todas as etapas do teste usando Prisma
+            const questionsCount = await prisma.testQuestion.count({
+              where: {
+                testId: test.id
+              },
+              distinct: ['questionId']
+            });
             
-            // Contar perguntas em todas as etapas do teste usando TestQuestion
-            const questionsCountResult = await prisma.$queryRaw`
-              SELECT COUNT(DISTINCT "questionId") as count
-              FROM "TestQuestion"
-              WHERE "testId" = ${test.id}
-            `;
-            
-            const questionsCount = Array.isArray(questionsCountResult) && questionsCountResult.length > 0
-              ? Number(questionsCountResult[0].count)
-              : 0;
-              
             return {
               ...test,
-              sectionsCount,
+              sectionsCount: stagesCount,
               questionsCount
             };
           } catch (countError) {
@@ -90,48 +85,15 @@ export default async function handler(
         return res.status(400).json({ error: 'Título do teste é obrigatório' });
       }
 
-      // Criar o teste usando SQL raw
-      await prisma.$executeRaw`
-        INSERT INTO "tests" (
-          id, 
-          title, 
-          description, 
-          "timeLimit", 
-          active, 
-          "createdAt", 
-          "updatedAt"
-        ) VALUES (
-          uuid_generate_v4(), 
-          ${title}, 
-          ${description || null}, 
-          ${timeLimit ? parseInt(timeLimit) : null}, 
-          ${active !== undefined ? active : true}, 
-          NOW(), 
-          NOW()
-        )
-      `;
-
-      // Buscar o teste recém-criado
-      const newTests = await prisma.$queryRaw`
-        SELECT 
-          id, 
-          title, 
-          description, 
-          "timeLimit", 
-          active, 
-          "createdAt", 
-          "updatedAt"
-        FROM "tests"
-        WHERE title = ${title}
-        ORDER BY "createdAt" DESC
-        LIMIT 1
-      `;
-
-      const newTest = Array.isArray(newTests) && newTests.length > 0 ? newTests[0] : null;
-
-      if (!newTest) {
-        return res.status(500).json({ error: 'Erro ao buscar teste criado' });
-      }
+      // Criar o teste usando Prisma Client
+      const newTest = await prisma.test.create({
+        data: {
+          title,
+          description,
+          timeLimit: timeLimit ? parseInt(timeLimit) : null,
+          active: active !== undefined ? active : true
+        }
+      });
 
       return res.status(201).json(newTest);
     } catch (error) {

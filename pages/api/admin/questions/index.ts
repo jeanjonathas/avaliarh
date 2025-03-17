@@ -132,6 +132,7 @@ export default async function handler(
           text: question.text,
           stageId: question.stageId,
           categoryId: question.categories.length > 0 ? question.categories[0].id : null,
+          categoryName: question.categories.length > 0 ? question.categories[0].name : null,
           createdAt: new Date(question.createdAt).toISOString(),
           updatedAt: new Date(question.updatedAt).toISOString(),
           stage: {
@@ -164,11 +165,12 @@ export default async function handler(
     }
   } else if (req.method === 'POST') {
     try {
-      const { text, stageId, categoryUuid, options, type, difficulty, showResults } = req.body;
+      const { text, stageId, categoryId, categoryUuid, options, type, difficulty, showResults } = req.body;
       
       console.log('Recebendo requisição POST para criar pergunta:', {
         text,
         stageId,
+        categoryId,
         categoryUuid,
         options
       });
@@ -266,30 +268,33 @@ export default async function handler(
 
       // Verificar se a categoria existe (se fornecida)
       let finalCategoryId = null;
-      if (categoryUuid) {
+      if (categoryId || categoryUuid) {
         try {
-          console.log('Verificando se a categoria existe:', categoryUuid);
+          const categoryToCheck = categoryId || categoryUuid;
+          console.log('Verificando se a categoria existe:', categoryToCheck);
           
-          // Verificar se o categoryUuid é um UUID válido
-          const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(categoryUuid);
+          // Verificar se o categoryId/categoryUuid é um UUID válido
+          const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(categoryToCheck);
           
           if (!isValidUuid) {
-            console.error('UUID de categoria inválido:', categoryUuid);
+            console.error('UUID de categoria inválido:', categoryToCheck);
             return res.status(400).json({ error: 'UUID de categoria inválido' });
           }
           
-          const category = await prisma.$queryRaw`
-            SELECT id FROM "Category" WHERE id = ${categoryUuid}
-          `;
+          // Usar Prisma Client em vez de SQL raw para verificar a categoria
+          const category = await prisma.category.findUnique({
+            where: { id: categoryToCheck }
+          });
 
           console.log('Resultado da consulta de categoria:', category);
 
-          if (!Array.isArray(category) || category.length === 0) {
+          if (!category) {
             console.log('Erro: categoria não encontrada');
             return res.status(404).json({ error: 'Categoria não encontrada' });
           }
           
-          finalCategoryId = categoryUuid;
+          finalCategoryId = categoryToCheck;
+          console.log('Categoria válida encontrada:', finalCategoryId);
         } catch (error) {
           console.error('Erro ao verificar categoria:', error);
           return res.status(500).json({ error: 'Erro ao verificar categoria' });
@@ -311,16 +316,22 @@ export default async function handler(
             type: (type || 'MULTIPLE_CHOICE') as any,
             difficulty: (difficulty || 'MEDIUM') as any,
             showResults: showResults !== undefined ? showResults : true,
+            // Definir apenas a relação categories, não usar categoryId diretamente
             ...(finalCategoryId ? {
-              // Se tiver categoria, conectar usando o campo categories
               categories: {
                 connect: [{ id: finalCategoryId }]
               }
             } : {})
+          },
+          include: {
+            categories: true,
+            stage: true,
+            options: true
           }
         });
 
         console.log('Pergunta criada com sucesso:', newQuestion.id);
+        console.log('Categorias conectadas:', newQuestion.categories);
         
         // Criar opções usando o Prisma Client
         const createdOptions = [];
@@ -358,6 +369,7 @@ export default async function handler(
           text: questionWithRelations.text,
           stageId: questionWithRelations.stageId,
           categoryId: questionWithRelations.categories.length > 0 ? questionWithRelations.categories[0].id : null,
+          categoryName: questionWithRelations.categories.length > 0 ? questionWithRelations.categories[0].name : null,
           createdAt: new Date(questionWithRelations.createdAt).toISOString(),
           updatedAt: new Date(questionWithRelations.updatedAt).toISOString(),
           options: Array.isArray(questionWithRelations.options) ? questionWithRelations.options.map((option: any) => ({

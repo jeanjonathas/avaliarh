@@ -111,6 +111,10 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
       categoryId: values.categoryUuid || values.categoryId || null,
     };
     
+    // Log para debug
+    console.log('Enviando formulário com os seguintes dados:', formData);
+    console.log('Categoria selecionada:', formData.categoryId);
+    
     // Remover campos desnecessários
     delete formData.categoryUuid;
     
@@ -171,6 +175,11 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
               id="categoryUuid"
               name="categoryUuid"
               className="input-field"
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                const value = e.target.value;
+                console.log('Categoria selecionada no dropdown:', value);
+                setFieldValue('categoryUuid', value);
+              }}
             >
               <option value="">Selecione uma categoria</option>
               {categories && categories.length > 0 ? (

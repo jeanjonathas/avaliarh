@@ -76,24 +76,62 @@ export default async function handler(
         return res.status(404).json({ error: 'Etapa não encontrada' });
       }
       
+      // Verificar se a categoria existe (se fornecida)
+      if (categoryId) {
+        try {
+          console.log('Verificando se a categoria existe:', categoryId);
+          
+          // Verificar se o categoryId é um UUID válido
+          const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(categoryId);
+          
+          if (!isValidUuid) {
+            console.error('UUID de categoria inválido:', categoryId);
+            return res.status(400).json({ error: 'UUID de categoria inválido' });
+          }
+          
+          // Usar Prisma Client em vez de SQL raw para verificar a categoria
+          const category = await prisma.category.findUnique({
+            where: { id: categoryId }
+          });
+
+          if (!category) {
+            console.log('Erro: categoria não encontrada');
+            return res.status(404).json({ error: 'Categoria não encontrada' });
+          }
+          
+          console.log('Categoria válida encontrada:', categoryId);
+        } catch (error) {
+          console.error('Erro ao verificar categoria:', error);
+          return res.status(500).json({ error: 'Erro ao verificar categoria' });
+        }
+      }
+      
       // 1. Atualizar a pergunta com todos os campos
-      await prisma.question.update({
+      const updatedQuestion = await prisma.question.update({
         where: { id },
         data: {
           text,
           stage: {
             connect: { id: stageId }
           },
-          categories: categoryId ? {
-            connect: [{ id: categoryId }]
+          // Atualizar apenas a relação categories, não usar categoryId diretamente
+          ...(categoryId ? {
+            categories: {
+              set: [], // Limpar categorias existentes
+              connect: [{ id: categoryId }] // Conectar nova categoria
+            }
           } : {
-            // Se não houver categoria selecionada, desconectar todas as categorias existentes
-            set: []
-          },
-          type: type || undefined,
-          difficulty: difficulty || undefined,
+            categories: { set: [] } // Remover todas as categorias se não houver categoryId
+          }),
+          type: type as any,
+          difficulty: difficulty as any,
           initialExplanation: initialExplanation || undefined,
           updatedAt: new Date()
+        },
+        include: {
+          options: true,
+          stage: true,
+          categories: true
         }
       });
       
