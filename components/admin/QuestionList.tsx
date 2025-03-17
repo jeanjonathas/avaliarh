@@ -100,8 +100,12 @@ const QuestionList: React.FC = () => {
     }
   };
 
-  const handleEdit = (id: string) => {
-    router.push(`/admin/questions/edit/${id}`);
+  const handleEdit = (id: string, type: QuestionType) => {
+    if (type === QuestionType.OPINION_MULTIPLE) {
+      router.push(`/admin/questions/edit-opinion/${id}`);
+    } else {
+      router.push(`/admin/questions/edit/${id}`);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -371,7 +375,7 @@ const QuestionList: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
-                      onClick={() => handleEdit(question.id)}
+                      onClick={() => handleEdit(question.id, question.type)}
                       className="text-primary-600 hover:text-primary-900 mr-4"
                     >
                       Editar

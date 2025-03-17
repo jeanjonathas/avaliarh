@@ -158,14 +158,16 @@ export default async function handler(
           // Adicionar campos específicos para perguntas de opinião, se existirem no schema
           if (type === 'OPINION_MULTIPLE' || type === 'OPINION') {
             try {
-              // Tentar adicionar campos específicos para perguntas de opinião
-              if (option.opinionCategory) optionData.opinionCategory = option.opinionCategory;
-              if (option.opinionWeight) optionData.opinionWeight = option.opinionWeight;
+              // Usar os campos corretos conforme o schema do Prisma
+              if (option.category) optionData.categoryName = option.category;
+              if (option.categoryNameUuid) optionData.categoryNameUuid = option.categoryNameUuid;
+              if (option.weight) optionData.weight = option.weight;
               if (option.explanation) optionData.explanation = option.explanation;
               
               console.log('Adicionando campos específicos para pergunta de opinião:', {
-                opinionCategory: option.opinionCategory,
-                opinionWeight: option.opinionWeight,
+                categoryName: option.category,
+                categoryNameUuid: option.categoryNameUuid,
+                weight: option.weight,
                 explanation: option.explanation
               });
             } catch (error) {
@@ -293,9 +295,14 @@ export default async function handler(
           id: id
         },
         include: {
-          options: true,
+          options: {
+            orderBy: {
+              position: 'asc'
+            }
+          },
           stage: true,
-          categories: true
+          categories: true,
+          emotionGroup: true
         }
       });
       
@@ -315,21 +322,24 @@ export default async function handler(
         difficulty: question.difficulty,
         stageId: question.stageId,
         categoryId: question.categories && question.categories.length > 0 ? question.categories[0].id : null,
-        categoryUuid: question.categories && question.categories.length > 0 ? question.categories[0].id : null, 
+        categoryUuid: question.categories && question.categories.length > 0 ? question.categories[0].id : null,
+        initialExplanation: question.initialExplanation || '',
         options: question.options.map(option => {
           // Dados base para qualquer tipo de opção
           const formattedOption: any = {
             id: option.id,
             text: option.text,
             isCorrect: option.isCorrect,
+            position: option.position || 0,
             createdAt: option.createdAt.toISOString(),
             updatedAt: option.updatedAt.toISOString()
           };
           
           // Adicionar campos específicos para perguntas de opinião, se existirem
           if (question.type === 'OPINION_MULTIPLE' || question.type === 'OPINION') {
-            if ('opinionCategory' in option) formattedOption.opinionCategory = option.opinionCategory;
-            if ('opinionWeight' in option) formattedOption.opinionWeight = option.opinionWeight;
+            formattedOption.category = option.categoryName || '';
+            formattedOption.categoryNameUuid = option.categoryNameUuid || '';
+            formattedOption.weight = option.weight || 1;
             if ('explanation' in option) formattedOption.explanation = option.explanation;
           }
           
@@ -345,6 +355,11 @@ export default async function handler(
           id: question.categories[0].id,
           name: question.categories[0].name,
           description: question.categories[0].description || ''
+        } : null,
+        // Incluir informações do grupo de emoções se for uma pergunta opinativa
+        opinionGroup: question.type === 'OPINION_MULTIPLE' && question.emotionGroup ? {
+          id: question.emotionGroup.id,
+          name: question.emotionGroup.name
         } : null
       };
 

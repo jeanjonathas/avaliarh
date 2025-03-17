@@ -42,8 +42,10 @@ interface OptionField {
 }
 
 interface OpinionQuestionWizardProps {
-  onSubmit: (data: any) => void;
+  onSubmit: (data: any) => Promise<void>;
+  onCancel?: () => void;
   initialData?: any;
+  isEditing?: boolean;
 }
 
 interface SystemCategory {
@@ -51,18 +53,22 @@ interface SystemCategory {
   name: string;
 }
 
-const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit, initialData }) => {
-  const [step, setStep] = useState(1);
-  const [opinionGroups, setOpinionGroups] = useState<OpinionGroup[]>([]);
-  const [selectedGroup, setSelectedGroup] = useState<OpinionGroup | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [groupsLoaded, setGroupsLoaded] = useState(false); 
-  const [systemCategories, setSystemCategories] = useState<SystemCategory[]>([]);
+const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ 
+  onSubmit, 
+  onCancel, 
+  initialData = null,
+  isEditing = false
+}) => {
   const router = useRouter();
-
-  const [categoriesModified, setCategoriesModified] = useState(false);
+  const [step, setStep] = useState(1);
+  const [opinionGroups, setOpinionGroups] = useState<any[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<any>(null);
   const [originalCategories, setOriginalCategories] = useState<{[key: string]: string}>({});
   const [originalCategoryCount, setOriginalCategoryCount] = useState(0);
+  const [categoriesModified, setCategoriesModified] = useState(false);
+  const [groupsLoaded, setGroupsLoaded] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [systemCategories, setSystemCategories] = useState<SystemCategory[]>([]);
 
   const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     defaultValues: initialData || {
@@ -87,11 +93,102 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
   });
 
   useEffect(() => {
+    // Carregar grupos de opinião
+    const fetchOpinionGroups = async () => {
+      try {
+        const response = await fetch('/api/admin/opinion-groups');
+        if (response.ok) {
+          const data = await response.json();
+          setOpinionGroups(data);
+          setGroupsLoaded(true);
+        } else {
+          console.error('Erro ao carregar grupos de opinião');
+        }
+      } catch (error) {
+        console.error('Erro ao buscar grupos de opinião:', error);
+      }
+    };
+
+    // Carregar categorias do sistema
+    const fetchSystemCategories = async () => {
+      try {
+        const response = await fetch('/api/admin/categories');
+        if (response.ok) {
+          const data = await response.json();
+          setSystemCategories(data);
+        } else {
+          console.error('Erro ao carregar categorias do sistema');
+        }
+      } catch (error) {
+        console.error('Erro ao buscar categorias do sistema:', error);
+      }
+    };
+
+    fetchOpinionGroups();
+    fetchSystemCategories();
+  }, []);
+
+  // Carregar dados iniciais se estiver em modo de edição
+  useEffect(() => {
+    if (initialData && isEditing) {
+      // Preencher o formulário com os dados da pergunta
+      setValue('text', initialData.text || '');
+      setValue('stageId', initialData.stageId || '');
+      setValue('categoryId', initialData.categoryId || '');
+      setValue('initialExplanation', initialData.initialExplanation || '');
+      setValue('difficulty', initialData.difficulty || 'MEDIUM');
+      
+      // Preparar categorias e opções
+      if (initialData.opinionGroup) {
+        const group = initialData.opinionGroup;
+        
+        // Configurar categorias
+        const categories = group.categories.map((cat: any) => ({
+          id: cat.id,
+          name: cat.name,
+          description: cat.description || '',
+          uuid: cat.uuid || generateUUID()
+        }));
+        
+        // Configurar opções
+        const options = initialData.options.map((opt: any) => {
+          const category = group.categories.find((c: any) => c.name === opt.category);
+          return {
+            id: opt.id,
+            text: opt.text,
+            categoryNameUuid: category?.uuid || generateUUID(),
+            category: opt.category,
+            weight: opt.weight || 1,
+            position: opt.position || 0
+          };
+        });
+        
+        // Definir valores no formulário
+        setValue('categories', categories);
+        setValue('options', options);
+        
+        // Salvar grupo selecionado e configurar estado original
+        setSelectedGroup(group);
+        
+        // Salvar as categorias originais para posterior comparação
+        const origCats: {[key: string]: string} = {};
+        group.categories.forEach((category: any) => {
+          if (category.uuid) {
+            origCats[category.uuid] = category.name;
+          }
+        });
+        setOriginalCategories(origCats);
+        setOriginalCategoryCount(group.categories.length);
+        setCategoriesModified(false);
+      }
+    }
+  }, [initialData, isEditing, setValue]);
+
+  useEffect(() => {
     if (groupsLoaded) return;
     
     const fetchOpinionGroups = async () => {
       if (!groupsLoaded) {
-        setIsLoading(true);
         try {
           const response = await fetch('/api/admin/opinion-groups', {
             credentials: 'include'
@@ -103,7 +200,6 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
         } catch (error) {
           console.error('Erro ao carregar grupos de opinião:', error);
         } finally {
-          setIsLoading(false);
           setGroupsLoaded(true);
         }
       }
@@ -195,34 +291,6 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
     }
   };
 
-  useEffect(() => {
-    if (initialData && initialData.categories && initialData.categories.length > 0) {
-      console.log('Inicializando com dados iniciais:', initialData);
-      
-      // Se temos categorias nos dados iniciais, não precisamos selecionar um grupo
-      // As categorias já estão definidas
-      setStep(2); // Avançar para o próximo passo automaticamente
-    }
-  }, [initialData]);
-
-  useEffect(() => {
-    const fetchSystemCategories = async () => {
-      try {
-        const response = await fetch('/api/admin/categories', {
-          credentials: 'include'
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setSystemCategories(data);
-        }
-      } catch (error) {
-        console.error('Erro ao carregar categorias do sistema:', error);
-      }
-    };
-
-    fetchSystemCategories();
-  }, []);
-
   const handleAddCategory = () => {
     const categoryUuid = generateUUID();
     setValue('categories', [...watch('categories'), {
@@ -307,27 +375,45 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
     setValue('categories', []);
     setValue('options', []);
     
-    // Redirecionar para a página de perguntas
-    router.push('/admin/questions');
+    // Usar a função onCancel se fornecida, caso contrário redirecionar
+    if (onCancel) {
+      onCancel();
+    } else {
+      router.push('/admin/questions');
+    }
   };
 
   const onFormSubmit = async (data: any) => {
+    // Formatar as opções para garantir que cada opção tenha a categoria correta
+    const formattedOptions = data.options.map((option: any, index: number) => {
+      const category = data.categories[index];
+      return {
+        id: option.id, // Manter o ID original se estiver editando
+        text: option.text,
+        category: category?.name || '',
+        categoryNameUuid: category?.uuid || option.categoryNameUuid,
+        weight: option.weight || 1,
+        position: index,
+        isCorrect: true // Todas as opções em perguntas opinativas são "corretas"
+      };
+    });
+
     const formData = {
       ...data,
-      type: QuestionType.OPINION_MULTIPLE,
-      options: data.options.map((option: any, index: number) => {
-        const category = data.categories[index];
-        return {
-          ...option,
-          category: category?.name || '',
-          categoryNameUuid: category?.uuid || option.categoryNameUuid,
-          categoryId: undefined,
-          isCorrect: true
-        };
-      })
+      type: 'OPINION_MULTIPLE',
+      opinionGroupId: selectedGroup?.id,
+      categoriesModified: categoriesModified,
+      options: formattedOptions
     };
     
-    onSubmit(formData);
+    try {
+      setIsSubmitting(true);
+      await onSubmit(formData);
+    } catch (error) {
+      console.error('Erro ao salvar pergunta opinativa:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Função para verificar se uma categoria foi modificada
@@ -402,13 +488,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
               
               <div className="p-3 border rounded-lg">
                 <h4 className="font-medium text-sm mb-1">USAR GRUPO EXISTENTE</h4>
-                {isLoading ? (
-                  <div className="flex justify-center py-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary-500"></div>
-                  </div>
-                ) : opinionGroups.length === 0 ? (
-                  <p className="text-xs text-gray-600">Nenhum grupo existente encontrado</p>
-                ) : (
+                {groupsLoaded ? (
                   <select 
                     className="w-full p-1.5 text-sm border border-gray-300 rounded-md"
                     onChange={(e) => handleSelectGroup(e.target.value)}
@@ -419,6 +499,10 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
                       <option key={group.id} value={group.id}>{group.name}</option>
                     ))}
                   </select>
+                ) : (
+                  <div className="flex justify-center py-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary-500"></div>
+                  </div>
                 )}
               </div>
             </div>
@@ -789,8 +873,16 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
               <Button 
                 type="submit" 
                 variant="primary"
+                disabled={isSubmitting}
               >
-                Salvar Pergunta
+                {isSubmitting ? (
+                  <div className="flex items-center">
+                    <div className="animate-spin mr-2 h-4 w-4 border-t-2 border-b-2 border-white rounded-full"></div>
+                    {isEditing ? 'Atualizando...' : 'Salvando...'}
+                  </div>
+                ) : (
+                  isEditing ? 'Atualizar Pergunta' : 'Salvar Pergunta'
+                )}
               </Button>
             </div>
           </div>
