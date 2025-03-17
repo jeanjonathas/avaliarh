@@ -19,12 +19,18 @@ interface OpinionQuestionWizardProps {
   initialData?: any;
 }
 
+interface SystemCategory {
+  id: string;
+  name: string;
+}
+
 const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit, initialData }) => {
   const [step, setStep] = useState(1);
   const [opinionGroups, setOpinionGroups] = useState<OpinionGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<OpinionGroup | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [groupsLoaded, setGroupsLoaded] = useState(false); 
+  const [systemCategories, setSystemCategories] = useState<SystemCategory[]>([]);
   const router = useRouter();
 
   const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm({
@@ -35,7 +41,8 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
       categories: [],
       options: [],
       initialExplanation: '',
-      showExplanation: false
+      showExplanation: false,
+      categoryId: ''
     }
   });
 
@@ -53,27 +60,63 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
     if (groupsLoaded) return;
     
     const fetchOpinionGroups = async () => {
-      try {
+      if (!groupsLoaded) {
         setIsLoading(true);
-        console.log('Carregando grupos de opiniões...');
-        const response = await fetch('/api/admin/opinion-groups');
-        if (response.ok) {
-          const data = await response.json();
-          console.log(`Carregados ${data.length} grupos de opiniões`);
-          setOpinionGroups(data);
-          setGroupsLoaded(true); 
-        } else {
-          console.error('Erro ao carregar grupos de opiniões:', response.statusText);
+        try {
+          const response = await fetch('/api/admin/opinion-groups');
+          if (response.ok) {
+            const data = await response.json();
+            setOpinionGroups(data);
+          }
+        } catch (error) {
+          console.error('Erro ao carregar grupos de opinião:', error);
+        } finally {
+          setIsLoading(false);
+          setGroupsLoaded(true);
         }
-      } catch (error) {
-        console.error('Erro ao carregar grupos de opiniões:', error);
-      } finally {
-        setIsLoading(false);
       }
     };
 
     fetchOpinionGroups();
-  }, [groupsLoaded]); 
+  }, [groupsLoaded]);
+
+  const handleCreateNewGroup = () => {
+    setSelectedGroup(null);
+    
+    // Limpar categorias existentes
+    setValue('categories', []);
+    setValue('options', []);
+    
+    // Adicionar uma categoria vazia
+    appendCategory({
+      name: '',
+      description: ''
+    });
+    
+    appendOption({
+      text: '',
+      categoryId: '',
+      weight: 1
+    });
+  };
+
+  const handleSelectGroup = (groupId: string) => {
+    const group = opinionGroups.find(g => g.id === groupId);
+    if (group) {
+      setSelectedGroup(group);
+      
+      // Preencher categorias do grupo selecionado
+      setValue('categories', group.categories);
+      
+      // Criar opções vazias para cada categoria
+      const newOptions = group.categories.map(category => ({
+        text: '',
+        weight: 5,
+        categoryId: category.id
+      }));
+      setValue('options', newOptions);
+    }
+  };
 
   useEffect(() => {
     if (initialData && initialData.categories && initialData.categories.length > 0) {
@@ -118,28 +161,21 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
     }
   }, [selectedGroup]); 
 
-  const handleCreateNewGroup = () => {
-    setSelectedGroup(null);
-    
-    while (categoryFields.length > 0) {
-      removeCategory(0);
-    }
-    
-    appendCategory({
-      name: '',
-      description: ''
-    });
-    
-    while (optionFields.length > 0) {
-      removeOption(0);
-    }
-    
-    appendOption({
-      text: '',
-      categoryId: '',
-      weight: 1
-    });
-  };
+  useEffect(() => {
+    const fetchSystemCategories = async () => {
+      try {
+        const response = await fetch('/api/admin/categories');
+        if (response.ok) {
+          const data = await response.json();
+          setSystemCategories(data);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar categorias do sistema:', error);
+      }
+    };
+
+    fetchSystemCategories();
+  }, []);
 
   const handleAddCategory = () => {
     appendCategory({
@@ -198,7 +234,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
   return (
     <div className="w-full max-w-4xl mx-auto">
       {/* Indicador de progresso - Mais compacto e visualmente claro */}
-      <div className="mb-6">
+      <div className="mb-4">
         <div className="flex items-center">
           <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step >= 1 ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-600'} text-sm font-medium`}>
             1
@@ -213,9 +249,9 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
           </div>
         </div>
         <div className="flex justify-between mt-1">
-          <div className="text-xs font-medium">Categorias</div>
-          <div className="text-xs font-medium">Pergunta</div>
-          <div className="text-xs font-medium">Configurações</div>
+          <div className="text-xs font-medium">CATEGORIAS</div>
+          <div className="text-xs font-medium">PERGUNTA</div>
+          <div className="text-xs font-medium">CONFIGURAÇÕES</div>
         </div>
       </div>
 
@@ -223,23 +259,23 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
         {/* Etapa 1: Definir categorias de opinião - Layout mais compacto */}
         {step === 1 && (
           <div>
-            <h2 className="text-lg font-semibold mb-2">Definir Categorias de Opinião</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              Defina as categorias de opinião para classificar as respostas.
+            <h2 className="text-lg font-semibold mb-2">CRIAR CATEGORIAS</h2>
+            <p className="text-sm text-gray-600 mb-3">
+              Defina as categorias de personalidade para esta pergunta.
             </p>
 
-            {/* Seleção de grupo existente ou criação de novo - Layout em cards mais compactos */}
+            {/* Seleção de grupo existente ou criação de novo */}
             <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-3">
               <div 
                 className={`p-3 border rounded-lg cursor-pointer transition-all ${!selectedGroup ? 'border-primary-500 bg-primary-50' : 'border-gray-300 hover:border-primary-300'}`}
                 onClick={handleCreateNewGroup}
               >
-                <h4 className="font-medium text-sm">Criar Novo Grupo</h4>
+                <h4 className="font-medium text-sm">CRIAR NOVO GRUPO</h4>
                 <p className="text-xs text-gray-600">Defina novas categorias para esta pergunta</p>
               </div>
               
               <div className="p-3 border rounded-lg">
-                <h4 className="font-medium text-sm mb-1">Usar Grupo Existente</h4>
+                <h4 className="font-medium text-sm mb-1">USAR GRUPO EXISTENTE</h4>
                 {isLoading ? (
                   <div className="flex justify-center py-2">
                     <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary-500"></div>
@@ -249,17 +285,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
                 ) : (
                   <select 
                     className="w-full p-1.5 text-sm border border-gray-300 rounded-md"
-                    onChange={(e) => {
-                      const groupId = e.target.value;
-                      if (groupId) {
-                        const group = opinionGroups.find(g => g.id === groupId);
-                        if (group) {
-                          setSelectedGroup(group);
-                        }
-                      } else {
-                        setSelectedGroup(null);
-                      }
-                    }}
+                    onChange={(e) => handleSelectGroup(e.target.value)}
                     value={selectedGroup?.id || ''}
                   >
                     <option value="">Selecione um grupo</option>
@@ -271,99 +297,83 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
               </div>
             </div>
 
-            {/* Lista de categorias - Layout mais compacto e eficiente */}
-            <div className="mb-4">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-sm font-medium">Categorias de Opinião</h3>
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {categoryFields.map((field, index) => (
+                  <div key={field.id} className="p-3 border border-gray-200 rounded-lg">
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="text-sm font-medium">CATEGORIA {index + 1}</h3>
+                      <button
+                        type="button"
+                        onClick={() => removeCategory(index)}
+                        className="text-red-500 hover:text-red-700 text-xs"
+                      >
+                        X
+                      </button>
+                    </div>
+                    
+                    <div className="mb-2">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Nome
+                      </label>
+                      <Controller
+                        name={`categories.${index}.name`}
+                        control={control}
+                        rules={{ required: "Nome da categoria é obrigatório" }}
+                        render={({ field }) => (
+                          <input 
+                            {...field}
+                            type="text" 
+                            className="w-full p-1.5 text-sm border border-gray-300 rounded-md"
+                            placeholder="Ex: Introvertido, Extrovertido..."
+                          />
+                        )}
+                      />
+                      {errors.categories?.[index]?.name && (
+                        <p className="text-red-500 text-xs mt-0.5">{errors.categories[index].name.message}</p>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Descrição
+                      </label>
+                      <Controller
+                        name={`categories.${index}.description`}
+                        control={control}
+                        render={({ field }) => (
+                          <textarea 
+                            {...field}
+                            rows={2}
+                            className="w-full p-1.5 text-sm border border-gray-300 rounded-md"
+                            placeholder="Descrição breve da categoria..."
+                          />
+                        )}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="flex justify-center">
                 <Button 
                   type="button" 
                   variant="secondary" 
+                  size="sm"
                   onClick={handleAddCategory}
-                  className="text-xs py-1 px-2"
+                  className="flex items-center"
                 >
-                  + Adicionar
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg> Adicionar Categoria
                 </Button>
               </div>
-              
-              {categoryFields.length === 0 ? (
-                <div className="p-3 border border-dashed border-gray-300 rounded-lg text-center text-gray-500 text-sm">
-                  Nenhuma categoria definida. Crie uma nova ou selecione um grupo existente.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {categoryFields.map((field, index) => (
-                    <div key={field.id} className="p-3 border border-gray-200 rounded-lg">
-                      <div className="flex justify-between items-start mb-1">
-                        <h4 className="font-medium text-sm">Categoria {index + 1}</h4>
-                        {categoryFields.length > 1 && (
-                          <button 
-                            type="button" 
-                            onClick={() => handleRemoveCategory(index)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                      
-                      <div className="mb-2">
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Nome da Categoria
-                        </label>
-                        <Controller
-                          name={`categories.${index}.name`}
-                          control={control}
-                          rules={{ required: "Nome da categoria é obrigatório" }}
-                          render={({ field }) => (
-                            <input 
-                              {...field}
-                              type="text" 
-                              className="w-full p-1.5 text-sm border border-gray-300 rounded-md"
-                              placeholder="Ex: Introvertido, Extrovertido..."
-                            />
-                          )}
-                        />
-                        {errors.categories?.[index]?.name && (
-                          <p className="text-red-500 text-xs mt-0.5">{errors.categories[index].name.message}</p>
-                        )}
-                      </div>
-                      
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Descrição (opcional)
-                        </label>
-                        <Controller
-                          name={`categories.${index}.description`}
-                          control={control}
-                          render={({ field }) => (
-                            <textarea 
-                              {...field}
-                              rows={1}
-                              className="w-full p-1.5 text-sm border border-gray-300 rounded-md"
-                              placeholder="Descrição breve"
-                            />
-                          )}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
 
-            <div className="flex justify-between mt-4">
+            <div className="flex justify-end mt-4">
               <Button 
                 type="button" 
-                variant="secondary" 
-                onClick={handleCancel}
-              >
-                Cancelar
-              </Button>
-              <Button 
-                type="button" 
-                variant="primary" 
+                variant="primary"
                 onClick={handleNextStep}
                 disabled={categoryFields.length === 0}
               >
@@ -376,15 +386,15 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
         {/* Etapa 2: Criar pergunta e opções - Layout mais compacto e organizado */}
         {step === 2 && (
           <div>
-            <h2 className="text-lg font-semibold mb-2">Criar Pergunta e Opções</h2>
-            <p className="text-sm text-gray-600 mb-4">
+            <h2 className="text-lg font-semibold mb-2">CRIAR PERGUNTA E OPÇÕES</h2>
+            <p className="text-sm text-gray-600 mb-3">
               Defina a pergunta e as opções de resposta para cada categoria.
             </p>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               {/* Pergunta */}
               <div className="p-3 border border-gray-200 rounded-lg">
-                <h3 className="text-sm font-medium mb-2">Pergunta</h3>
+                <h3 className="text-sm font-medium mb-2">PERGUNTA</h3>
                 
                 <div className="mb-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -411,7 +421,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
 
               {/* Opções de resposta */}
               <div>
-                <h3 className="text-sm font-medium mb-2">Opções de Resposta</h3>
+                <h3 className="text-sm font-medium mb-2">OPÇÕES DE RESPOSTA</h3>
                 <p className="text-xs text-gray-600 mb-2">
                   Defina uma opção de resposta para cada categoria.
                 </p>
@@ -419,10 +429,23 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {optionFields.map((field, index) => {
                     const category = watch(`categories.${index}`);
+                    // Cores diferentes para cada categoria
+                    const categoryColors = [
+                      'bg-blue-100 border-blue-300', 
+                      'bg-green-100 border-green-300',
+                      'bg-purple-100 border-purple-300',
+                      'bg-yellow-100 border-yellow-300',
+                      'bg-pink-100 border-pink-300',
+                      'bg-indigo-100 border-indigo-300',
+                      'bg-red-100 border-red-300',
+                      'bg-orange-100 border-orange-300'
+                    ];
+                    const colorClass = categoryColors[index % categoryColors.length];
+                    
                     return (
-                      <div key={field.id} className="p-3 border border-gray-200 rounded-lg">
-                        <h4 className="font-medium text-sm mb-1">
-                          Opção para: {category?.name || `Categoria ${index + 1}`}
+                      <div key={field.id} className={`p-3 border rounded-lg ${colorClass}`}>
+                        <h4 className="font-medium text-sm mb-1 capitalize">
+                          {category?.name || `CATEGORIA ${index + 1}`}
                         </h4>
                         
                         <div className="mb-2">
@@ -437,7 +460,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
                               <textarea 
                                 {...field}
                                 rows={2}
-                                className="w-full p-1.5 text-sm border border-gray-300 rounded-md"
+                                className="w-full p-1.5 text-sm border border-gray-300 rounded-md bg-white"
                                 placeholder="Digite o texto da opção..."
                               />
                             )}
@@ -465,7 +488,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
                                 type="number" 
                                 min={1}
                                 max={10}
-                                className="w-full p-1.5 text-sm border border-gray-300 rounded-md"
+                                className="w-full p-1.5 text-sm border border-gray-300 rounded-md bg-white"
                               />
                             )}
                           />
@@ -502,14 +525,14 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
         {/* Etapa 3: Configurações adicionais */}
         {step === 3 && (
           <div>
-            <h2 className="text-lg font-semibold mb-2">Configurações Adicionais</h2>
-            <p className="text-sm text-gray-600 mb-4">
+            <h2 className="text-lg font-semibold mb-2">CONFIGURAÇÕES ADICIONAIS</h2>
+            <p className="text-sm text-gray-600 mb-3">
               Configure opções adicionais para a pergunta.
             </p>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="p-3 border border-gray-200 rounded-lg">
-                <h3 className="text-sm font-medium mb-2">Configurações</h3>
+                <h3 className="text-sm font-medium mb-2">CONFIGURAÇÕES</h3>
                 
                 <div className="mb-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -526,6 +549,29 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
                         <option value={QuestionDifficulty.EASY}>Fácil</option>
                         <option value={QuestionDifficulty.MEDIUM}>Média</option>
                         <option value={QuestionDifficulty.HARD}>Difícil</option>
+                      </select>
+                    )}
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Categoria do Sistema
+                  </label>
+                  <Controller
+                    name="categoryId"
+                    control={control}
+                    render={({ field }) => (
+                      <select 
+                        {...field}
+                        className="w-full p-1.5 text-sm border border-gray-300 rounded-md"
+                      >
+                        <option value="">Selecione uma categoria</option>
+                        {systemCategories.map(category => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
                       </select>
                     )}
                   />
