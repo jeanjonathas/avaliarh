@@ -501,80 +501,163 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
               <label className="block text-sm font-medium text-secondary-700 mb-3">
                 Opções (marque a correta)
               </label>
-              
               <FieldArray name="options">
                 {({ remove, push }) => (
-                  <div className="space-y-3">
-                    {values.options.map((option, index) => (
-                      <div key={index} className="flex items-start space-x-3">
-                        <div className="pt-2">
+                  <div>
+                    {values.type === QuestionType.MULTIPLE_CHOICE ? (
+                      // Formulário para perguntas de múltipla escolha com resposta correta
+                      <>
+                        {values.options.map((option, index) => (
+                          <div key={index} className="flex items-center mb-3">
+                            <div className="flex-1 mr-2">
+                              <Field
+                                name={`options.${index}.text`}
+                                type="text"
+                                placeholder={`Opção ${index + 1}`}
+                                className="input-field"
+                              />
+                              <ErrorMessage
+                                name={`options.${index}.text`}
+                                render={msg => <div className="text-red-500 text-sm mt-1">{msg}</div>}
+                              />
+                            </div>
+                            <div className="flex items-center">
+                              <label className="inline-flex items-center cursor-pointer mr-2">
+                                <Field
+                                  type="checkbox"
+                                  name={`options.${index}.isCorrect`}
+                                  className="form-checkbox h-5 w-5 text-primary-600 rounded"
+                                />
+                                <span className="ml-2 text-sm text-secondary-700">Correta</span>
+                              </label>
+                              {values.options.length > 2 && (
+                                <button
+                                  type="button"
+                                  onClick={() => remove(index)}
+                                  className="text-red-500 hover:text-red-700"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    ) : (
+                      // Formulário para perguntas opinativas (OPINION_MULTIPLE)
+                      <>
+                        <div className="mb-4">
+                          <label htmlFor="initialExplanation" className="block text-sm font-medium text-secondary-700 mb-1">
+                            Explicação Inicial
+                          </label>
                           <Field
-                            type="radio"
-                            name={`options.${index}.isCorrect`}
-                            id={`option-correct-${index}`}
-                            checked={option.isCorrect}
-                            onChange={() => {
-                              setFieldValue(`options.${index}.isCorrect`, true)
-                              values.options.forEach((_, i) => {
-                                if (i !== index) {
-                                  setFieldValue(`options.${i}.isCorrect`, false)
-                                }
-                              })
-                            }}
-                            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-secondary-300"
-                          />
-                        </div>
-                        <div className="flex-grow">
-                          <Field
-                            type="text"
-                            name={`options.${index}.text`}
-                            placeholder={`Opção ${index + 1}`}
+                            as="textarea"
+                            id="initialExplanation"
+                            name="initialExplanation"
+                            rows={2}
                             className="input-field"
-                          />
-                          <ErrorMessage
-                            name={`options.${index}.text`}
-                            render={msg => {
-                              return typeof msg === 'string' 
-                                ? <div className="text-red-500 text-sm mt-1">{msg}</div>
-                                : <div className="text-red-500 text-sm mt-1">Erro de validação na opção</div>
-                            }}
+                            placeholder="Ex: As perguntas a seguir não têm resposta certa ou errada. Escolha a alternativa que melhor te representa."
                           />
                         </div>
-                        {values.options.length > 2 && (
-                          <button
-                            type="button"
-                            onClick={() => remove(index)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                    
-                    {values.options.length < 5 && (
-                      <button
-                        type="button"
-                        onClick={() => push({ text: '', isCorrect: false })}
-                        className="mt-2 text-primary-600 hover:text-primary-800 font-medium flex items-center"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 01-1 1h-3a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-                        </svg>
-                        Adicionar Opção
-                      </button>
+                        
+                        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                          <div className="flex">
+                            <div className="flex-shrink-0">
+                              <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                            <div className="ml-3">
+                              <p className="text-sm text-yellow-700">
+                                Nas perguntas opinativas, cada alternativa representa uma opinião. Defina o texto e a categoria/peso de cada alternativa.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {values.options.map((option, index) => (
+                          <div key={index} className="bg-gray-50 p-4 rounded-md mb-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="text-sm font-medium text-gray-700">Alternativa {index + 1}</h4>
+                              {values.options.length > 2 && (
+                                <button
+                                  type="button"
+                                  onClick={() => remove(index)}
+                                  className="text-red-500 hover:text-red-700"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                            
+                            <div className="mb-2">
+                              <label htmlFor={`options.${index}.text`} className="block text-xs font-medium text-gray-700 mb-1">
+                                Texto da alternativa
+                              </label>
+                              <Field
+                                name={`options.${index}.text`}
+                                type="text"
+                                placeholder="Digite o texto da alternativa"
+                                className="input-field"
+                              />
+                              <ErrorMessage
+                                name={`options.${index}.text`}
+                                render={msg => <div className="text-red-500 text-sm mt-1">{msg}</div>}
+                              />
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label htmlFor={`options.${index}.category`} className="block text-xs font-medium text-gray-700 mb-1">
+                                  Categoria/Opinião
+                                </label>
+                                <Field
+                                  name={`options.${index}.category`}
+                                  type="text"
+                                  placeholder="Ex: Introvertido, Extrovertido"
+                                  className="input-field"
+                                />
+                              </div>
+                              
+                              <div>
+                                <label htmlFor={`options.${index}.weight`} className="block text-xs font-medium text-gray-700 mb-1">
+                                  Peso (0-10)
+                                </label>
+                                <Field
+                                  name={`options.${index}.weight`}
+                                  type="number"
+                                  min="0"
+                                  max="10"
+                                  placeholder="Peso"
+                                  className="input-field"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </>
                     )}
                     
-                    <ErrorMessage
-                      name="options"
-                      render={msg => {
-                        return typeof msg === 'string' 
-                          ? <div className="text-red-500 text-sm mt-1">{msg}</div>
-                          : <div className="text-red-500 text-sm mt-1">Erro de validação nas opções</div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (values.type === QuestionType.MULTIPLE_CHOICE) {
+                          push({ text: '', isCorrect: false });
+                        } else {
+                          push({ text: '', isCorrect: false, category: '', weight: 5 });
+                        }
                       }}
-                    />
+                      className="mt-2 flex items-center text-primary-600 hover:text-primary-800"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      Adicionar opção
+                    </button>
                   </div>
                 )}
               </FieldArray>
