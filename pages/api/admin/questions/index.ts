@@ -248,7 +248,7 @@ export default async function handler(
     }
   } else if (req.method === 'POST') {
     try {
-      const { text, stageId, categoryUuid, options } = req.body;
+      const { text, stageId, categoryUuid, options, type, difficulty, initialExplanation, showResults } = req.body;
       
       console.log('Recebendo requisição POST para criar pergunta:', {
         text,
@@ -386,18 +386,44 @@ export default async function handler(
         });
         
         // Usar SQL bruto para evitar problemas de tipagem com o Prisma
-        const newQuestionId = await prisma.$queryRaw`
-          INSERT INTO "Question" (id, text, "stageId", "categoryId", "createdAt", "updatedAt")
-          VALUES (
-            uuid_generate_v4(), 
-            ${text}, 
-            ${finalStageId}, 
-            ${finalCategoryId}, 
-            NOW(), 
-            NOW()
-          )
-          RETURNING id
-        `;
+        let newQuestionId;
+        
+        if (finalCategoryId) {
+          // Se tiver categoria, converter para UUID explicitamente
+          newQuestionId = await prisma.$queryRaw`
+            INSERT INTO "Question" (id, text, "stageId", "categoryId", "createdAt", "updatedAt", type, difficulty, "initialExplanation", "showResults")
+            VALUES (
+              uuid_generate_v4(), 
+              ${text}, 
+              ${finalStageId}, 
+              ${finalCategoryId}::uuid, 
+              NOW(), 
+              NOW(),
+              ${type || 'MULTIPLE_CHOICE'},
+              ${difficulty || 'MEDIUM'},
+              ${initialExplanation || null},
+              ${showResults !== undefined ? showResults : true}
+            )
+            RETURNING id
+          `;
+        } else {
+          // Se não tiver categoria, não incluir o campo
+          newQuestionId = await prisma.$queryRaw`
+            INSERT INTO "Question" (id, text, "stageId", "createdAt", "updatedAt", type, difficulty, "initialExplanation", "showResults")
+            VALUES (
+              uuid_generate_v4(), 
+              ${text}, 
+              ${finalStageId}, 
+              NOW(), 
+              NOW(),
+              ${type || 'MULTIPLE_CHOICE'},
+              ${difficulty || 'MEDIUM'},
+              ${initialExplanation || null},
+              ${showResults !== undefined ? showResults : true}
+            )
+            RETURNING id
+          `;
+        }
         
         console.log('Verificando a inserção de dados na tabela Question:', newQuestionId);
         

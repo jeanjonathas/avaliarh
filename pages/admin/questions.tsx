@@ -55,18 +55,42 @@ interface Question {
 const validationSchema = Yup.object({
   text: Yup.string().required('Texto da pergunta é obrigatório'),
   stageId: Yup.string().required('Etapa é obrigatória'),
+  type: Yup.string().required('Tipo de pergunta é obrigatório'),
+  difficulty: Yup.string().required('Nível de dificuldade é obrigatório'),
+  initialExplanation: Yup.string().when('type', {
+    is: QuestionType.OPINION_MULTIPLE,
+    then: (schema) => schema.required('Explicação inicial é obrigatória para perguntas opinativas'),
+    otherwise: (schema) => schema.optional(),
+  }),
   options: Yup.array()
     .of(
-      Yup.object({
+      Yup.object().shape({
         text: Yup.string().required('Texto da opção é obrigatório'),
         isCorrect: Yup.boolean(),
+        category: Yup.string().when('$type', {
+          is: QuestionType.OPINION_MULTIPLE,
+          then: (schema) => schema.required('Categoria/opinião é obrigatória'),
+          otherwise: (schema) => schema.optional(),
+        }),
+        weight: Yup.number().when('$type', {
+          is: QuestionType.OPINION_MULTIPLE,
+          then: (schema) => schema.min(0, 'Peso deve ser maior ou igual a 0'),
+          otherwise: (schema) => schema.optional(),
+        }),
       })
     )
     .min(2, 'Pelo menos 2 opções são necessárias')
     .test(
       'one-correct',
       'Pelo menos uma opção deve ser marcada como correta',
-      (options) => options?.some((option) => option.isCorrect)
+      function(options) {
+        const { type } = this.parent;
+        // Só validar a existência de opção correta para perguntas de múltipla escolha
+        if (type === QuestionType.MULTIPLE_CHOICE) {
+          return options?.some((option) => option.isCorrect);
+        }
+        return true; // Para perguntas opinativas, não exigir opção correta
+      }
     ),
 })
 
@@ -91,8 +115,10 @@ const Questions: NextPage = () => {
   const [selectedStageName, setSelectedStageName] = useState('')
   const [associationMode, setAssociationMode] = useState<'test' | 'test-and-stage' | 'none'>('none')
   const [categories, setCategories] = useState<any[]>([])
-  const [filterType, setFilterType] = useState<'test' | 'category'>('test')
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all')
+  const [filterType, setFilterType] = useState<'test' | 'category' | 'question_type' | 'difficulty'>('test')
+  const [selectedCategoryId, setSelectedCategoryId] = useState('all')
+  const [selectedQuestionType, setSelectedQuestionType] = useState('all')
+  const [selectedDifficulty, setSelectedDifficulty] = useState('all')
 
   useEffect(() => {
     // Verificar se o usuário está autenticado
@@ -302,6 +328,13 @@ const Questions: NextPage = () => {
     
     fetchQuestions()
   }, [filterType, selectedCategoryId])
+
+  useEffect(() => {
+    // Efeito para carregar perguntas quando os filtros mudarem
+    if (session && session.user) {
+      fetchQuestions();
+    }
+  }, [selectedTestId, selectedStageId, selectedCategoryId, selectedQuestionType, selectedDifficulty]);
 
   const handleSubmit = async (values: any, formikHelpers: any) => {
     try {
@@ -513,6 +546,16 @@ const Questions: NextPage = () => {
           // e buscar todas as perguntas
           console.log('Buscando todas as perguntas (todas as categorias)');
         }
+      } else if (filterType === 'question_type') {
+        console.log('Filtrando por tipo de pergunta:', selectedQuestionType);
+        if (selectedQuestionType !== 'all') {
+          params.append('type', selectedQuestionType);
+        }
+      } else if (filterType === 'difficulty') {
+        console.log('Filtrando por nível de dificuldade:', selectedDifficulty);
+        if (selectedDifficulty !== 'all') {
+          params.append('difficulty', selectedDifficulty);
+        }
       }
       
       if (params.toString()) {
@@ -715,10 +758,13 @@ const Questions: NextPage = () => {
                     stageId: currentQuestion.stageId,
                     categoryUuid: currentQuestion.categoryUuid || '',
                     options: currentQuestion.options,
+                    type: currentQuestion.type || QuestionType.MULTIPLE_CHOICE,
+                    difficulty: currentQuestion.difficulty || DifficultyLevel.EASY,
+                    initialExplanation: currentQuestion.initialExplanation || '',
+                    showResults: currentQuestion.showResults || false,
                   }
                 : undefined
             }
-            isEditing={isEditing}
             hideStageField={selectedTestId === 'all'}
             preSelectedStageId={selectedStageId !== 'all' ? selectedStageId : ''}
             isUpdating={isEditing} // Definir isUpdating como true quando estiver editando uma pergunta
@@ -738,11 +784,13 @@ const Questions: NextPage = () => {
                 id="filterType"
                 value={filterType}
                 onChange={(e) => {
-                  const newFilterType = e.target.value as 'test' | 'category';
+                  const newFilterType = e.target.value as 'test' | 'category' | 'question_type' | 'difficulty';
                   setFilterType(newFilterType);
                   setSelectedTestId('all');
                   setSelectedStageId('all');
                   setSelectedCategoryId('all');
+                  setSelectedQuestionType('all');
+                  setSelectedDifficulty('all');
                   // Recarregar todas as perguntas quando mudar o tipo de filtro
                   loadQuestions();
                 }}
@@ -750,6 +798,8 @@ const Questions: NextPage = () => {
               >
                 <option value="test">Filtrar por Teste</option>
                 <option value="category">Filtrar por Categoria</option>
+                <option value="question_type">Filtrar por Tipo de Pergunta</option>
+                <option value="difficulty">Filtrar por Nível de Dificuldade</option>
               </select>
             </div>
 
@@ -827,6 +877,53 @@ const Questions: NextPage = () => {
               </div>
             )}
 
+            {filterType === 'question_type' && (
+              <div className="mb-4">
+                <label htmlFor="questionTypeFilter" className="block text-sm font-medium text-secondary-700 mb-1">
+                  Selecionar Tipo de Pergunta
+                </label>
+                <select
+                  id="questionTypeFilter"
+                  value={selectedQuestionType}
+                  onChange={(e) => {
+                    const newQuestionType = e.target.value;
+                    console.log('Tipo de pergunta selecionado:', newQuestionType);
+                    setSelectedQuestionType(newQuestionType);
+                    // Não chamamos fetchQuestions() aqui, pois o useEffect cuidará disso
+                  }}
+                  className="input-field"
+                >
+                  <option value="all">Todos os Tipos de Pergunta</option>
+                  <option value={QuestionType.MULTIPLE_CHOICE}>Múltipla Escolha</option>
+                  <option value={QuestionType.OPINION_MULTIPLE}>Opinativa</option>
+                </select>
+              </div>
+            )}
+
+            {filterType === 'difficulty' && (
+              <div className="mb-4">
+                <label htmlFor="difficultyFilter" className="block text-sm font-medium text-secondary-700 mb-1">
+                  Selecionar Nível de Dificuldade
+                </label>
+                <select
+                  id="difficultyFilter"
+                  value={selectedDifficulty}
+                  onChange={(e) => {
+                    const newDifficulty = e.target.value;
+                    console.log('Nível de dificuldade selecionado:', newDifficulty);
+                    setSelectedDifficulty(newDifficulty);
+                    // Não chamamos fetchQuestions() aqui, pois o useEffect cuidará disso
+                  }}
+                  className="input-field"
+                >
+                  <option value="all">Todos os Níveis de Dificuldade</option>
+                  <option value={DifficultyLevel.EASY}>Fácil</option>
+                  <option value={DifficultyLevel.MEDIUM}>Média</option>
+                  <option value={DifficultyLevel.HARD}>Difícil</option>
+                </select>
+              </div>
+            )}
+
             {questions.length === 0 ? (
               <div className="text-center py-8 text-secondary-500">
                 Nenhuma pergunta cadastrada
@@ -840,10 +937,18 @@ const Questions: NextPage = () => {
                       : selectedTestId !== 'all' && selectedStageId === 'all'
                       ? `Exibindo perguntas do teste "${tests.find((t) => t.id === selectedTestId)?.title || ''}"`
                       : `Exibindo perguntas da etapa "${filteredStages.find((s) => s.id === selectedStageId)?.title || ''}" do teste "${tests.find((t) => t.id === selectedTestId)?.title || ''}"`
-                  ) : (
+                  ) : filterType === 'category' ? (
                     selectedCategoryId === 'all'
                       ? `Exibindo todas as ${questions.length} perguntas`
                       : `Exibindo perguntas da categoria "${categories.find((c) => c.id === selectedCategoryId)?.name || ''}"`
+                  ) : filterType === 'question_type' ? (
+                    selectedQuestionType === 'all'
+                      ? `Exibindo todas as ${questions.length} perguntas`
+                      : `Exibindo perguntas do tipo "${selectedQuestionType === QuestionType.MULTIPLE_CHOICE ? 'Múltipla Escolha' : 'Opinativa'}"`
+                  ) : (
+                    selectedDifficulty === 'all'
+                      ? `Exibindo todas as ${questions.length} perguntas`
+                      : `Exibindo perguntas do nível de dificuldade "${selectedDifficulty === DifficultyLevel.EASY ? 'Fácil' : selectedDifficulty === DifficultyLevel.MEDIUM ? 'Média' : 'Difícil'}"`
                   )}
                 </div>
                 <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
@@ -917,20 +1022,35 @@ const Questions: NextPage = () => {
                             </div>
                           </div>
                           <p className="text-secondary-800 font-medium mt-2">{question.text}</p>
+                          
+                          {/* Exibir explicação inicial para perguntas opinativas */}
+                          {question.type === QuestionType.OPINION_MULTIPLE && question.initialExplanation && (
+                            <div className="mt-2 text-sm text-secondary-600 bg-gray-50 p-2 rounded-md border border-gray-200">
+                              <span className="font-medium">Explicação inicial:</span> {question.initialExplanation}
+                            </div>
+                          )}
+                          
                           <div className="mt-3 space-y-1">
                             {question.options && question.options.length > 0 ? (
                               question.options.map((option, index) => (
                                 <div key={option.id || index} className="flex items-center">
-                                  <span
-                                    className={`w-4 h-4 rounded-full mr-2 ${
-                                      option.isCorrect ? 'bg-green-500' : 'bg-secondary-200'
+                                  <div
+                                    className={`w-4 h-4 mr-2 rounded-full ${
+                                      option.isCorrect ? 'bg-green-500' : 'bg-red-500'
                                     }`}
-                                  ></span>
-                                  <span className={option.isCorrect ? 'font-medium' : ''}>{option.text}</span>
+                                  ></div>
+                                  <span className="text-sm text-secondary-700">
+                                    {option.text}
+                                    {question.type === QuestionType.OPINION_MULTIPLE && option.category && (
+                                      <span className="ml-2 text-xs font-medium text-secondary-500">
+                                        ({option.category}{option.weight ? `, Peso: ${option.weight}` : ''})
+                                      </span>
+                                    )}
+                                  </span>
                                 </div>
                               ))
                             ) : (
-                              <p className="text-sm text-secondary-500 italic">Sem opções</p>
+                              <div className="text-sm text-secondary-500">Sem opções</div>
                             )}
                           </div>
                         </div>

@@ -87,6 +87,9 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
     preSelectedCategoryId || null
   );
+  const [existingOpinions, setExistingOpinions] = useState<string[]>([]);
+  const [opinionGroups, setOpinionGroups] = useState<{[key: string]: string[]}>({});
+  const [selectedOpinionGroup, setSelectedOpinionGroup] = useState<string | null>(null);
   const notify = useNotificationSystem();
 
   // Debug das props recebidas
@@ -127,10 +130,118 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
       const matchingCategory = categories.find(cat => cat.id === initialValues.categoryUuid);
       if (matchingCategory) {
         console.log('Categoria encontrada pelo UUID:', matchingCategory.name);
+        // Importante: definir o UUID para uso no backend
         setSelectedCategoryId(matchingCategory.id);
       }
     }
   }, [initialValues, categories]);
+
+  useEffect(() => {
+    // Carregar opiniões existentes quando o componente for montado
+    fetchExistingOpinions();
+  }, []);
+
+  // Função para buscar opiniões existentes
+  const fetchExistingOpinions = async () => {
+    try {
+      const response = await fetch('/api/admin/opinions');
+      if (response.ok) {
+        const data = await response.json();
+        setExistingOpinions(data);
+        
+        // Agrupar opiniões com base nas perguntas existentes
+        fetchOpinionGroups();
+      } else {
+        console.error('Erro ao buscar opiniões existentes');
+      }
+    } catch (error) {
+      console.error('Erro ao buscar opiniões:', error);
+    }
+  };
+  
+  // Função para buscar grupos de opiniões de perguntas existentes
+  const fetchOpinionGroups = async () => {
+    try {
+      const response = await fetch('/api/admin/opinion-groups');
+      if (response.ok) {
+        const data = await response.json();
+        setOpinionGroups(data);
+      } else {
+        console.error('Erro ao buscar grupos de opiniões');
+      }
+    } catch (error) {
+      console.error('Erro ao buscar grupos de opiniões:', error);
+    }
+  };
+  
+  // Função para aplicar um grupo de opiniões às opções da pergunta atual
+  const applyOpinionGroup = (groupName: string, setFieldValue: any) => {
+    if (opinionGroups[groupName]) {
+      const opinions = opinionGroups[groupName];
+      
+      // Criar novas opções com base nas opiniões do grupo
+      const newOptions = opinions.map((opinion, index) => ({
+        text: '', // O usuário precisará preencher o texto
+        isCorrect: true, // Todas as opções são corretas em perguntas opinativas
+        category: opinion,
+        weight: 1 // Peso padrão
+      }));
+      
+      // Atualizar o formulário com as novas opções
+      setFieldValue('options', newOptions);
+      setSelectedOpinionGroup(groupName);
+      
+      notify.showSuccess(`Grupo de opiniões "${groupName}" aplicado com sucesso!`);
+    }
+  };
+  
+  // Função para salvar o grupo atual de opiniões
+  const saveCurrentOpinionGroup = async (values: any) => {
+    try {
+      // Extrair opiniões das opções atuais
+      const opinions = values.options.map((option: any) => option.category).filter(Boolean);
+      
+      if (opinions.length === 0) {
+        notify.showError('Não há opiniões para salvar como grupo');
+        return;
+      }
+      
+      // Solicitar nome para o grupo
+      const groupName = prompt('Digite um nome para este grupo de opiniões:');
+      
+      if (!groupName || groupName.trim() === '') {
+        return;
+      }
+      
+      // Enviar para a API
+      const response = await fetch('/api/admin/opinion-groups', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          name: groupName.trim(),
+          opinions 
+        }),
+      });
+      
+      if (response.ok) {
+        // Atualizar estado local
+        setOpinionGroups(prev => ({
+          ...prev,
+          [groupName.trim()]: opinions
+        }));
+        setSelectedOpinionGroup(groupName.trim());
+        
+        notify.showSuccess(`Grupo de opiniões "${groupName.trim()}" salvo com sucesso!`);
+      } else {
+        notify.showError('Erro ao salvar grupo de opiniões');
+      }
+    } catch (error) {
+      console.error('Erro ao salvar grupo de opiniões:', error);
+      notify.showError('Erro ao salvar grupo de opiniões');
+    }
+  };
 
   const defaultValues = {
     text: '',
@@ -255,14 +366,26 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
           return;
         }
       } else if (values.type === QuestionType.OPINION_MULTIPLE) {
-        // Para perguntas opinativas, verificar se todas as opções têm categoria e peso
+        // Para perguntas opinativas, verificar se todas as opções têm opinião e peso
         const hasIncompleteOption = values.options.some(
           (option: any) => !option.text.trim() || !option.category?.trim()
         );
         
         if (hasIncompleteOption) {
-          setError('Todas as opções devem ter texto e categoria/opinião preenchidos');
-          notify.showError('Todas as opções devem ter texto e categoria/opinião preenchidos');
+          setError('Todas as opções devem ter texto e opinião/personalidade preenchidos');
+          notify.showError('Todas as opções devem ter texto e opinião/personalidade preenchidos');
+          setSubmitting(false);
+          setLoading(false);
+          return;
+        }
+        
+        // Verificar se há opiniões repetidas nas alternativas
+        const opinions = values.options.map((option: any) => option.category?.trim());
+        const uniqueOpinions = new Set(opinions);
+        
+        if (uniqueOpinions.size !== opinions.length) {
+          setError('Cada alternativa deve representar uma opinião/personalidade diferente');
+          notify.showError('Cada alternativa deve representar uma opinião/personalidade diferente');
           setSubmitting(false);
           setLoading(false);
           return;
@@ -273,6 +396,44 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
           ...option,
           isCorrect: true
         }));
+
+        // Salvar as opiniões para uso futuro
+        try {
+          // Extrair opiniões únicas das opções
+          const uniqueOpinions = new Set<string>();
+          values.options.forEach((option: any) => {
+            if (option.category && option.category.trim()) {
+              uniqueOpinions.add(option.category.trim());
+            }
+          });
+
+          // Verificar se há novas opiniões que ainda não estão no estado
+          const newOpinions = Array.from(uniqueOpinions).filter(
+            opinion => !existingOpinions.includes(opinion)
+          );
+
+          // Se houver novas opiniões, salvar no estado e no servidor
+          if (newOpinions.length > 0) {
+            console.log('Novas opiniões encontradas:', newOpinions);
+            
+            // Atualizar o estado local com as novas opiniões
+            setExistingOpinions(prev => [...prev, ...newOpinions]);
+            
+            // Salvar cada nova opinião no servidor
+            for (const opinion of newOpinions) {
+              await fetch('/api/admin/opinions', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ opinion }),
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao salvar opiniões:', error);
+          // Não bloquear o envio do formulário se falhar ao salvar opiniões
+        }
       }
 
       // Verificar se há texto em todas as opções
@@ -593,7 +754,10 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                             </div>
                             <div className="ml-3">
                               <p className="text-sm text-yellow-700">
-                                Nas perguntas opinativas, cada alternativa representa uma opinião. Defina o texto e a categoria/peso de cada alternativa.
+                                Nas perguntas opinativas, cada alternativa representa uma opinião diferente. Defina o texto e a opinião/personalidade de cada alternativa.
+                              </p>
+                              <p className="text-sm text-yellow-700 mt-1">
+                                Para mapear perfis de personalidade, use o mesmo conjunto de opiniões em várias perguntas. Você pode salvar e reutilizar grupos de opiniões.
                               </p>
                             </div>
                           </div>
@@ -617,8 +781,8 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                             </div>
                             
                             <div className="mb-2">
-                              <label htmlFor={`options.${index}.text`} className="block text-xs font-medium text-gray-700 mb-1">
-                                Texto da alternativa
+                              <label className="block text-sm font-medium text-secondary-700 mb-1">
+                                Texto da Alternativa
                               </label>
                               <Field
                                 name={`options.${index}.text`}
@@ -632,32 +796,61 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                               />
                             </div>
                             
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <label htmlFor={`options.${index}.category`} className="block text-xs font-medium text-gray-700 mb-1">
-                                  Categoria/Opinião
-                                </label>
+                            <div className="mb-2">
+                              <label className="block text-sm font-medium text-secondary-700 mb-1">
+                                Opinião/Personalidade
+                              </label>
+                              <div className="relative">
                                 <Field
                                   name={`options.${index}.category`}
                                   type="text"
-                                  placeholder="Ex: Introvertido, Extrovertido"
+                                  placeholder="Ex: Analítico, Criativo, Conservador, etc."
                                   className="input-field"
+                                  autoComplete="off"
                                 />
+                                {existingOpinions.length > 0 && (
+                                  <div className="mt-1">
+                                    <p className="text-xs text-gray-500 mb-1">Opiniões existentes:</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {existingOpinions.map((opinion, catIndex) => (
+                                        <button
+                                          key={catIndex}
+                                          type="button"
+                                          className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200"
+                                          onClick={() => {
+                                            const newOptions = [...values.options];
+                                            newOptions[index].category = opinion;
+                                            setFieldValue('options', newOptions);
+                                          }}
+                                        >
+                                          {opinion}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-                              
-                              <div>
-                                <label htmlFor={`options.${index}.weight`} className="block text-xs font-medium text-gray-700 mb-1">
-                                  Peso (0-10)
-                                </label>
-                                <Field
-                                  name={`options.${index}.weight`}
-                                  type="number"
-                                  min="0"
-                                  max="10"
-                                  placeholder="Peso"
-                                  className="input-field"
-                                />
-                              </div>
+                              <ErrorMessage
+                                name={`options.${index}.category`}
+                                render={msg => <div className="text-red-500 text-sm mt-1">{msg}</div>}
+                              />
+                            </div>
+                            
+                            <div>
+                              <label className="block text-sm font-medium text-secondary-700 mb-1">
+                                Peso (opcional)
+                              </label>
+                              <Field
+                                name={`options.${index}.weight`}
+                                type="number"
+                                min="0"
+                                placeholder="Ex: 1, 2, 3, etc."
+                                className="input-field"
+                              />
+                              <ErrorMessage
+                                name={`options.${index}.weight`}
+                                render={msg => <div className="text-red-500 text-sm mt-1">{msg}</div>}
+                              />
                             </div>
                           </div>
                         ))}
@@ -680,6 +873,36 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                       </svg>
                       Adicionar opção
                     </button>
+                    
+                    {values.type === QuestionType.OPINION_MULTIPLE && (
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-secondary-700 mb-1">
+                          Grupos de Opiniões
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          {Object.keys(opinionGroups).map((groupName, index) => (
+                            <button
+                              key={index}
+                              type="button"
+                              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200"
+                              onClick={() => applyOpinionGroup(groupName, setFieldValue)}
+                            >
+                              {groupName}
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          className="mt-2 flex items-center text-primary-600 hover:text-primary-800"
+                          onClick={() => saveCurrentOpinionGroup(values)}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                          </svg>
+                          Salvar Grupo de Opiniões
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </FieldArray>
