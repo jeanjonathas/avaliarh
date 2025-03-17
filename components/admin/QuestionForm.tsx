@@ -3,6 +3,19 @@ import { Formik, Form, Field, ErrorMessage, FieldArray, FormikConsumer, FormikHe
 import * as Yup from 'yup';
 import { useNotificationSystem } from '../../hooks/useNotificationSystem';
 
+// Enum para tipos de pergunta
+enum QuestionType {
+  MULTIPLE_CHOICE = 'MULTIPLE_CHOICE',  // Questão com resposta correta
+  OPINION_MULTIPLE = 'OPINION_MULTIPLE' // Questão opinativa categorizada
+}
+
+// Enum para níveis de dificuldade
+enum DifficultyLevel {
+  EASY = 'EASY',      // Questão simples
+  MEDIUM = 'MEDIUM',  // Questão moderada
+  HARD = 'HARD'       // Questão complexa
+}
+
 interface Stage {
   id: string;
   title: string;
@@ -19,6 +32,8 @@ interface Option {
   id?: string;
   text: string;
   isCorrect: boolean;
+  weight?: number;  // Peso para questões opinativas
+  category?: string; // Categoria para questões opinativas
 }
 
 interface Question {
@@ -28,6 +43,10 @@ interface Question {
   categoryId?: string;
   categoryUuid?: string;
   options: Option[];
+  type: QuestionType;
+  difficulty: DifficultyLevel;
+  showResults?: boolean;
+  initialExplanation?: string; // Explicação inicial para questões opinativas
   category?: {
     id: string;
     name: string;
@@ -124,6 +143,8 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
       { text: '', isCorrect: false },
       { text: '', isCorrect: false },
     ],
+    type: QuestionType.MULTIPLE_CHOICE,
+    difficulty: DifficultyLevel.EASY,
   };
 
   // Prepare initial values for Formik form
@@ -168,6 +189,8 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
           { text: '', isCorrect: true },
           { text: '', isCorrect: false },
         ],
+        type: initialValues?.type || QuestionType.MULTIPLE_CHOICE,
+        difficulty: initialValues?.difficulty || DifficultyLevel.EASY,
       };
     }
 
@@ -178,6 +201,8 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
       categoryId: initialValues?.categoryId || (preSelectedCategoryId || ''),
       categoryUuid: initialValues?.categoryUuid || (preSelectedCategoryId || ''),
       options: initialValues?.options || [],
+      type: initialValues?.type || QuestionType.MULTIPLE_CHOICE,
+      difficulty: initialValues?.difficulty || DifficultyLevel.EASY,
     };
   };
 
@@ -195,6 +220,8 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
         .test('one-correct', 'Pelo menos uma opção deve ser marcada como correta', (options) => {
           return options.some((option) => option.isCorrect);
         }),
+      type: Yup.string().oneOf([QuestionType.MULTIPLE_CHOICE, QuestionType.OPINION_MULTIPLE], 'Tipo de pergunta inválido'),
+      difficulty: Yup.string().oneOf([DifficultyLevel.EASY, DifficultyLevel.MEDIUM, DifficultyLevel.HARD], 'Nível de dificuldade inválido'),
     };
 
     // Incluir stageId na validação apenas se o campo não estiver oculto
@@ -419,6 +446,53 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
                   return typeof msg === 'string' 
                     ? <div className="text-red-500 text-sm mt-1">{msg}</div>
                     : <div className="text-red-500 text-sm mt-1">Erro de validação na categoria</div>
+                }}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-secondary-700 mb-1">
+                Tipo de Pergunta
+              </label>
+              <Field
+                as="select"
+                name="type"
+                id="type"
+                className="input-field"
+              >
+                <option value={QuestionType.MULTIPLE_CHOICE}>Questão com resposta correta</option>
+                <option value={QuestionType.OPINION_MULTIPLE}>Questão opinativa categorizada</option>
+              </Field>
+              <ErrorMessage
+                name="type"
+                render={msg => {
+                  return typeof msg === 'string' 
+                    ? <div className="text-red-500 text-sm mt-1">{msg}</div>
+                    : <div className="text-red-500 text-sm mt-1">Erro de validação no tipo de pergunta</div>
+                }}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-secondary-700 mb-1">
+                Nível de Dificuldade
+              </label>
+              <Field
+                as="select"
+                name="difficulty"
+                id="difficulty"
+                className="input-field"
+              >
+                <option value={DifficultyLevel.EASY}>Simples</option>
+                <option value={DifficultyLevel.MEDIUM}>Moderado</option>
+                <option value={DifficultyLevel.HARD}>Complexo</option>
+              </Field>
+              <ErrorMessage
+                name="difficulty"
+                render={msg => {
+                  return typeof msg === 'string' 
+                    ? <div className="text-red-500 text-sm mt-1">{msg}</div>
+                    : <div className="text-red-500 text-sm mt-1">Erro de validação no nível de dificuldade</div>
                 }}
               />
             </div>
