@@ -200,8 +200,21 @@ const CompaniesPage: React.FC<CompaniesPageProps> = ({ initialCompanies }) => {
         throw new Error(`Falha ao ${selectedCompany ? 'atualizar' : 'criar'} empresa`);
       }
 
-      // Recarrega a lista de empresas após a criação/atualização
-      await loadCompanies();
+      // Obter a resposta da criação/atualização
+      const newCompanyData = await response.json();
+      
+      // Atualizar a lista de empresas localmente sem fazer uma nova requisição
+      if (selectedCompany) {
+        // Atualização: substituir a empresa existente
+        setCompanies(prevCompanies => 
+          prevCompanies.map(company => 
+            company.id === selectedCompany.id ? newCompanyData : company
+          )
+        );
+      } else {
+        // Criação: adicionar a nova empresa à lista
+        setCompanies(prevCompanies => [...prevCompanies, newCompanyData]);
+      }
       
       // Fecha o formulário
       setIsFormOpen(false);
