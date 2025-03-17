@@ -20,127 +20,141 @@ export default async function handler(
       try {
         console.log('Buscando grupos de emoções para perguntas opinativas...');
         
-        // Buscar grupos de emoções do banco de dados
-        const emotionGroups = await prisma.emotionGroup.findMany({
-          include: {
-            questions: {
+        // Verificar se o modelo EmotionGroup está disponível no Prisma Client
+        let emotionGroups = [];
+        
+        try {
+          // Tentar buscar grupos de emoções do banco de dados
+          if (prisma.emotionGroup) {
+            emotionGroups = await prisma.emotionGroup.findMany({
               include: {
-                options: true
-              }
-            }
-          }
-        });
-
-        console.log(`Encontrados ${emotionGroups.length} grupos de emoções no banco de dados`);
-
-        // Formatar grupos para a resposta
-        const formattedGroups = emotionGroups.map(group => {
-          // Extrair categorias únicas das opções de todas as perguntas do grupo
-          const categories = new Map();
-          
-          group.questions.forEach(question => {
-            question.options.forEach(option => {
-              if (option.categoryNameUuid && option.categoryName) {
-                categories.set(option.categoryNameUuid, {
-                  id: option.categoryId || `cat-${option.categoryName.replace(/\s+/g, '-').toLowerCase()}`,
-                  name: option.categoryName,
-                  description: option.explanation || '',
-                  uuid: option.categoryNameUuid
-                });
+                questions: {
+                  include: {
+                    options: true
+                  }
+                }
               }
             });
-          });
-          
-          return {
-            id: group.id,
-            name: group.name,
-            description: group.description,
-            categories: Array.from(categories.values())
-          };
-        });
-
-        // Se não houver grupos no banco, buscar grupos a partir das perguntas (método antigo)
-        if (formattedGroups.length === 0) {
-          console.log('Nenhum grupo de emoções encontrado no banco, buscando a partir das perguntas...');
-          
-          // Buscar todas as perguntas do tipo opinião com suas opções
-          const questions = await prisma.question.findMany({
-            where: {
-              type: 'OPINION_MULTIPLE'
-            },
-            include: {
-              categories: true,
-              options: true
-            }
-          });
-
-          console.log(`Encontradas ${questions.length} perguntas opinativas`);
-
-          // Criar grupos de categorias
-          const opinionGroups = [];
-          const processedQuestionIds = new Set();
-          
-          // Processar perguntas para identificar grupos únicos de categorias
-          for (const question of questions) {
-            // Pular perguntas já processadas
-            if (processedQuestionIds.has(question.id)) continue;
             
-            // Extrair categorias das opções
-            const categoriesFromOptions = [];
-            const optionsByCategory = {};
+            console.log(`Encontrados ${emotionGroups.length} grupos de emoções no banco de dados`);
+          } else {
+            console.log('Modelo EmotionGroup não disponível no Prisma Client');
+          }
+        } catch (error) {
+          console.log('Erro ao buscar grupos de emoções, usando método alternativo:', error);
+          // Continuar com o método alternativo
+        }
+
+        // Se conseguiu buscar grupos de emoções e encontrou algum, formatar para a resposta
+        if (emotionGroups && emotionGroups.length > 0) {
+          // Formatar grupos para a resposta
+          const formattedGroups = emotionGroups.map(group => {
+            // Extrair categorias únicas das opções de todas as perguntas do grupo
+            const categories = new Map();
             
-            // Agrupar opções por categoria usando categoryNameUuid
-            for (const option of question.options) {
-              if (option.categoryName && option.categoryNameUuid) {
-                if (!optionsByCategory[option.categoryNameUuid]) {
-                  optionsByCategory[option.categoryNameUuid] = [];
-                  categoriesFromOptions.push({
+            group.questions.forEach(question => {
+              question.options.forEach(option => {
+                if (option.categoryNameUuid && option.categoryName) {
+                  categories.set(option.categoryNameUuid, {
                     id: option.categoryId || `cat-${option.categoryName.replace(/\s+/g, '-').toLowerCase()}`,
                     name: option.categoryName,
                     description: option.explanation || '',
                     uuid: option.categoryNameUuid
                   });
                 }
-                optionsByCategory[option.categoryNameUuid].push(option);
-              }
-            }
+              });
+            });
             
-            // Se encontrou categorias nas opções, criar um grupo
-            if (categoriesFromOptions.length > 0) {
-              processedQuestionIds.add(question.id);
-              
-              // Verificar se já existe um grupo similar usando UUIDs
-              const existingGroupIndex = opinionGroups.findIndex(group => 
-                group.categories.length === categoriesFromOptions.length && 
-                group.categories.every((cat, idx) => 
-                  cat.uuid === categoriesFromOptions[idx].uuid
-                )
-              );
-              
-              // Se não encontrou grupo similar, criar um novo
-              if (existingGroupIndex === -1) {
-                const groupName = `Grupo: ${categoriesFromOptions.map(c => c.name).join(', ')}`;
-                
-                opinionGroups.push({
-                  id: `group-${opinionGroups.length + 1}`,
-                  name: groupName,
-                  categories: categoriesFromOptions
+            return {
+              id: group.id,
+              name: group.name,
+              description: group.description,
+              categories: Array.from(categories.values())
+            };
+          });
+          
+          console.log(`Retornando ${formattedGroups.length} grupos de emoções`);
+          return res.status(200).json(formattedGroups);
+        }
+
+        // Se não houver grupos no banco, buscar grupos a partir das perguntas (método antigo)
+        console.log('Nenhum grupo de emoções encontrado no banco, buscando a partir das perguntas...');
+        
+        // Buscar todas as perguntas do tipo opinião com suas opções
+        const questions = await prisma.question.findMany({
+          where: {
+            type: 'OPINION_MULTIPLE'
+          },
+          include: {
+            categories: true,
+            options: true
+          }
+        });
+
+        console.log(`Encontradas ${questions.length} perguntas opinativas`);
+
+        // Criar grupos de categorias
+        const opinionGroups = [];
+        const processedQuestionIds = new Set();
+        
+        // Processar perguntas para identificar grupos únicos de categorias
+        for (const question of questions) {
+          // Pular perguntas já processadas
+          if (processedQuestionIds.has(question.id)) continue;
+          
+          // Extrair categorias das opções
+          const categoriesFromOptions = [];
+          const optionsByCategory = {};
+          
+          // Agrupar opções por categoria usando categoryNameUuid
+          for (const option of question.options) {
+            if (option.categoryName && option.categoryNameUuid) {
+              if (!optionsByCategory[option.categoryNameUuid]) {
+                optionsByCategory[option.categoryNameUuid] = [];
+                categoriesFromOptions.push({
+                  id: option.categoryId || `cat-${option.categoryName.replace(/\s+/g, '-').toLowerCase()}`,
+                  name: option.categoryName,
+                  description: option.explanation || '',
+                  uuid: option.categoryNameUuid
                 });
-                
-                console.log(`Adicionado grupo de categorias: ${groupName}`);
               }
+              optionsByCategory[option.categoryNameUuid].push(option);
             }
           }
           
-          console.log(`Retornando ${opinionGroups.length} grupos de categorias (método antigo)`);
-          return res.status(200).json(opinionGroups);
+          // Se encontrou categorias nas opções, criar um grupo
+          if (categoriesFromOptions.length > 0) {
+            processedQuestionIds.add(question.id);
+            
+            // Verificar se já existe um grupo similar usando UUIDs
+            const existingGroupIndex = opinionGroups.findIndex(group => 
+              group.categories.length === categoriesFromOptions.length && 
+              group.categories.every((cat, idx) => 
+                cat.uuid === categoriesFromOptions[idx].uuid
+              )
+            );
+            
+            // Se não encontrou grupo similar, criar um novo
+            if (existingGroupIndex === -1) {
+              const groupName = `Grupo: ${categoriesFromOptions.map(c => c.name).join(', ')}`;
+              
+              opinionGroups.push({
+                id: `group-${opinionGroups.length + 1}`,
+                name: groupName,
+                categories: categoriesFromOptions
+              });
+              
+              console.log(`Adicionado grupo de categorias: ${groupName}`);
+            }
+          }
         }
-
-        console.log(`Retornando ${formattedGroups.length} grupos de emoções`);
-        return res.status(200).json(formattedGroups);
+        
+        console.log(`Retornando ${opinionGroups.length} grupos de categorias (método antigo)`);
+        return res.status(200).json(opinionGroups);
       } catch (error) {
         console.error('Erro ao buscar grupos de emoções:', error);
-        return res.status(500).json({ message: 'Erro ao buscar grupos de emoções' });
+        // Retornar array vazio em caso de erro para não quebrar o front-end
+        return res.status(200).json([]);
       }
     } else if (req.method === 'POST') {
       try {
@@ -150,22 +164,39 @@ export default async function handler(
           return res.status(400).json({ message: 'Nome e categorias são obrigatórios' });
         }
 
-        // Criar um novo grupo de emoções no banco de dados
-        const newGroup = await prisma.emotionGroup.create({
-          data: {
-            name,
-            description: `Grupo de emoções/personalidades: ${categories.map(c => c.name).join(', ')}`
+        // Criar grupo de emoções no banco de dados
+        let newGroup;
+        
+        try {
+          if (prisma.emotionGroup) {
+            newGroup = await prisma.emotionGroup.create({
+              data: {
+                name,
+                description: req.body.description || `Grupo de emoções: ${name}`
+              }
+            });
+          } else {
+            console.log('Modelo EmotionGroup não disponível no Prisma Client');
+            return res.status(500).json({ message: 'Erro ao criar grupo de emoções' });
           }
-        });
+        } catch (error) {
+          console.error('Erro ao criar grupo de emoções:', error);
+          return res.status(500).json({ message: 'Erro ao criar grupo de emoções' });
+        }
         
         console.log('Grupo de emoções criado:', newGroup);
         
-        return res.status(201).json({ 
-          message: 'Grupo de emoções adicionado com sucesso',
+        // Retornar o grupo criado com o formato esperado pelo front-end
+        return res.status(201).json({
           id: newGroup.id,
           name: newGroup.name,
           description: newGroup.description,
-          categories
+          categories: categories.map(cat => ({
+            id: cat.id || `cat-${cat.name.replace(/\s+/g, '-').toLowerCase()}`,
+            name: cat.name,
+            description: cat.description || '',
+            uuid: cat.uuid
+          }))
         });
       } catch (error) {
         console.error('Erro ao adicionar grupo de emoções:', error);
