@@ -107,8 +107,9 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
     // Preparar dados para envio
     const formData = {
       ...values,
-      // Se categoryUuid estiver definido, usá-lo como categoryId
-      categoryId: values.categoryUuid || values.categoryId || null,
+      // Se categoryUuid estiver definido e não for string vazia, usá-lo como categoryId
+      // Caso contrário, definir explicitamente como null para remover a categoria
+      categoryId: values.categoryUuid && values.categoryUuid !== "" ? values.categoryUuid : null,
     };
     
     // Log para debug
