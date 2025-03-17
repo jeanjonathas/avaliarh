@@ -248,13 +248,13 @@ export default async function handler(
     }
   } else if (req.method === 'POST') {
     try {
-      const { text, stageId, categoryUuid, options, type, difficulty, initialExplanation, showResults } = req.body;
+      const { text, stageId, categoryUuid, options, type, difficulty, showResults } = req.body;
       
       console.log('Recebendo requisição POST para criar pergunta:', {
         text,
         stageId,
         categoryUuid,
-        options: options?.length || 0
+        options
       });
 
       // Validar dados obrigatórios
@@ -262,8 +262,16 @@ export default async function handler(
         return res.status(400).json({ error: 'Texto da pergunta é obrigatório' });
       }
 
+      // Verificar se options é um array válido
       if (!options || !Array.isArray(options) || options.length < 2) {
-        return res.status(400).json({ error: 'Pelo menos duas opções são necessárias' });
+        console.error('Erro: options inválido:', options);
+        return res.status(400).json({ error: 'Pelo menos duas opções são necessárias e devem estar em formato de array' });
+      }
+
+      // Verificar se pelo menos uma opção está marcada como correta
+      const hasCorrectOption = options.some((option: any) => option.isCorrect);
+      if (!hasCorrectOption) {
+        return res.status(400).json({ error: 'Pelo menos uma opção deve ser marcada como correta' });
       }
 
       // Verificar se a etapa existe (se fornecida)
@@ -372,12 +380,6 @@ export default async function handler(
         }
       }
 
-      // Verificar se pelo menos uma opção está marcada como correta
-      const hasCorrectOption = options.some((option: any) => option.isCorrect);
-      if (!hasCorrectOption) {
-        return res.status(400).json({ error: 'Pelo menos uma opção deve ser marcada como correta' });
-      }
-
       try {
         console.log('Criando pergunta com os seguintes dados:', {
           text,
@@ -391,7 +393,7 @@ export default async function handler(
         if (finalCategoryId) {
           // Se tiver categoria, converter para UUID explicitamente
           newQuestionId = await prisma.$queryRaw`
-            INSERT INTO "Question" (id, text, "stageId", "categoryId", "createdAt", "updatedAt", type, difficulty, "initialExplanation", "showResults")
+            INSERT INTO "Question" (id, text, "stageId", "categoryId", "createdAt", "updatedAt", type, difficulty, "showResults")
             VALUES (
               uuid_generate_v4(), 
               ${text}, 
@@ -401,7 +403,6 @@ export default async function handler(
               NOW(),
               ${type || 'MULTIPLE_CHOICE'},
               ${difficulty || 'MEDIUM'},
-              ${initialExplanation || null},
               ${showResults !== undefined ? showResults : true}
             )
             RETURNING id
@@ -409,7 +410,7 @@ export default async function handler(
         } else {
           // Se não tiver categoria, não incluir o campo
           newQuestionId = await prisma.$queryRaw`
-            INSERT INTO "Question" (id, text, "stageId", "createdAt", "updatedAt", type, difficulty, "initialExplanation", "showResults")
+            INSERT INTO "Question" (id, text, "stageId", "createdAt", "updatedAt", type, difficulty, "showResults")
             VALUES (
               uuid_generate_v4(), 
               ${text}, 
@@ -418,7 +419,6 @@ export default async function handler(
               NOW(),
               ${type || 'MULTIPLE_CHOICE'},
               ${difficulty || 'MEDIUM'},
-              ${initialExplanation || null},
               ${showResults !== undefined ? showResults : true}
             )
             RETURNING id

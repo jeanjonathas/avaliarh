@@ -10,13 +10,12 @@ const AddQuestionPage = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
   const notify = useNotificationSystem();
-  const [stages, setStages] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [dataFetched, setDataFetched] = useState(false); // Flag para controlar se os dados já foram buscados
 
-  // Carregar estágios e categorias
+  // Carregar categorias
   useEffect(() => {
     // Evitar múltiplas chamadas de API
     if (dataFetched || status !== 'authenticated') return;
@@ -25,24 +24,6 @@ const AddQuestionPage = () => {
       try {
         setLoading(true);
         setError(false);
-        
-        // Carregar estágios
-        let stagesData = [];
-        try {
-          console.log('Buscando estágios...');
-          const stagesResponse = await fetch('/api/admin/stages');
-          if (stagesResponse.ok) {
-            stagesData = await stagesResponse.json();
-            console.log(`Encontrados ${stagesData.length} estágios`);
-          } else {
-            console.error('Erro ao carregar estágios:', stagesResponse.statusText);
-            stagesData = [];
-          }
-        } catch (stageError) {
-          console.error('Erro ao carregar estágios:', stageError);
-          stagesData = [];
-        }
-        setStages(stagesData);
         
         // Carregar categorias
         let categoriesData = [];
@@ -72,7 +53,7 @@ const AddQuestionPage = () => {
     };
     
     fetchData();
-  }, [status, dataFetched]); // Remover notify das dependências e adicionar dataFetched
+  }, [status, dataFetched]);
 
   const handleCancel = () => {
     router.push('/admin/questions');
@@ -157,7 +138,6 @@ const AddQuestionPage = () => {
             <QuestionForm 
               onSubmit={handleSubmit}
               isEditing={false}
-              stages={stages || []}
               categories={categories || []}
             />
           )}

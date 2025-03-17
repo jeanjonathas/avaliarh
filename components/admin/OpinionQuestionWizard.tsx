@@ -24,6 +24,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
   const [opinionGroups, setOpinionGroups] = useState<OpinionGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<OpinionGroup | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [groupsLoaded, setGroupsLoaded] = useState(false); 
   const router = useRouter();
 
   const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm({
@@ -47,15 +48,21 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
     name: 'options'
   });
 
-  // Carregar grupos de opiniões existentes
   useEffect(() => {
+    if (groupsLoaded) return;
+    
     const fetchOpinionGroups = async () => {
       try {
         setIsLoading(true);
+        console.log('Carregando grupos de opiniões...');
         const response = await fetch('/api/admin/opinion-groups');
         if (response.ok) {
           const data = await response.json();
+          console.log(`Carregados ${data.length} grupos de opiniões`);
           setOpinionGroups(data);
+          setGroupsLoaded(true); 
+        } else {
+          console.error('Erro ao carregar grupos de opiniões:', response.statusText);
         }
       } catch (error) {
         console.error('Erro ao carregar grupos de opiniões:', error);
@@ -65,65 +72,57 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
     };
 
     fetchOpinionGroups();
-  }, []);
+  }, [groupsLoaded]); 
 
-  // Quando selecionar um grupo existente, preencher as categorias
   useEffect(() => {
-    if (selectedGroup) {
-      // Limpar categorias atuais
-      while (categoryFields.length > 0) {
-        removeCategory(0);
+    if (!selectedGroup) return;
+    
+    console.log(`Aplicando grupo selecionado: ${selectedGroup.name}`);
+    
+    while (categoryFields.length > 0) {
+      removeCategory(0);
+    }
+
+    selectedGroup.categories.forEach(category => {
+      appendCategory({
+        id: category.id,
+        name: category.name,
+        description: category.description || ''
+      });
+    });
+
+    const currentOptions = watch('options');
+    if (currentOptions.length === 0 || currentOptions.length !== selectedGroup.categories.length) {
+      while (optionFields.length > 0) {
+        removeOption(0);
       }
 
-      // Adicionar categorias do grupo selecionado
-      selectedGroup.categories.forEach(category => {
-        appendCategory({
-          id: category.id,
-          name: category.name,
-          description: category.description || ''
+      selectedGroup.categories.forEach(() => {
+        appendOption({
+          text: '',
+          categoryId: '',
+          weight: 1
         });
       });
-
-      // Atualizar opções para corresponder às categorias
-      const currentOptions = watch('options');
-      if (currentOptions.length === 0 || currentOptions.length !== selectedGroup.categories.length) {
-        // Limpar opções atuais
-        while (optionFields.length > 0) {
-          removeOption(0);
-        }
-
-        // Adicionar opções vazias para cada categoria
-        selectedGroup.categories.forEach(() => {
-          appendOption({
-            text: '',
-            categoryId: '',
-            weight: 1
-          });
-        });
-      }
     }
-  }, [selectedGroup, appendCategory, removeCategory, appendOption, removeOption, categoryFields.length, optionFields.length, watch]);
+  }, [selectedGroup]); 
 
   const handleCreateNewGroup = () => {
     setSelectedGroup(null);
     
-    // Limpar categorias atuais
     while (categoryFields.length > 0) {
       removeCategory(0);
     }
     
-    // Adicionar uma categoria vazia para começar
     appendCategory({
       name: '',
       description: ''
     });
     
-    // Limpar opções atuais
     while (optionFields.length > 0) {
       removeOption(0);
     }
     
-    // Adicionar uma opção vazia
     appendOption({
       text: '',
       categoryId: '',
@@ -137,7 +136,6 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
       description: ''
     });
     
-    // Adicionar uma opção correspondente
     appendOption({
       text: '',
       categoryId: '',
@@ -151,7 +149,6 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
   };
 
   const handleNextStep = () => {
-    // Atualizar os categoryId nas opções para corresponder às categorias
     const categories = watch('categories');
     const options = watch('options');
     
@@ -173,11 +170,12 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
   };
 
   const onFormSubmit = (data: any) => {
-    // Garantir que cada opção tenha um categoryId
     data.options.forEach((option: any, index: number) => {
       if (!option.categoryId && data.categories[index]) {
         option.categoryId = data.categories[index].id || `temp-${index}`;
       }
+      
+      option.isCorrect = true;
     });
     
     onSubmit({
@@ -200,136 +198,125 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
           </div>
         </div>
         <div className="flex justify-between mt-2">
-          <span className="text-sm font-medium">Definir Categorias</span>
-          <span className="text-sm font-medium">Criar Pergunta e Opções</span>
+          <div className="text-sm font-medium">Definir Categorias de Opinião</div>
+          <div className="text-sm font-medium">Criar Pergunta e Opções</div>
         </div>
       </div>
 
       <form onSubmit={handleSubmit(onFormSubmit)}>
-        {/* Etapa 1: Definir categorias */}
+        {/* Etapa 1: Definir categorias de opinião */}
         {step === 1 && (
           <div>
-            <h2 className="text-xl font-semibold mb-4">Etapa 1: Definir Categorias de Opinião</h2>
-            
+            <h2 className="text-xl font-semibold mb-4">Definir Categorias de Opinião</h2>
+            <p className="text-gray-600 mb-6">
+              Nesta etapa, defina as categorias de opinião que serão usadas para classificar as respostas.
+              Você pode criar um novo conjunto de categorias ou usar um grupo existente.
+            </p>
+
             {/* Seleção de grupo existente ou criação de novo */}
             <div className="mb-6">
-              <h3 className="text-lg font-medium mb-2">Grupos de Opinião Existentes</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Selecione um grupo existente ou crie um novo. Grupos são reutilizáveis em várias perguntas.
-              </p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                {isLoading ? (
-                  <div className="col-span-2 flex justify-center py-4">
-                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"></div>
-                  </div>
-                ) : opinionGroups.length > 0 ? (
-                  <>
-                    {opinionGroups.map(group => (
-                      <div 
-                        key={group.id}
-                        className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                          selectedGroup?.id === group.id ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-primary-300'
-                        }`}
-                        onClick={() => setSelectedGroup(group)}
-                      >
-                        <h4 className="font-medium">{group.name}</h4>
-                        <p className="text-sm text-gray-600 mt-1">{group.categories.length} categorias</p>
-                        <div className="mt-2">
-                          {group.categories.map(category => (
-                            <span key={category.id} className="inline-block bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded mr-2 mb-2">
-                              {category.name}
-                            </span>
-                          ))}
-                        </div>
+              <h3 className="text-lg font-medium mb-3">Escolha uma opção:</h3>
+              <div className="flex flex-col space-y-4 md:flex-row md:space-y-0 md:space-x-4">
+                <div 
+                  className={`flex-1 p-4 border rounded-lg cursor-pointer transition-all ${!selectedGroup ? 'border-primary-500 bg-primary-50' : 'border-gray-300 hover:border-primary-300'}`}
+                  onClick={handleCreateNewGroup}
+                >
+                  <h4 className="font-medium">Criar Novo Grupo</h4>
+                  <p className="text-sm text-gray-600">Defina novas categorias de opinião para esta pergunta</p>
+                </div>
+                
+                <div className="flex-1">
+                  <div className="p-4 border rounded-lg h-full">
+                    <h4 className="font-medium mb-2">Usar Grupo Existente</h4>
+                    {isLoading ? (
+                      <div className="flex justify-center py-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary-500"></div>
                       </div>
-                    ))}
-                  </>
-                ) : (
-                  <p className="col-span-2 text-gray-500 italic">Nenhum grupo de opinião encontrado.</p>
-                )}
+                    ) : opinionGroups.length === 0 ? (
+                      <p className="text-sm text-gray-600">Nenhum grupo existente encontrado</p>
+                    ) : (
+                      <select 
+                        className="w-full p-2 border border-gray-300 rounded-md"
+                        onChange={(e) => {
+                          const groupId = e.target.value;
+                          if (groupId) {
+                            const group = opinionGroups.find(g => g.id === groupId);
+                            if (group) {
+                              setSelectedGroup(group);
+                            }
+                          } else {
+                            setSelectedGroup(null);
+                          }
+                        }}
+                        value={selectedGroup?.id || ''}
+                      >
+                        <option value="">Selecione um grupo</option>
+                        {opinionGroups.map(group => (
+                          <option key={group.id} value={group.id}>{group.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Lista de categorias */}
+            <div className="mb-6">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-lg font-medium">Categorias de Opinião</h3>
+                <Button 
+                  type="button" 
+                  variant="secondary" 
+                  onClick={handleAddCategory}
+                  className="text-sm"
+                >
+                  Adicionar Categoria
+                </Button>
               </div>
               
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={handleCreateNewGroup}
-                className="mt-2"
-              >
-                Criar Novo Grupo de Opinião
-              </Button>
-            </div>
-            
-            {/* Editor de categorias */}
-            <div className="mb-6">
-              <h3 className="text-lg font-medium mb-2">
-                {selectedGroup ? `Editando Grupo: ${selectedGroup.name}` : 'Novo Grupo de Opinião'}
-              </h3>
-              
-              {!selectedGroup && (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nome do Grupo
-                  </label>
-                  <Controller
-                    name="groupName"
-                    control={control}
-                    defaultValue=""
-                    rules={{ required: "Nome do grupo é obrigatório" }}
-                    render={({ field }) => (
-                      <input
-                        {...field}
-                        type="text"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                        placeholder="Ex: Perfil de Liderança, Tipos de Personalidade, etc."
-                      />
-                    )}
-                  />
-                  {errors.groupName && (
-                    <p className="mt-1 text-sm text-red-600">{errors.groupName.message as string}</p>
-                  )}
+              {categoryFields.length === 0 ? (
+                <div className="p-4 border border-dashed border-gray-300 rounded-lg text-center text-gray-500">
+                  Nenhuma categoria definida. Crie uma nova ou selecione um grupo existente.
                 </div>
-              )}
-              
-              <div className="space-y-4">
-                {categoryFields.map((field, index) => (
-                  <div key={field.id} className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <h4 className="font-medium">Categoria {index + 1}</h4>
-                      {categoryFields.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveCategory(index)}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                    
-                    <div className="grid grid-cols-1 gap-4">
-                      <div>
+              ) : (
+                <div className="space-y-4">
+                  {categoryFields.map((field, index) => (
+                    <div key={field.id} className="p-4 border border-gray-200 rounded-lg">
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-medium">Categoria {index + 1}</h4>
+                        {categoryFields.length > 1 && (
+                          <button 
+                            type="button" 
+                            onClick={() => handleRemoveCategory(index)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                      
+                      <div className="mb-3">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Nome da Categoria
                         </label>
                         <Controller
                           name={`categories.${index}.name`}
                           control={control}
-                          defaultValue=""
                           rules={{ required: "Nome da categoria é obrigatório" }}
                           render={({ field }) => (
-                            <input
+                            <input 
                               {...field}
-                              type="text"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                              placeholder="Ex: Líder Democrático, Introvertido, etc."
+                              type="text" 
+                              className="w-full p-2 border border-gray-300 rounded-md"
+                              placeholder="Ex: Introvertido, Extrovertido, Analítico, etc."
                             />
                           )}
                         />
                         {errors.categories?.[index]?.name && (
-                          <p className="mt-1 text-sm text-red-600">{errors.categories[index]?.name?.message as string}</p>
+                          <p className="text-red-500 text-sm mt-1">{errors.categories[index].name.message}</p>
                         )}
                       </div>
                       
@@ -340,45 +327,33 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
                         <Controller
                           name={`categories.${index}.description`}
                           control={control}
-                          defaultValue=""
                           render={({ field }) => (
-                            <textarea
+                            <textarea 
                               {...field}
                               rows={2}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                              placeholder="Descreva esta categoria..."
+                              className="w-full p-2 border border-gray-300 rounded-md"
+                              placeholder="Descreva esta categoria de opinião"
                             />
                           )}
                         />
                       </div>
                     </div>
-                  </div>
-                ))}
-                
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={handleAddCategory}
-                  className="w-full"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-                  </svg>
-                  Adicionar Categoria
-                </Button>
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
-            
-            <div className="flex justify-between mt-8">
-              <Button
-                type="button"
-                variant="secondary"
+
+            <div className="flex justify-between pt-4 border-t border-gray-200">
+              <Button 
+                type="button" 
+                variant="secondary" 
                 onClick={handleCancel}
               >
                 Cancelar
               </Button>
-              <Button
-                type="button"
+              <Button 
+                type="button" 
+                variant="primary" 
                 onClick={handleNextStep}
                 disabled={categoryFields.length === 0}
               >
@@ -387,162 +362,169 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
             </div>
           </div>
         )}
-        
+
         {/* Etapa 2: Criar pergunta e opções */}
         {step === 2 && (
           <div>
-            <h2 className="text-xl font-semibold mb-4">Etapa 2: Criar Pergunta e Opções</h2>
-            
-            <div className="space-y-6">
-              {/* Campos da pergunta */}
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Texto da Pergunta
-                  </label>
-                  <Controller
-                    name="text"
-                    control={control}
-                    defaultValue=""
-                    rules={{ required: "Texto da pergunta é obrigatório" }}
-                    render={({ field }) => (
-                      <textarea
-                        {...field}
-                        rows={3}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                        placeholder="Digite a pergunta aqui..."
-                      />
-                    )}
+            <h2 className="text-xl font-semibold mb-4">Criar Pergunta e Opções</h2>
+            <p className="text-gray-600 mb-6">
+              Agora, defina o texto da pergunta, a explicação inicial (opcional) e as opções de resposta.
+              Cada opção deve corresponder a uma das categorias de opinião definidas anteriormente.
+            </p>
+
+            {/* Texto da pergunta */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Texto da Pergunta
+              </label>
+              <Controller
+                name="text"
+                control={control}
+                rules={{ required: "Texto da pergunta é obrigatório" }}
+                render={({ field }) => (
+                  <textarea 
+                    {...field}
+                    rows={3}
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                    placeholder="Digite o texto da pergunta"
                   />
-                  {errors.text && (
-                    <p className="mt-1 text-sm text-red-600">{errors.text.message as string}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Explicação Inicial (opcional)
-                  </label>
-                  <Controller
-                    name="initialExplanation"
-                    control={control}
-                    defaultValue=""
-                    render={({ field }) => (
-                      <textarea
-                        {...field}
-                        rows={2}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                        placeholder="Explicação que será mostrada antes das opções..."
-                      />
-                    )}
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Dificuldade
-                  </label>
-                  <Controller
-                    name="difficulty"
-                    control={control}
-                    defaultValue={QuestionDifficulty.MEDIUM}
-                    render={({ field }) => (
-                      <select
-                        {...field}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      >
-                        <option value={QuestionDifficulty.EASY}>Fácil</option>
-                        <option value={QuestionDifficulty.MEDIUM}>Média</option>
-                        <option value={QuestionDifficulty.HARD}>Difícil</option>
-                      </select>
-                    )}
-                  />
-                </div>
-              </div>
-              
-              {/* Opções da pergunta */}
-              <div>
-                <h3 className="text-lg font-medium mb-2">Opções da Pergunta</h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  Para cada categoria, defina o texto da opção correspondente.
-                </p>
-                
-                <div className="space-y-4">
-                  {optionFields.map((field, index) => {
-                    const category = watch(`categories.${index}`);
-                    
-                    return (
-                      <div key={field.id} className="border border-gray-200 rounded-lg p-4">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="md:col-span-1 bg-gray-50 p-3 rounded-lg">
-                            <h4 className="font-medium text-gray-800">{category?.name || `Categoria ${index + 1}`}</h4>
-                            {category?.description && (
-                              <p className="text-sm text-gray-600 mt-1">{category.description}</p>
-                            )}
-                          </div>
-                          
-                          <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Texto da Opção
-                            </label>
-                            <Controller
-                              name={`options.${index}.text`}
-                              control={control}
-                              defaultValue=""
-                              rules={{ required: "Texto da opção é obrigatório" }}
-                              render={({ field }) => (
-                                <textarea
-                                  {...field}
-                                  rows={3}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                                  placeholder={`Digite o texto para a opção "${category?.name || `Categoria ${index + 1}`}"...`}
-                                />
-                              )}
-                            />
-                            {errors.options?.[index]?.text && (
-                              <p className="mt-1 text-sm text-red-600">{errors.options[index]?.text?.message as string}</p>
-                            )}
-                            
-                            {/* Campo oculto para o categoryId */}
-                            <Controller
-                              name={`options.${index}.categoryId`}
-                              control={control}
-                              defaultValue={category?.id || `temp-${index}`}
-                              render={({ field }) => (
-                                <input type="hidden" {...field} />
-                              )}
-                            />
-                            
-                            {/* Campo oculto para o peso (padrão: 1) */}
-                            <Controller
-                              name={`options.${index}.weight`}
-                              control={control}
-                              defaultValue={1}
-                              render={({ field }) => (
-                                <input type="hidden" {...field} />
-                              )}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+                )}
+              />
+              {errors.text && (
+                <p className="text-red-500 text-sm mt-1">{errors.text.message}</p>
+              )}
             </div>
-            
-            <div className="flex justify-between mt-8">
-              <Button
-                type="button"
-                variant="secondary"
+
+            {/* Explicação inicial */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Explicação Inicial (opcional)
+              </label>
+              <Controller
+                name="initialExplanation"
+                control={control}
+                render={({ field }) => (
+                  <textarea 
+                    {...field}
+                    rows={3}
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                    placeholder="Explicação que será mostrada antes das opções"
+                  />
+                )}
+              />
+            </div>
+
+            {/* Nível de dificuldade */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Nível de Dificuldade
+              </label>
+              <Controller
+                name="difficulty"
+                control={control}
+                render={({ field }) => (
+                  <select 
+                    {...field}
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                  >
+                    <option value={QuestionDifficulty.EASY}>Fácil</option>
+                    <option value={QuestionDifficulty.MEDIUM}>Médio</option>
+                    <option value={QuestionDifficulty.HARD}>Difícil</option>
+                  </select>
+                )}
+              />
+            </div>
+
+            {/* Opções */}
+            <div className="mb-6">
+              <h3 className="text-lg font-medium mb-3">Opções de Resposta</h3>
+              <p className="text-gray-600 mb-4">
+                Defina o texto para cada opção de resposta. Cada opção corresponde a uma categoria de opinião.
+              </p>
+              
+              {optionFields.map((field, index) => {
+                const category = watch(`categories.${index}`);
+                return (
+                  <div key={field.id} className="p-4 border border-gray-200 rounded-lg mb-4">
+                    <h4 className="font-medium mb-2">
+                      Opção para categoria: <span className="text-primary-600">{category?.name || `Categoria ${index + 1}`}</span>
+                    </h4>
+                    
+                    <div className="mb-3">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Texto da Opção
+                      </label>
+                      <Controller
+                        name={`options.${index}.text`}
+                        control={control}
+                        rules={{ required: "Texto da opção é obrigatório" }}
+                        render={({ field }) => (
+                          <textarea 
+                            {...field}
+                            rows={2}
+                            className="w-full p-2 border border-gray-300 rounded-md"
+                            placeholder={`Texto para a opção que representa ${category?.name || `Categoria ${index + 1}`}`}
+                          />
+                        )}
+                      />
+                      {errors.options?.[index]?.text && (
+                        <p className="text-red-500 text-sm mt-1">{errors.options[index].text.message}</p>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Peso (1-10)
+                      </label>
+                      <Controller
+                        name={`options.${index}.weight`}
+                        control={control}
+                        rules={{ 
+                          required: "Peso é obrigatório",
+                          min: { value: 1, message: "Peso mínimo é 1" },
+                          max: { value: 10, message: "Peso máximo é 10" }
+                        }}
+                        render={({ field }) => (
+                          <input 
+                            {...field}
+                            type="number" 
+                            min="1"
+                            max="10"
+                            className="w-full p-2 border border-gray-300 rounded-md"
+                            placeholder="Peso da opção (1-10)"
+                          />
+                        )}
+                      />
+                      {errors.options?.[index]?.weight && (
+                        <p className="text-red-500 text-sm mt-1">{errors.options[index].weight.message}</p>
+                      )}
+                    </div>
+
+                    <Controller
+                      name={`options.${index}.categoryId`}
+                      control={control}
+                      render={({ field }) => (
+                        <input type="hidden" {...field} value={category?.id || `temp-${index}`} />
+                      )}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex justify-between pt-4 border-t border-gray-200">
+              <Button 
+                type="button" 
+                variant="secondary" 
                 onClick={handlePrevStep}
               >
                 Voltar
               </Button>
-              <Button
-                type="submit"
+              <Button 
+                type="submit" 
+                variant="primary"
               >
-                Salvar Pergunta
+                Criar Pergunta
               </Button>
             </div>
           </div>
