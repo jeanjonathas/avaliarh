@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
+import { useRouter } from 'next/router';
+import { v4 as uuidv4 } from 'uuid';
+import Toast from '../ui/Toast';
 import { Button } from '../ui/Button';
 import { QuestionDifficulty, QuestionType } from '../../types/questions';
 
@@ -51,6 +53,7 @@ interface OpinionQuestionWizardProps {
 interface SystemCategory {
   id: string;
   name: string;
+  description?: string;
 }
 
 const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ 
@@ -69,6 +72,9 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
   const [groupsLoaded, setGroupsLoaded] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [systemCategories, setSystemCategories] = useState<SystemCategory[]>([]);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info' | 'warning'>('warning');
 
   const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     defaultValues: initialData || {
@@ -358,6 +364,18 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
       // Avançar para o próximo passo
       setStep(2);
     } else if (step === 2) {
+      // Verificar se todas as opções têm texto preenchido
+      const options = watch('options');
+      const emptyOptions = options.filter(option => !option.text || option.text.trim() === '');
+      
+      if (emptyOptions.length > 0) {
+        // Mostrar mensagem de aviso usando o Toast
+        setToastMessage('Por favor, preencha o texto de todas as opções antes de avançar.');
+        setToastType('warning');
+        setShowToast(true);
+        return;
+      }
+      
       setStep(3);
     }
   };
@@ -445,6 +463,17 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
 
   return (
     <div className="w-full max-w-4xl mx-auto">
+      {/* Toast para mensagens de aviso */}
+      {showToast && (
+        <div className="fixed top-4 right-4 z-50">
+          <Toast 
+            message={toastMessage} 
+            type={toastType} 
+            onClose={() => setShowToast(false)} 
+          />
+        </div>
+      )}
+      
       {/* Indicador de progresso - Mais compacto e visualmente claro */}
       <div className="mb-4">
         <div className="flex items-center">
