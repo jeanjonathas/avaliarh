@@ -15,6 +15,18 @@ import DialogTitle from '@mui/material/DialogTitle';
 import Button from '@mui/material/Button';
 import { useNotificationSystem } from '../../hooks/useNotificationSystem';
 
+// Enums para tipos de pergunta e níveis de dificuldade
+enum QuestionType {
+  MULTIPLE_CHOICE = 'MULTIPLE_CHOICE',  // Questão com resposta correta
+  OPINION_MULTIPLE = 'OPINION_MULTIPLE' // Questão opinativa categorizada
+}
+
+enum DifficultyLevel {
+  EASY = 'EASY',      // Questão simples
+  MEDIUM = 'MEDIUM',  // Questão moderada
+  HARD = 'HARD'       // Questão complexa
+}
+
 interface Stage {
   id: string
   title: string
@@ -27,10 +39,16 @@ interface Question {
   stageId: string
   categoryUuid?: string
   categoryName?: string
+  type: QuestionType
+  difficulty: DifficultyLevel
+  showResults?: boolean
+  initialExplanation?: string
   options: {
     id: string
     text: string
     isCorrect: boolean
+    weight?: number
+    category?: string
   }[]
 }
 
@@ -840,9 +858,31 @@ const Questions: NextPage = () => {
                       return (
                         <div key={question.id} className="border border-secondary-200 rounded-md p-4 hover:bg-secondary-50">
                           <div className="flex justify-between">
-                            <span className="text-xs font-medium text-primary-600 bg-primary-50 px-2 py-1 rounded-full">
-                              {question.categoryName || 'Sem categoria'}
-                            </span>
+                            <div className="flex space-x-2">
+                              <span className="text-xs font-medium text-primary-600 bg-primary-50 px-2 py-1 rounded-full">
+                                {question.categoryName || 'Sem categoria'}
+                              </span>
+                              <span className={`text-xs font-medium ${
+                                question.type === QuestionType.MULTIPLE_CHOICE 
+                                  ? 'text-blue-600 bg-blue-50' 
+                                  : 'text-purple-600 bg-purple-50'
+                              } px-2 py-1 rounded-full`}>
+                                {question.type === QuestionType.MULTIPLE_CHOICE ? 'Múltipla Escolha' : 'Opinativa'}
+                              </span>
+                              <span className={`text-xs font-medium ${
+                                question.difficulty === DifficultyLevel.EASY 
+                                  ? 'text-green-600 bg-green-50' 
+                                  : question.difficulty === DifficultyLevel.MEDIUM
+                                    ? 'text-yellow-600 bg-yellow-50'
+                                    : 'text-red-600 bg-red-50'
+                              } px-2 py-1 rounded-full`}>
+                                {question.difficulty === DifficultyLevel.EASY 
+                                  ? 'Fácil' 
+                                  : question.difficulty === DifficultyLevel.MEDIUM
+                                    ? 'Média'
+                                    : 'Difícil'}
+                              </span>
+                            </div>
                             <div className="flex space-x-2">
                               <button
                                 onClick={() => handleEditQuestion(question)}

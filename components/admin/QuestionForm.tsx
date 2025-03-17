@@ -243,14 +243,36 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
       setSuccess('');
       setLoading(true);
 
-      // Verificar se há pelo menos uma opção correta
-      const hasCorrectOption = values.options.some((option: any) => option.isCorrect);
-      if (!hasCorrectOption) {
-        setError('Pelo menos uma opção deve ser marcada como correta');
-        notify.showError('Pelo menos uma opção deve ser marcada como correta');
-        setSubmitting(false);
-        setLoading(false);
-        return;
+      // Validações específicas para cada tipo de pergunta
+      if (values.type === QuestionType.MULTIPLE_CHOICE) {
+        // Verificar se há pelo menos uma opção correta
+        const hasCorrectOption = values.options.some((option: any) => option.isCorrect);
+        if (!hasCorrectOption) {
+          setError('Pelo menos uma opção deve ser marcada como correta');
+          notify.showError('Pelo menos uma opção deve ser marcada como correta');
+          setSubmitting(false);
+          setLoading(false);
+          return;
+        }
+      } else if (values.type === QuestionType.OPINION_MULTIPLE) {
+        // Para perguntas opinativas, verificar se todas as opções têm categoria e peso
+        const hasIncompleteOption = values.options.some(
+          (option: any) => !option.text.trim() || !option.category?.trim()
+        );
+        
+        if (hasIncompleteOption) {
+          setError('Todas as opções devem ter texto e categoria/opinião preenchidos');
+          notify.showError('Todas as opções devem ter texto e categoria/opinião preenchidos');
+          setSubmitting(false);
+          setLoading(false);
+          return;
+        }
+        
+        // Definir todas as opções como "corretas" para perguntas opinativas
+        values.options = values.options.map((option: any) => ({
+          ...option,
+          isCorrect: true
+        }));
       }
 
       // Verificar se há texto em todas as opções
