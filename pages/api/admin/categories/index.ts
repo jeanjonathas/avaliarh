@@ -2,29 +2,56 @@
 
 import { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
-import { authOptions } from '../../../../lib/auth'
+import { authOptions } from '../../auth/[...nextauth]'
 import { prisma } from '../../../../lib/prisma'
+
+// Definição dos papéis de usuário conforme o schema
+type Role = 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'INSTRUCTOR' | 'STUDENT' | 'USER';
+
+// Papéis permitidos para acessar este endpoint
+const allowedRoles: Role[] = ['SUPER_ADMIN', 'COMPANY_ADMIN'];
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Verificar autenticação
-  const session = await getServerSession(req, res, authOptions)
-  if (!session) {
-    return res.status(401).json({ error: 'Não autorizado' })
-  }
+  console.log(`API Categories: Método ${req.method} recebido`);
+  console.log('API Categories: Headers:', JSON.stringify(req.headers, null, 2));
+  
+  try {
+    // Verificar autenticação usando getServerSession em vez de getSession
+    const session = await getServerSession(req, res, authOptions);
+    
+    console.log('API Categories: Session:', session); // Log para depuração
+    
+    // Verifica se o usuário está autenticado
+    if (!session) {
+      console.log('API Categories: Usuário não autenticado');
+      return res.status(401).json({ message: 'Não autenticado' });
+    }
 
-  if (req.method === 'GET') {
-    try {
-      console.log('Buscando categorias');
-      
-      // Buscar todas as categorias usando o Prisma Client em vez de SQL raw
+    console.log(`API Categories: Papel do usuário: ${session.user.role}`);
+    
+    // Verifica se o usuário tem permissão
+    if (!allowedRoles.includes(session.user.role as Role)) {
+      const rolesMessage = allowedRoles.join(' ou ');
+      console.log(`API Categories: Usuário não autorizado. Papel: ${session.user.role}, Papéis permitidos: ${rolesMessage}`);
+      return res.status(403).json({ 
+        message: `Não autorizado - Apenas ${rolesMessage} podem acessar este recurso` 
+      });
+    }
+
+    if (req.method === 'GET') {
       try {
+        console.log('API Categories: Buscando categorias');
+        
+        // Buscar todas as categorias usando o Prisma Client em vez de SQL raw
         const categories = await prisma.category.findMany({
           include: {
             _count: {
-              select: { questions: true }
+              select: {
+                questions: true
+              }
             }
           },
           orderBy: {
@@ -32,36 +59,48 @@ export default async function handler(
           }
         });
         
-        // Formatar os resultados para incluir a contagem de questões
+        // Transformar os dados para incluir questionsCount
         const formattedCategories = categories.map(category => ({
-          ...category,
+          id: category.id,
+          name: category.name,
+          description: category.description,
           questionsCount: category._count.questions
         }));
         
-        console.log(`Encontradas ${formattedCategories.length} categorias`);
+        console.log(`API Categories: ${formattedCategories.length} categorias encontradas`);
         return res.status(200).json(formattedCategories);
       } catch (error) {
-        console.error('Erro ao buscar categorias:', error);
-        // Retornar array vazio em vez de erro para não quebrar a UI
-        return res.status(200).json([]);
+        console.error('API Categories: Erro ao buscar categorias:', error);
+        return res.status(500).json({ message: 'Erro ao buscar categorias' });
       }
-    } catch (error) {
-      console.error('Erro ao buscar categorias:', error)
-      // Retornar array vazio em vez de erro para não quebrar a UI
-      return res.status(200).json([])
-    }
-  } else if (req.method === 'POST') {
-    try {
-      const { name, description } = req.body
-      
-      if (!name) {
-        return res.status(400).json({ error: 'Nome da categoria é obrigatório' })
-      }
-      
-      console.log('Criando categoria:', { name, description });
-      
+    } else if (req.method === 'POST') {
       try {
-        // Criar categoria usando o Prisma Client
+        console.log('API Categories: Criando nova categoria');
+        console.log('API Categories: Dados recebidos:', req.body);
+        
+        const { name, description } = req.body;
+        
+        if (!name) {
+          console.log('API Categories: Nome da categoria é obrigatório');
+          return res.status(400).json({ message: 'Nome da categoria é obrigatório' });
+        }
+        
+        // Verificar se já existe uma categoria com o mesmo nome
+        const existingCategory = await prisma.category.findFirst({
+          where: {
+            name: {
+              equals: name,
+              mode: 'insensitive'
+            }
+          }
+        });
+        
+        if (existingCategory) {
+          console.log(`API Categories: Categoria com nome "${name}" já existe`);
+          return res.status(400).json({ message: 'Já existe uma categoria com este nome' });
+        }
+        
+        // Criar nova categoria
         const newCategory = await prisma.category.create({
           data: {
             name,
@@ -69,65 +108,68 @@ export default async function handler(
           }
         });
         
-        console.log('Categoria criada com sucesso:', newCategory);
+        console.log('API Categories: Categoria criada com sucesso:', newCategory);
         return res.status(201).json(newCategory);
       } catch (error) {
-        console.error('Erro ao criar categoria:', error);
-        throw error; // Propagar o erro para o tratamento externo
+        console.error('API Categories: Erro ao criar categoria:', error);
+        return res.status(500).json({ message: 'Erro ao criar categoria' });
       }
-    } catch (error) {
-      console.error('Erro ao criar categoria:', error)
-      return res.status(500).json({ error: 'Erro ao criar categoria' })
-    }
-  } else if (req.method === 'DELETE') {
-    try {
-      const { id } = req.query
-      
-      if (!id || typeof id !== 'string') {
-        return res.status(400).json({ error: 'ID da categoria é obrigatório' })
-      }
-      
-      console.log(`Excluindo categoria com ID: ${id}`);
-      
-      // Verificar se existem perguntas associadas à categoria
+    } else if (req.method === 'DELETE') {
       try {
-        const questionsCount = await prisma.question.count({
-          where: {
-            categories: {
-              some: {
-                id: id
-              }
-            }
-          }
-        });
+        const { id } = req.query
         
-        console.log(`Número de perguntas associadas: ${questionsCount}`);
-        
-        if (questionsCount > 0) {
-          return res.status(400).json({
-            error: 'Não é possível excluir esta categoria porque existem perguntas associadas a ela.'
-          });
+        if (!id || typeof id !== 'string') {
+          console.log('API Categories: ID da categoria é obrigatório');
+          return res.status(400).json({ message: 'ID da categoria é obrigatório' });
         }
         
-        // Excluir categoria
-        await prisma.category.delete({
-          where: {
-            id: id
-          }
-        });
+        console.log(`API Categories: Excluindo categoria com ID: ${id}`);
         
-        console.log(`Categoria excluída com sucesso: ${id}`);
-        return res.status(200).json({ success: true });
+        // Verificar se existem perguntas associadas à categoria
+        try {
+          const questionsCount = await prisma.question.count({
+            where: {
+              categories: {
+                some: {
+                  id: id
+                }
+              }
+            }
+          });
+          
+          console.log(`API Categories: Número de perguntas associadas: ${questionsCount}`);
+          
+          if (questionsCount > 0) {
+            console.log('API Categories: Não é possível excluir esta categoria porque existem perguntas associadas a ela.');
+            return res.status(400).json({
+              message: 'Não é possível excluir esta categoria porque existem perguntas associadas a ela.'
+            });
+          }
+          
+          // Excluir categoria
+          await prisma.category.delete({
+            where: {
+              id: id
+            }
+          });
+          
+          console.log(`API Categories: Categoria excluída com sucesso: ${id}`);
+          return res.status(200).json({ success: true });
+        } catch (error) {
+          console.error('API Categories: Erro ao excluir categoria:', error);
+          return res.status(500).json({ message: 'Erro ao excluir categoria' });
+        }
       } catch (error) {
-        console.error('Erro ao excluir categoria:', error);
-        throw error;
+        console.error('API Categories: Erro ao excluir categoria:', error);
+        return res.status(500).json({ message: 'Erro ao excluir categoria' });
       }
-    } catch (error) {
-      console.error('Erro ao excluir categoria:', error)
-      return res.status(500).json({ error: 'Erro ao excluir categoria' })
+    } else {
+      console.log(`API Categories: Método ${req.method} não permitido`);
+      res.setHeader('Allow', ['GET', 'POST', 'DELETE'])
+      return res.status(405).end(`Method ${req.method} Not Allowed`)
     }
-  } else {
-    res.setHeader('Allow', ['GET', 'POST', 'DELETE'])
-    res.status(405).end(`Method ${req.method} Not Allowed`)
+  } catch (error) {
+    console.error('API Categories: Erro no handler principal:', error);
+    return res.status(500).json({ message: 'Erro interno do servidor' });
   }
 }

@@ -39,17 +39,31 @@ const Categories: NextPage = () => {
   
   useEffect(() => {
     const fetchCategories = async () => {
+      setLoading(true)
       try {
-        setLoading(true)
-        const response = await fetch('/api/admin/categories')
+        // Log da sessão para depuração
+        console.log('Status da sessão:', status);
+        console.log('Dados da sessão:', session);
+        
+        const response = await fetch('/api/admin/categories', {
+          credentials: 'include',
+        })
+        
+        // Log da resposta para depuração
+        console.log('Status da resposta:', response.status);
+        
         if (!response.ok) {
-          throw new Error('Erro ao carregar as categorias')
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Erro ao carregar categorias:', errorData);
+          throw new Error(errorData.message || 'Falha ao carregar categorias')
         }
+        
         const data = await response.json()
+        console.log('Categorias carregadas:', data.length);
         setCategories(data)
       } catch (error) {
         console.error('Erro:', error)
-        notify.showError('Não foi possível carregar as categorias. Por favor, tente novamente.');
+        setError(error instanceof Error ? error.message : 'Não foi possível carregar as categorias. Por favor, tente novamente.');
       } finally {
         setLoading(false)
       }
@@ -58,7 +72,7 @@ const Categories: NextPage = () => {
     if (status === 'authenticated') {
       fetchCategories()
     }
-  }, [status]) 
+  }, [status, session]) 
   
   const handleSubmit = async (values: any, { resetForm }: any) => {
     try {
@@ -73,6 +87,7 @@ const Categories: NextPage = () => {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify(values),
       })
       
@@ -81,7 +96,9 @@ const Categories: NextPage = () => {
       }
       
       // Recarregar categorias
-      const categoriesResponse = await fetch('/api/admin/categories')
+      const categoriesResponse = await fetch('/api/admin/categories', {
+        credentials: 'include',
+      })
       const categoriesData = await categoriesResponse.json()
       setCategories(categoriesData)
       
@@ -119,6 +136,7 @@ const Categories: NextPage = () => {
         try {
           const response = await fetch(`/api/admin/categories/${id}`, {
             method: 'DELETE',
+            credentials: 'include',
           });
 
           if (response.ok) {

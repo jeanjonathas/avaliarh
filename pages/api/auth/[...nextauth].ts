@@ -154,19 +154,21 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id
-        token.role = user.role
-        token.companyId = user.companyId
-        token.company = user.company
+        token.id = user.id;
+        token.role = user.role;
+        
+        // Log para depuração do papel do usuário
+        console.log('NextAuth JWT: Papel do usuário:', user.role);
       }
       return token
     },
     async session({ session, token }) {
       if (token) {
-        session.user.id = token.id
-        session.user.role = token.role
-        session.user.companyId = token.companyId
-        session.user.company = token.company
+        session.user.id = token.id;
+        session.user.role = token.role;
+        
+        // Log para depuração da sessão
+        console.log('NextAuth Session: Papel do usuário:', token.role);
       }
       return session
     },
@@ -191,7 +193,7 @@ export const authOptions: NextAuthOptions = {
       },
     },
   },
-  debug: process.env.NODE_ENV === 'development',
+  debug: process.env.NODE_ENV !== 'production',
   secret: process.env.NEXTAUTH_SECRET,
 }
 
