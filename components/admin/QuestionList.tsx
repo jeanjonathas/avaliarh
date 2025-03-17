@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { QuestionType, QuestionDifficulty } from '../../types/questions';
 import Link from 'next/link';
+import { useNotification } from '../../contexts/NotificationContext';
 
 interface Question {
   id: string;
@@ -23,6 +24,7 @@ interface Question {
 
 const QuestionList: React.FC = () => {
   const router = useRouter();
+  const { showToast, showModal } = useNotification();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -103,24 +105,54 @@ const QuestionList: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Tem certeza que deseja excluir esta pergunta?')) {
-      try {
-        const response = await fetch(`/api/admin/questions/${id}`, {
-          method: 'DELETE',
-        });
+    showModal(
+      'Excluir Pergunta',
+      'Tem certeza que deseja excluir esta pergunta?',
+      async () => {
+        try {
+          const response = await fetch(`/api/admin/questions/${id}`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            credentials: 'include' // Importante para enviar cookies de sessão
+          });
 
-        if (response.ok) {
-          // Remover a pergunta da lista
-          setQuestions(questions.filter(q => q.id !== id));
-          alert('Pergunta excluída com sucesso!');
-        } else {
-          throw new Error('Erro ao excluir pergunta');
+          if (response.ok) {
+            // Remover a pergunta da lista
+            setQuestions(questions.filter(q => q.id !== id));
+            
+            // Tentar ler a mensagem de sucesso, se disponível
+            try {
+              const data = await response.json();
+              showToast(data.message || 'Pergunta excluída com sucesso!', 'success');
+            } catch (e) {
+              // Se não conseguir ler o JSON, usar mensagem padrão
+              showToast('Pergunta excluída com sucesso!', 'success');
+            }
+          } else {
+            // Ler o corpo da resposta para obter detalhes do erro
+            try {
+              const errorData = await response.json();
+              showToast(errorData.message || errorData.error || 'Erro ao excluir pergunta', 'error');
+            } catch (e) {
+              // Se não conseguir ler o JSON, usar mensagem baseada no status HTTP
+              if (response.status === 401) {
+                showToast('Você precisa estar autenticado para excluir perguntas', 'error');
+              } else if (response.status === 403) {
+                showToast('Você não tem permissão para excluir perguntas', 'error');
+              } else {
+                showToast(`Erro ao excluir pergunta (${response.status})`, 'error');
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Erro ao excluir pergunta:', err);
+          showToast('Erro ao excluir pergunta. Tente novamente mais tarde.', 'error');
         }
-      } catch (err) {
-        console.error('Erro ao excluir pergunta:', err);
-        alert('Erro ao excluir pergunta. Tente novamente mais tarde.');
-      }
-    }
+      },
+      { type: 'warning', confirmText: 'Excluir', cancelText: 'Cancelar' }
+    );
   };
 
   const getDifficultyLabel = (difficulty: QuestionDifficulty) => {

@@ -1,18 +1,34 @@
+/// <reference types="next" />
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '../../../../lib/prisma'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
-
-const prisma = new PrismaClient()
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
   const session = await getServerSession(req, res, authOptions)
-
-  if (!session || session.user.role !== 'ADMIN') {
-    return res.status(401).json({ error: 'Não autorizado' })
+  
+  console.log('Session:', JSON.stringify(session, null, 2));
+  
+  if (!session) {
+    return res.status(401).json({ 
+      error: 'Não autorizado', 
+      message: 'Você precisa estar autenticado para realizar esta ação' 
+    })
+  }
+  
+  console.log('User role:', session.user?.role);
+  console.log('User role type:', typeof session.user?.role);
+  
+  // Verificar se o papel do usuário é um dos papéis de administrador
+  const adminRoles = ['ADMIN', 'SUPER_ADMIN', 'COMPANY_ADMIN'];
+  if (!session.user?.role || !adminRoles.includes(session.user.role)) {
+    return res.status(403).json({ 
+      error: 'Acesso negado', 
+      message: 'Apenas administradores podem realizar esta ação' 
+    })
   }
 
   const { id } = req.query
@@ -226,46 +242,38 @@ export default async function handler(
     }
   } else if (req.method === 'DELETE') {
     try {
-      // Verificar se a pergunta tem respostas associadas
-      const responseCount = await prisma.$queryRaw`
-        SELECT COUNT(*) as count FROM "Response" WHERE "questionId"::text = ${id}::text
+      console.log(`Excluindo pergunta com ID: ${id}`);
+      
+      // Primeiro, excluir as opções relacionadas à pergunta
+      await prisma.option.deleteMany({
+        where: {
+          questionId: id
+        }
+      });
+      
+      // Em seguida, desconectar a pergunta de suas categorias
+      await prisma.$executeRaw`
+        DELETE FROM "_CategoryToQuestion"
+        WHERE "B" = ${id}
       `;
       
-      // Verificar se a pergunta está associada a algum teste
-      const testQuestionCount = await prisma.$queryRaw`
-        SELECT COUNT(*) as count FROM "TestQuestion" WHERE "questionId"::text = ${id}::text
-      `;
+      // Por fim, excluir a pergunta
+      await prisma.question.delete({
+        where: {
+          id: id
+        }
+      });
       
-      const hasResponses = responseCount[0].count > 0;
-      const isAssociatedWithTest = testQuestionCount[0].count > 0;
-      
-      // Se a pergunta não estiver associada a nenhum teste e não tiver respostas, podemos excluí-la diretamente
-      if (!isAssociatedWithTest && !hasResponses) {
-        // Remover todas as opções associadas à pergunta
-        await prisma.$executeRaw`
-          DELETE FROM "Option" WHERE "questionId"::text = ${id}::text
-        `;
-
-        // Excluir a pergunta
-        await prisma.$executeRaw`
-          DELETE FROM "Question" WHERE id::text = ${id}::text
-        `;
-
-        return res.status(204).end();
-      } else {
-        // Se a pergunta estiver associada a um teste ou tiver respostas, retornar um status especial
-        return res.status(409).json({
-          error: 'Esta pergunta não pode ser excluída diretamente.',
-          isAssociatedWithTest,
-          hasResponses,
-          message: hasResponses 
-            ? 'Esta pergunta possui respostas de candidatos. Os dados das respostas estão seguros em snapshots, então você pode prosseguir com a exclusão se necessário.' 
-            : 'Esta pergunta está associada a um ou mais testes.'
-        });
-      }
+      return res.status(200).json({ 
+        success: true, 
+        message: 'Pergunta excluída com sucesso' 
+      });
     } catch (error) {
       console.error('Erro ao excluir pergunta:', error);
-      return res.status(500).json({ error: 'Erro ao excluir a pergunta' })
+      return res.status(500).json({ 
+        error: 'Erro ao excluir a pergunta',
+        message: 'Ocorreu um erro ao tentar excluir a pergunta. Por favor, tente novamente.'
+      });
     }
   } else if (req.method === 'GET') {
     try {
