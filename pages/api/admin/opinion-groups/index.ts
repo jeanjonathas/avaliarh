@@ -1,4 +1,4 @@
-import { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../../lib/auth';
 import { prisma } from '../../../../lib/prisma';
@@ -21,16 +21,36 @@ export default async function handler(
       try {
         console.log('Buscando grupos de categorias para perguntas opinativas...');
         
-        // Buscar todas as perguntas do tipo opinião com suas opções
+        // Buscar todas as perguntas do tipo opinião múltipla com suas opções
         const questions = await prisma.question.findMany({
           where: {
             type: 'OPINION_MULTIPLE'
           },
           include: {
-            categories: true,
             options: true
           }
         });
+
+        // Buscar os valores de categoryName e categoryNameUuid diretamente do banco de dados
+        // já que o Prisma Client não está reconhecendo esses campos
+        const questionIds = questions.map(q => `'${q.id}'`).join(',');
+        const optionsWithCategories = await prisma.$queryRaw`
+          SELECT id, "categoryName", "categoryNameUuid", explanation
+          FROM "Option"
+          WHERE "questionId" IN (${questionIds})
+          AND "categoryName" IS NOT NULL
+          AND "categoryNameUuid" IS NOT NULL
+        `;
+
+        // Mapear os resultados para um objeto para fácil acesso
+        const optionCategoryMap = {};
+        for (const opt of optionsWithCategories) {
+          optionCategoryMap[opt.id] = {
+            categoryName: opt.categoryName,
+            categoryNameUuid: opt.categoryNameUuid,
+            explanation: opt.explanation
+          };
+        }
 
         console.log(`Encontradas ${questions.length} perguntas opinativas`);
 
@@ -47,19 +67,21 @@ export default async function handler(
           const categoriesFromOptions = [];
           const optionsByCategory = {};
           
-          // Agrupar opções por categoria usando categoryNameUuid
+          // Agrupar opções por categoria usando os dados obtidos via SQL
           for (const option of question.options) {
-            if (option.categoryName && option.categoryNameUuid) {
-              if (!optionsByCategory[option.categoryNameUuid]) {
-                optionsByCategory[option.categoryNameUuid] = [];
+            const categoryData = optionCategoryMap[option.id];
+            
+            if (categoryData && categoryData.categoryNameUuid) {
+              if (!optionsByCategory[categoryData.categoryNameUuid]) {
+                optionsByCategory[categoryData.categoryNameUuid] = [];
                 categoriesFromOptions.push({
-                  id: `cat-${option.categoryName.replace(/\s+/g, '-').toLowerCase()}`,
-                  name: option.categoryName,
-                  description: option.explanation || '',
-                  uuid: option.categoryNameUuid
+                  id: `cat-${categoryData.categoryName.replace(/\s+/g, '-').toLowerCase()}`,
+                  name: categoryData.categoryName,
+                  description: categoryData.explanation || '',
+                  uuid: categoryData.categoryNameUuid
                 });
               }
-              optionsByCategory[option.categoryNameUuid].push(option);
+              optionsByCategory[categoryData.categoryNameUuid].push(option);
             }
           }
           
@@ -116,18 +138,26 @@ export default async function handler(
           }
         });
         
-        // Criar opções para cada categoria
+        // Criar opções para a pergunta temporária
         for (const category of categories) {
-          await prisma.option.create({
+          // Criar opção com o Prisma
+          const option = await prisma.option.create({
             data: {
               text: category.name,
               isCorrect: true,
-              questionId: tempQuestion.id,
-              categoryName: category.name,
-              categoryNameUuid: category.uuid || crypto.randomUUID(),
-              explanation: category.description || ''
+              questionId: tempQuestion.id
             }
           });
+          
+          // Atualizar os campos categoryName e categoryNameUuid via SQL
+          const categoryUuid = category.uuid || crypto.randomUUID();
+          await prisma.$executeRaw`
+            UPDATE "Option"
+            SET "categoryName" = ${category.name},
+                "categoryNameUuid" = ${categoryUuid},
+                "explanation" = ${category.description || null}
+            WHERE id = ${option.id}
+          `;
         }
         
         console.log('Grupo de categorias criado via pergunta temporária:', tempQuestion.id);

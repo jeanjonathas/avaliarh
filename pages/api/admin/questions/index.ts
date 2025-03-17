@@ -338,10 +338,10 @@ export default async function handler(
             // Adicionar campos específicos para perguntas opinativas
             if (type === 'OPINION_MULTIPLE') {
               Object.assign(optionData, {
+                position: option.position || 0,
                 categoryName: option.category || null,
                 categoryNameUuid: option.categoryNameUuid || null,
-                explanation: option.explanation || null,
-                position: option.position || 0
+                explanation: option.explanation || null
               });
             } else if (option.categoryId) {
               // Para perguntas não opinativas, manter o categoryId se existir
@@ -349,13 +349,37 @@ export default async function handler(
                 categoryId: option.categoryId
               });
             }
-            
-            // Criar opção com os campos apropriados
-            const newOption = await prisma.option.create({
-              data: optionData
-            });
-            
-            console.log('Opção criada:', newOption);
+
+            // Criar a opção usando o Prisma
+            try {
+              const createdOption = await prisma.option.create({
+                data: optionData
+              });
+              console.log('Opção criada:', createdOption);
+            } catch (error) {
+              console.error('Erro ao criar opção com Prisma Client:', error);
+              
+              // Fallback para SQL direto se o Prisma Client falhar
+              const baseOption = await prisma.option.create({
+                data: {
+                  text: optionData.text,
+                  isCorrect: optionData.isCorrect,
+                  questionId: optionData.questionId,
+                  position: optionData.position || 0
+                }
+              });
+              
+              if (type === 'OPINION_MULTIPLE' && option.category && option.categoryNameUuid) {
+                await prisma.$executeRaw`
+                  UPDATE "Option" 
+                  SET "categoryName" = ${option.category}, 
+                      "categoryNameUuid" = ${option.categoryNameUuid},
+                      "explanation" = ${option.explanation || null}
+                  WHERE id = ${baseOption.id}
+                `;
+                console.log('Opção atualizada via SQL direto:', baseOption.id);
+              }
+            }
           } catch (error) {
             console.error('Erro ao criar opção:', error);
             // Continuar criando as outras opções mesmo se uma falhar
