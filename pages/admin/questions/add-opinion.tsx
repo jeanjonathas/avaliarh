@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import AdminLayout from '../../../components/admin/AdminLayout';
@@ -10,6 +10,7 @@ const AddOpinionQuestionPage = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
   const notify = useNotificationSystem();
+  const [loading, setLoading] = useState(false);
 
   const handleCancel = () => {
     router.push('/admin/questions');
@@ -17,6 +18,7 @@ const AddOpinionQuestionPage = () => {
 
   const handleSubmit = async (values: any) => {
     try {
+      setLoading(true);
       const response = await fetch('/api/admin/questions', {
         method: 'POST',
         headers: {
@@ -35,6 +37,8 @@ const AddOpinionQuestionPage = () => {
     } catch (error) {
       console.error('Erro ao criar pergunta opinativa:', error);
       notify.showError(`Erro ao criar pergunta opinativa: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -72,9 +76,15 @@ const AddOpinionQuestionPage = () => {
         </div>
 
         <div className="bg-white shadow-md rounded-lg p-6">
-          <OpinionQuestionWizard 
-            onSubmit={handleSubmit}
-          />
+          {loading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+            </div>
+          ) : (
+            <OpinionQuestionWizard 
+              onSubmit={handleSubmit}
+            />
+          )}
         </div>
       </div>
     </AdminLayout>

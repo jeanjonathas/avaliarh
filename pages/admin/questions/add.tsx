@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import AdminLayout from '../../../components/admin/AdminLayout';
@@ -10,6 +10,69 @@ const AddQuestionPage = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
   const notify = useNotificationSystem();
+  const [stages, setStages] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [dataFetched, setDataFetched] = useState(false); // Flag para controlar se os dados já foram buscados
+
+  // Carregar estágios e categorias
+  useEffect(() => {
+    // Evitar múltiplas chamadas de API
+    if (dataFetched || status !== 'authenticated') return;
+    
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(false);
+        
+        // Carregar estágios
+        let stagesData = [];
+        try {
+          console.log('Buscando estágios...');
+          const stagesResponse = await fetch('/api/admin/stages');
+          if (stagesResponse.ok) {
+            stagesData = await stagesResponse.json();
+            console.log(`Encontrados ${stagesData.length} estágios`);
+          } else {
+            console.error('Erro ao carregar estágios:', stagesResponse.statusText);
+            stagesData = [];
+          }
+        } catch (stageError) {
+          console.error('Erro ao carregar estágios:', stageError);
+          stagesData = [];
+        }
+        setStages(stagesData);
+        
+        // Carregar categorias
+        let categoriesData = [];
+        try {
+          console.log('Buscando categorias...');
+          const categoriesResponse = await fetch('/api/admin/categories');
+          if (categoriesResponse.ok) {
+            categoriesData = await categoriesResponse.json();
+            console.log(`Encontradas ${categoriesData.length} categorias`);
+          } else {
+            console.error('Erro ao carregar categorias:', categoriesResponse.statusText);
+            categoriesData = [];
+          }
+        } catch (categoryError) {
+          console.error('Erro ao carregar categorias:', categoryError);
+          categoriesData = [];
+        }
+        setCategories(categoriesData);
+        
+        setLoading(false);
+        setDataFetched(true); // Marcar que os dados foram buscados
+      } catch (error) {
+        console.error('Erro ao carregar dados:', error);
+        setError(true);
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [status, dataFetched]); // Remover notify das dependências e adicionar dataFetched
 
   const handleCancel = () => {
     router.push('/admin/questions');
@@ -72,10 +135,32 @@ const AddQuestionPage = () => {
         </div>
 
         <div className="bg-white shadow-md rounded-lg p-6">
-          <QuestionForm 
-            onSubmit={handleSubmit}
-            isEditing={false}
-          />
+          {loading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+            </div>
+          ) : error ? (
+            <div className="text-center py-8">
+              <p className="text-red-500 mb-4">Ocorreu um erro ao carregar os dados necessários para o formulário.</p>
+              <Button 
+                variant="primary" 
+                onClick={() => {
+                  setDataFetched(false); // Resetar a flag para permitir nova tentativa
+                  window.location.reload();
+                }}
+                className="mx-auto"
+              >
+                Tentar novamente
+              </Button>
+            </div>
+          ) : (
+            <QuestionForm 
+              onSubmit={handleSubmit}
+              isEditing={false}
+              stages={stages || []}
+              categories={categories || []}
+            />
+          )}
         </div>
       </div>
     </AdminLayout>
