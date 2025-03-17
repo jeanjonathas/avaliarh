@@ -386,120 +386,61 @@ export default async function handler(
           stageId: finalStageId,
           categoryId: finalCategoryId
         });
+
+        // Criar pergunta usando o Prisma Client em vez de SQL raw
+        const newQuestion = await prisma.question.create({
+          data: {
+            text,
+            stageId: finalStageId,
+            categoryId: finalCategoryId,
+            type: (type || 'MULTIPLE_CHOICE') as any,
+            difficulty: (difficulty || 'MEDIUM') as any,
+            showResults: showResults !== undefined ? showResults : true,
+          }
+        });
+
+        console.log('Pergunta criada com sucesso:', newQuestion.id);
         
-        // Usar SQL bruto para evitar problemas de tipagem com o Prisma
-        let newQuestionId;
-        
-        if (finalCategoryId) {
-          // Se tiver categoria, converter para UUID explicitamente
-          newQuestionId = await prisma.$queryRaw`
-            INSERT INTO "Question" (id, text, "stageId", "categoryId", "createdAt", "updatedAt", type, difficulty, "showResults")
-            VALUES (
-              uuid_generate_v4(), 
-              ${text}, 
-              ${finalStageId}, 
-              ${finalCategoryId}::uuid, 
-              NOW(), 
-              NOW(),
-              ${type || 'MULTIPLE_CHOICE'},
-              ${difficulty || 'MEDIUM'},
-              ${showResults !== undefined ? showResults : true}
-            )
-            RETURNING id
-          `;
-        } else {
-          // Se não tiver categoria, não incluir o campo
-          newQuestionId = await prisma.$queryRaw`
-            INSERT INTO "Question" (id, text, "stageId", "createdAt", "updatedAt", type, difficulty, "showResults")
-            VALUES (
-              uuid_generate_v4(), 
-              ${text}, 
-              ${finalStageId}, 
-              NOW(), 
-              NOW(),
-              ${type || 'MULTIPLE_CHOICE'},
-              ${difficulty || 'MEDIUM'},
-              ${showResults !== undefined ? showResults : true}
-            )
-            RETURNING id
-          `;
-        }
-        
-        console.log('Verificando a inserção de dados na tabela Question:', newQuestionId);
-        
-        if (!Array.isArray(newQuestionId) || newQuestionId.length === 0) {
-          console.log('Erro: não foi possível criar a pergunta');
-          return res.status(500).json({ error: 'Erro ao criar pergunta' });
-        }
-        
-        const questionId = newQuestionId[0].id;
-        console.log('Pergunta criada com sucesso:', questionId);
-        
-        // Criar opções
+        // Criar opções usando o Prisma Client
+        const createdOptions = [];
         for (const option of options) {
-          const newOptionId = await prisma.$queryRaw`
-            INSERT INTO "Option" (id, text, "isCorrect", "questionId", "createdAt", "updatedAt")
-            VALUES (
-              uuid_generate_v4(), 
-              ${option.text}, 
-              ${option.isCorrect}, 
-              ${questionId}, 
-              NOW(), 
-              NOW()
-            )
-            RETURNING id
-          `;
-          console.log('Verificando a inserção de dados na tabela Option:', newOptionId);
+          console.log('Inserindo opção:', option);
+          const newOption = await prisma.option.create({
+            data: {
+              text: option.text,
+              isCorrect: option.isCorrect,
+              questionId: newQuestion.id,
+            }
+          });
+          createdOptions.push(newOption);
+          console.log('Opção criada com sucesso:', newOption.id);
         }
         
-        // Buscar a pergunta completa
-        const questionData = await prisma.$queryRaw`
-          SELECT 
-            q.id, 
-            q.text, 
-            q."stageId",
-            q."categoryId",
-            q."createdAt", 
-            q."updatedAt",
-            s.title as "stageTitle",
-            s.description as "stageDescription",
-            s.order as "stageOrder",
-            c.name as "categoryName",
-            c.description as "categoryDescription"
-          FROM "Question" q
-          LEFT JOIN "Stage" s ON q."stageId" = s.id
-          LEFT JOIN "Category" c ON q."categoryId" = c.id
-          WHERE q.id = ${questionId}
-        `;
+        // Buscar a pergunta completa com suas relações
+        const questionWithRelations = await prisma.question.findUnique({
+          where: { id: newQuestion.id },
+          include: {
+            stage: true,
+            options: true,
+            company: true,
+            categories: true,
+          }
+        });
         
-        // Buscar opções
-        const optionsData = await prisma.$queryRaw`
-          SELECT 
-            id, 
-            text, 
-            "isCorrect", 
-            "createdAt", 
-            "updatedAt"
-          FROM "Option" 
-          WHERE "questionId" = ${questionId}
-        `;
-        
-        if (!Array.isArray(questionData) || questionData.length === 0) {
+        if (!questionWithRelations) {
           console.log('Erro: não foi possível buscar a pergunta criada');
           return res.status(500).json({ error: 'Erro ao buscar pergunta criada' });
         }
-        
-        const question = questionData[0];
-        
+
         // Serializar os dados para evitar problemas com BigInt
         const serializedQuestion = {
-          id: question.id.toString(),
-          text: question.text,
-          stageId: question.stageId,
-          categoryId: question.categoryId,
-          createdAt: new Date(question.createdAt).toISOString(),
-          updatedAt: new Date(question.updatedAt).toISOString(),
-          options: Array.isArray(optionsData) ? optionsData.map((option: any) => ({
+          id: questionWithRelations.id.toString(),
+          text: questionWithRelations.text,
+          stageId: questionWithRelations.stageId,
+          categoryId: questionWithRelations.categoryId,
+          createdAt: new Date(questionWithRelations.createdAt).toISOString(),
+          updatedAt: new Date(questionWithRelations.updatedAt).toISOString(),
+          options: Array.isArray(questionWithRelations.options) ? questionWithRelations.options.map((option: any) => ({
             id: option.id.toString(),
             text: option.text,
             isCorrect: option.isCorrect,
@@ -507,15 +448,15 @@ export default async function handler(
             updatedAt: new Date(option.updatedAt).toISOString(),
           })) : [],
           stage: {
-            id: question.stageId,
-            title: question.stageTitle,
-            description: question.stageDescription || '',
-            order: question.stageOrder,
+            id: questionWithRelations.stageId,
+            title: questionWithRelations.stage.title,
+            description: questionWithRelations.stage.description || '',
+            order: questionWithRelations.stage.order,
           },
-          category: question.categoryId ? {
-            id: question.categoryId,
-            name: question.categoryName,
-            description: question.categoryDescription || '',
+          category: questionWithRelations.categoryId && questionWithRelations.categories.length > 0 ? {
+            id: questionWithRelations.categoryId,
+            name: questionWithRelations.categories[0]?.name || '',
+            description: questionWithRelations.categories[0]?.description || '',
           } : null,
         };
 
