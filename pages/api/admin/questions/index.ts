@@ -307,57 +307,79 @@ export default async function handler(
           if (categoryUuids.length > 0) {
             console.log('Verificando se já existe um grupo de emoções com as mesmas categorias:', categoryUuids);
             
-            // Buscar todas as perguntas opinativas com seus grupos de emoções
-            const existingQuestions = await prisma.question.findMany({
-              where: {
-                type: 'OPINION_MULTIPLE',
-                emotionGroupId: { not: null }
-              },
-              include: {
-                options: true,
-                emotionGroup: true
+            try {
+              // Verificar se o modelo EmotionGroup está disponível
+              if (!prisma.emotionGroup) {
+                console.log('Modelo EmotionGroup não disponível no Prisma Client');
+                throw new Error('Modelo EmotionGroup não disponível');
               }
-            });
-            
-            // Verificar se alguma pergunta existente tem exatamente as mesmas categorias
-            for (const question of existingQuestions) {
-              if (question.emotionGroupId) {
-                const questionCategoryUuids = question.options
-                  .filter(opt => opt.categoryNameUuid)
-                  .map(opt => opt.categoryNameUuid)
-                  .sort();
-                
-                // Verificar se os arrays de UUIDs são idênticos
-                const isMatch = 
-                  categoryUuids.length === questionCategoryUuids.length && 
-                  categoryUuids.every((uuid, index) => uuid === questionCategoryUuids[index]);
-                
-                if (isMatch) {
-                  emotionGroupId = question.emotionGroupId;
-                  console.log('Encontrado grupo de emoções existente:', emotionGroupId);
-                  break;
+              
+              // Buscar todas as perguntas opinativas com seus grupos de emoções
+              const existingQuestions = await prisma.question.findMany({
+                where: {
+                  type: 'OPINION_MULTIPLE',
+                  emotionGroupId: { not: null }
+                },
+                include: {
+                  options: true,
+                  emotionGroup: true
+                }
+              });
+              
+              // Verificar se alguma pergunta existente tem exatamente as mesmas categorias
+              for (const question of existingQuestions) {
+                if (question.emotionGroup) {
+                  const questionCategoryUuids = question.options
+                    .filter(opt => opt.categoryNameUuid)
+                    .map(opt => opt.categoryNameUuid)
+                    .sort();
+                  
+                  // Verificar se os arrays de UUIDs são idênticos
+                  const isMatch = 
+                    categoryUuids.length === questionCategoryUuids.length && 
+                    categoryUuids.every((uuid, index) => uuid === questionCategoryUuids[index]);
+                  
+                  if (isMatch) {
+                    emotionGroupId = question.emotionGroup.id;
+                    console.log('Encontrado grupo de emoções existente:', emotionGroupId);
+                    break;
+                  }
                 }
               }
+            } catch (error) {
+              console.error('Erro ao buscar perguntas existentes:', error);
+              // Continuar o fluxo mesmo com erro na busca
             }
             
             // Se não encontrou um grupo existente, criar um novo
             if (!emotionGroupId) {
-              // Criar nome para o grupo baseado nas categorias
-              const categoryNames = options
-                .filter(opt => opt.category)
-                .map(opt => opt.category);
-              
-              const groupName = `Grupo: ${categoryNames.join(', ')}`;
-              
-              const newEmotionGroup = await prisma.emotionGroup.create({
-                data: {
-                  name: groupName,
-                  description: `Grupo de emoções/personalidades: ${categoryNames.join(', ')}`
+              try {
+                // Verificar se o modelo EmotionGroup está disponível
+                if (!prisma.emotionGroup) {
+                  console.log('Modelo EmotionGroup não disponível no Prisma Client para criar novo grupo');
+                  // Continuar sem criar grupo de emoções
+                } else {
+                  // Extrair nomes de categorias das opções
+                  const categoryNames = options
+                    .filter(opt => opt.category)
+                    .map(opt => opt.category);
+                  
+                  const groupName = `Grupo: ${categoryNames.join(', ')}`;
+                  
+                  const newEmotionGroup = await prisma.emotionGroup.create({
+                    data: {
+                      name: groupName,
+                      description: `Grupo de emoções/personalidades: ${categoryNames.join(', ')}`
+                    }
+                  });
+                  
+                  emotionGroupId = newEmotionGroup.id;
+                  console.log('Criado novo grupo de emoções:', emotionGroupId);
                 }
-              });
-              
-              emotionGroupId = newEmotionGroup.id;
-              console.log('Criado novo grupo de emoções:', emotionGroupId);
+              } catch (error) {
+                console.error('Erro ao criar grupo de emoções:', error);
+                // Continuar sem grupo de emoções
+              }
             }
           }
         }
@@ -404,8 +426,7 @@ export default async function handler(
               text: option.text,
               isCorrect: option.isCorrect,
               questionId: newQuestion.id,
-              weight: option.weight || 0,
-              ...(option.categoryId ? { categoryId: option.categoryId } : {})
+              weight: option.weight || 0
             };
             
             // Adicionar campos específicos para perguntas opinativas
@@ -416,6 +437,11 @@ export default async function handler(
                 explanation: option.explanation || null,
                 emotionGroupId: emotionGroupId || null,
                 position: option.position || 0
+              });
+            } else if (option.categoryId) {
+              // Para perguntas não opinativas, manter o categoryId se existir
+              Object.assign(optionData, {
+                categoryId: option.categoryId
               });
             }
             

@@ -3,7 +3,16 @@ import { useRouter } from 'next/router';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { Button } from '../ui/Button';
 import { QuestionDifficulty, QuestionType } from '../../types/questions';
-import crypto from 'crypto';
+
+// Função para gerar UUID v4 compatível com navegador
+function generateUUID() {
+  // https://stackoverflow.com/questions/105034/how-to-create-a-guid-uuid
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0, 
+          v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
 
 interface OpinionGroup {
   id: string;
@@ -93,16 +102,16 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
     appendCategory({
       name: '',
       description: '',
-      uuid: crypto.randomUUID()
+      uuid: generateUUID()
     });
     
+    const categoryUuid = generateUUID();
     appendOption({
       text: '',
-      categoryId: '',
-      categoryNameUuid: '',
+      categoryNameUuid: categoryUuid,
       category: '',
       weight: 1,
-      position: 0
+      position: optionFields.length
     });
   };
 
@@ -117,8 +126,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
       // Criar opções vazias para cada categoria
       const newOptions = group.categories.map(category => ({
         text: '',
-        categoryId: category.id,
-        categoryNameUuid: category.uuid || crypto.randomUUID(),
+        categoryNameUuid: category.uuid || generateUUID(),
         category: category.name,
         weight: 5,
         position: 0
@@ -151,7 +159,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
         id: category.id,
         name: category.name,
         description: category.description || '',
-        uuid: category.uuid || crypto.randomUUID()
+        uuid: category.uuid || generateUUID()
       });
     });
 
@@ -164,8 +172,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
       selectedGroup.categories.forEach((category, index) => {
         appendOption({
           text: '',
-          categoryId: category.id,
-          categoryNameUuid: category.uuid || crypto.randomUUID(),
+          categoryNameUuid: category.uuid || generateUUID(),
           category: category.name,
           weight: 1,
           position: index
@@ -191,7 +198,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
   }, []);
 
   const handleAddCategory = () => {
-    const categoryUuid = crypto.randomUUID();
+    const categoryUuid = generateUUID();
     appendCategory({
       name: '',
       description: '',
@@ -200,7 +207,6 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
     
     appendOption({
       text: '',
-      categoryId: '',
       categoryNameUuid: categoryUuid,
       category: '',
       weight: 1,
