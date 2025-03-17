@@ -21,6 +21,13 @@ const AddOpinionQuestionPage = () => {
 
   const handleSubmit = async (values: any) => {
     try {
+      // Verificar se os dados estão completos antes de enviar
+      if (!values.text || !values.categories || values.categories.length === 0 || !values.options || values.options.length === 0) {
+        notify.showError('Por favor, preencha todos os campos necessários antes de salvar.');
+        setLoading(false);
+        return;
+      }
+      
       setLoading(true);
       const response = await fetch('/api/admin/questions', {
         method: 'POST',

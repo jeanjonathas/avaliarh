@@ -298,7 +298,16 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
     setStep(1);
   };
 
-  const handleCancel = () => {
+  const handleCancel = (e: React.MouseEvent) => {
+    // Prevenir comportamento padrão do formulário
+    e.preventDefault();
+    
+    // Limpar o formulário antes de redirecionar
+    setValue('text', '');
+    setValue('categories', []);
+    setValue('options', []);
+    
+    // Redirecionar para a página de perguntas
     router.push('/admin/questions');
   };
 
@@ -516,7 +525,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
             <div className="flex justify-end space-x-3 pt-4">
               <Button
                 variant="secondary"
-                onClick={() => router.push('/admin/questions')}
+                onClick={handleCancel}
               >
                 Cancelar
               </Button>
