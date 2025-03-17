@@ -194,8 +194,8 @@ export default async function handler(
         id: question.id,
         text: question.text,
         stageId: question.stageId,
-        categoryId: question.category_id || null,
-        categoryUuid: question.category_id || null, 
+        categoryId: question.categories && question.categories.length > 0 ? question.categories[0].id : null,
+        categoryUuid: question.categories && question.categories.length > 0 ? question.categories[0].id : null, 
         options: optionsList.map(option => ({
           id: option.id,
           text: option.text,
@@ -209,10 +209,10 @@ export default async function handler(
           description: question.stage_description === null ? '' : question.stage_description,
           order: question.stage_order || 0
         },
-        category: question.category_id ? {
-          id: question.category_id,
-          name: question.category_name === null ? '' : question.category_name,
-          description: question.category_description === null ? '' : question.category_description
+        category: question.categories && question.categories.length > 0 ? {
+          id: question.categories[0].id,
+          name: question.categories[0].name,
+          description: question.categories[0].description || ''
         } : null
       };
 
@@ -279,96 +279,50 @@ export default async function handler(
     try {
       console.log(`Buscando detalhes da pergunta com ID: ${id}`);
       
-      // Vamos usar SQL bruto para evitar problemas de tipagem
-      const questionQuery = `
-        SELECT 
-          q.id, 
-          q.text, 
-          q."stageId",
-          q."categoryId",
-          s.id as "stage_id",
-          s.title as "stage_title",
-          s.description as "stage_description",
-          s.order as "stage_order",
-          c.id as "category_id",
-          c.name as "category_name",
-          c.description as "category_description"
-        FROM "Question" q
-        LEFT JOIN "Stage" s ON q."stageId" = s.id
-        LEFT JOIN "Category" c ON q."categoryId" = c.id
-        WHERE q.id = '${id}'
-      `;
+      // Usar Prisma Client em vez de SQL bruto para evitar problemas de tipo
+      const question = await prisma.question.findUnique({
+        where: {
+          id: id
+        },
+        include: {
+          options: true,
+          stage: true,
+          categories: true
+        }
+      });
       
-      const optionsQuery = `
-        SELECT id, text, "isCorrect", "createdAt", "updatedAt"
-        FROM "Option"
-        WHERE "questionId" = '${id}'
-      `;
-      
-      const questionResult = await prisma.$queryRawUnsafe(questionQuery);
-      const optionsResult = await prisma.$queryRawUnsafe(optionsQuery);
-      
-      if (!questionResult || !Array.isArray(questionResult) || questionResult.length === 0) {
+      if (!question) {
         return res.status(404).json({ error: 'Pergunta não encontrada' });
       }
-
-      // Definir interface para o tipo do resultado da query
-      interface QuestionQueryResult {
-        id: string;
-        text: string;
-        stageId: string;
-        categoryId: string | null;
-        stage_id: string;
-        stage_title: string;
-        stage_description: string | null;
-        stage_order: number | null;
-        category_id: string | null;
-        category_name: string | null;
-        category_description: string | null;
-      }
-
-      // Usar asserção de tipo
-      const question = questionResult[0] as QuestionQueryResult;
-      const optionsList = Array.isArray(optionsResult) ? optionsResult : [];
 
       // Formatar a resposta
       const formattedQuestion = {
         id: question.id,
         text: question.text,
+        type: question.type,
+        difficulty: question.difficulty,
         stageId: question.stageId,
-        categoryId: question.category_id || null,
-        categoryUuid: question.category_id || null, 
-        options: optionsList.map(option => ({
+        categoryId: question.categories && question.categories.length > 0 ? question.categories[0].id : null,
+        categoryUuid: question.categories && question.categories.length > 0 ? question.categories[0].id : null, 
+        options: question.options.map(option => ({
           id: option.id,
           text: option.text,
           isCorrect: option.isCorrect,
-          createdAt: new Date(option.createdAt).toISOString(),
-          updatedAt: new Date(option.updatedAt).toISOString()
+          createdAt: option.createdAt.toISOString(),
+          updatedAt: option.updatedAt.toISOString()
         })),
-        stage: {
-          id: question.stage_id,
-          title: question.stage_title,
-          description: question.stage_description === null ? '' : question.stage_description,
-          order: question.stage_order || 0
-        },
-        category: question.category_id ? {
-          id: question.category_id,
-          name: question.category_name === null ? '' : question.category_name,
-          description: question.category_description === null ? '' : question.category_description
+        stage: question.stage ? {
+          id: question.stage.id,
+          title: question.stage.title,
+          description: question.stage.description || '',
+          order: question.stage.order || 0
+        } : null,
+        category: question.categories && question.categories.length > 0 ? {
+          id: question.categories[0].id,
+          name: question.categories[0].name,
+          description: question.categories[0].description || ''
         } : null
       };
-
-      console.assert(typeof question.id === 'string', 'question.id deve ser uma string');
-      console.assert(typeof question.text === 'string', 'question.text deve ser uma string');
-      console.assert(typeof question.stageId === 'string', 'question.stageId deve ser uma string');
-      console.assert(typeof question.category_id === 'string' || question.category_id === null, 'question.category_id deve ser uma string ou null');
-      console.assert(typeof question.stage_id === 'string', 'question.stage_id deve ser uma string');
-      console.assert(typeof question.stage_title === 'string', 'question.stage_title deve ser uma string');
-      console.assert(typeof question.stage_description === 'string', 'question.stage_description deve ser uma string');
-      console.assert(typeof question.stage_order === 'number', 'question.stage_order deve ser um número');
-      console.assert(typeof question.category_id === 'string' || question.category_id === null, 'question.category_id deve ser uma string ou null');
-      console.assert(typeof question.category_name === 'string', 'question.category_name deve ser uma string');
-      console.assert(typeof question.category_description === 'string', 'question.category_description deve ser uma string');
 
       console.log('API retornando pergunta formatada:', {
         id: formattedQuestion.id,
