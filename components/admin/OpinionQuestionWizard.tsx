@@ -75,6 +75,8 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error' | 'info' | 'warning'>('warning');
+  const [isCreatingNewGroup, setIsCreatingNewGroup] = useState(false);
+  const firstEmptyCategoryRef = React.useRef<HTMLInputElement>(null);
 
   const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     defaultValues: initialData || {
@@ -214,34 +216,32 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
     fetchOpinionGroups();
   }, [groupsLoaded]);
 
+  // Função para criar um novo grupo de categorias
   const handleCreateNewGroup = () => {
-    // Limpar a seleção de grupo
+    // Limpar categorias existentes
+    setValue('categories', [
+      { name: '', description: '', uuid: generateUUID() },
+      { name: '', description: '', uuid: generateUUID() }
+    ]);
+    
+    // Limpar opções existentes e criar duas opções vazias
+    setValue('options', [
+      { text: '', categoryNameUuid: watch('categories')[0].uuid, category: '', weight: 1, position: 0 },
+      { text: '', categoryNameUuid: watch('categories')[1].uuid, category: '', weight: 1, position: 1 }
+    ]);
+    
+    // Resetar o grupo selecionado
     setSelectedGroup(null);
     
-    // Limpar categorias e opções existentes usando setValue
-    setValue('categories', []);
-    setValue('options', []);
+    // Marcar que estamos criando um novo grupo
+    setIsCreatingNewGroup(true);
     
-    // Adicionar uma categoria vazia
-    setValue('categories', [{
-      name: '',
-      description: '',
-      uuid: generateUUID()
-    }]);
-    
-    // Adicionar uma opção vazia
-    setValue('options', [{
-      text: '',
-      categoryNameUuid: generateUUID(),
-      category: '',
-      weight: 1,
-      position: 0
-    }]);
-    
-    // Resetar o flag de modificação
-    setCategoriesModified(false);
-    setOriginalCategories({});
-    setOriginalCategoryCount(0);
+    // Focar no primeiro campo de categoria após renderização
+    setTimeout(() => {
+      if (firstEmptyCategoryRef.current) {
+        firstEmptyCategoryRef.current.focus();
+      }
+    }, 100);
   };
 
   const handleSelectGroup = (groupId: string) => {
@@ -335,8 +335,34 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
         setSelectedGroup(null);
       }
       
-      // Verificar se o número de opções corresponde ao número de categorias
+      // Verificar se temos pelo menos 2 categorias
       const currentCategories = watch('categories');
+      if (currentCategories.length < 2) {
+        setToastMessage('É necessário ter pelo menos 2 categorias para avançar.');
+        setToastType('warning');
+        setShowToast(true);
+        return;
+      }
+      
+      // Verificar se todas as categorias têm nome preenchido
+      const emptyCategoryIndex = currentCategories.findIndex(cat => !cat.name || cat.name.trim() === '');
+      if (emptyCategoryIndex >= 0) {
+        setToastMessage('Por favor, preencha o nome de todas as categorias antes de avançar.');
+        setToastType('warning');
+        setShowToast(true);
+        
+        // Focar no primeiro campo de categoria vazio
+        setTimeout(() => {
+          const categoryInputs = document.querySelectorAll('input[name^="categories"][name$="name"]');
+          if (categoryInputs[emptyCategoryIndex]) {
+            (categoryInputs[emptyCategoryIndex] as HTMLInputElement).focus();
+          }
+        }, 100);
+        
+        return;
+      }
+      
+      // Verificar se o número de opções corresponde ao número de categorias
       const currentOptions = watch('options');
       
       // Se o número de opções não corresponder ao número de categorias, ajustar
@@ -508,7 +534,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
             {/* Seleção de grupo existente ou criação de novo */}
             <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-3">
               <div 
-                className={`p-3 border rounded-lg cursor-pointer transition-all ${!selectedGroup ? 'border-primary-500 bg-primary-50' : 'border-gray-300 hover:border-primary-300'}`}
+                className={`p-3 border rounded-lg cursor-pointer transition-all ${isCreatingNewGroup ? 'border-primary-500 bg-primary-50' : 'border-gray-300 hover:border-primary-300'}`}
                 onClick={handleCreateNewGroup}
               >
                 <h4 className="font-medium text-sm">CRIAR NOVO GRUPO</h4>
@@ -564,22 +590,18 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
                             <label className="block text-xs font-medium text-gray-700 mb-1">
                               Nome
                             </label>
-                            <Controller
-                              name={`categories.${index}.name`}
-                              control={control}
-                              rules={{ required: "Nome da categoria é obrigatório" }}
-                              render={({ field }) => (
-                                <input 
-                                  {...field}
-                                  type="text" 
-                                  className="w-full p-1.5 text-sm border border-gray-300 rounded-md"
-                                  placeholder="Ex: Introvertido, Extrovertido..."
-                                  onChange={(e) => {
-                                    field.onChange(e);
-                                    handleCategoryChange(index, 'name', e.target.value);
-                                  }}
-                                />
-                              )}
+                            <input
+                              ref={index === 0 ? firstEmptyCategoryRef : null}
+                              type="text"
+                              className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                              placeholder="Nome da categoria"
+                              value={category.name}
+                              onChange={(e) => {
+                                const newCategories = [...watch('categories')];
+                                newCategories[index].name = e.target.value;
+                                setValue('categories', newCategories);
+                                handleCategoryChange(index, 'name', e.target.value);
+                              }}
                             />
                             {errors.categories?.[index]?.name && (
                               <p className="text-red-500 text-xs mt-0.5">{errors.categories[index].name.message}</p>
@@ -590,21 +612,17 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
                             <label className="block text-xs font-medium text-gray-700 mb-1">
                               Descrição
                             </label>
-                            <Controller
-                              name={`categories.${index}.description`}
-                              control={control}
-                              render={({ field }) => (
-                                <textarea 
-                                  {...field}
-                                  rows={2}
-                                  className="w-full p-1.5 text-sm border border-gray-300 rounded-md"
-                                  placeholder="Descrição breve da categoria..."
-                                  onChange={(e) => {
-                                    field.onChange(e);
-                                    handleCategoryChange(index, 'description', e.target.value);
-                                  }}
-                                />
-                              )}
+                            <textarea 
+                              className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                              rows={2}
+                              placeholder="Descrição breve da categoria..."
+                              value={category.description}
+                              onChange={(e) => {
+                                const newCategories = [...watch('categories')];
+                                newCategories[index].description = e.target.value;
+                                setValue('categories', newCategories);
+                                handleCategoryChange(index, 'description', e.target.value);
+                              }}
                             />
                           </div>
                         </div>
@@ -671,18 +689,12 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Texto da Pergunta
                   </label>
-                  <Controller
-                    name="text"
-                    control={control}
-                    rules={{ required: "Texto da pergunta é obrigatório" }}
-                    render={({ field }) => (
-                      <textarea 
-                        {...field}
-                        rows={2}
-                        className="w-full p-1.5 text-sm border border-gray-300 rounded-md"
-                        placeholder="Digite a pergunta aqui..."
-                      />
-                    )}
+                  <textarea 
+                    className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                    rows={2}
+                    placeholder="Digite a pergunta aqui..."
+                    value={watch('text')}
+                    onChange={(e) => setValue('text', e.target.value)}
                   />
                   {errors.text && (
                     <p className="text-red-500 text-xs mt-0.5">{errors.text.message}</p>
@@ -723,18 +735,16 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
                           <label className="block text-xs font-medium text-gray-700 mb-1">
                             Texto da Opção
                           </label>
-                          <Controller
-                            name={`options.${index}.text`}
-                            control={control}
-                            rules={{ required: "Texto da opção é obrigatório" }}
-                            render={({ field }) => (
-                              <textarea 
-                                {...field}
-                                rows={2}
-                                className="w-full p-1.5 text-sm border border-gray-300 rounded-md bg-white"
-                                placeholder="Digite o texto da opção..."
-                              />
-                            )}
+                          <textarea 
+                            className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                            rows={2}
+                            placeholder="Digite o texto da opção..."
+                            value={option.text}
+                            onChange={(e) => {
+                              const newOptions = [...watch('options')];
+                              newOptions[index].text = e.target.value;
+                              setValue('options', newOptions);
+                            }}
                           />
                           {errors.options?.[index]?.text && (
                             <p className="text-red-500 text-xs mt-0.5">{errors.options[index].text.message}</p>
@@ -745,23 +755,17 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
                           <label className="block text-xs font-medium text-gray-700 mb-1">
                             Peso (1-10)
                           </label>
-                          <Controller
-                            name={`options.${index}.weight`}
-                            control={control}
-                            rules={{ 
-                              required: "Peso é obrigatório",
-                              min: { value: 1, message: "Peso mínimo é 1" },
-                              max: { value: 10, message: "Peso máximo é 10" }
+                          <input 
+                            type="number" 
+                            min={1}
+                            max={10}
+                            className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                            value={option.weight}
+                            onChange={(e) => {
+                              const newOptions = [...watch('options')];
+                              newOptions[index].weight = parseInt(e.target.value);
+                              setValue('options', newOptions);
                             }}
-                            render={({ field }) => (
-                              <input 
-                                {...field}
-                                type="number" 
-                                min={1}
-                                max={10}
-                                className="w-full p-1.5 text-sm border border-gray-300 rounded-md bg-white"
-                              />
-                            )}
                           />
                           {errors.options?.[index]?.weight && (
                             <p className="text-red-500 text-xs mt-0.5">{errors.options[index].weight.message}</p>
@@ -809,59 +813,42 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Dificuldade
                   </label>
-                  <Controller
-                    name="difficulty"
-                    control={control}
-                    render={({ field }) => (
-                      <select 
-                        {...field}
-                        className="w-full p-1.5 text-sm border border-gray-300 rounded-md"
-                      >
-                        <option value={QuestionDifficulty.EASY}>Fácil</option>
-                        <option value={QuestionDifficulty.MEDIUM}>Média</option>
-                        <option value={QuestionDifficulty.HARD}>Difícil</option>
-                      </select>
-                    )}
-                  />
+                  <select 
+                    className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                    value={watch('difficulty')}
+                    onChange={(e) => setValue('difficulty', e.target.value)}
+                  >
+                    <option value={QuestionDifficulty.EASY}>Fácil</option>
+                    <option value={QuestionDifficulty.MEDIUM}>Média</option>
+                    <option value={QuestionDifficulty.HARD}>Difícil</option>
+                  </select>
                 </div>
 
                 <div className="mb-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Categoria do Sistema
                   </label>
-                  <Controller
-                    name="categoryId"
-                    control={control}
-                    render={({ field }) => (
-                      <select 
-                        {...field}
-                        className="w-full p-1.5 text-sm border border-gray-300 rounded-md"
-                      >
-                        <option value="">Selecione uma categoria</option>
-                        {systemCategories.map(category => (
-                          <option key={category.id} value={category.id}>
-                            {category.name}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  />
+                  <select 
+                    className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                    value={watch('categoryId')}
+                    onChange={(e) => setValue('categoryId', e.target.value)}
+                  >
+                    <option value="">Selecione uma categoria</option>
+                    {systemCategories.map(category => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="mb-3">
                   <label className="flex items-center">
-                    <Controller
-                      name="showExplanation"
-                      control={control}
-                      defaultValue={false}
-                      render={({ field }) => (
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                          checked={field.value}
-                          onChange={(e) => field.onChange(e.target.checked)}
-                        />
-                      )}
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                      checked={watch('showExplanation')}
+                      onChange={(e) => setValue('showExplanation', e.target.checked)}
                     />
                     <span className="ml-2 text-xs font-medium text-gray-700">
                       Mostrar explicação inicial
@@ -874,17 +861,12 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Explicação Inicial
                     </label>
-                    <Controller
-                      name="initialExplanation"
-                      control={control}
-                      render={({ field }) => (
-                        <textarea 
-                          {...field}
-                          rows={3}
-                          className="w-full p-1.5 text-sm border border-gray-300 rounded-md"
-                          placeholder="Explicação que aparecerá antes da pergunta..."
-                        />
-                      )}
+                    <textarea 
+                      className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                      rows={3}
+                      placeholder="Explicação que aparecerá antes da pergunta..."
+                      value={watch('initialExplanation')}
+                      onChange={(e) => setValue('initialExplanation', e.target.value)}
                     />
                   </div>
                 )}
