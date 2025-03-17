@@ -53,7 +53,6 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
       options: [],
       initialExplanation: '',
       showExplanation: false,
-      categoryId: ''
     }
   });
 
@@ -240,19 +239,23 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
     router.push('/admin/questions');
   };
 
-  const onFormSubmit = (data: any) => {
-    data.options.forEach((option: any, index: number) => {
-      if (!option.categoryId && data.categories[index]) {
-        option.categoryId = data.categories[index].id || `temp-${index}`;
-      }
-      
-      option.isCorrect = true;
-    });
-    
-    onSubmit({
+  const onFormSubmit = async (data: any) => {
+    const formData = {
       ...data,
-      type: QuestionType.OPINION_MULTIPLE
-    });
+      type: QuestionType.OPINION_MULTIPLE,
+      options: data.options.map((option: any, index: number) => {
+        const category = data.categories[index];
+        return {
+          ...option,
+          category: category?.name || '',
+          categoryNameUuid: category?.uuid || option.categoryNameUuid,
+          categoryId: undefined,
+          isCorrect: true
+        };
+      })
+    };
+    
+    onSubmit(formData);
   };
 
   return (
