@@ -5,7 +5,7 @@ import AdminLayout from '../../../components/admin/AdminLayout';
 import QuestionList from '../../../components/admin/QuestionList';
 import { Button } from '../../../components/ui/Button';
 import { QuestionType } from '../../../types/questions';
-import { Modal } from '../../../components/ui/Modal';
+import Modal from '../../../components/ui/Modal';
 
 const QuestionsPage = () => {
   const { data: session, status } = useSession();
