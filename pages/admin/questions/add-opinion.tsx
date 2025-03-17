@@ -5,12 +5,15 @@ import AdminLayout from '../../../components/admin/AdminLayout';
 import { Button } from '../../../components/ui/Button';
 import { useNotificationSystem } from '../../../hooks/useNotificationSystem';
 import OpinionQuestionWizard from '../../../components/admin/OpinionQuestionWizard';
+import { useModal } from '../../../hooks/useModal';
 
 const AddOpinionQuestionPage = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
   const notify = useNotificationSystem();
+  const { showModal } = useModal();
   const [loading, setLoading] = useState(false);
+  const [lastCreatedQuestion, setLastCreatedQuestion] = useState<any>(null);
 
   const handleCancel = () => {
     router.push('/admin/questions');
@@ -28,8 +31,33 @@ const AddOpinionQuestionPage = () => {
       });
 
       if (response.ok) {
+        const createdQuestion = await response.json();
+        setLastCreatedQuestion({
+          ...values,
+          id: createdQuestion.id
+        });
+        
         notify.showSuccess('Pergunta opinativa criada com sucesso!');
-        router.push('/admin/questions');
+        
+        // Perguntar se deseja criar outra pergunta com o mesmo grupo
+        showModal(
+          'Criar outra pergunta',
+          'Deseja criar outra pergunta opinativa com o mesmo grupo de personalidade/categorias?',
+          () => {
+            // Usuário escolheu criar outra pergunta
+            // Resetar o estado para permitir nova criação, mas manter as categorias
+            setLoading(false);
+          },
+          {
+            type: 'confirm',
+            confirmText: 'Sim, criar outra',
+            cancelText: 'Não, voltar à lista',
+            onCancel: () => {
+              // Usuário escolheu voltar à lista
+              router.push('/admin/questions');
+            }
+          }
+        );
       } else {
         const error = await response.json();
         throw new Error(error.message || 'Erro ao criar pergunta opinativa');
@@ -37,7 +65,6 @@ const AddOpinionQuestionPage = () => {
     } catch (error) {
       console.error('Erro ao criar pergunta opinativa:', error);
       notify.showError(`Erro ao criar pergunta opinativa: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-    } finally {
       setLoading(false);
     }
   };
@@ -83,6 +110,16 @@ const AddOpinionQuestionPage = () => {
           ) : (
             <OpinionQuestionWizard 
               onSubmit={handleSubmit}
+              initialData={lastCreatedQuestion ? {
+                text: '', // Novo texto para a nova pergunta
+                difficulty: lastCreatedQuestion.difficulty,
+                categories: lastCreatedQuestion.categories, // Manter as mesmas categorias
+                options: lastCreatedQuestion.options.map((opt: any) => ({
+                  ...opt,
+                  text: '' // Resetar o texto das opções
+                })),
+                initialExplanation: lastCreatedQuestion.initialExplanation
+              } : undefined}
             />
           )}
         </div>

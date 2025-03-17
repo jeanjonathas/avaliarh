@@ -33,12 +33,13 @@ interface NotificationContextData {
       type?: ModalType;
       confirmText?: string;
       cancelText?: string;
+      onCancel?: () => void;
     }
   ) => void;
   closeModal: () => void;
 }
 
-const NotificationContext = createContext<NotificationContextData>({} as NotificationContextData);
+export const NotificationContext = createContext<NotificationContextData>({} as NotificationContextData);
 
 export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -73,6 +74,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
       type?: ModalType;
       confirmText?: string;
       cancelText?: string;
+      onCancel?: () => void;
     }
   ) => {
     setModalConfig({
@@ -86,9 +88,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
         onConfirm();
         setModalConfig((prev) => ({ ...prev, isOpen: false }));
       },
-      onCancel: () => {
-        setModalConfig((prev) => ({ ...prev, isOpen: false }));
-      }
+      onCancel: options?.onCancel || (() => setModalConfig((prev) => ({ ...prev, isOpen: false })))
     });
   }, []);
 
