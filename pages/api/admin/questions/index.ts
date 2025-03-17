@@ -198,16 +198,16 @@ export default async function handler(
       if (stageId) {
         try {
           console.log('Verificando se a etapa existe:', stageId);
-          const stage = await prisma.$queryRaw`
-            SELECT id FROM "Stage" WHERE id = ${stageId}
-          `;
+          const stage = await prisma.stage.findUnique({
+            where: { id: stageId }
+          });
 
-          if (!Array.isArray(stage) || stage.length === 0) {
+          if (!stage) {
             console.log('Erro: etapa não encontrada');
             return res.status(404).json({ error: 'Etapa não encontrada' });
           }
         } catch (error) {
-          console.error('Erro ao verificar etapa (tabela pode não existir):', error);
+          console.error('Erro ao verificar etapa:', error);
           return res.status(404).json({ error: 'Etapa não encontrada' });
         }
       } else {
@@ -216,41 +216,43 @@ export default async function handler(
           console.log('Criando etapa padrão para pergunta sem etapa');
           
           // Verificar se já existe uma etapa padrão
-          const defaultStages = await prisma.$queryRaw`
-            SELECT id FROM "Stage" WHERE title = 'Sem Etapa' LIMIT 1
-          `;
+          const defaultStages = await prisma.stage.findMany({
+            where: { title: 'Sem Etapa' }
+          });
           
           console.log('Etapas padrão encontradas:', defaultStages);
           
           let defaultStageId;
           
-          if (Array.isArray(defaultStages) && defaultStages.length > 0) {
+          if (defaultStages.length > 0) {
             defaultStageId = defaultStages[0].id;
             console.log('Usando etapa padrão existente:', defaultStageId);
           } else {
             // Criar uma etapa padrão
             console.log('Criando nova etapa padrão');
-            // Gerar um UUID manualmente para a etapa
-            const uuid = await prisma.$queryRaw`SELECT uuid_generate_v4() as uuid`;
-            const newUuid = Array.isArray(uuid) && uuid.length > 0 ? uuid[0].uuid : null;
-            
-            if (!newUuid) {
-              console.log('Erro: não foi possível gerar UUID para etapa padrão');
-              return res.status(500).json({ error: 'Erro ao criar etapa padrão' });
-            }
+            // Gerar um UUID usando o módulo crypto do Node.js
+            const newUuid = crypto.randomUUID();
             
             console.log('UUID gerado para etapa padrão:', newUuid);
             
-            const newStageId = await prisma.$queryRaw`
-              INSERT INTO "Stage" (id, title, description, "order", "createdAt", "updatedAt")
-              VALUES (${newUuid}, 'Sem Etapa', 'Etapa padrão para perguntas sem etapa específica', 9999, NOW(), NOW())
-              RETURNING id
-            `;
+            const newStageId = await prisma.stage.create({
+              data: {
+                id: newUuid,
+                title: 'Sem Etapa',
+                description: 'Etapa padrão para perguntas sem etapa específica',
+                order: 9999,
+                createdAt: new Date(),
+                updatedAt: new Date()
+              },
+              select: {
+                id: true
+              }
+            });
             
             console.log('Nova etapa padrão criada:', newStageId);
             
-            if (Array.isArray(newStageId) && newStageId.length > 0) {
-              defaultStageId = newStageId[0].id;
+            if (newStageId && newStageId.id) {
+              defaultStageId = newStageId.id;
               console.log('ID da etapa padrão criada:', defaultStageId);
             } else {
               console.log('Erro: não foi possível criar etapa padrão');
@@ -268,37 +270,21 @@ export default async function handler(
       }
 
       // Verificar se a categoria existe (se fornecida)
-      let finalCategoryId = null;
-      if (categoryId || categoryUuid) {
+      let finalCategoryId = categoryId;
+      if (categoryId) {
         try {
-          const categoryToCheck = categoryId || categoryUuid;
-          console.log('Verificando se a categoria existe:', categoryToCheck);
-          
-          // Verificar se o categoryId/categoryUuid é um UUID válido
-          const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(categoryToCheck);
-          
-          if (!isValidUuid) {
-            console.error('UUID de categoria inválido:', categoryToCheck);
-            return res.status(400).json({ error: 'UUID de categoria inválido' });
-          }
-          
-          // Usar Prisma Client em vez de SQL raw para verificar a categoria
+          console.log('Verificando se a categoria existe:', categoryId);
           const category = await prisma.category.findUnique({
-            where: { id: categoryToCheck }
+            where: { id: categoryId }
           });
-
-          console.log('Resultado da consulta de categoria:', category);
 
           if (!category) {
             console.log('Erro: categoria não encontrada');
             return res.status(404).json({ error: 'Categoria não encontrada' });
           }
-          
-          finalCategoryId = categoryToCheck;
-          console.log('Categoria válida encontrada:', finalCategoryId);
         } catch (error) {
           console.error('Erro ao verificar categoria:', error);
-          return res.status(500).json({ error: 'Erro ao verificar categoria' });
+          return res.status(404).json({ error: 'Categoria não encontrada' });
         }
       }
 
@@ -308,6 +294,73 @@ export default async function handler(
           stageId: finalStageId,
           categoryId: finalCategoryId
         });
+
+        // Para perguntas opinativas, verificar se já existe um grupo de emoções com as mesmas categorias
+        let emotionGroupId = null;
+        if (type === 'OPINION_MULTIPLE' && options && options.length > 0) {
+          // Extrair UUIDs de categorias/emoções das opções
+          const categoryUuids = options
+            .filter(opt => opt.categoryNameUuid)
+            .map(opt => opt.categoryNameUuid)
+            .sort(); // Ordenar para garantir comparação consistente
+          
+          if (categoryUuids.length > 0) {
+            console.log('Verificando se já existe um grupo de emoções com as mesmas categorias:', categoryUuids);
+            
+            // Buscar todas as perguntas opinativas com seus grupos de emoções
+            const existingQuestions = await prisma.question.findMany({
+              where: {
+                type: 'OPINION_MULTIPLE',
+                emotionGroupId: { not: null }
+              },
+              include: {
+                options: true,
+                emotionGroup: true
+              }
+            });
+            
+            // Verificar se alguma pergunta existente tem exatamente as mesmas categorias
+            for (const question of existingQuestions) {
+              if (question.emotionGroupId) {
+                const questionCategoryUuids = question.options
+                  .filter(opt => opt.categoryNameUuid)
+                  .map(opt => opt.categoryNameUuid)
+                  .sort();
+                
+                // Verificar se os arrays de UUIDs são idênticos
+                const isMatch = 
+                  categoryUuids.length === questionCategoryUuids.length && 
+                  categoryUuids.every((uuid, index) => uuid === questionCategoryUuids[index]);
+                
+                if (isMatch) {
+                  emotionGroupId = question.emotionGroupId;
+                  console.log('Encontrado grupo de emoções existente:', emotionGroupId);
+                  break;
+                }
+              }
+            }
+            
+            // Se não encontrou um grupo existente, criar um novo
+            if (!emotionGroupId) {
+              // Criar nome para o grupo baseado nas categorias
+              const categoryNames = options
+                .filter(opt => opt.category)
+                .map(opt => opt.category);
+              
+              const groupName = `Grupo: ${categoryNames.join(', ')}`;
+              
+              const newEmotionGroup = await prisma.emotionGroup.create({
+                data: {
+                  name: groupName,
+                  description: `Grupo de emoções/personalidades: ${categoryNames.join(', ')}`
+                }
+              });
+              
+              emotionGroupId = newEmotionGroup.id;
+              console.log('Criado novo grupo de emoções:', emotionGroupId);
+            }
+          }
+        }
 
         // Criar pergunta usando o Prisma Client em vez de SQL raw
         const newQuestion = await prisma.question.create({
@@ -322,46 +375,72 @@ export default async function handler(
               categories: {
                 connect: [{ id: finalCategoryId }]
               }
+            } : {}),
+            // Associar ao grupo de emoções se for uma pergunta opinativa
+            ...(emotionGroupId ? {
+              emotionGroupId
             } : {})
           },
           include: {
             categories: true,
             stage: true,
-            options: true
+            options: true,
+            ...(type === 'OPINION_MULTIPLE' ? { emotionGroup: true } : {})
           }
         });
 
         console.log('Pergunta criada com sucesso:', newQuestion.id);
         console.log('Categorias conectadas:', newQuestion.categories);
         
-        // Criar opções usando o Prisma Client
-        const createdOptions = [];
+        // Criar opções para a pergunta
+        console.log('Criando opções para a pergunta:', options);
+        
         for (const option of options) {
-          console.log('Inserindo opção:', option);
-          const newOption = await prisma.option.create({
-            data: {
+          console.log('Criando opção:', option);
+          
+          try {
+            // Determinar os campos a serem usados com base no tipo de pergunta
+            const optionData = {
               text: option.text,
               isCorrect: option.isCorrect,
               questionId: newQuestion.id,
               weight: option.weight || 0,
-              position: option.position || 0,
-              categoryId: option.categoryId && !option.categoryId.startsWith('temp-') ? option.categoryId : null,
-              categoryName: option.category || null,
-              categoryNameUuid: option.categoryNameUuid || (option.category ? crypto.randomUUID() : null),
-              explanation: option.explanation || null
+              ...(option.categoryId ? { categoryId: option.categoryId } : {})
+            };
+            
+            // Adicionar campos específicos para perguntas opinativas
+            if (type === 'OPINION_MULTIPLE') {
+              Object.assign(optionData, {
+                categoryName: option.category || null,
+                categoryNameUuid: option.categoryNameUuid || null,
+                explanation: option.explanation || null,
+                emotionGroupId: emotionGroupId || null,
+                position: option.position || 0
+              });
             }
-          });
-          createdOptions.push(newOption);
-          console.log('Opção criada com sucesso:', newOption.id);
+            
+            // Criar opção com os campos apropriados
+            const newOption = await prisma.option.create({
+              data: optionData
+            });
+            
+            console.log('Opção criada:', newOption);
+          } catch (error) {
+            console.error('Erro ao criar opção:', error);
+            // Continuar criando as outras opções mesmo se uma falhar
+          }
         }
         
         // Buscar a pergunta completa com suas relações
         const questionWithRelations = await prisma.question.findUnique({
-          where: { id: newQuestion.id },
+          where: {
+            id: newQuestion.id
+          },
           include: {
             options: true,
             stage: true,
-            categories: true
+            categories: true,
+            ...(type === 'OPINION_MULTIPLE' ? { emotionGroup: true } : {})
           }
         });
         
@@ -375,28 +454,36 @@ export default async function handler(
           id: questionWithRelations.id.toString(),
           text: questionWithRelations.text,
           stageId: questionWithRelations.stageId,
-          categoryId: questionWithRelations.categories.length > 0 ? questionWithRelations.categories[0].id : null,
-          categoryName: questionWithRelations.categories.length > 0 ? questionWithRelations.categories[0].name : null,
-          createdAt: new Date(questionWithRelations.createdAt).toISOString(),
-          updatedAt: new Date(questionWithRelations.updatedAt).toISOString(),
+          type: questionWithRelations.type,
+          difficulty: questionWithRelations.difficulty,
+          showResults: questionWithRelations.showResults,
           options: Array.isArray(questionWithRelations.options) ? questionWithRelations.options.map((option: any) => ({
             id: option.id.toString(),
             text: option.text,
             isCorrect: option.isCorrect,
-            createdAt: new Date(option.createdAt).toISOString(),
-            updatedAt: new Date(option.updatedAt).toISOString(),
+            weight: option.weight || 0,
+            position: option.position || 0,
+            categoryName: option.categoryName || null,
+            categoryNameUuid: option.categoryNameUuid || null,
+            explanation: option.explanation || null
           })) : [],
           stage: {
             id: questionWithRelations.stageId,
             title: questionWithRelations.stage.title,
             description: questionWithRelations.stage.description || '',
-            order: questionWithRelations.stage.order,
           },
           category: questionWithRelations.categories.length > 0 ? {
             id: questionWithRelations.categories[0].id,
             name: questionWithRelations.categories[0].name || '',
             description: questionWithRelations.categories[0].description || '',
           } : null,
+          ...(questionWithRelations.emotionGroup ? {
+            emotionGroup: {
+              id: questionWithRelations.emotionGroup.id,
+              name: questionWithRelations.emotionGroup.name,
+              description: questionWithRelations.emotionGroup.description
+            }
+          } : {})
         };
 
         return res.status(201).json(serializedQuestion);

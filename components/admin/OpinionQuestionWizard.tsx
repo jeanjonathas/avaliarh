@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { Button } from '../ui/Button';
 import { QuestionDifficulty, QuestionType } from '../../types/questions';
+import crypto from 'crypto';
 
 interface OpinionGroup {
   id: string;
@@ -11,6 +12,7 @@ interface OpinionGroup {
     id: string;
     name: string;
     description?: string;
+    uuid?: string;
   }[];
 }
 
@@ -90,13 +92,17 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
     // Adicionar uma categoria vazia
     appendCategory({
       name: '',
-      description: ''
+      description: '',
+      uuid: crypto.randomUUID()
     });
     
     appendOption({
       text: '',
       categoryId: '',
-      weight: 1
+      categoryNameUuid: '',
+      category: '',
+      weight: 1,
+      position: 0
     });
   };
 
@@ -111,8 +117,11 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
       // Criar opções vazias para cada categoria
       const newOptions = group.categories.map(category => ({
         text: '',
+        categoryId: category.id,
+        categoryNameUuid: category.uuid || crypto.randomUUID(),
+        category: category.name,
         weight: 5,
-        categoryId: category.id
+        position: 0
       }));
       setValue('options', newOptions);
     }
@@ -141,7 +150,8 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
       appendCategory({
         id: category.id,
         name: category.name,
-        description: category.description || ''
+        description: category.description || '',
+        uuid: category.uuid || crypto.randomUUID()
       });
     });
 
@@ -151,11 +161,14 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
         removeOption(0);
       }
 
-      selectedGroup.categories.forEach(() => {
+      selectedGroup.categories.forEach((category, index) => {
         appendOption({
           text: '',
-          categoryId: '',
-          weight: 1
+          categoryId: category.id,
+          categoryNameUuid: category.uuid || crypto.randomUUID(),
+          category: category.name,
+          weight: 1,
+          position: index
         });
       });
     }
@@ -178,15 +191,20 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({ onSubmit,
   }, []);
 
   const handleAddCategory = () => {
+    const categoryUuid = crypto.randomUUID();
     appendCategory({
       name: '',
-      description: ''
+      description: '',
+      uuid: categoryUuid
     });
     
     appendOption({
       text: '',
       categoryId: '',
-      weight: 1
+      categoryNameUuid: categoryUuid,
+      category: '',
+      weight: 1,
+      position: optionFields.length
     });
   };
 
