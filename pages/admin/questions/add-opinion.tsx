@@ -5,15 +5,15 @@ import AdminLayout from '../../../components/admin/AdminLayout';
 import { Button } from '../../../components/ui/Button';
 import { useNotificationSystem } from '../../../hooks/useNotificationSystem';
 import OpinionQuestionWizard from '../../../components/admin/OpinionQuestionWizard';
-import { useModal } from '../../../hooks/useModal';
+import Modal from '../../../components/ui/Modal';
 
 const AddOpinionQuestionPage = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
   const notify = useNotificationSystem();
-  const { showModal } = useModal();
   const [loading, setLoading] = useState(false);
   const [lastCreatedQuestion, setLastCreatedQuestion] = useState<any>(null);
+  const [showCreateAnotherModal, setShowCreateAnotherModal] = useState(false);
 
   const handleCancel = () => {
     router.push('/admin/questions');
@@ -39,25 +39,8 @@ const AddOpinionQuestionPage = () => {
         
         notify.showSuccess('Pergunta opinativa criada com sucesso!');
         
-        // Perguntar se deseja criar outra pergunta com o mesmo grupo
-        showModal(
-          'Criar outra pergunta',
-          'Deseja criar outra pergunta opinativa com o mesmo grupo de personalidade/categorias?',
-          () => {
-            // Usuário escolheu criar outra pergunta
-            // Resetar o estado para permitir nova criação, mas manter as categorias
-            setLoading(false);
-          },
-          {
-            type: 'confirm',
-            confirmText: 'Sim, criar outra',
-            cancelText: 'Não, voltar à lista',
-            onCancel: () => {
-              // Usuário escolheu voltar à lista
-              router.push('/admin/questions');
-            }
-          }
-        );
+        // Mostrar modal perguntando se deseja criar outra pergunta
+        setShowCreateAnotherModal(true);
       } else {
         const error = await response.json();
         throw new Error(error.message || 'Erro ao criar pergunta opinativa');
@@ -67,6 +50,16 @@ const AddOpinionQuestionPage = () => {
       notify.showError(`Erro ao criar pergunta opinativa: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
       setLoading(false);
     }
+  };
+
+  const handleCreateAnother = () => {
+    setShowCreateAnotherModal(false);
+    setLoading(false);
+  };
+
+  const handleReturnToList = () => {
+    setShowCreateAnotherModal(false);
+    router.push('/admin/questions');
   };
 
   // Verificar autenticação
@@ -124,6 +117,18 @@ const AddOpinionQuestionPage = () => {
           )}
         </div>
       </div>
+
+      {/* Modal para perguntar se deseja criar outra pergunta */}
+      <Modal
+        isOpen={showCreateAnotherModal}
+        title="Criar outra pergunta"
+        message="Deseja criar outra pergunta opinativa com o mesmo grupo de personalidade/categorias?"
+        type="confirm"
+        confirmText="Sim, criar outra"
+        cancelText="Não, voltar à lista"
+        onConfirm={handleCreateAnother}
+        onCancel={handleReturnToList}
+      />
     </AdminLayout>
   );
 };
