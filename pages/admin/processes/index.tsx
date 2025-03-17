@@ -57,12 +57,10 @@ const ProcessList: React.FC = () => {
   };
 
   const handleDelete = (id: string) => {
-    showModal({
-      title: 'Confirmar exclusão',
-      message: 'Tem certeza que deseja excluir este processo seletivo? Esta ação não pode ser desfeita.',
-      confirmText: 'Excluir',
-      cancelText: 'Cancelar',
-      onConfirm: async () => {
+    showModal(
+      'Confirmar exclusão',
+      'Tem certeza que deseja excluir este processo seletivo? Esta ação não pode ser desfeita.',
+      async () => {
         try {
           const response = await fetch(`/api/admin/processes/${id}`, {
             method: 'DELETE',
@@ -72,22 +70,21 @@ const ProcessList: React.FC = () => {
             throw new Error('Erro ao excluir processo seletivo');
           }
           
-          showToast({
-            type: 'success',
-            message: 'Processo seletivo excluído com sucesso!',
-          });
+          showToast('Processo seletivo excluído com sucesso!', 'success');
           
           // Atualizar a lista de processos
           setProcesses(processes.filter(process => process.id !== id));
         } catch (err) {
           console.error('Erro ao excluir processo:', err);
-          showToast({
-            type: 'error',
-            message: 'Não foi possível excluir o processo seletivo. Tente novamente mais tarde.',
-          });
+          showToast('Não foi possível excluir o processo seletivo. Tente novamente mais tarde.', 'error');
         }
       },
-    });
+      {
+        type: 'warning',
+        confirmText: 'Excluir',
+        cancelText: 'Cancelar'
+      }
+    );
   };
 
   return (

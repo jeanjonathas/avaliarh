@@ -5,20 +5,23 @@ import LeftBar from './LeftBar';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
+  activeSection?: 'selecao' | 'treinamento';
 }
 
-const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
+const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeSection: propActiveSection }) => {
   const router = useRouter();
-  const [activeSection, setActiveSection] = useState<'selecao' | 'treinamento'>('selecao');
+  const [activeSection, setActiveSection] = useState<'selecao' | 'treinamento'>(propActiveSection || 'selecao');
   
   // Detectar a seção ativa com base na URL atual ao montar o componente
   useEffect(() => {
-    if (router.pathname.includes('/admin/training')) {
+    if (propActiveSection) {
+      setActiveSection(propActiveSection);
+    } else if (router.pathname.includes('/admin/training')) {
       setActiveSection('treinamento');
     } else {
       setActiveSection('selecao');
     }
-  }, [router.pathname]);
+  }, [router.pathname, propActiveSection]);
   
   // Função para atualizar a seção ativa quando o usuário clica em uma opção no Navbar
   const handleSectionChange = (section: 'selecao' | 'treinamento') => {
