@@ -143,20 +143,38 @@ export default async function handler(
       // 3. Criar novas opções
       if (Array.isArray(options) && options.length > 0) {
         for (const option of options) {
-          const { text, isCorrect, explanation, opinionCategory, opinionWeight } = option;
+          const { text, isCorrect } = option;
           
-          console.log(`Inserindo opção: ${text}, isCorrect: ${isCorrect}`);
+          console.log(`Inserindo opção: ${text}, isCorrect: ${isCorrect}, tipo de pergunta: ${type}`);
+          
+          // Dados base para qualquer tipo de opção
+          const optionData: any = {
+            text,
+            isCorrect,
+            questionId: id,
+            updatedAt: new Date()
+          };
+          
+          // Adicionar campos específicos para perguntas de opinião, se existirem no schema
+          if (type === 'OPINION_MULTIPLE' || type === 'OPINION') {
+            try {
+              // Tentar adicionar campos específicos para perguntas de opinião
+              if (option.opinionCategory) optionData.opinionCategory = option.opinionCategory;
+              if (option.opinionWeight) optionData.opinionWeight = option.opinionWeight;
+              if (option.explanation) optionData.explanation = option.explanation;
+              
+              console.log('Adicionando campos específicos para pergunta de opinião:', {
+                opinionCategory: option.opinionCategory,
+                opinionWeight: option.opinionWeight,
+                explanation: option.explanation
+              });
+            } catch (error) {
+              console.warn('Alguns campos específicos para perguntas de opinião não puderam ser adicionados:', error);
+            }
+          }
           
           await prisma.option.create({
-            data: {
-              text,
-              isCorrect,
-              explanation: explanation || null,
-              opinionCategory: opinionCategory || null,
-              opinionWeight: opinionWeight || null,
-              questionId: id,
-              updatedAt: new Date()
-            }
+            data: optionData
           });
         }
       }
@@ -184,16 +202,25 @@ export default async function handler(
         stageId: question.stageId,
         categoryId: question.categories && question.categories.length > 0 ? question.categories[0].id : null,
         categoryUuid: question.categories && question.categories.length > 0 ? question.categories[0].id : null, 
-        options: question.options.map(option => ({
-          id: option.id,
-          text: option.text,
-          isCorrect: option.isCorrect,
-          explanation: option.explanation,
-          opinionCategory: option.opinionCategory,
-          opinionWeight: option.opinionWeight,
-          createdAt: option.createdAt.toISOString(),
-          updatedAt: option.updatedAt.toISOString()
-        })),
+        options: question.options.map(option => {
+          // Dados base para qualquer tipo de opção
+          const formattedOption: any = {
+            id: option.id,
+            text: option.text,
+            isCorrect: option.isCorrect,
+            createdAt: option.createdAt.toISOString(),
+            updatedAt: option.updatedAt.toISOString()
+          };
+          
+          // Adicionar campos específicos para perguntas de opinião, se existirem
+          if (question.type === 'OPINION_MULTIPLE' || question.type === 'OPINION') {
+            if ('opinionCategory' in option) formattedOption.opinionCategory = option.opinionCategory;
+            if ('opinionWeight' in option) formattedOption.opinionWeight = option.opinionWeight;
+            if ('explanation' in option) formattedOption.explanation = option.explanation;
+          }
+          
+          return formattedOption;
+        }),
         stage: question.stage ? {
           id: question.stage.id,
           title: question.stage.title,
@@ -289,16 +316,25 @@ export default async function handler(
         stageId: question.stageId,
         categoryId: question.categories && question.categories.length > 0 ? question.categories[0].id : null,
         categoryUuid: question.categories && question.categories.length > 0 ? question.categories[0].id : null, 
-        options: question.options.map(option => ({
-          id: option.id,
-          text: option.text,
-          isCorrect: option.isCorrect,
-          explanation: option.explanation,
-          opinionCategory: option.opinionCategory,
-          opinionWeight: option.opinionWeight,
-          createdAt: option.createdAt.toISOString(),
-          updatedAt: option.updatedAt.toISOString()
-        })),
+        options: question.options.map(option => {
+          // Dados base para qualquer tipo de opção
+          const formattedOption: any = {
+            id: option.id,
+            text: option.text,
+            isCorrect: option.isCorrect,
+            createdAt: option.createdAt.toISOString(),
+            updatedAt: option.updatedAt.toISOString()
+          };
+          
+          // Adicionar campos específicos para perguntas de opinião, se existirem
+          if (question.type === 'OPINION_MULTIPLE' || question.type === 'OPINION') {
+            if ('opinionCategory' in option) formattedOption.opinionCategory = option.opinionCategory;
+            if ('opinionWeight' in option) formattedOption.opinionWeight = option.opinionWeight;
+            if ('explanation' in option) formattedOption.explanation = option.explanation;
+          }
+          
+          return formattedOption;
+        }),
         stage: question.stage ? {
           id: question.stage.id,
           title: question.stage.title,

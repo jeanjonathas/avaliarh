@@ -16,57 +16,49 @@ const EditQuestionPage: React.FC = () => {
 
   useEffect(() => {
     if (id) {
-      fetchQuestion();
-      fetchCategories();
+      const loadData = async () => {
+        setLoading(true);
+        try {
+          const [questionResponse, categoriesResponse] = await Promise.all([
+            fetch(`/api/admin/questions/${id}`, {
+              credentials: 'include'
+            }),
+            fetch('/api/admin/categories')
+          ]);
+
+          if (!questionResponse.ok) {
+            const errorData = await questionResponse.json();
+            throw new Error(errorData.message || errorData.error || `Erro ao buscar pergunta: ${questionResponse.status}`);
+          }
+          const questionData = await questionResponse.json();
+          console.log('Dados da pergunta recebidos da API:', questionData);
+          console.log('Opções recebidas:', questionData.options);
+          setQuestion(questionData);
+
+          if (!categoriesResponse.ok) {
+            console.error('Erro ao carregar categorias:', categoriesResponse.status);
+          } else {
+            const categoriesData = await categoriesResponse.json();
+            console.log('Categorias recebidas:', categoriesData);
+            setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+          }
+
+          setError(null);
+        } catch (err: any) {
+          console.error('Erro ao carregar dados:', err);
+          setError(err.message || 'Erro ao carregar os dados');
+          showToast(err.message || 'Erro ao carregar os dados', 'error');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      loadData();
     }
-  }, [id]);
-
-  const fetchQuestion = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/admin/questions/${id}`, {
-        credentials: 'include' // Importante para enviar cookies de sessão
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || errorData.error || `Erro ao buscar pergunta: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('Dados da pergunta recebidos da API:', data);
-      console.log('Opções recebidas:', data.options);
-      setQuestion(data);
-      setError(null);
-    } catch (err: any) {
-      console.error('Erro ao buscar pergunta:', err);
-      setError(err.message || 'Erro ao carregar os dados da pergunta');
-      showToast(err.message || 'Erro ao carregar os dados da pergunta', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchCategories = async () => {
-    try {
-      console.log('Buscando categorias para o formulário de edição');
-      const response = await fetch('/api/admin/categories');
-      if (!response.ok) {
-        throw new Error('Erro ao carregar categorias');
-      }
-      const data = await response.json();
-      console.log('Categorias recebidas:', data);
-      
-      // A API retorna diretamente o array de categorias, não dentro de um objeto 'categories'
-      setCategories(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error('Erro ao buscar categorias:', err);
-    }
-  };
+  }, [id, showToast]);
 
   const handleSubmit = async (values: any) => {
     try {
-      // Confirmar antes de salvar
       showModal(
         'Salvar Alterações',
         'Tem certeza que deseja salvar as alterações nesta pergunta?',
@@ -78,7 +70,7 @@ const EditQuestionPage: React.FC = () => {
                 'Content-Type': 'application/json'
               },
               body: JSON.stringify(values),
-              credentials: 'include' // Importante para enviar cookies de sessão
+              credentials: 'include'
             });
 
             if (!response.ok) {
@@ -88,8 +80,6 @@ const EditQuestionPage: React.FC = () => {
 
             const data = await response.json();
             showToast('Pergunta atualizada com sucesso!', 'success');
-            
-            // Redirecionar para a lista de perguntas após atualização bem-sucedida
             router.push('/admin/questions');
           } catch (err: any) {
             console.error('Erro ao atualizar pergunta:', err);
@@ -138,7 +128,46 @@ const EditQuestionPage: React.FC = () => {
               </div>
             </div>
             <button
-              onClick={fetchQuestion}
+              onClick={() => {
+                const loadData = async () => {
+                  setLoading(true);
+                  try {
+                    const [questionResponse, categoriesResponse] = await Promise.all([
+                      fetch(`/api/admin/questions/${id}`, {
+                        credentials: 'include'
+                      }),
+                      fetch('/api/admin/categories')
+                    ]);
+
+                    if (!questionResponse.ok) {
+                      const errorData = await questionResponse.json();
+                      throw new Error(errorData.message || errorData.error || `Erro ao buscar pergunta: ${questionResponse.status}`);
+                    }
+                    const questionData = await questionResponse.json();
+                    console.log('Dados da pergunta recebidos da API:', questionData);
+                    console.log('Opções recebidas:', questionData.options);
+                    setQuestion(questionData);
+
+                    if (!categoriesResponse.ok) {
+                      console.error('Erro ao carregar categorias:', categoriesResponse.status);
+                    } else {
+                      const categoriesData = await categoriesResponse.json();
+                      console.log('Categorias recebidas:', categoriesData);
+                      setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+                    }
+
+                    setError(null);
+                  } catch (err: any) {
+                    console.error('Erro ao carregar dados:', err);
+                    setError(err.message || 'Erro ao carregar os dados');
+                    showToast(err.message || 'Erro ao carregar os dados', 'error');
+                  } finally {
+                    setLoading(false);
+                  }
+                };
+
+                loadData();
+              }}
               className="px-4 py-2 bg-primary-500 text-white rounded-md hover:bg-primary-600 transition-colors"
             >
               Tentar novamente
