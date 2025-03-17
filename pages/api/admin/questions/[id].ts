@@ -1,6 +1,7 @@
 /// <reference types="next" />
-import type { NextApiRequest, NextApiResponse } from 'next'
-import { prisma } from '../../../../lib/prisma'
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { getSession } from 'next-auth/react';
+import { prisma } from '../../../../lib/prisma';
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
 
@@ -40,7 +41,7 @@ export default async function handler(
 
   if (req.method === 'PUT') {
     // Validação das entradas
-    const { text, stageId, categoryId, options } = req.body
+    const { text, stageId, categoryId, options, type, difficulty, initialExplanation } = req.body
     
     if (!text || text.trim() === '') {
       return res.status(400).json({ error: 'Texto da pergunta é obrigatório' })
@@ -66,15 +67,7 @@ export default async function handler(
     console.log('CategoryId é nulo ou vazio?', !categoryId || categoryId.trim() === '');
 
     try {
-      // Verificações básicas
-      const questionExists = await prisma.question.findUnique({
-        where: { id }
-      });
-      
-      if (!questionExists) {
-        return res.status(404).json({ error: 'Pergunta não encontrada' });
-      }
-      
+      // Verificar se a etapa existe
       const stage = await prisma.stage.findUnique({
         where: { id: stageId }
       });
@@ -83,53 +76,46 @@ export default async function handler(
         return res.status(404).json({ error: 'Etapa não encontrada' });
       }
       
-      // Vamos usar a abordagem mais direta possível para resolver o problema
-      // Converter todos os UUIDs para texto nas consultas SQL
+      // 1. Atualizar a pergunta com todos os campos
+      await prisma.question.update({
+        where: { id },
+        data: {
+          text,
+          stage: {
+            connect: { id: stageId }
+          },
+          categories: categoryId ? {
+            connect: [{ id: categoryId }]
+          } : {
+            // Se não houver categoria selecionada, desconectar todas as categorias existentes
+            set: []
+          },
+          type: type || undefined,
+          difficulty: difficulty || undefined,
+          initialExplanation: initialExplanation || undefined,
+          updatedAt: new Date()
+        }
+      });
       
-      // 1. Atualizar os campos básicos da pergunta
-      const textQuery = `
-        UPDATE "Question"
-        SET text = '${text}', "updatedAt" = NOW()
-        WHERE id::text = '${id}'
-      `;
-      await prisma.$executeRawUnsafe(textQuery);
+      // 2. Excluir opções existentes
+      await prisma.option.deleteMany({
+        where: { questionId: id }
+      });
       
-      // 2. Atualizar a etapa da pergunta
-      await prisma.$executeRaw`
-        UPDATE "Question"
-        SET "stageId" = ${stageId}
-        WHERE id = ${id}
-      `;
-      
-      // 3. Atualizar a categoria
-      if (categoryId) {
-        await prisma.$executeRaw`
-          UPDATE "Question"
-          SET "categoryId" = ${categoryId}
-          WHERE id = ${id}
-        `;
-      } else {
-        // Se não houver categoria, definir como NULL
-        await prisma.$executeRaw`
-          UPDATE "Question"
-          SET "categoryId" = NULL
-          WHERE id = ${id}
-        `;
-      }
-      
-      // 4. Excluir opções existentes
-      await prisma.$executeRaw`
-        DELETE FROM "Option"
-        WHERE "questionId" = ${id}
-      `;
-      
-      // 5. Inserir novas opções
+      // 3. Criar novas opções
       if (Array.isArray(options) && options.length > 0) {
         for (const option of options) {
+          const { text, isCorrect, explanation, opinionCategory, opinionWeight } = option;
+          
+          console.log(`Inserindo opção: ${text}, isCorrect: ${isCorrect}`);
+          
           await prisma.option.create({
             data: {
-              text: option.text,
-              isCorrect: option.isCorrect,
+              text,
+              isCorrect,
+              explanation: explanation || null,
+              opinionCategory: opinionCategory || null,
+              opinionWeight: opinionWeight || null,
               questionId: id,
               updatedAt: new Date()
             }
@@ -138,77 +124,44 @@ export default async function handler(
       }
       
       // Buscar a pergunta atualizada com suas relações
-      const questionQuery = `
-        SELECT 
-          q.id, 
-          q.text, 
-          q."stageId",
-          q."categoryId",
-          s.id as "stage_id",
-          s.title as "stage_title",
-          s.description as "stage_description",
-          s.order as "stage_order",
-          c.id as "category_id",
-          c.name as "category_name",
-          c.description as "category_description"
-        FROM "Question" q
-        LEFT JOIN "Stage" s ON q."stageId" = s.id
-        LEFT JOIN "Category" c ON q."categoryId" = c.id
-        WHERE q.id = '${id}'
-      `;
+      const question = await prisma.question.findUnique({
+        where: { id },
+        include: {
+          options: true,
+          stage: true,
+          categories: true
+        }
+      });
       
-      const optionsQuery = `
-        SELECT id, text, "isCorrect", "createdAt", "updatedAt"
-        FROM "Option"
-        WHERE "questionId" = '${id}'
-      `;
-      
-      const questionResult = await prisma.$queryRawUnsafe(questionQuery);
-      const optionsResult = await prisma.$queryRawUnsafe(optionsQuery);
-      
-      if (!questionResult || !Array.isArray(questionResult) || questionResult.length === 0) {
-        return res.status(500).json({ error: 'Falha ao recuperar a pergunta atualizada' });
+      if (!question) {
+        return res.status(404).json({ error: 'Pergunta não encontrada' });
       }
-
-      // Definir interface para o tipo do resultado da query
-      interface QuestionQueryResult {
-        id: string;
-        text: string;
-        stageId: string;
-        categoryId: string | null;
-        stage_id: string;
-        stage_title: string;
-        stage_description: string | null;
-        stage_order: number | null;
-        category_id: string | null;
-        category_name: string | null;
-        category_description: string | null;
-      }
-
-      // Usar asserção de tipo
-      const question = questionResult[0] as QuestionQueryResult;
-      const optionsList = Array.isArray(optionsResult) ? optionsResult : [];
 
       // Formatar a resposta
       const formattedQuestion = {
         id: question.id,
         text: question.text,
+        type: question.type,
+        difficulty: question.difficulty,
         stageId: question.stageId,
         categoryId: question.categories && question.categories.length > 0 ? question.categories[0].id : null,
         categoryUuid: question.categories && question.categories.length > 0 ? question.categories[0].id : null, 
-        options: optionsList.map(option => ({
+        options: question.options.map(option => ({
           id: option.id,
           text: option.text,
           isCorrect: option.isCorrect,
-          createdAt: new Date(option.createdAt).toISOString(),
-          updatedAt: new Date(option.updatedAt).toISOString()
+          explanation: option.explanation,
+          opinionCategory: option.opinionCategory,
+          opinionWeight: option.opinionWeight,
+          createdAt: option.createdAt.toISOString(),
+          updatedAt: option.updatedAt.toISOString()
         })),
-        stage: {
-          id: question.stage_id,
-          title: question.stage_title,
-          description: question.stage_description === null ? '' : question.stage_description,
-          order: question.stage_order || 0
-        },
+        stage: question.stage ? {
+          id: question.stage.id,
+          title: question.stage.title,
+          description: question.stage.description || '',
+          order: question.stage.order || 0
+        } : null,
         category: question.categories && question.categories.length > 0 ? {
           id: question.categories[0].id,
           name: question.categories[0].name,
@@ -216,23 +169,13 @@ export default async function handler(
         } : null
       };
 
-      console.assert(typeof question.id === 'string', 'question.id deve ser uma string');
-      console.assert(typeof question.text === 'string', 'question.text deve ser uma string');
-      console.assert(typeof question.stageId === 'string', 'question.stageId deve ser uma string');
-      console.assert(typeof question.category_id === 'string' || question.category_id === null, 'question.category_id deve ser uma string ou null');
-      console.assert(typeof question.stage_id === 'string', 'question.stage_id deve ser uma string');
-      console.assert(typeof question.stage_title === 'string', 'question.stage_title deve ser uma string');
-      console.assert(typeof question.stage_description === 'string', 'question.stage_description deve ser uma string');
-      console.assert(typeof question.stage_order === 'number', 'question.stage_order deve ser um número');
-      console.assert(typeof question.category_id === 'string' || question.category_id === null, 'question.category_id deve ser uma string ou null');
-      console.assert(typeof question.category_name === 'string', 'question.category_name deve ser uma string');
-      console.assert(typeof question.category_description === 'string', 'question.category_description deve ser uma string');
-
       console.log('API retornando pergunta formatada:', {
         id: formattedQuestion.id,
         categoryId: formattedQuestion.categoryId,
         categoryUuid: formattedQuestion.categoryUuid,
-        'category?.id': formattedQuestion.category?.id
+        'category?.id': formattedQuestion.category?.id,
+        'options': formattedQuestion.options ? `${formattedQuestion.options.length} opções` : 'sem opções',
+        'options[0]': formattedQuestion.options && formattedQuestion.options.length > 0 ? formattedQuestion.options[0] : null
       });
 
       return res.status(200).json(formattedQuestion);
@@ -244,24 +187,24 @@ export default async function handler(
     try {
       console.log(`Excluindo pergunta com ID: ${id}`);
       
-      // Primeiro, excluir as opções relacionadas à pergunta
+      // 1. Excluir as opções relacionadas à pergunta
       await prisma.option.deleteMany({
-        where: {
-          questionId: id
+        where: { questionId: id }
+      });
+      
+      // 2. Desconectar a pergunta de suas categorias usando Prisma em vez de SQL raw
+      await prisma.question.update({
+        where: { id },
+        data: {
+          categories: {
+            set: [] // Desconecta todas as categorias
+          }
         }
       });
       
-      // Em seguida, desconectar a pergunta de suas categorias
-      await prisma.$executeRaw`
-        DELETE FROM "_CategoryToQuestion"
-        WHERE "B" = ${id}
-      `;
-      
-      // Por fim, excluir a pergunta
+      // 3. Excluir a pergunta
       await prisma.question.delete({
-        where: {
-          id: id
-        }
+        where: { id }
       });
       
       return res.status(200).json({ 
@@ -295,6 +238,10 @@ export default async function handler(
         return res.status(404).json({ error: 'Pergunta não encontrada' });
       }
 
+      console.log('Pergunta encontrada:', question);
+      console.log('Opções da pergunta:', question.options);
+      console.log('Número de opções encontradas:', question.options.length);
+
       // Formatar a resposta
       const formattedQuestion = {
         id: question.id,
@@ -308,6 +255,9 @@ export default async function handler(
           id: option.id,
           text: option.text,
           isCorrect: option.isCorrect,
+          explanation: option.explanation,
+          opinionCategory: option.opinionCategory,
+          opinionWeight: option.opinionWeight,
           createdAt: option.createdAt.toISOString(),
           updatedAt: option.updatedAt.toISOString()
         })),
@@ -328,7 +278,9 @@ export default async function handler(
         id: formattedQuestion.id,
         categoryId: formattedQuestion.categoryId,
         categoryUuid: formattedQuestion.categoryUuid,
-        'category?.id': formattedQuestion.category?.id
+        'category?.id': formattedQuestion.category?.id,
+        'options': formattedQuestion.options ? `${formattedQuestion.options.length} opções` : 'sem opções',
+        'options[0]': formattedQuestion.options && formattedQuestion.options.length > 0 ? formattedQuestion.options[0] : null
       });
 
       return res.status(200).json(formattedQuestion);

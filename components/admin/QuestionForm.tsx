@@ -26,6 +26,11 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
   const [existingOpinions, setExistingOpinions] = useState<string[]>([]);
   const [opinionGroups, setOpinionGroups] = useState<{[key: string]: string[]}>({});
 
+  useEffect(() => {
+    console.log('QuestionForm - Valores iniciais:', initialValues);
+    console.log('QuestionForm - Categorias disponíveis:', categories);
+  }, [initialValues, categories]);
+
   // Validação do formulário
   const validationSchema = Yup.object().shape({
     text: Yup.string().required('Texto da pergunta é obrigatório'),
@@ -60,9 +65,25 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
   // Preparar valores iniciais para o formulário
   const getInitialValues = () => {
     if (initialValues) {
+      console.log('Valores iniciais da pergunta:', initialValues);
+      console.log('Opções recebidas:', initialValues.options);
+      
+      // Verificar se as opções existem e são um array
+      const options = Array.isArray(initialValues.options) && initialValues.options.length > 0 
+        ? initialValues.options 
+        : [
+            { text: '', isCorrect: false },
+            { text: '', isCorrect: false },
+            { text: '', isCorrect: false },
+            { text: '', isCorrect: false },
+          ];
+      
+      console.log('Opções processadas:', options);
+      
       return {
         ...initialValues,
-        categoryUuid: initialValues.categoryId || '',
+        categoryUuid: initialValues.categoryId || initialValues.categoryUuid || '',
+        options: options,
       };
     }
     
@@ -152,12 +173,25 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
               className="input-field"
             >
               <option value="">Selecione uma categoria</option>
-              {categories && categories.length > 0 && categories.map((category: any) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
+              {categories && categories.length > 0 ? (
+                categories.map((category: any) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))
+              ) : (
+                <option value="" disabled>Nenhuma categoria disponível</option>
+              )}
             </Field>
+            {categories && categories.length > 0 ? (
+              <div className="text-xs text-gray-500 mt-1">
+                {categories.length} categorias disponíveis
+              </div>
+            ) : (
+              <div className="text-xs text-red-500 mt-1">
+                Nenhuma categoria disponível
+              </div>
+            )}
           </div>
 
           {/* Nível de dificuldade */}

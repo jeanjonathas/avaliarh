@@ -34,6 +34,8 @@ const EditQuestionPage: React.FC = () => {
       }
 
       const data = await response.json();
+      console.log('Dados da pergunta recebidos da API:', data);
+      console.log('Opções recebidas:', data.options);
       setQuestion(data);
       setError(null);
     } catch (err: any) {
@@ -47,12 +49,16 @@ const EditQuestionPage: React.FC = () => {
 
   const fetchCategories = async () => {
     try {
+      console.log('Buscando categorias para o formulário de edição');
       const response = await fetch('/api/admin/categories');
       if (!response.ok) {
         throw new Error('Erro ao carregar categorias');
       }
       const data = await response.json();
-      setCategories(data.categories || []);
+      console.log('Categorias recebidas:', data);
+      
+      // A API retorna diretamente o array de categorias, não dentro de um objeto 'categories'
+      setCategories(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Erro ao buscar categorias:', err);
     }
