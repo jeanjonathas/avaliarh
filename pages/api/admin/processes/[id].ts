@@ -97,7 +97,7 @@ export default async function handler(
         const updatedProcess = await prisma.$transaction(async (tx) => {
           // Excluir etapas existentes
           await tx.processStage.deleteMany({
-            where: { id: { in: stages.filter((s: any) => s.id).map((s: any) => s.id) } },
+            where: { processId: id },
           });
 
           // Atualizar o processo
@@ -114,6 +114,7 @@ export default async function handler(
                   description: stage.description,
                   order: stage.order,
                   type: stage.type,
+                  testId: stage.testId
                 })),
               },
             },

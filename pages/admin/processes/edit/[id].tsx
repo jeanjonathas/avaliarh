@@ -1,23 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
-import AdminLayout from '../../../components/admin/AdminLayout';
-import { useNotification } from '../../../contexts/NotificationContext';
+import AdminLayout from '../../../../components/admin/AdminLayout';
+import { useNotification } from '../../../../contexts/NotificationContext';
 
 interface ProcessStage {
+  id?: string;
   name: string;
   description?: string;
   order: number;
   type: string;
   testId?: string;
-}
-
-interface FormDraft {
-  name: string;
-  description?: string;
-  evaluationType: string;
-  cutoffScore?: number;
-  stages: ProcessStage[];
 }
 
 interface FormData {
@@ -40,25 +33,20 @@ const stageTypes = [
   { value: 'GROUP_DYNAMIC', label: 'Dinâmica em Grupo' }
 ];
 
-const NewProcess: React.FC = () => {
+const EditProcess: React.FC = () => {
   const router = useRouter();
+  const { id } = router.query;
   const { showToast } = useNotification();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tests, setTests] = useState<Test[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const { control, handleSubmit, register, formState: { errors }, watch, setValue } = useForm<FormData>({
+  const { control, handleSubmit, register, formState: { errors }, watch, setValue, reset } = useForm<FormData>({
     defaultValues: {
       name: '',
       description: '',
       evaluationType: 'SCORE_BASED',
-      stages: [
-        {
-          name: '',
-          description: '',
-          order: 1,
-          type: 'TEST'
-        }
-      ]
+      stages: []
     }
   });
 
@@ -67,8 +55,49 @@ const NewProcess: React.FC = () => {
     name: 'stages'
   });
 
+  // Carregar dados do processo seletivo
   useEffect(() => {
-    // Carregar testes disponíveis
+    const fetchProcess = async () => {
+      if (!id) return;
+
+      try {
+        const response = await fetch(`/api/admin/processes/${id}`);
+        if (response.ok) {
+          const process = await response.json();
+          
+          // Resetar o formulário com os dados do processo
+          reset({
+            name: process.name,
+            description: process.description,
+            evaluationType: process.evaluationType,
+            cutoffScore: process.cutoffScore,
+            stages: process.stages.map((stage: ProcessStage) => ({
+              id: stage.id,
+              name: stage.name,
+              description: stage.description,
+              order: stage.order,
+              type: stage.type,
+              testId: stage.testId
+            }))
+          });
+        } else {
+          showToast('Erro ao carregar processo seletivo', 'error');
+          router.push('/admin/processes');
+        }
+      } catch (error) {
+        console.error('Erro ao carregar processo:', error);
+        showToast('Erro ao carregar processo seletivo', 'error');
+        router.push('/admin/processes');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProcess();
+  }, [id, reset, router, showToast]);
+
+  // Carregar testes disponíveis
+  useEffect(() => {
     const fetchTests = async () => {
       try {
         const response = await fetch('/api/admin/tests');
@@ -105,36 +134,14 @@ const NewProcess: React.FC = () => {
     }
   };
 
-  // Recuperar rascunho ao montar o componente
-  useEffect(() => {
-    const draft = localStorage.getItem('processDraft');
-    if (draft) {
-      try {
-        const draftData = JSON.parse(draft) as FormDraft;
-        
-        // Atualizar os campos do formulário com os dados do rascunho
-        setValue('name', draftData.name);
-        setValue('description', draftData.description);
-        setValue('evaluationType', draftData.evaluationType);
-        setValue('cutoffScore', draftData.cutoffScore);
-        
-        // Atualizar as etapas
-        draftData.stages.forEach((stage, index) => {
-          setValue(`stages.${index}`, stage);
-        });
-      } catch (error) {
-        console.error('Erro ao carregar rascunho:', error);
-        localStorage.removeItem('processDraft');
-      }
-    }
-  }, [setValue]);
-
   const onSubmit = async (data: FormData) => {
+    if (!id) return;
+
     try {
       setIsSubmitting(true);
 
-      const response = await fetch('/api/admin/processes', {
-        method: 'POST',
+      const response = await fetch(`/api/admin/processes/${id}`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -142,27 +149,46 @@ const NewProcess: React.FC = () => {
       });
 
       if (response.ok) {
-        showToast('Processo seletivo criado com sucesso!', 'success');
-        localStorage.removeItem('processDraft'); // Limpar rascunho após salvar
+        showToast('Processo seletivo atualizado com sucesso!', 'success');
+        localStorage.removeItem('processDraft');
         router.push('/admin/processes');
       } else {
         const error = await response.json();
-        showToast(error.message || 'Erro ao criar processo seletivo', 'error');
+        showToast(error.message || 'Erro ao atualizar processo seletivo', 'error');
       }
     } catch (error) {
-      console.error('Erro ao criar processo seletivo:', error);
-      showToast('Erro ao criar processo seletivo', 'error');
+      console.error('Erro ao atualizar processo seletivo:', error);
+      showToast('Erro ao atualizar processo seletivo', 'error');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <div className="container mx-auto px-4 py-8">
+          <div className="bg-white shadow-md rounded-lg p-6">
+            <div className="animate-pulse">
+              <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
+              <div className="space-y-4">
+                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
       <div className="container mx-auto px-4 py-8">
         <div className="bg-white shadow-md rounded-lg p-6">
           <h1 className="text-2xl font-semibold text-secondary-900 mb-6">
-            Novo Processo Seletivo
+            Editar Processo Seletivo
           </h1>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -179,6 +205,18 @@ const NewProcess: React.FC = () => {
               {errors.name && (
                 <p className="mt-1 text-sm text-red-600">Nome é obrigatório</p>
               )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-secondary-700 mb-1">
+                Descrição
+              </label>
+              <textarea
+                {...register('description')}
+                rows={3}
+                className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                placeholder="Descreva o processo seletivo..."
+              />
             </div>
 
             <div>
@@ -208,29 +246,29 @@ const NewProcess: React.FC = () => {
                     min="0"
                     max="100"
                     {...register('cutoffScore', {
-                      min: 0,
-                      max: 100,
-                      valueAsNumber: true
+                      min: { value: 0, message: 'Mínimo é 0%' },
+                      max: { value: 100, message: 'Máximo é 100%' }
                     })}
                     className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                   />
                 </div>
                 {errors.cutoffScore && (
-                  <p className="mt-1 text-sm text-red-600">
-                    Pontuação deve estar entre 0% e 100%
-                  </p>
+                  <p className="mt-1 text-sm text-red-600">{errors.cutoffScore.message}</p>
                 )}
               </div>
             )}
 
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-secondary-800">
-                  Etapas do Processo
-                </h2>
+                <h2 className="text-lg font-medium text-secondary-900">Etapas</h2>
                 <button
                   type="button"
-                  onClick={() => append({ name: '', description: '', order: fields.length + 1, type: 'TEST' })}
+                  onClick={() => append({
+                    name: '',
+                    description: '',
+                    order: fields.length + 1,
+                    type: 'TEST'
+                  })}
                   className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                 >
                   Adicionar Etapa
@@ -238,31 +276,30 @@ const NewProcess: React.FC = () => {
               </div>
 
               {fields.map((field, index) => (
-                <div key={field.id} className="bg-secondary-50 p-4 rounded-lg">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-medium text-secondary-800">
+                <div key={field.id} className="bg-gray-50 p-4 rounded-md space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-md font-medium text-secondary-900">
                       Etapa {index + 1}
                     </h3>
-                    {fields.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => remove(index)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        Remover
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => remove(index)}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      Remover
+                    </button>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-secondary-700 mb-1">
                         Nome da Etapa *
                       </label>
                       <input
                         type="text"
-                        placeholder="Ex: Entrevista Técnica"
-                        {...register(`stages.${index}.name` as const, { required: 'Nome da etapa é obrigatório' })}
+                        {...register(`stages.${index}.name` as const, {
+                          required: 'Nome da etapa é obrigatório'
+                        })}
                         className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                       />
                       {errors.stages?.[index]?.name && (
@@ -272,51 +309,51 @@ const NewProcess: React.FC = () => {
 
                     <div>
                       <label className="block text-sm font-medium text-secondary-700 mb-1">
-                        Tipo de Etapa *
+                        Tipo *
                       </label>
                       <select
-                        {...register(`stages.${index}.type` as const, { required: 'Tipo de etapa é obrigatório' })}
+                        {...register(`stages.${index}.type` as const)}
                         className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                       >
                         {stageTypes.map(type => (
-                          <option key={type.value} value={type.value}>{type.label}</option>
+                          <option key={type.value} value={type.value}>
+                            {type.label}
+                          </option>
                         ))}
                       </select>
-                      {errors.stages?.[index]?.type && (
-                        <p className="mt-1 text-sm text-red-600">Tipo de etapa é obrigatório</p>
-                      )}
                     </div>
                   </div>
-
-                  {watch(`stages.${index}.type`) === 'TEST' && (
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-secondary-700 mb-1">
-                        Selecionar Teste
-                      </label>
-                      <select
-                        {...register(`stages.${index}.testId`)}
-                        onChange={(e) => handleTestSelect(e.target.value, index)}
-                        className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      >
-                        <option value="">Selecione um teste</option>
-                        {Array.isArray(tests) && tests.map(test => (
-                          <option key={test.id} value={test.id}>{test.title}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-secondary-700 mb-1">
                       Descrição
                     </label>
                     <textarea
-                      {...register(`stages.${index}.description`)}
-                      placeholder="Descreva os objetivos e requisitos desta etapa"
-                      rows={3}
+                      {...register(`stages.${index}.description` as const)}
+                      rows={2}
                       className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                     />
                   </div>
+
+                  {watch(`stages.${index}.type`) === 'TEST' && (
+                    <div>
+                      <label className="block text-sm font-medium text-secondary-700 mb-1">
+                        Selecionar Teste
+                      </label>
+                      <select
+                        {...register(`stages.${index}.testId` as const)}
+                        onChange={(e) => handleTestSelect(e.target.value, index)}
+                        className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                      >
+                        <option value="">Selecione um teste...</option>
+                        {tests.map(test => (
+                          <option key={test.id} value={test.id}>
+                            {test.title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -324,7 +361,7 @@ const NewProcess: React.FC = () => {
             <div className="flex justify-end space-x-4">
               <button
                 type="button"
-                onClick={() => router.back()}
+                onClick={() => router.push('/admin/processes')}
                 className="px-4 py-2 text-sm font-medium text-secondary-700 bg-white border border-secondary-300 rounded-md hover:bg-secondary-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
               >
                 Cancelar
@@ -334,7 +371,7 @@ const NewProcess: React.FC = () => {
                 disabled={isSubmitting}
                 className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
               >
-                {isSubmitting ? 'Salvando...' : 'Salvar'}
+                {isSubmitting ? 'Salvando...' : 'Salvar Alterações'}
               </button>
             </div>
           </form>
@@ -344,4 +381,4 @@ const NewProcess: React.FC = () => {
   );
 };
 
-export default NewProcess;
+export default EditProcess;

@@ -109,18 +109,21 @@ model SelectionProcess {
 }
 
 model ProcessStage {
-  id           String              @id @default(uuid())
-  name         String
-  description  String?
-  order        Int
-  type         String              @default("TEST")
-  duration     Int?
-  requestPhoto Boolean             @default(false)
-  processId    String
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
-  progresses   CandidateProgress[]
-  process      SelectionProcess    @relation(fields: [processId], references: [id])
+  id              String              @id @default(uuid())
+  name            String
+  description     String?
+  order          Int
+  type           String              @default("TEST")
+  duration       Int?
+  requestPhoto   Boolean             @default(false)
+  processId      String
+  testId         String?             // ID do teste associado quando type = "TEST"
+  expectedProfile Json?              // Perfil esperado para perguntas opinativas
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  progresses     CandidateProgress[]
+  process        SelectionProcess    @relation(fields: [processId], references: [id])
+  test           Test?              @relation(fields: [testId], references: [id])  // Relação com o teste
 
   @@index([order])
 }
@@ -160,6 +163,7 @@ model Test {
   globalVersions  GlobalAccess[]
   stages          Stage[]
   testStages      TestStage[]
+  processStages   ProcessStage[]   // Relação inversa com ProcessStage
   company         Company          @relation(fields: [companyId], references: [id])
   testInvitations TestInvitation[]
   usedInviteCodes UsedInviteCode[]
