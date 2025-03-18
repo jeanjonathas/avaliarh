@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
 import { prisma } from '../../../../lib/prisma'
+import { Role } from '@prisma/client';
 
 export default async function handler(
   req: NextApiRequest,
@@ -11,6 +12,20 @@ export default async function handler(
   const session = await getServerSession(req, res, authOptions)
   if (!session) {
     return res.status(401).json({ error: 'Não autorizado' })
+  }
+
+  // Verificar se o usuário é admin
+  const userEmail = session.user?.email;
+  if (!userEmail) {
+    return res.status(401).json({ error: 'Email de usuário não encontrado na sessão' });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { email: userEmail },
+  });
+
+  if (!user || (user.role !== Role.COMPANY_ADMIN && user.role !== Role.SUPER_ADMIN)) {
+    return res.status(403).json({ error: 'Não autorizado. Acesso apenas para administradores.' });
   }
 
   if (req.method === 'GET') {
@@ -62,200 +77,72 @@ export default async function handler(
     }
   } else if (req.method === 'POST') {
     try {
-      const { title, description, order, testId } = req.body;
+      const { title, description, order, testId, questionType } = req.body
 
+      // Validar dados
       if (!title) {
-        return res.status(400).json({ error: 'Título é obrigatório' });
-      }
-
-      console.log('Recebido para criar estágio:', { title, description, order, testId });
-
-      // Verificar se a tabela Stage existe
-      try {
-        await prisma.$executeRawUnsafe(`
-          CREATE TABLE IF NOT EXISTS "Stage" (
-            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-            title VARCHAR(255) NOT NULL,
-            description TEXT,
-            "order" INTEGER,
-            "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-            "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-          )
-        `);
-      } catch (tableError) {
-        console.error('Erro ao verificar tabela Stage:', tableError);
-        // Continuar mesmo se houver erro, pois a tabela pode já existir
+        return res.status(400).json({ error: 'Título é obrigatório' })
       }
 
       // Determinar a próxima ordem disponível se não for fornecida
       let nextOrder = order;
       if (testId && (nextOrder === undefined || nextOrder === null)) {
         try {
-          // Verificar a maior ordem existente para este teste
-          const maxOrderResult = await prisma.$queryRaw`
-            SELECT COALESCE(MAX(ts."order"), -1) as "maxOrder"
-            FROM "TestStage" ts
-            WHERE ts."testId" = ${testId}
-          `;
+          // Buscar a maior ordem existente para este teste
+          const testStages = await prisma.testStage.findMany({
+            where: { 
+              testId: testId 
+            },
+            orderBy: { 
+              order: 'desc' 
+            },
+            take: 1
+          });
           
-          if (Array.isArray(maxOrderResult) && maxOrderResult.length > 0) {
-            const maxOrder = maxOrderResult[0].maxOrder;
-            // Garantir que a próxima ordem seja sempre maxOrder + 1
-            nextOrder = maxOrder !== null ? Number(maxOrder) + 1 : 0;
-          } else {
-            nextOrder = 0;
-          }
-          
-          console.log(`Próxima ordem para o teste ${testId}:`, nextOrder);
+          nextOrder = testStages.length > 0 ? testStages[0].order + 1 : 0;
+          console.log('Próxima ordem determinada:', nextOrder);
         } catch (orderError) {
           console.error('Erro ao determinar próxima ordem:', orderError);
-          nextOrder = 0;
+          nextOrder = 0; // Fallback para ordem 0 se houver erro
         }
       } else {
         nextOrder = nextOrder || 0;
       }
 
-      // Criar nova etapa usando executeRawUnsafe para maior controle
-      let newStageId = '';
-      try {
-        console.log('Inserindo nova etapa com valores:', {
+      console.log('Inserindo nova etapa com valores:', {
+        title,
+        description: description || null,
+        order: nextOrder,
+        questionType: questionType || null
+      });
+      
+      // Criar a etapa usando Prisma Client
+      const newStage = await prisma.stage.create({
+        data: {
           title,
-          description: description || null,
-          order: nextOrder
-        });
-        
-        // Verificar se a tabela TestStage existe
-        try {
-          await prisma.$executeRawUnsafe(`
-            CREATE TABLE IF NOT EXISTS "TestStage" (
-              id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-              "testId" UUID NOT NULL,
-              "stageId" UUID NOT NULL,
-              "order" INTEGER NOT NULL,
-              "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-              "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-              FOREIGN KEY ("testId") REFERENCES "tests"(id) ON DELETE CASCADE,
-              FOREIGN KEY ("stageId") REFERENCES "Stage"(id) ON DELETE CASCADE
-            )
-          `);
-        } catch (tableError) {
-          console.error('Erro ao verificar tabela TestStage:', tableError);
-          // Continuar mesmo se houver erro, pois a tabela pode já existir
+          description,
+          order: nextOrder,
+          questionType,
+          ...(testId ? { test: { connect: { id: testId } } } : {})
         }
-        
-        // Gerar um UUID para a nova etapa
-        const uuidResult = await prisma.$queryRaw`SELECT uuid_generate_v4() as uuid`;
-        if (!Array.isArray(uuidResult) || uuidResult.length === 0) {
-          throw new Error('Falha ao gerar UUID para nova etapa');
-        }
-        
-        newStageId = uuidResult[0].uuid;
-        console.log('UUID gerado para nova etapa:', newStageId);
-        
-        const result = await prisma.$queryRaw`
-          INSERT INTO "Stage" (
-            id,
-            title,
-            description,
-            "order",
-            "createdAt",
-            "updatedAt"
-          ) VALUES (
-            ${newStageId}::uuid,
-            ${title},
-            ${description || null},
-            ${nextOrder},
-            NOW(),
-            NOW()
-          )
-          RETURNING id
-        `;
-        
-        if (Array.isArray(result) && result.length > 0) {
-          newStageId = result[0].id;
-          console.log('Nova etapa criada com ID:', newStageId);
-        } else {
-          throw new Error('Falha ao criar etapa: ID não retornado');
-        }
-        
-        // Se um testId foi fornecido, associar a etapa ao teste
-        if (testId) {
-          console.log(`Associando etapa ${newStageId} ao teste ${testId} com ordem ${nextOrder}`);
-          
-          try {
-            // Verificar se o testId e stageId são válidos antes de inserir
-            if (!testId || !newStageId) {
-              throw new Error(`Valores inválidos para associação: testId=${testId}, stageId=${newStageId}`);
-            }
+      });
 
-            // Garantir que nextOrder seja um número
-            const orderValue = typeof nextOrder === 'number' ? nextOrder : 0;
-            
-            console.log('Valores para inserção em TestStage:', {
-              testId,
-              stageId: newStageId,
-              order: orderValue
-            });
-
-            // Usar o Prisma Client para criar o TestStage
-            const testStage = await prisma.$executeRawUnsafe(`
-              INSERT INTO "TestStage" (
-                id,
-                "testId",
-                "stageId",
-                "order",
-                "createdAt",
-                "updatedAt"
-              ) VALUES (
-                uuid_generate_v4(),
-                '${testId}'::uuid,
-                '${newStageId}'::uuid,
-                ${orderValue},
-                NOW(),
-                NOW()
-              )
-            `);
-            
-            console.log(`Relação TestStage criada com sucesso para teste ${testId} e etapa ${newStageId}`);
-          } catch (relationError) {
-            console.error('Erro ao criar relação TestStage:', relationError);
-            throw new Error(`Erro ao associar etapa ao teste: ${relationError.message}`);
+      // Se o testId foi fornecido, criar também a relação TestStage
+      if (testId) {
+        await prisma.testStage.create({
+          data: {
+            test: { connect: { id: testId } },
+            stage: { connect: { id: newStage.id } },
+            order: nextOrder
           }
-        }
-        
-        // Buscar o estágio recém-criado com todas as informações
-        const newStage = await prisma.$queryRaw`
-          SELECT 
-            s.id, 
-            s.title, 
-            s.description, 
-            s."order",
-            ts.id as "testStageId",
-            ts."testId",
-            s."createdAt",
-            s."updatedAt"
-          FROM "Stage" s
-          LEFT JOIN "TestStage" ts ON s.id = ts."stageId" AND ts."testId" = ${testId || null}
-          WHERE s.id = ${newStageId}
-        `;
-        
-        console.log('Etapa criada com sucesso:', newStage);
-        
-        if (Array.isArray(newStage) && newStage.length > 0) {
-          return res.status(201).json({
-            ...newStage[0],
-            questionCount: 0
-          });
-        } else {
-          throw new Error('Não foi possível encontrar a etapa criada');
-        }
-      } catch (insertError) {
-        console.error('Erro específico ao inserir estágio:', insertError);
-        throw insertError;
+        });
       }
+
+      console.log('Etapa criada com sucesso:', newStage);
+      return res.status(201).json(newStage);
     } catch (error) {
-      console.error('Erro ao criar estágio:', error);
-      return res.status(500).json({ error: 'Erro ao criar estágio: ' + (error.message || 'Erro desconhecido') });
+      console.error('Erro ao criar etapa:', error)
+      return res.status(500).json({ error: `Erro ao criar etapa: ${error}` })
     }
   } else {
     res.setHeader('Allow', ['GET', 'POST']);

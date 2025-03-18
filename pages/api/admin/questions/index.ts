@@ -20,18 +20,27 @@ export default async function handler(
       console.log('Iniciando busca de perguntas');
       let questions = [];
       
-      const { stageId, testId, categoryId, ids } = req.query;
+      const { stageId, testId, categoryId, ids, type } = req.query;
       
-      console.log('Parâmetros de busca:', { stageId, testId, categoryId, ids });
+      console.log('Parâmetros de busca:', { stageId, testId, categoryId, ids, type });
       
       try {
+        // Base where condition
+        let whereCondition: any = {};
+        
+        // Add type filter if provided
+        if (type) {
+          whereCondition.type = type;
+          console.log(`Filtrando perguntas por tipo: ${type}`);
+        }
+        
         if (stageId) {
           console.log(`Buscando perguntas para a etapa ${stageId}`);
           // Buscar perguntas de uma etapa específica
+          whereCondition.stageId = stageId;
+          
           questions = await prisma.question.findMany({
-            where: {
-              stageId: stageId
-            },
+            where: whereCondition,
             include: {
               stage: true,
               categories: true,
@@ -56,6 +65,7 @@ export default async function handler(
           // Buscar perguntas de uma categoria específica
           questions = await prisma.question.findMany({
             where: {
+              ...whereCondition,
               categories: {
                 some: {
                   id: categoryId
@@ -77,12 +87,14 @@ export default async function handler(
             ]
           });
         } else if (ids && ids.length > 0) {
-          console.log(`Buscando perguntas específicas: ${ids.join(', ')}`);
+          const idArray = Array.isArray(ids) ? ids : [ids];
+          console.log(`Buscando perguntas específicas: ${idArray.join(', ')}`);
           // Buscar perguntas específicas por IDs
           questions = await prisma.question.findMany({
             where: {
+              ...whereCondition,
               id: {
-                in: ids
+                in: idArray
               }
             },
             include: {
@@ -103,6 +115,7 @@ export default async function handler(
           console.log('Buscando todas as perguntas');
           // Obter todas as perguntas
           questions = await prisma.question.findMany({
+            where: whereCondition,
             include: {
               stage: true,
               categories: true,

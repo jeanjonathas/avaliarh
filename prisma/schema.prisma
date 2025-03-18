@@ -159,6 +159,7 @@ model Test {
   candidates      Candidate[]
   globalVersions  GlobalAccess[]
   stages          Stage[]
+  testStages      TestStage[]
   company         Company          @relation(fields: [companyId], references: [id])
   testInvitations TestInvitation[]
   usedInviteCodes UsedInviteCode[]
@@ -176,6 +177,18 @@ model Stage {
   questionType String?      // Tipo de pergunta permitido nesta etapa
   questions    Question[]
   test         Test?        @relation(fields: [testId], references: [id])
+  TestStage    TestStage[]
+}
+
+model TestStage {
+  id        String   @id @default(uuid())
+  testId    String
+  stageId   String
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  test      Test     @relation(fields: [testId], references: [id])
+  stage     Stage    @relation(fields: [stageId], references: [id])
 }
 
 model Question {

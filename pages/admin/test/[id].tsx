@@ -474,42 +474,51 @@ const TestDetail: NextPage = () => {
     }
 
     try {
-      setLoading(true);
-      console.log('[TestDetail] Adicionando nova etapa:', stageData.title);
-      
-      // Não vamos mais calcular a ordem aqui, deixaremos a API fazer isso
-      // A API vai determinar a próxima ordem disponível com base nas etapas existentes
-      console.log('[TestDetail] Solicitando à API para determinar a próxima ordem disponível');
-
-      // Criar a nova etapa
-      const response = await fetch('/api/admin/stages', {
+      const response = await fetch(`/api/admin/stages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(stageData),
+        body: JSON.stringify({
+          title: stageData.title,
+          description: stageData.description,
+          testId: stageData.testId,
+          questionType: stageData.questionType
+        }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('[TestDetail] Erro da API:', errorData);
-        throw new Error(errorData.error || 'Erro ao adicionar nova etapa');
+        throw new Error('Erro ao criar etapa');
       }
 
-      // Recarregar os dados do teste após adicionar a etapa
-      await reloadTestData();
+      const newStage = await response.json();
       
-      notify.showSuccess('Etapa adicionada com sucesso!');
+      // Associar a etapa ao teste
+      const testStageResponse = await fetch(`/api/admin/tests/${stageData.testId}/stages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          stageId: newStage.id,
+          order: test?.testStages?.length || 0,
+        }),
+      });
+
+      if (!testStageResponse.ok) {
+        throw new Error('Erro ao associar etapa ao teste');
+      }
+
+      return newStage;
     } catch (error) {
       console.error('Erro ao adicionar etapa:', error);
+      notify.showError('Ocorreu um erro ao adicionar a etapa');
       throw error;
-    } finally {
-      setLoading(false);
     }
   };
 
   // Função para adicionar uma etapa ao teste
-  const addStageToTest = async () => {
+  const handleAddStage = async () => {
     if (!newStageName.trim()) {
       notify.showError('O nome da etapa é obrigatório');
       return;
@@ -602,6 +611,34 @@ const TestDetail: NextPage = () => {
   const questionsAlreadyInTest = test?.testStages?.flatMap(testStage => 
     testStage.stage.questionStages?.map(qs => qs.questionId) || []
   ) || [];
+
+  // Função para buscar perguntas disponíveis
+  const fetchAvailableQuestions = async (stageId: string) => {
+    setLoading(true);
+    try {
+      // Primeiro, buscar a etapa para obter o tipo de pergunta
+      const stageResponse = await fetch(`/api/admin/stages/${stageId}`);
+      if (!stageResponse.ok) {
+        throw new Error('Erro ao buscar detalhes da etapa');
+      }
+      const stageData = await stageResponse.json();
+      const questionType = stageData.questionType;
+      
+      // Buscar perguntas disponíveis, filtrando pelo tipo se especificado
+      const response = await fetch(`/api/admin/questions?${questionType ? `type=${questionType}` : ''}`);
+      if (!response.ok) {
+        throw new Error('Erro ao buscar perguntas disponíveis');
+      }
+      
+      const data = await response.json();
+      setAvailableQuestions(data);
+    } catch (error) {
+      console.error('Erro ao buscar perguntas disponíveis:', error);
+      notify.showError('Erro ao buscar perguntas disponíveis');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredQuestions = availableQuestions.filter(question => {
     // Excluir perguntas que já estão sendo usadas no teste
@@ -1210,7 +1247,7 @@ const TestDetail: NextPage = () => {
                 Cancelar
               </button>
               <button
-                onClick={addStageToTest}
+                onClick={handleAddStage}
                 className="px-4 py-2 text-sm text-white bg-primary-600 rounded-md hover:bg-primary-700"
               >
                 Adicionar
