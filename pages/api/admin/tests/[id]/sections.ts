@@ -22,7 +22,7 @@ export default async function handler(
   // Verificar se o teste existe
   try {
     const testExists = await prisma.$queryRaw`
-      SELECT id FROM "tests" WHERE id = ${id}
+      SELECT id FROM "Test" WHERE id = ${id}::uuid
     `;
 
     if (!Array.isArray(testExists) || testExists.length === 0) {
@@ -47,7 +47,7 @@ export default async function handler(
 
       // Verificar se o estágio existe
       const stageExists = await prisma.$queryRaw`
-        SELECT id FROM "Stage" WHERE id = ${stageId}
+        SELECT id FROM "Stage" WHERE id = ${stageId}::uuid
       `;
 
       if (!Array.isArray(stageExists) || stageExists.length === 0) {
@@ -59,8 +59,8 @@ export default async function handler(
         await prisma.$executeRawUnsafe(`
           CREATE TABLE IF NOT EXISTS "TestStage" (
             id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-            "testId" UUID NOT NULL REFERENCES "tests"(id) ON DELETE CASCADE,
-            "stageId" VARCHAR(255) NOT NULL,
+            "testId" UUID NOT NULL REFERENCES "Test"(id) ON DELETE CASCADE,
+            "stageId" UUID NOT NULL,
             "order" INTEGER NOT NULL DEFAULT 0,
             "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
             "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
@@ -75,7 +75,7 @@ export default async function handler(
       // Verificar se a relação já existe
       const existingRelation = await prisma.$queryRaw`
         SELECT * FROM "TestStage" 
-        WHERE "testId" = ${id} AND "stageId" = ${stageId}
+        WHERE "testId" = ${id}::uuid AND "stageId" = ${stageId}::uuid
       `;
 
       if (Array.isArray(existingRelation) && existingRelation.length > 0) {
@@ -83,10 +83,17 @@ export default async function handler(
       }
 
       // Adicionar o estágio ao teste
-      await prisma.$executeRawUnsafe(`
-        INSERT INTO "TestStage" ("testId", "stageId", "order", "createdAt", "updatedAt")
-        VALUES ('${id}', '${stageId}', ${order || 0}, NOW(), NOW())
-      `);
+      await prisma.$queryRaw`
+        INSERT INTO "TestStage" (id, "testId", "stageId", "order", "createdAt", "updatedAt")
+        VALUES (
+          uuid_generate_v4(),
+          ${id}::uuid, 
+          ${stageId}::uuid, 
+          ${order || 0}, 
+          NOW(), 
+          NOW()
+        )
+      `;
 
       return res.status(201).json({ success: true });
     } catch (error) {
@@ -110,7 +117,7 @@ export default async function handler(
             s.description
           FROM "TestStage" ts
           JOIN "Stage" s ON ts."stageId" = s.id
-          WHERE ts."testId" = ${id}
+          WHERE ts."testId" = ${id}::uuid
           ORDER BY ts."order" ASC
         `;
       } catch (error) {

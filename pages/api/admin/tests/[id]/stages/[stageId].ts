@@ -22,7 +22,7 @@ export default async function handler(
   // Verificar se o teste existe
   try {
     const testExists = await prisma.$queryRaw`
-      SELECT id FROM "tests" WHERE id = ${id}
+      SELECT id FROM "Test" WHERE id = ${id}
     `;
 
     if (!Array.isArray(testExists) || testExists.length === 0) {
@@ -42,8 +42,8 @@ export default async function handler(
       const testStageExists = await prisma.$queryRaw`
         SELECT ts.id 
         FROM "TestStage" ts
-        WHERE ts."testId" = ${id}
-        AND ts."stageId" = ${stageId}
+        WHERE ts."testId" = ${id}::uuid
+        AND ts."stageId" = ${stageId}::uuid
       `;
 
       if (!Array.isArray(testStageExists) || testStageExists.length === 0) {
@@ -56,8 +56,8 @@ export default async function handler(
       // Remover a relação TestStage (não a etapa em si)
       const result = await prisma.$executeRaw`
         DELETE FROM "TestStage"
-        WHERE "testId" = ${id}
-        AND "stageId" = ${stageId}
+        WHERE "testId" = ${id}::uuid
+        AND "stageId" = ${stageId}::uuid
       `;
       
       console.log(`[API] Resultado da remoção:`, result);
@@ -86,8 +86,8 @@ export default async function handler(
       const testStageExists = await prisma.$queryRaw`
         SELECT ts.id 
         FROM "TestStage" ts
-        WHERE ts."testId" = ${id}
-        AND ts."stageId" = ${stageId}
+        WHERE ts."testId" = ${id}::uuid
+        AND ts."stageId" = ${stageId}::uuid
       `;
 
       if (!Array.isArray(testStageExists) || testStageExists.length === 0) {
@@ -101,8 +101,8 @@ export default async function handler(
       const result = await prisma.$executeRaw`
         UPDATE "TestStage"
         SET "order" = ${order}
-        WHERE "testId" = ${id}
-        AND "stageId" = ${stageId}
+        WHERE "testId" = ${id}::uuid
+        AND "stageId" = ${stageId}::uuid
       `;
       
       console.log(`[API] Resultado da atualização:`, result);

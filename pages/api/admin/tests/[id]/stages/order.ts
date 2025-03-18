@@ -22,7 +22,7 @@ export default async function handler(
   // Verificar se o teste existe
   try {
     const testExists = await prisma.$queryRaw`
-      SELECT id FROM "tests" WHERE id = ${id}
+      SELECT id FROM "Test" WHERE id = ${id}
     `;
 
     if (!Array.isArray(testExists) || testExists.length === 0) {
@@ -53,7 +53,7 @@ export default async function handler(
         const stageExists = await prisma.$queryRaw`
           SELECT ts.id 
           FROM "TestStage" ts
-          WHERE ts."stageId" = ${stageId} AND ts."testId" = ${id}
+          WHERE ts."stageId" = ${stageId}::uuid AND ts."testId" = ${id}::uuid
         `;
 
         if (!Array.isArray(stageExists) || stageExists.length === 0) {
@@ -70,7 +70,7 @@ export default async function handler(
           SET 
             "order" = ${order},
             "updatedAt" = NOW()
-          WHERE "stageId" = ${stageId} AND "testId" = ${id}
+          WHERE "stageId" = ${stageId}::uuid AND "testId" = ${id}::uuid
         `;
       }
 

@@ -22,7 +22,7 @@ export default async function handler(
   // Verificar se o teste existe
   try {
     const testExists = await prisma.$queryRaw`
-      SELECT id FROM "tests" WHERE id = ${id}
+      SELECT id FROM "Test" WHERE id = ${id}
     `;
 
     if (!Array.isArray(testExists) || testExists.length === 0) {
@@ -51,7 +51,7 @@ export default async function handler(
 
         // Verificar se o estágio existe
         const stageExists = await prisma.$queryRaw`
-          SELECT id FROM "Stage" WHERE id = ${stageId}
+          SELECT id FROM "Stage" WHERE id = ${stageId}::uuid
         `;
 
         if (!Array.isArray(stageExists) || stageExists.length === 0) {
@@ -61,7 +61,7 @@ export default async function handler(
         // Verificar se o estágio já está associado ao teste na tabela TestStage
         const stageAlreadyAssociated = await prisma.$queryRaw`
           SELECT id FROM "TestStage" 
-          WHERE "stageId" = ${stageId} AND "testId" = ${id}::uuid
+          WHERE "stageId" = ${stageId}::uuid AND "testId" = ${id}::uuid
         `;
 
         if (Array.isArray(stageAlreadyAssociated) && stageAlreadyAssociated.length > 0) {
@@ -81,7 +81,7 @@ export default async function handler(
             ) VALUES (
               uuid_generate_v4(),
               ${id}::uuid,
-              ${stageId},
+              ${stageId}::uuid,
               ${order || 0},
               NOW(),
               NOW()
@@ -137,7 +137,7 @@ export default async function handler(
             ) VALUES (
               uuid_generate_v4(),
               ${id}::uuid,
-              ${stageId},
+              ${stageId}::uuid,
               0,
               NOW(),
               NOW()
@@ -229,7 +229,7 @@ export default async function handler(
                 ) VALUES (
                   uuid_generate_v4(),
                   ${id},
-                  ${stage.stageId},
+                  ${stage.stageId}::uuid,
                   ${stage.order || 0},
                   NOW(),
                   NOW()

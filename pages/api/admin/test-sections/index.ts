@@ -60,16 +60,16 @@ export default async function handler(
 
       // Verificar se o teste existe
       try {
-        const tests = await prisma.$queryRaw`
-          SELECT id FROM "tests" WHERE id = ${testId}
+        const testExists = await prisma.$queryRaw`
+          SELECT id FROM "Test" WHERE id = ${testId}
         `;
 
-        if (!Array.isArray(tests) || tests.length === 0) {
+        if (!Array.isArray(testExists) || testExists.length === 0) {
           return res.status(404).json({ error: 'Teste não encontrado' });
         }
       } catch (error) {
-        console.error('Erro ao verificar teste (tabela pode não existir):', error);
-        return res.status(404).json({ error: 'Teste não encontrado' });
+        console.error('Erro ao verificar teste:', error);
+        return res.status(500).json({ error: 'Erro ao verificar teste' });
       }
 
       // Verificar se a seção existe
