@@ -649,7 +649,7 @@ const TestDetail: NextPage = () => {
       // Armazenar o tipo de pergunta da etapa selecionada
       setSelectedStageQuestionType(questionType);
       
-      // Buscar todas as perguntas disponíveis - não filtramos na API para garantir que o filtro seja aplicado corretamente no frontend
+      // Buscar todas as perguntas disponíveis
       const response = await fetch(`/api/admin/questions`);
       if (!response.ok) {
         throw new Error('Erro ao buscar perguntas disponíveis');
@@ -657,12 +657,11 @@ const TestDetail: NextPage = () => {
       
       const data = await response.json();
       console.log(`[AddQuestions] Perguntas recebidas: ${data.length}`);
-      console.log(`[AddQuestions] Exemplo de pergunta:`, data.length > 0 ? {
-        id: data[0].id,
-        text: data[0].text,
-        type: data[0].type,
-        difficulty: data[0].difficulty
-      } : 'Nenhuma pergunta encontrada');
+      
+      // Log detalhado das perguntas recebidas
+      data.forEach((question: any) => {
+        console.log(`[AddQuestions] Pergunta ID: ${question.id}, Tipo: ${question.type}, Dificuldade: ${question.difficulty}`);
+      });
       
       setAvailableQuestions(data);
     } catch (error) {
@@ -1001,11 +1000,11 @@ const TestDetail: NextPage = () => {
                   <p className="mt-2 text-secondary-600">{test.description}</p>
                 )}
                 <div className="mt-2 flex items-center space-x-4">
-                  <span className={`px-2 py-1 text-xs rounded-full ${test.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                  <span key="status-tag" className={`px-2 py-1 text-xs rounded-full ${test.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                     {test.active ? 'Ativo' : 'Inativo'}
                   </span>
                   {test.timeLimit && (
-                    <span className="text-sm text-secondary-600">
+                    <span key="time-limit-tag" className="text-sm text-secondary-600">
                       Tempo limite: {test.timeLimit} minutos
                     </span>
                   )}
@@ -1171,18 +1170,64 @@ const TestDetail: NextPage = () => {
                                           {qIndex + 1}. {questionStage.question.text}
                                         </div>
                                         <div className="mt-2 flex flex-wrap gap-2">
-                                          {/* Dificuldade temporariamente desativada */}
-                                          <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
-                                            Sem dificuldade
-                                          </span>
-                                          {questionStage.question.categories && questionStage.question.categories.map(category => (
-                                            <span 
-                                              key={category.id}
-                                              className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full"
-                                            >
-                                              {category.name}
-                                            </span>
-                                          ))}
+                                           {/* Exibir a dificuldade corretamente */}
+                                           <span key={`difficulty-${questionStage.id}`} className={`px-2 py-1 text-xs rounded-full flex items-center ${
+                                             questionStage.question.difficulty === 'EASY' 
+                                               ? 'bg-green-100 text-green-800 border border-green-300' 
+                                               : questionStage.question.difficulty === 'MEDIUM'
+                                                 ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
+                                                 : 'bg-red-100 text-red-800 border border-red-300'
+                                           }`}>
+                                             <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                             </svg>
+                                             {questionStage.question.difficulty === 'EASY' 
+                                               ? 'Fácil' 
+                                               : questionStage.question.difficulty === 'MEDIUM' 
+                                                 ? 'Médio' 
+                                                 : 'Difícil'}
+                                           </span>
+                                           
+                                           {/* Exibir o tipo de pergunta */}
+                                           <span key={`type-${questionStage.id}`} className={`px-2 py-1 text-xs rounded-full flex items-center ${
+                                             questionStage.question.type === 'MULTIPLE_CHOICE' 
+                                               ? 'bg-blue-100 text-blue-800 border border-blue-300' 
+                                               : 'bg-purple-100 text-purple-800 border border-purple-300'
+                                           }`}>
+                                             {questionStage.question.type === 'MULTIPLE_CHOICE' ? (
+                                               <>
+                                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                 </svg>
+                                                 <span>Múltipla Escolha</span>
+                                               </>
+                                             ) : (
+                                               <>
+                                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                                                 </svg>
+                                                 <span>Opinativa</span>
+                                               </>
+                                             )}
+                                           </span>
+                                         </div>
+                                        <div className="mt-2">
+                                          {questionStage.question.categories && questionStage.question.categories.length > 0 && (
+                                            <div className="flex flex-wrap gap-2 mt-2">
+                                              <span className="text-xs text-gray-500 mr-1">Categorias:</span>
+                                              {questionStage.question.categories.map(category => (
+                                                <span 
+                                                  key={`${questionStage.id}-${category.id}`}
+                                                  className="px-2 py-1 text-xs bg-indigo-100 text-indigo-800 border border-indigo-300 rounded-full flex items-center"
+                                                >
+                                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                                  </svg>
+                                                  {category.name}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
                                       <button
@@ -1385,7 +1430,7 @@ const TestDetail: NextPage = () => {
                 </div>
               ) : (
                 <div className="p-4 space-y-4">
-                  {filteredQuestions.map(question => (
+                  {filteredQuestions.map((question, index) => (
                     <div 
                       key={question.id}
                       className={`p-4 border rounded-md ${
@@ -1401,7 +1446,7 @@ const TestDetail: NextPage = () => {
                         </div>
                         <div className="mt-2 flex flex-wrap gap-2">
                           {/* Exibir a dificuldade corretamente */}
-                          <span className={`px-2 py-1 text-xs rounded-full flex items-center ${
+                          <span key={`difficulty-${question.id}`} className={`px-2 py-1 text-xs rounded-full flex items-center ${
                             question.difficulty === 'EASY' 
                               ? 'bg-green-100 text-green-800 border border-green-300' 
                               : question.difficulty === 'MEDIUM'
@@ -1419,7 +1464,7 @@ const TestDetail: NextPage = () => {
                           </span>
                           
                           {/* Exibir o tipo de pergunta */}
-                          <span className={`px-2 py-1 text-xs rounded-full flex items-center ${
+                          <span key={`type-${question.id}`} className={`px-2 py-1 text-xs rounded-full flex items-center ${
                             question.type === 'MULTIPLE_CHOICE' 
                               ? 'bg-blue-100 text-blue-800 border border-blue-300' 
                               : 'bg-purple-100 text-purple-800 border border-purple-300'
@@ -1447,7 +1492,7 @@ const TestDetail: NextPage = () => {
                               <span className="text-xs text-gray-500 mr-1">Categorias:</span>
                               {question.categories.map(category => (
                                 <span 
-                                  key={category.id}
+                                  key={`${question.id}-${category.id}`}
                                   className="px-2 py-1 text-xs bg-indigo-100 text-indigo-800 border border-indigo-300 rounded-full flex items-center"
                                 >
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
