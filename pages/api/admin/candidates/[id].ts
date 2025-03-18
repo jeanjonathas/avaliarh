@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
-import { PrismaClient, Candidate, Response, Test, Stage, Question } from '@prisma/client'
+import { PrismaClient, Candidate, Response, Test, Stage, Question, Status } from '@prisma/client'
 
 // Função auxiliar para converter BigInt para Number
 function convertBigIntToNumber(obj: any): any {
@@ -62,10 +62,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!id || typeof id !== 'string') {
       return res.status(400).json({ error: 'ID do candidato é obrigatório' });
     }
-    
+
     // GET - Buscar candidato por ID
     if (req.method === 'GET') {
-      // Buscar o candidato com todas as relações necessárias
       const candidate = await prisma.candidate.findUnique({
         where: { id },
         include: {
@@ -98,89 +97,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(404).json({ error: 'Candidato não encontrado' });
       }
 
-      // Mapear as respostas para incluir informações da etapa e categoria
-      const processedResponses = candidate.responses.map(response => {
-        const category = response.question?.categories?.[0];
-        return {
-          id: response.id,
-          candidateId: response.candidateId,
-          questionId: response.questionId,
-          questionText: response.questionText,
-          optionText: response.optionText,
-          isCorrect: response.isCorrect,
-          stageId: response.question?.stage?.id || '',
-          stageName: response.question?.stage?.title || '',
-          categoryId: category?.id || '',
-          categoryName: category?.name || '',
-          createdAt: response.createdAt,
-          updatedAt: response.updatedAt,
-          timeSpent: response.timeSpent || 0
-        };
-      });
-
-      // Verificar se o candidato completou o teste com base nas respostas
-      let candidateCompleted = candidate.completed;
-      let candidateStatus = candidate.status;
-      if (processedResponses.length > 0 && (!candidate.completed || candidate.status === 'PENDING')) {
-        candidateCompleted = true;
-        candidateStatus = 'APPROVED';
-      }
-
-      // Obter os IDs das etapas que pertencem ao teste do candidato
-      const testStages = candidate.test?.testStages || [];
-      const stageMap = new Map();
-
-      // Inicializar o mapa com todas as etapas do teste
-      testStages.forEach(testStage => {
-        if (testStage.stage) {
-          stageMap.set(testStage.stage.id, {
-            id: testStage.stage.id,
-            name: testStage.stage.title,
-            correct: 0,
-            total: 0,
-            order: testStage.order
-          });
-        }
-      });
-
-      // Processar respostas para calcular pontuações por etapa
-      processedResponses.forEach(response => {
-        if (response.stageId && stageMap.has(response.stageId)) {
-          const stageData = stageMap.get(response.stageId);
-          stageData.total += 1;
-          
-          if (response.isCorrect) {
-            stageData.correct += 1;
-          }
-          
-          stageMap.set(response.stageId, stageData);
-        }
-      });
-
-      // Converter o mapa em array e calcular percentual para cada etapa
-      const stageScores = Array.from(stageMap.values())
-        .map(stage => ({
-          ...stage,
-          percentage: stage.total > 0 ? (stage.correct / stage.total * 100) : 0
-        }))
-        .sort((a, b) => (a.order || 0) - (b.order || 0));
-
-      // Calcular pontuação total
-      const totalCorrect = stageScores.reduce((acc, stage) => acc + stage.correct, 0);
-      const totalQuestions = stageScores.reduce((acc, stage) => acc + stage.total, 0);
-      const percentageScore = totalQuestions > 0 ? (totalCorrect * 100 / totalQuestions) : 0;
-
-      // Atualizar o candidato com a pontuação calculada
-      await prisma.candidate.update({
-        where: { id },
-        data: {
-          score: Math.round(percentageScore),
-          completed: candidateCompleted,
-          status: candidateStatus
-        }
-      });
-
-      // Formatar datas para evitar problemas de serialização
+      // Processar e retornar o candidato como antes...
       const formattedCandidate = {
         ...candidate,
         testDate: candidate.testDate?.toISOString() || null,
@@ -188,13 +105,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         inviteExpires: candidate.inviteExpires?.toISOString() || null,
         createdAt: candidate.createdAt.toISOString(),
         updatedAt: candidate.updatedAt.toISOString(),
-        responses: processedResponses,
-        stageScores,
-        score: {
-          correct: totalCorrect,
-          total: totalQuestions,
-          percentage: percentageScore
-        }
       };
 
       return res.status(200).json(formattedCandidate);
@@ -202,35 +112,68 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // PUT - Atualizar candidato
     if (req.method === 'PUT') {
-      const updateData = req.body;
-      
-      // Remover campos que não devem ser atualizados diretamente
-      delete updateData.id;
-      delete updateData.createdAt;
-      delete updateData.updatedAt;
-      delete updateData.responses;
-      delete updateData.test;
-      
+      const {
+        name,
+        email,
+        position,
+        status,
+        observations,
+        testId,
+      } = req.body;
+
+      // Validar campos obrigatórios
+      if (!name || !email) {
+        return res.status(400).json({ error: 'Nome e email são obrigatórios' });
+      }
+
+      // Validar status
+      if (status && !Object.values(Status).includes(status)) {
+        return res.status(400).json({ error: 'Status inválido' });
+      }
+
+      // Atualizar candidato
       const updatedCandidate = await prisma.candidate.update({
         where: { id },
-        data: updateData,
+        data: {
+          name,
+          email,
+          position,
+          status: status as Status,
+          observations,
+          testId,
+          updatedAt: new Date(),
+        },
       });
-      
+
       return res.status(200).json(updatedCandidate);
     }
 
-    // DELETE - Excluir candidato
-    if (req.method === 'DELETE') {
-      await prisma.candidate.delete({
+    // POST - Gerar novo código de convite
+    if (req.method === 'POST' && req.body.action === 'generateInvite') {
+      const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const inviteExpires = new Date();
+      inviteExpires.setDate(inviteExpires.getDate() + 7); // Expira em 7 dias
+
+      const updatedCandidate = await prisma.candidate.update({
         where: { id },
+        data: {
+          inviteCode,
+          inviteExpires,
+          updatedAt: new Date(),
+        },
       });
-      
-      return res.status(204).end();
+
+      return res.status(200).json({
+        inviteCode: updatedCandidate.inviteCode,
+        inviteExpires: updatedCandidate.inviteExpires,
+      });
     }
 
+    // Método não permitido
     return res.status(405).json({ error: 'Método não permitido' });
+
   } catch (error) {
-    console.error('Erro na API:', error);
+    console.error('Erro ao processar requisição:', error);
     return res.status(500).json({ error: 'Erro interno do servidor' });
   } finally {
     await prisma.$disconnect();
