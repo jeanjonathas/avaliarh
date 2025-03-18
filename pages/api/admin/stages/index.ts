@@ -89,7 +89,7 @@ export default async function handler(
       if (testId && (nextOrder === undefined || nextOrder === null)) {
         try {
           // Buscar a maior ordem existente para este teste
-          const testStages = await prisma.testStage.findMany({
+          const existingStages = await prisma.stage.findMany({
             where: { 
               testId: testId 
             },
@@ -99,7 +99,7 @@ export default async function handler(
             take: 1
           });
           
-          nextOrder = testStages.length > 0 ? testStages[0].order + 1 : 0;
+          nextOrder = existingStages.length > 0 ? existingStages[0].order + 1 : 0;
           console.log('Próxima ordem determinada:', nextOrder);
         } catch (orderError) {
           console.error('Erro ao determinar próxima ordem:', orderError);
@@ -122,21 +122,11 @@ export default async function handler(
           title,
           description,
           order: nextOrder,
-          questionType,
-          ...(testId ? { test: { connect: { id: testId } } } : {})
+          // Usar o tipo como string, já que o campo questionType é do tipo String? no schema
+          ...(questionType ? { questionType } : {}),
+          testId: testId || undefined
         }
       });
-
-      // Se o testId foi fornecido, criar também a relação TestStage
-      if (testId) {
-        await prisma.testStage.create({
-          data: {
-            test: { connect: { id: testId } },
-            stage: { connect: { id: newStage.id } },
-            order: nextOrder
-          }
-        });
-      }
 
       console.log('Etapa criada com sucesso:', newStage);
       return res.status(201).json(newStage);
