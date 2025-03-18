@@ -21,11 +21,13 @@ export default async function handler(
 
   // Verificar se o teste existe
   try {
-    const testExists = await prisma.$queryRaw`
-      SELECT id FROM "Test" WHERE id = ${id}
-    `;
+    const testExists = await prisma.test.findUnique({
+      where: {
+        id: id
+      }
+    });
 
-    if (!Array.isArray(testExists) || testExists.length === 0) {
+    if (!testExists) {
       return res.status(404).json({ error: 'Teste não encontrado' });
     }
   } catch (error) {
@@ -39,14 +41,14 @@ export default async function handler(
       console.log(`[API] Tentando remover etapa ${stageId} do teste ${id}`);
       
       // Verificar se a relação TestStage existe
-      const testStageExists = await prisma.$queryRaw`
-        SELECT ts.id 
-        FROM "TestStage" ts
-        WHERE ts."testId" = ${id}::uuid
-        AND ts."stageId" = ${stageId}::uuid
-      `;
+      const testStageExists = await prisma.testStage.findFirst({
+        where: {
+          testId: id,
+          stageId: stageId
+        }
+      });
 
-      if (!Array.isArray(testStageExists) || testStageExists.length === 0) {
+      if (!testStageExists) {
         console.log(`[API] Relação TestStage não encontrada para testId=${id} e stageId=${stageId}`);
         return res.status(404).json({ error: 'Etapa não encontrada neste teste' });
       }
@@ -54,15 +56,16 @@ export default async function handler(
       console.log(`[API] Relação TestStage encontrada:`, testStageExists);
       
       // Remover a relação TestStage (não a etapa em si)
-      const result = await prisma.$executeRaw`
-        DELETE FROM "TestStage"
-        WHERE "testId" = ${id}::uuid
-        AND "stageId" = ${stageId}::uuid
-      `;
+      const result = await prisma.testStage.deleteMany({
+        where: {
+          testId: id,
+          stageId: stageId
+        }
+      });
       
       console.log(`[API] Resultado da remoção:`, result);
 
-      if (result === 0) {
+      if (result.count === 0) {
         return res.status(404).json({ error: 'Etapa não encontrada neste teste' });
       }
 
@@ -83,14 +86,14 @@ export default async function handler(
       }
 
       // Verificar se a relação TestStage existe
-      const testStageExists = await prisma.$queryRaw`
-        SELECT ts.id 
-        FROM "TestStage" ts
-        WHERE ts."testId" = ${id}::uuid
-        AND ts."stageId" = ${stageId}::uuid
-      `;
+      const testStageExists = await prisma.testStage.findFirst({
+        where: {
+          testId: id,
+          stageId: stageId
+        }
+      });
 
-      if (!Array.isArray(testStageExists) || testStageExists.length === 0) {
+      if (!testStageExists) {
         console.log(`[API] Relação TestStage não encontrada para testId=${id} e stageId=${stageId}`);
         return res.status(404).json({ error: 'Etapa não encontrada neste teste' });
       }
@@ -98,16 +101,19 @@ export default async function handler(
       console.log(`[API] Relação TestStage encontrada:`, testStageExists);
 
       // Atualizar a ordem na tabela TestStage
-      const result = await prisma.$executeRaw`
-        UPDATE "TestStage"
-        SET "order" = ${order}
-        WHERE "testId" = ${id}::uuid
-        AND "stageId" = ${stageId}::uuid
-      `;
+      const result = await prisma.testStage.updateMany({
+        where: {
+          testId: id,
+          stageId: stageId
+        },
+        data: {
+          order: order
+        }
+      });
       
       console.log(`[API] Resultado da atualização:`, result);
 
-      if (result === 0) {
+      if (result.count === 0) {
         return res.status(404).json({ error: 'Etapa não encontrada neste teste' });
       }
 

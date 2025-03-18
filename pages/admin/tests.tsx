@@ -355,7 +355,7 @@ const Tests: NextPage = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-secondary-900">
-                              {test.sectionsCount || 0} seções
+                              {test.sectionsCount || 0} etapas
                             </div>
                             <div className="text-sm text-secondary-500">
                               {test.questionsCount || 0} perguntas

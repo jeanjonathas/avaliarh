@@ -21,11 +21,13 @@ export default async function handler(
 
   // Verificar se o teste existe
   try {
-    const testExists = await prisma.$queryRaw`
-      SELECT id FROM "Test" WHERE id = ${id}
-    `;
+    const testExists = await prisma.test.findFirst({
+      where: {
+        id: id
+      }
+    });
 
-    if (!Array.isArray(testExists) || testExists.length === 0) {
+    if (!testExists) {
       return res.status(404).json({ error: 'Teste não encontrado' });
     }
   } catch (error) {
@@ -50,13 +52,14 @@ export default async function handler(
           return res.status(400).json({ error: 'Cada item deve conter stageId e order' });
         }
 
-        const stageExists = await prisma.$queryRaw`
-          SELECT ts.id 
-          FROM "TestStage" ts
-          WHERE ts."stageId" = ${stageId}::uuid AND ts."testId" = ${id}::uuid
-        `;
+        const stageExists = await prisma.testStage.findFirst({
+          where: {
+            stageId: stageId,
+            testId: id
+          }
+        });
 
-        if (!Array.isArray(stageExists) || stageExists.length === 0) {
+        if (!stageExists) {
           return res.status(404).json({ error: `Etapa com ID ${stageId} não encontrada ou não associada a este teste` });
         }
       }
@@ -65,30 +68,30 @@ export default async function handler(
       for (const stageOrder of stageOrders) {
         const { stageId, order } = stageOrder;
         
-        await prisma.$executeRaw`
-          UPDATE "TestStage"
-          SET 
-            "order" = ${order},
-            "updatedAt" = NOW()
-          WHERE "stageId" = ${stageId}::uuid AND "testId" = ${id}::uuid
-        `;
+        await prisma.testStage.updateMany({
+          where: {
+            stageId: stageId,
+            testId: id
+          },
+          data: {
+            order: order,
+            updatedAt: new Date()
+          }
+        });
       }
 
       // Buscar as etapas atualizadas
-      const updatedStages = await prisma.$queryRaw`
-        SELECT 
-          s.id,
-          s.title,
-          s.description,
-          ts.order,
-          s."testId",
-          s."createdAt",
-          s."updatedAt"
-        FROM "Stage" s
-        JOIN "TestStage" ts ON s.id = ts."stageId"
-        WHERE ts."testId" = ${id}
-        ORDER BY ts.order ASC
-      `;
+      const updatedStages = await prisma.testStage.findMany({
+        where: {
+          testId: id
+        },
+        include: {
+          stage: true
+        },
+        orderBy: {
+          order: 'asc'
+        }
+      });
 
       return res.status(200).json(updatedStages);
     } catch (error) {

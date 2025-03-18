@@ -2,7 +2,6 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
 import { prisma } from '../../../../lib/prisma'
-import { Prisma } from '@prisma/client'
 
 export default async function handler(
   req: NextApiRequest,
@@ -56,6 +55,7 @@ export default async function handler(
           title: true,
           description: true,
           order: true,
+          questionType: true,
           createdAt: true,
           updatedAt: true
         }
