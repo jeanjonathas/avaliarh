@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
-import { PrismaClient, Candidate, Response, Test, Stage, Question, Option, TestStage } from '@prisma/client'
+import { PrismaClient, Candidate, Response, Test, Stage, Question } from '@prisma/client'
 
 // Função auxiliar para converter BigInt para Number
 function convertBigIntToNumber(obj: any): any {
@@ -38,12 +38,12 @@ type CandidateWithRelations = Candidate & {
         name: string;
       }[];
     };
-    option?: Option;
   })[];
   test?: Test & {
-    testStages: (TestStage & {
+    testStages: {
       stage: Stage;
-    })[];
+      order: number;
+    }[];
   };
 };
 
@@ -88,8 +88,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   stage: true,
                   categories: true
                 }
-              },
-              option: true
+              }
             }
           }
         }
@@ -106,10 +105,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           id: response.id,
           candidateId: response.candidateId,
           questionId: response.questionId,
-          optionId: response.option?.id || '',
-          questionText: response.questionText || response.question?.text || '',
-          optionText: response.optionText || response.option?.text || '',
-          isCorrectOption: response.isCorrect || response.option?.isCorrect || false,
+          questionText: response.questionText,
+          optionText: response.optionText,
+          isCorrect: response.isCorrect,
           stageId: response.question?.stage?.id || '',
           stageName: response.question?.stage?.title || '',
           categoryId: category?.id || '',
@@ -151,7 +149,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const stageData = stageMap.get(response.stageId);
           stageData.total += 1;
           
-          if (response.isCorrectOption) {
+          if (response.isCorrect) {
             stageData.correct += 1;
           }
           
@@ -171,8 +169,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const totalCorrect = stageScores.reduce((acc, stage) => acc + stage.correct, 0);
       const totalQuestions = stageScores.reduce((acc, stage) => acc + stage.total, 0);
       const percentageScore = totalQuestions > 0 ? (totalCorrect * 100 / totalQuestions) : 0;
-
-      console.log(`Pontuação total calculada: ${totalCorrect}/${totalQuestions} (${percentageScore}%)`);
 
       // Atualizar o candidato com a pontuação calculada
       await prisma.candidate.update({
@@ -201,57 +197,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       };
 
-      return res.status(200).json(convertBigIntToNumber(formattedCandidate));
+      return res.status(200).json(formattedCandidate);
     }
 
     // PUT - Atualizar candidato
     if (req.method === 'PUT') {
-      const { 
-        name, 
-        email, 
-        phone, 
-        position, 
-        observations,
-        status,
-        rating,
-        testDate,
-        interviewDate,
-        inviteCode,
-        inviteExpires,
-        instagram,
-        showResults,
-        score
-      } = req.body;
-
-      const existingCandidate = await prisma.candidate.findUnique({
-        where: { id }
-      });
-
-      if (!existingCandidate) {
-        return res.status(404).json({ error: 'Candidato não encontrado' });
-      }
-
+      const updateData = req.body;
+      
+      // Remover campos que não devem ser atualizados diretamente
+      delete updateData.id;
+      delete updateData.createdAt;
+      delete updateData.updatedAt;
+      delete updateData.responses;
+      delete updateData.test;
+      
       const updatedCandidate = await prisma.candidate.update({
         where: { id },
-        data: {
-          name: name || undefined,
-          email: email || undefined,
-          phone: phone !== undefined ? phone : undefined,
-          position: position !== undefined ? position : undefined,
-          observations: observations !== undefined ? observations : undefined,
-          status: status || undefined,
-          rating: rating !== undefined ? Number(rating) : undefined,
-          testDate: testDate ? new Date(testDate) : undefined,
-          interviewDate: interviewDate ? new Date(interviewDate) : undefined,
-          inviteCode: inviteCode !== undefined ? inviteCode : undefined,
-          inviteExpires: inviteExpires ? new Date(inviteExpires) : undefined,
-          instagram: instagram !== undefined ? instagram : undefined,
-          showResults: showResults !== undefined ? showResults : undefined,
-          score: score !== undefined ? Number(score) : undefined
-        }
+        data: updateData,
       });
+      
+      return res.status(200).json(updatedCandidate);
+    }
 
-      return res.status(200).json(convertBigIntToNumber(updatedCandidate));
+    // DELETE - Excluir candidato
+    if (req.method === 'DELETE') {
+      await prisma.candidate.delete({
+        where: { id },
+      });
+      
+      return res.status(204).end();
     }
 
     return res.status(405).json({ error: 'Método não permitido' });
