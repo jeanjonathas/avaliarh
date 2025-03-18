@@ -71,65 +71,18 @@ export default async function handler(
         return res.status(400).json({ error: 'Estágio não está associado a nenhum teste' });
       }
       
-      // Verificar se existe uma associação na tabela TestQuestion
-      console.log(`[API] Verificando associação na tabela TestQuestion...`);
-      const testQuestionResult = await prisma.$queryRaw`
+      // Verificar se a questão está associada ao teste e etapa
+      const association = await prisma.$queryRaw`
         SELECT id FROM "TestQuestion" 
-        WHERE "stageId" = ${id} AND "questionId" = ${questionId} AND "testId" = ${testId}
+        WHERE "stageId" = ${id}::uuid AND "questionId" = ${questionId}::uuid AND "testId" = ${testId}::uuid
       `;
-      
-      const testQuestions = Array.isArray(testQuestionResult) ? testQuestionResult : [];
-      console.log(`[API] Encontradas ${testQuestions.length} associações na tabela TestQuestion`);
-      
-      // Verificar se existe uma associação entre a questão e a etapa na tabela StageQuestion
-      console.log(`[API] Verificando associação na tabela StageQuestion...`);
-      const stageQuestion = await prisma.stageQuestion.findUnique({
-        where: {
-          stageId_questionId: {
-            stageId: id,
-            questionId: questionId
-          }
-        }
-      });
-      
-      console.log(`[API] Associação na tabela StageQuestion: ${stageQuestion ? 'encontrada' : 'não encontrada'}`);
-      
-      // Se não houver associação em nenhuma das tabelas, retornar erro
-      if (!stageQuestion && testQuestions.length === 0) {
-        console.log(`[API] Questão não está associada a esta etapa neste teste`);
-        return res.status(404).json({ error: 'Questão não está associada a esta etapa neste teste' });
+
+      if (!Array.isArray(association) || association.length === 0) {
+        return res.status(404).json({ error: 'Questão não encontrada neste teste e etapa' });
       }
-      
-      // Remover a associação na tabela StageQuestion se existir
-      if (stageQuestion) {
-        console.log(`[API] Removendo associação da tabela StageQuestion...`);
-        try {
-          await prisma.stageQuestion.delete({
-            where: {
-              stageId_questionId: {
-                stageId: id,
-                questionId: questionId
-              }
-            }
-          });
-          console.log(`[API] Associação removida da tabela StageQuestion com sucesso`);
-        } catch (error) {
-          console.error('Erro ao remover associação da tabela StageQuestion:', error);
-          // Continuar mesmo com erro, pois a associação pode existir apenas na tabela TestQuestion
-        }
-      } else {
-        console.log(`[API] Não há associação na tabela StageQuestion para remover`);
-      }
-      
-      // Remover a associação na tabela TestQuestion usando SQL raw
-      console.log(`[API] Removendo associação da tabela TestQuestion...`);
-      try {
-        const result = await prisma.$executeRaw`DELETE FROM "TestQuestion" WHERE "stageId" = ${id} AND "questionId" = ${questionId} AND "testId" = ${testId}`;
-        console.log(`[API] Associação removida da tabela TestQuestion com sucesso. Linhas afetadas: ${result}`);
-      } catch (error) {
-        console.error('Erro ao remover associação da tabela TestQuestion:', error);
-        // Não retornar erro aqui, pois a associação pode não existir na tabela TestQuestion
-      }
+
+      // Remover a associação
+      const result = await prisma.$executeRaw`DELETE FROM "TestQuestion" WHERE "stageId" = ${id}::uuid AND "questionId" = ${questionId}::uuid AND "testId" = ${testId}::uuid`;
       
       // Retornar resposta de sucesso
       console.log(`[API] Questão removida da etapa com sucesso`);

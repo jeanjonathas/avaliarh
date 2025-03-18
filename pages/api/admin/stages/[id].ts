@@ -88,10 +88,10 @@ export default async function handler(
         // Usando transação para garantir que todas as operações sejam concluídas ou nenhuma
         await prisma.$transaction(async (tx) => {
           // Excluir as associações TestStage
-          await tx.$executeRaw`DELETE FROM "TestStage" WHERE "stageId" = ${id}`;
+          await tx.$executeRaw`DELETE FROM "TestStage" WHERE "stageId" = ${id}::uuid`;
           
           // Excluir a etapa
-          await tx.$executeRaw`DELETE FROM "Stage" WHERE id = ${id}`;
+          await tx.$executeRaw`DELETE FROM "Stage" WHERE id = ${id}::uuid`;
         });
         
         console.log(`[API] Etapa ${id} excluída com sucesso`);

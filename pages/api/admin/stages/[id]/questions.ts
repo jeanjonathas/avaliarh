@@ -2,8 +2,12 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../../lib/auth'
 import { prisma } from '../../../../../lib/prisma'
-import { Prisma } from '@prisma/client'
 import crypto from 'crypto'
+
+// Função auxiliar para juntar elementos de um array com vírgulas
+function joinArray(arr: any[]): string {
+  return arr.map(item => `'${item}'`).join(',');
+}
 
 export default async function handler(
   req: NextApiRequest,
@@ -97,7 +101,7 @@ export default async function handler(
       // Verificar quais questões já estão associadas a este teste e etapa usando SQL raw
       const existingAssociations = await prisma.$queryRaw`
         SELECT "questionId" FROM "TestQuestion" 
-        WHERE "testId" = ${testId} AND "stageId" = ${id} AND "questionId" IN (${Prisma.join(questionIds)})
+        WHERE "testId" = ${testId}::uuid AND "stageId" = ${id}::uuid AND "questionId" IN (${joinArray(questionIds)})
       `;
       
       console.log('Associações existentes:', existingAssociations);
@@ -114,7 +118,7 @@ export default async function handler(
       // Encontrar a maior ordem atual para adicionar as novas questões em sequência usando SQL raw
       const maxOrderResult = await prisma.$queryRaw`
         SELECT "order" FROM "TestQuestion" 
-        WHERE "testId" = ${testId} AND "stageId" = ${id}
+        WHERE "testId" = ${testId}::uuid AND "stageId" = ${id}::uuid
         ORDER BY "order" DESC
         LIMIT 1
       `;
@@ -162,7 +166,7 @@ export default async function handler(
         
         await prisma.$executeRaw`
           INSERT INTO "TestQuestion" ("id", "testId", "stageId", "questionId", "order", "createdAt", "updatedAt")
-          VALUES (${uuid}, ${testId}, ${id}, ${questionId}, ${nextOrder}, ${now}::timestamp, ${now}::timestamp)
+          VALUES (${uuid}, ${testId}::uuid, ${id}::uuid, ${questionId}, ${nextOrder}, ${now}::timestamp, ${now}::timestamp)
         `;
         
         // Criar um objeto de associação para manter compatibilidade
@@ -225,7 +229,7 @@ export default async function handler(
         const testQuestionsRaw = await prisma.$queryRaw`
           SELECT tq."id" as "testQuestionId", tq."questionId", tq."order"
           FROM "TestQuestion" tq
-          WHERE tq."testId" = ${testId} AND tq."stageId" = ${id}
+          WHERE tq."testId" = ${testId}::uuid AND tq."stageId" = ${id}::uuid
           ORDER BY tq."order" ASC
         `;
         
