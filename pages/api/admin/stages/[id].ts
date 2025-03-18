@@ -75,12 +75,52 @@ export default async function handler(
       
       // Verificar se a etapa existe
       const stage = await prisma.stage.findUnique({
-        where: { id }
+        where: { id },
+        include: {
+          questions: true
+        }
       });
 
       if (!stage) {
         console.log(`[API] Etapa com ID ${id} não encontrada`);
         return res.status(404).json({ error: 'Etapa não encontrada' });
+      }
+
+      // Verificar se há perguntas associadas à etapa
+      if (stage.questions && stage.questions.length > 0) {
+        console.log(`[API] A etapa ${id} possui ${stage.questions.length} perguntas associadas`);
+        
+        // Buscar ou criar um estágio "Banco de Questões"
+        let questionBankStage = await prisma.stage.findFirst({
+          where: {
+            title: "Banco de Questões",
+            testId: null
+          }
+        });
+        
+        if (!questionBankStage) {
+          // Criar um novo estágio "Banco de Questões" se não existir
+          questionBankStage = await prisma.stage.create({
+            data: {
+              title: "Banco de Questões",
+              description: "Repositório para questões não associadas a testes ativos",
+              order: 999 // Ordem alta para ficar no final
+            }
+          });
+          console.log(`[API] Criado novo estágio Banco de Questões: ${questionBankStage.id}`);
+        }
+        
+        // Mover todas as perguntas para o estágio "Banco de Questões"
+        await prisma.question.updateMany({
+          where: {
+            stageId: id
+          },
+          data: {
+            stageId: questionBankStage.id
+          }
+        });
+        
+        console.log(`[API] ${stage.questions.length} perguntas movidas para o Banco de Questões ${questionBankStage.id}`);
       }
 
       try {
@@ -177,7 +217,7 @@ export default async function handler(
       const existingStageData = await prisma.stage.findUnique({
         where: { id },
         include: {
-          testStages: true
+          TestStage: true
         }
       });
 
@@ -216,7 +256,7 @@ export default async function handler(
       const updatedStageData = await prisma.stage.findUnique({
         where: { id },
         include: {
-          testStages: true
+          TestStage: true
         }
       });
       

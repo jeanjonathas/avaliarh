@@ -55,6 +55,33 @@ export default async function handler(
       
       console.log(`[API] Relação TestStage encontrada:`, testStageExists);
       
+      // Verificar se a etapa tem perguntas associadas
+      const questions = await prisma.question.findMany({
+        where: {
+          stageId: stageId
+        }
+      });
+      
+      if (questions.length > 0) {
+        console.log(`[API] A etapa ${stageId} tem ${questions.length} perguntas associadas.`);
+        
+        // Verificar se a etapa está sendo usada apenas neste teste
+        const otherTestStages = await prisma.testStage.findMany({
+          where: {
+            stageId: stageId,
+            testId: {
+              not: id
+            }
+          }
+        });
+        
+        // Se a etapa não está sendo usada em outros testes, não precisamos fazer nada com as perguntas
+        // Elas permanecerão associadas à etapa, que não estará mais associada a nenhum teste
+        if (otherTestStages.length === 0) {
+          console.log(`[API] A etapa ${stageId} não está associada a outros testes, mantendo as perguntas associadas a ela.`);
+        }
+      }
+      
       // Remover a relação TestStage (não a etapa em si)
       const result = await prisma.testStage.deleteMany({
         where: {
@@ -69,7 +96,12 @@ export default async function handler(
         return res.status(404).json({ error: 'Etapa não encontrada neste teste' });
       }
 
-      return res.status(200).json({ success: true });
+      return res.status(200).json({ 
+        success: true,
+        message: 'Etapa removida com sucesso',
+        questionsCount: questions.length,
+        stageRemoved: false // A etapa em si não foi removida, apenas desassociada do teste
+      });
     } catch (error) {
       console.error('Erro ao remover etapa do teste:', error);
       return res.status(500).json({ error: 'Erro ao remover etapa do teste: ' + (error.message || 'Erro desconhecido') });
