@@ -15,6 +15,8 @@ export default async function handler(
 
   if (req.method === 'GET') {
     try {
+      console.log('[API] Buscando todos os testes...');
+      
       // Buscar todos os testes usando Prisma Client em vez de SQL raw
       const tests = await prisma.test.findMany({
         orderBy: {
@@ -56,32 +58,56 @@ export default async function handler(
         }
       });
       
+      console.log(`[API] Encontrados ${tests.length} testes`);
+      
+      // Adicionar contagens de seções e perguntas para cada teste
+      const testsWithCounts = tests.map(test => {
+        const sectionsCount = test.stages.length;
+        const questionsCount = test.stages.reduce((total, stage) => total + stage.questions.length, 0);
+        
+        return {
+          ...test,
+          sectionsCount,
+          questionsCount
+        };
+      });
+      
       // Corrigir o formato da resposta para incluir a propriedade 'tests'
-      return res.status(200).json({ tests });
+      return res.status(200).json({ 
+        success: true,
+        tests: testsWithCounts 
+      });
     } catch (error) {
       console.error('Erro ao buscar testes:', error);
       // Retornar array vazio em vez de erro para não quebrar a UI
-      return res.status(200).json({ tests: [] });
+      return res.status(200).json({ 
+        success: false,
+        error: 'Erro ao buscar testes',
+        tests: [] 
+      });
     }
   } else if (req.method === 'POST') {
     try {
       const { title, description, timeLimit, active } = req.body;
 
-      console.log('Dados recebidos:', { title, description, timeLimit, active });
-      console.log('Sessão do usuário:', JSON.stringify(session, null, 2));
+      console.log('[API] Criando novo teste:', { title, description, timeLimit, active });
+      console.log('[API] Sessão do usuário:', JSON.stringify(session, null, 2));
 
       if (!title) {
-        return res.status(400).json({ error: 'Título do teste é obrigatório' });
+        return res.status(400).json({ 
+          success: false,
+          error: 'Título do teste é obrigatório' 
+        });
       }
 
       // Obter o companyId do usuário da sessão
       let companyId = session.user?.companyId;
       
-      console.log('CompanyId obtido da sessão:', companyId);
+      console.log('[API] CompanyId obtido da sessão:', companyId);
       
       // Se o companyId não estiver na sessão, buscar do banco de dados
       if (!companyId) {
-        console.log('CompanyId não encontrado na sessão, buscando do banco de dados...');
+        console.log('[API] CompanyId não encontrado na sessão, buscando do banco de dados...');
         
         // Buscar o usuário no banco de dados para obter o companyId
         const user = await prisma.user.findUnique({
@@ -94,31 +120,50 @@ export default async function handler(
         });
         
         companyId = user?.companyId;
-        console.log('CompanyId obtido do banco de dados:', companyId);
+        console.log('[API] CompanyId obtido do banco de dados:', companyId);
       }
       
       if (!companyId) {
-        return res.status(400).json({ error: 'ID da empresa não encontrado. O usuário precisa estar associado a uma empresa para criar testes.' });
+        return res.status(400).json({ 
+          success: false,
+          error: 'ID da empresa não encontrado. O usuário precisa estar associado a uma empresa para criar testes.' 
+        });
       }
 
-      // Criar o teste usando Prisma Client incluindo o companyId
+      // Criar o teste
       const newTest = await prisma.test.create({
         data: {
           title,
           description,
           timeLimit: timeLimit ? parseInt(timeLimit) : null,
-          active: active !== undefined ? active : true,
-          companyId: companyId
+          active: active === undefined ? true : active,
+          company: {
+            connect: {
+              id: companyId
+            }
+          }
         }
       });
 
-      return res.status(201).json(newTest);
+      console.log(`[API] Teste criado com sucesso. ID: ${newTest.id}`);
+
+      return res.status(201).json({ 
+        success: true, 
+        message: 'Teste criado com sucesso',
+        test: newTest 
+      });
     } catch (error) {
-      console.error('Erro ao criar teste:', error);
-      return res.status(500).json({ error: 'Erro ao criar teste' });
+      console.error('[API] Erro ao criar teste:', error);
+      return res.status(500).json({ 
+        success: false,
+        error: 'Erro ao criar teste' 
+      });
     }
   } else {
     res.setHeader('Allow', ['GET', 'POST']);
-    return res.status(405).json({ error: `Método ${req.method} não permitido` });
+    return res.status(405).json({ 
+      success: false,
+      error: `Método ${req.method} não permitido` 
+    });
   }
 }
