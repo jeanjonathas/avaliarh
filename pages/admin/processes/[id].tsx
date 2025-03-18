@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import AdminLayout from '../../../components/admin/AdminLayout';
 import { useNotification } from '../../../contexts/NotificationContext';
+import AddCandidateModal from '../../../components/admin/processes/AddCandidateModal';
 
 interface ProcessStage {
   id: string;
@@ -46,6 +47,7 @@ const ProcessDetails: React.FC = () => {
   const [process, setProcess] = useState<SelectionProcess | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAddCandidateModalOpen, setIsAddCandidateModalOpen] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -191,6 +193,12 @@ const ProcessDetails: React.FC = () => {
             )}
           </div>
           <div className="flex space-x-3">
+            <button
+              onClick={() => setIsAddCandidateModalOpen(true)}
+              className="px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors"
+            >
+              Adicionar Candidato
+            </button>
             <Link href={`/admin/processes/edit/${process.id}`}>
               <button className="px-4 py-2 bg-primary-500 text-white rounded-md hover:bg-primary-600 transition-colors">
                 Editar Processo
@@ -303,27 +311,25 @@ const ProcessDetails: React.FC = () => {
                 Adicione candidatos a este processo seletivo para começar a avaliação.
               </p>
               <div className="mt-6">
-                <Link href="/admin/candidates/new">
-                  <button
-                    type="button"
-                    className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                <button
+                  onClick={() => setIsAddCandidateModalOpen(true)}
+                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                >
+                  <svg
+                    className="-ml-1 mr-2 h-5 w-5"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
                   >
-                    <svg
-                      className="-ml-1 mr-2 h-5 w-5"
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    Adicionar Candidato
-                  </button>
-                </Link>
+                    <path
+                      fillRule="evenodd"
+                      d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  Adicionar Candidato
+                </button>
               </div>
             </div>
           ) : (
@@ -395,6 +401,14 @@ const ProcessDetails: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Modal de Adicionar Candidato */}
+        <AddCandidateModal
+          isOpen={isAddCandidateModalOpen}
+          onClose={() => setIsAddCandidateModalOpen(false)}
+          processId={process.id}
+          onSuccess={fetchProcessDetails}
+        />
       </div>
     </AdminLayout>
   );
