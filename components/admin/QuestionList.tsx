@@ -381,7 +381,10 @@ const QuestionList: React.FC = () => {
               {questions.map((question) => (
                 <tr key={question.id}>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{question.text}</div>
+                    <div 
+                      className="text-sm font-medium text-gray-900"
+                      dangerouslySetInnerHTML={{ __html: question.text }}
+                    />
                     {question.stageName && (
                       <div className="text-xs text-gray-500">Etapa: {question.stageName}</div>
                     )}

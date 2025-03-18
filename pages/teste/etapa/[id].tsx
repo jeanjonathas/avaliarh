@@ -863,12 +863,8 @@ const TestStage: NextPage = () => {
                     {questions.map((question, index) => (
                       <div key={question.id} className="card">
                         <h3 className="text-lg font-semibold text-secondary-800 mb-4">
-                          {index + 1}. {question.text.split('\n').map((line, i) => (
-                            <React.Fragment key={i}>
-                              {line}
-                              {i < question.text.split('\n').length - 1 && <br />}
-                            </React.Fragment>
-                          ))}
+                          <span className="mr-2">{index + 1}.</span>
+                          <span dangerouslySetInnerHTML={{ __html: question.text }} />
                         </h3>
                         <div className="space-y-3">
                           {question.options.map((option) => (
@@ -893,14 +889,7 @@ const TestStage: NextPage = () => {
                                   }
                                 }}
                               />
-                              <span className="text-secondary-700">
-                                {option.text.split('\n').map((line, i) => (
-                                  <React.Fragment key={i}>
-                                    {line}
-                                    {i < option.text.split('\n').length - 1 && <br />}
-                                  </React.Fragment>
-                                ))}
-                              </span>
+                              <span className="text-secondary-700" dangerouslySetInnerHTML={{ __html: option.text }} />
                             </label>
                           ))}
                           {errors[question.id] && touched[question.id] && (

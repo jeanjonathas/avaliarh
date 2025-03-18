@@ -63,7 +63,10 @@ const QuestionPreview: React.FC<QuestionPreviewProps> = ({ question, onClose }) 
           {/* Texto da pergunta */}
           <div className="mb-6">
             <h3 className="font-medium text-gray-700 mb-2">Pergunta:</h3>
-            <p className="text-gray-900 text-lg">{question.text}</p>
+            <div 
+              className="text-gray-900 text-lg"
+              dangerouslySetInnerHTML={{ __html: question.text }}
+            />
           </div>
           
           {/* Opções */}

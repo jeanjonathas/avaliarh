@@ -1201,7 +1201,8 @@ const TestDetail: NextPage = () => {
                                     <div className="flex justify-between">
                                       <div className="flex-1">
                                         <div className="font-medium text-secondary-800">
-                                          {qIndex + 1}. {questionStage.question.text}
+                                          <span className="mr-2">{qIndex + 1}.</span>
+                                          <span dangerouslySetInnerHTML={{ __html: questionStage.question.text }} />
                                         </div>
                                         <div className="mt-2 flex flex-wrap gap-2">
                                            {/* Exibir a dificuldade corretamente */}
@@ -1481,7 +1482,8 @@ const TestDetail: NextPage = () => {
                     >
                       <div>
                         <div className="font-medium text-secondary-800">
-                          {question.text}
+                          <span className="mr-2">{index + 1}.</span>
+                          <span dangerouslySetInnerHTML={{ __html: question.text }} />
                         </div>
                         <div className="mt-2 flex flex-wrap gap-2">
                           {/* Exibir a dificuldade corretamente */}

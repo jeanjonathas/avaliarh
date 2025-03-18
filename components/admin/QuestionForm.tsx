@@ -3,6 +3,35 @@ import { Formik, Form, Field, ErrorMessage, FieldArray } from 'formik';
 import * as Yup from 'yup';
 import { QuestionType, QuestionDifficulty } from '../../types/questions';
 import { useNotificationSystem } from '../../hooks/useNotificationSystem';
+import dynamic from 'next/dynamic';
+
+// Importar o React Quill dinamicamente para evitar problemas de SSR
+const ReactQuill = dynamic(() => import('react-quill'), {
+  ssr: false,
+  loading: () => <div className="h-32 bg-gray-100 animate-pulse rounded"></div>
+});
+
+// Importar os estilos do Quill
+import 'react-quill/dist/quill.snow.css';
+
+// Estilos customizados para o editor
+const editorStyles = {
+  editor: {
+    minHeight: '200px',
+  },
+};
+
+// Estilos globais para o conteúdo do editor
+if (typeof window !== 'undefined') {
+  const styleSheet = document.createElement("style");
+  styleSheet.type = "text/css";
+  styleSheet.innerText = `
+    .ql-editor, .ql-editor p, .ql-editor span {
+      font-size: 20px !important;
+    }
+  `;
+  document.head.appendChild(styleSheet);
+}
 
 interface Option {
   text: string;
@@ -158,19 +187,40 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
       onSubmit={handleSubmit}
     >
       {({ values, errors, touched, isSubmitting, setFieldValue }) => (
-        <Form className="space-y-4">
+        <Form className="space-y-4" style={{overflow: 'auto'}}>
           {/* Texto da pergunta */}
           <div className="mb-4">
             <label htmlFor="text" className="block text-sm font-medium text-secondary-700 mb-1">
               Texto da Pergunta
             </label>
-            <Field
-              as="textarea"
+            <ReactQuill
               id="text"
-              name="text"
-              rows={3}
-              className="input-field"
+              style={editorStyles.editor}
+              modules={{
+                toolbar: [
+                  [{ 'header': [1, 2, 3, false] }],
+                  ['bold', 'italic', 'underline', 'strike'],
+                  [{'list': 'ordered'}, {'list': 'bullet'}],
+                  ['link'],
+                  ['clean']
+                ],
+                clipboard: {
+                  matchVisual: false,
+                },
+              }}
+              formats={[
+                'header',
+                'bold', 'italic', 'underline', 'strike',
+                'list', 'bullet',
+                'link'
+              ]}
               placeholder="Digite o texto da pergunta"
+              theme="snow"
+              value={values.text}
+              onChange={(content) => {
+                setFieldValue('text', content);
+              }}
+              className="mb-2"
             />
             <ErrorMessage
               name="text"
