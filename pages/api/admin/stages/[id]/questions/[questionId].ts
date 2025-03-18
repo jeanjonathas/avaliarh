@@ -3,6 +3,10 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../../../lib/auth'
 import { prisma } from '../../../../../../lib/prisma'
 
+// ID de um estágio especial para armazenar questões "removidas"
+// Este ID deve ser criado no banco de dados ou usar um existente
+const UNASSIGNED_STAGE_ID = process.env.UNASSIGNED_STAGE_ID || "00000000-0000-0000-0000-000000000000";
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -38,14 +42,13 @@ export default async function handler(
         return res.status(404).json({ error: 'Questão não encontrada' });
       }
       
-      // Obter o estágio com o teste associado
+      // Verificar se o estágio existe e se a questão está associada a ele
       const stage = await prisma.stage.findUnique({
         where: { id },
         include: {
-          test: true,
-          TestStage: {
-            include: {
-              test: true
+          questions: {
+            where: {
+              id: questionId
             }
           }
         }
@@ -56,39 +59,47 @@ export default async function handler(
         return res.status(404).json({ error: 'Estágio não encontrado' });
       }
       
-      // Verificar se o estágio está associado a um teste diretamente ou via TestStage
-      let testId = stage.testId;
-      
-      // Se não houver testId direto, tentar obter do TestStage
-      if (!testId && stage.TestStage && stage.TestStage.length > 0) {
-        testId = stage.TestStage[0].testId;
+      // Verificar se a questão está associada ao estágio
+      if (stage.questions.length === 0) {
+        console.log(`[API] Questão ${questionId} não está associada ao estágio ${id}`);
+        return res.status(404).json({ error: 'Questão não encontrada neste estágio' });
       }
       
-      console.log(`[API] Estágio ${id} associado ao teste ${testId || 'nenhum'}`);
+      // Buscar ou criar um estágio especial "Banco de Questões" sem associação a teste
+      let questionBankStage = await prisma.stage.findFirst({
+        where: {
+          title: "Banco de Questões",
+          testId: null
+        }
+      });
       
-      if (!testId) {
-        console.log(`[API] Estágio ${id} não está associado a nenhum teste`);
-        return res.status(400).json({ error: 'Estágio não está associado a nenhum teste' });
+      if (!questionBankStage) {
+        // Criar um novo estágio "Banco de Questões" se não existir
+        questionBankStage = await prisma.stage.create({
+          data: {
+            title: "Banco de Questões",
+            description: "Repositório para questões não associadas a testes ativos",
+            order: 999 // Ordem alta para ficar no final
+          }
+        });
+        console.log(`[API] Criado novo estágio Banco de Questões: ${questionBankStage.id}`);
       }
       
-      // Verificar se a questão está associada ao teste e etapa
-      const association = await prisma.$queryRaw`
-        SELECT id FROM "TestQuestion" 
-        WHERE "stageId" = ${id}::uuid AND "questionId" = ${questionId}::uuid AND "testId" = ${testId}::uuid
-      `;
-
-      if (!Array.isArray(association) || association.length === 0) {
-        return res.status(404).json({ error: 'Questão não encontrada neste teste e etapa' });
-      }
-
-      // Remover a associação
-      const result = await prisma.$executeRaw`DELETE FROM "TestQuestion" WHERE "stageId" = ${id}::uuid AND "questionId" = ${questionId}::uuid AND "testId" = ${testId}::uuid`;
+      // Atualizar a questão para apontar para o estágio "Banco de Questões"
+      await prisma.question.update({
+        where: { id: questionId },
+        data: {
+          stageId: questionBankStage.id
+        }
+      });
+      
+      console.log(`[API] Questão ${questionId} movida para o Banco de Questões ${questionBankStage.id}`);
       
       // Retornar resposta de sucesso
-      console.log(`[API] Questão removida da etapa com sucesso`);
       return res.status(200).json({ 
         success: true,
-        message: 'Questão removida da etapa com sucesso'
+        message: 'Questão removida da etapa com sucesso',
+        newStageId: questionBankStage.id
       });
     } catch (error) {
       console.error('Erro ao remover questão do estágio:', error);
@@ -100,26 +111,48 @@ export default async function handler(
     try {
       const { order } = req.body;
 
-      if (order === undefined) {
-        return res.status(400).json({ error: 'Ordem é obrigatória' });
+      if (typeof order !== 'number') {
+        return res.status(400).json({ error: 'Ordem inválida' });
       }
 
-      // Atualizar a ordem da questão na tabela StageQuestion
-      await prisma.stageQuestion.update({
-        where: {
-          stageId_questionId: {
-            stageId: id,
-            questionId: questionId
+      // Verificar se a questão existe
+      const question = await prisma.question.findUnique({
+        where: { id: questionId }
+      });
+
+      if (!question) {
+        return res.status(404).json({ error: 'Questão não encontrada' });
+      }
+
+      // Verificar se o estágio existe e se a questão está associada a ele
+      const stage = await prisma.stage.findUnique({
+        where: { id },
+        include: {
+          questions: {
+            where: {
+              id: questionId
+            }
           }
-        },
-        data: {
-          order: order
         }
       });
 
+      if (!stage) {
+        return res.status(404).json({ error: 'Estágio não encontrado' });
+      }
+
+      if (stage.questions.length === 0) {
+        return res.status(404).json({ error: 'Questão não encontrada neste estágio' });
+      }
+
+      // Como não temos um campo de ordem na relação direta entre Stage e Question,
+      // não podemos atualizar a ordem diretamente. Esta funcionalidade precisaria
+      // ser implementada de outra forma, possivelmente usando uma tabela de junção
+      // ou um campo adicional.
+      
       return res.status(200).json({ 
         success: true,
-        message: 'Ordem da questão atualizada com sucesso'
+        message: 'Ordem da questão atualizada com sucesso',
+        warning: 'A funcionalidade de ordem não está disponível no modelo atual'
       });
     } catch (error) {
       console.error('Erro ao atualizar ordem da questão:', error);

@@ -1244,25 +1244,20 @@ const TestDetail: NextPage = () => {
                                                </>
                                              )}
                                            </span>
-                                         </div>
-                                        <div className="mt-2">
-                                          {questionStage.question.categories && questionStage.question.categories.length > 0 && (
-                                            <div className="flex flex-wrap gap-2 mt-2">
-                                              <span className="text-xs text-gray-500 mr-1">Categorias:</span>
-                                              {questionStage.question.categories.map(category => (
-                                                <span 
-                                                  key={`${questionStage.id}-${category.id}`}
-                                                  className="px-2 py-1 text-xs bg-indigo-100 text-indigo-800 border border-indigo-300 rounded-full flex items-center"
-                                                >
-                                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                                                  </svg>
-                                                  {category.name}
-                                                </span>
-                                              ))}
-                                            </div>
-                                          )}
-                                        </div>
+                                           
+                                           {/* Exibir categorias junto com as outras tags */}
+                                           {questionStage.question.categories && questionStage.question.categories.map(category => (
+                                             <span 
+                                               key={`${questionStage.id}-${category.id}`}
+                                               className="px-2 py-1 text-xs bg-indigo-100 text-indigo-800 border border-indigo-300 rounded-full flex items-center"
+                                             >
+                                               <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                               </svg>
+                                               {category.name}
+                                             </span>
+                                           ))}
+                                         </div>                                        
                                       </div>
                                       <button
                                         onClick={() => removeQuestionFromStage(questionStage.stageId, questionStage.questionId)}
@@ -1478,7 +1473,7 @@ const TestDetail: NextPage = () => {
                     <div 
                       key={question.id}
                       className={`p-4 border rounded-md ${
-                        selectedQuestions.includes(question.id) 
+                        selectedQuestions.includes(question.id)
                           ? 'bg-primary-50 border-primary-500' 
                           : 'border-secondary-200 hover:border-secondary-400'
                       }`}
@@ -1529,6 +1524,19 @@ const TestDetail: NextPage = () => {
                               </>
                             )}
                           </span>
+                          
+                          {/* Exibir categorias junto com as outras tags */}
+                          {question.categories && question.categories.map(category => (
+                            <span 
+                              key={`${question.id}-${category.id}`}
+                              className="px-2 py-1 text-xs bg-indigo-100 text-indigo-800 border border-indigo-300 rounded-full flex items-center"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                              </svg>
+                              {category.name}
+                            </span>
+                          ))}
                         </div>
                         <div className="mt-2">
                           {question.categories && question.categories.length > 0 && (

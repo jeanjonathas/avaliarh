@@ -117,7 +117,13 @@ export default async function handler(
               type: true,
               difficulty: true,
               createdAt: true,
-              updatedAt: true
+              updatedAt: true,
+              categories: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
             }
           });
           
