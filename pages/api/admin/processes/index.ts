@@ -57,10 +57,14 @@ export default async function handler(
           return res.status(403).json({ message: 'Acesso negado' });
         }
 
-        const { name, description, cutoffScore, evaluationType, stages } = req.body;
+        const { name, description, cutoffScore, evaluationType, stages, jobPosition } = req.body;
 
         if (!name) {
           return res.status(400).json({ message: 'Nome do processo seletivo é obrigatório' });
+        }
+
+        if (!jobPosition) {
+          return res.status(400).json({ message: 'Cargo é obrigatório' });
         }
 
         if (!stages || !Array.isArray(stages) || stages.length === 0) {
@@ -73,6 +77,7 @@ export default async function handler(
             description,
             cutoffScore,
             evaluationType,
+            jobPosition,
             companyId: user.companyId,
             stages: {
               create: stages.map((stage: any) => ({

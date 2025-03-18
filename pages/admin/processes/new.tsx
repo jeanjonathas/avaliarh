@@ -21,7 +21,7 @@ interface FormDraft {
   description?: string;
   evaluationType: string;
   cutoffScore?: number;
-  jobPosition?: string;
+  jobPosition: string;
   stages: ProcessStage[];
 }
 
@@ -30,7 +30,7 @@ interface FormData {
   description?: string;
   cutoffScore?: number;
   evaluationType: string;
-  jobPosition?: string;
+  jobPosition: string;
   stages: ProcessStage[];
 }
 
