@@ -7,6 +7,7 @@ import { Formik, Form, Field, ErrorMessage, FieldArray } from 'formik'
 import * as Yup from 'yup'
 import AdminLayout from '../../../components/admin/AdminLayout'
 import QuestionForm from '../../../components/admin/QuestionForm'
+import OpinionQuestionWizard from '../../../components/admin/OpinionQuestionWizard'
 import { useNotification } from '../../../contexts/NotificationContext'
 import { useNotificationSystem } from '../../../hooks/useNotificationSystem'
 import { QuestionType } from '../../../types/questions'
@@ -83,7 +84,10 @@ const TestDetail: NextPage = () => {
   const [categories, setCategories] = useState<any[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all')
-  const [loading, setLoading] = useState(true)
+  const [pageLoading, setPageLoading] = useState(true) // Loading inicial da página
+  const [testDataLoading, setTestDataLoading] = useState(false) // Loading para recarregar dados do teste
+  const [questionLoading, setQuestionLoading] = useState(false) // Loading para operações com perguntas
+  const [stageLoading, setStageLoading] = useState(false) // Loading para operações com etapas
   
   // Estado para armazenar logs de depuração
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
@@ -102,6 +106,9 @@ const TestDetail: NextPage = () => {
   const [newStageDescription, setNewStageDescription] = useState('')
   const [newStageQuestionType, setNewStageQuestionType] = useState('')
   const [showNewQuestionForm, setShowNewQuestionForm] = useState(false)
+  const [showOpinionQuestionForm, setShowOpinionQuestionForm] = useState(false)
+  const [showQuestionTypeModal, setShowQuestionTypeModal] = useState(false)
+  const [selectedQuestionType, setSelectedQuestionType] = useState<string>('')
   
   // Estado para edição de nome de etapa
   const [editingStageId, setEditingStageId] = useState<string | null>(null)
@@ -123,7 +130,7 @@ const TestDetail: NextPage = () => {
       try {
         console.log(`[TestDetail] Iniciando carregamento de dados para o teste ID: ${id}`)
         addDebugLog(`Iniciando carregamento de dados para o teste ID: ${id}`)
-        setLoading(true)
+        setPageLoading(true)
         
         // Buscar dados do teste
         console.log(`[TestDetail] Fazendo requisição para /api/admin/tests/${id}`)
@@ -231,7 +238,7 @@ const TestDetail: NextPage = () => {
         console.error('Erro ao carregar dados:', error)
         notify.showError('Não foi possível carregar os dados do teste. Por favor, tente novamente.')
       } finally {
-        setLoading(false)
+        setPageLoading(false)
       }
     }
 
@@ -246,7 +253,7 @@ const TestDetail: NextPage = () => {
 
     try {
       console.log('Iniciando recarregamento de dados...');
-      setLoading(true)
+      setTestDataLoading(true)
       
       // Buscar dados do teste
       console.log('Fazendo requisição para:', `/api/admin/tests/${id}`);
@@ -296,13 +303,14 @@ const TestDetail: NextPage = () => {
       console.error('Erro ao recarregar dados:', error)
       notify.showError('Não foi possível recarregar os dados do teste. Por favor, tente novamente.')
     } finally {
-      setLoading(false)
+      setTestDataLoading(false)
     }
   }
 
   // Função para atualizar a ordem de uma etapa
   const updateStageOrder = async (stageId: string, newOrder: number) => {
     try {
+      setStageLoading(true)
       const response = await fetch(`/api/admin/tests/${id}/stages/${stageId}`, {
         method: 'PATCH',
         headers: {
@@ -320,6 +328,8 @@ const TestDetail: NextPage = () => {
     } catch (error) {
       console.error('Erro:', error)
       notify.showError('Ocorreu um erro ao reordenar as etapas. Por favor, tente novamente.')
+    } finally {
+      setStageLoading(false)
     }
   }
 
@@ -612,7 +622,7 @@ const TestDetail: NextPage = () => {
     setSelectedQuestions([])
     
     // Encontrar a etapa selecionada para obter o tipo de pergunta
-    const selectedTestStage = test?.testStages?.find(ts => ts.id === stageId);
+    const selectedTestStage = test?.testStages?.find(ts => ts.stage.id === stageId);
     if (selectedTestStage && selectedTestStage.stage.questionType) {
       console.log(`[OpenModal] Definindo tipo de pergunta: ${selectedTestStage.stage.questionType}`);
       setSelectedStageQuestionType(selectedTestStage.stage.questionType);
@@ -634,7 +644,7 @@ const TestDetail: NextPage = () => {
 
   // Função para buscar perguntas disponíveis
   const fetchAvailableQuestions = async (stageId: string) => {
-    setLoading(true);
+    setQuestionLoading(true);
     try {
       // Primeiro, buscar a etapa para obter o tipo de pergunta
       const stageResponse = await fetch(`/api/admin/stages/${stageId}`);
@@ -668,7 +678,7 @@ const TestDetail: NextPage = () => {
       console.error('Erro ao buscar perguntas disponíveis:', error);
       notify.showError('Erro ao buscar perguntas disponíveis');
     } finally {
-      setLoading(false);
+      setQuestionLoading(false);
     }
   };
 
@@ -729,6 +739,7 @@ const TestDetail: NextPage = () => {
     }
 
     try {
+      setQuestionLoading(true)
       const response = await fetch(`/api/admin/stages/${selectedStageId}/questions`, {
         method: 'POST',
         headers: {
@@ -802,6 +813,8 @@ const TestDetail: NextPage = () => {
     } catch (error) {
       console.error('Erro:', error)
       notify.showError(error instanceof Error ? error.message : 'Ocorreu um erro ao adicionar as perguntas. Por favor, tente novamente.')
+    } finally {
+      setQuestionLoading(false)
     }
   }
 
@@ -882,6 +895,7 @@ const TestDetail: NextPage = () => {
         body: JSON.stringify({
           ...values,
           stageId: selectedStageId || null,
+          type: selectedQuestionType || QuestionType.MULTIPLE_CHOICE,
         }),
       });
 
@@ -943,12 +957,12 @@ const TestDetail: NextPage = () => {
     );
   };
 
-  if (status === 'loading' || loading) {
+  if (status === 'loading' || pageLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-primary-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-secondary-700">Carregando...</p>
+          <p className="mt-4 text-secondary-700">Carregando página...</p>
         </div>
       </div>
     )
@@ -1032,7 +1046,7 @@ const TestDetail: NextPage = () => {
 
             {!test || !test.testStages || test.testStages.length === 0 ? (
               <div className="bg-white rounded-lg shadow-md p-6 text-center">
-                <p className="text-secondary-600">Este teste ainda não possui etapas.</p>
+                <p    className="text-secondary-600">Este teste ainda não possui etapas.</p>
                 <button
                   onClick={() => setShowAddStageModal(true)}
                   className="mt-2 text-sm text-primary-600 hover:text-primary-800"
@@ -1041,17 +1055,37 @@ const TestDetail: NextPage = () => {
                 </button>
               </div>
             ) : (
-              <div className="space-y-6">
-                {test.testStages
-                  .sort((a, b) => a.order - b.order)
-                  .map((testStage, index) => (
-                    <div key={testStage.id} className="flex items-stretch">
-                      <div className="bg-white rounded-lg shadow-md overflow-hidden flex-grow">
-                        <div className="bg-secondary-50 px-6 py-4 flex justify-between items-center">
-                          <div>
-                            <h3 className="text-lg font-medium text-secondary-800">
-                              {index + 1}. {editingStageId === testStage.id ? (
-                                <input
+              <>
+                {/* Overlay de carregamento para dados do teste */}
+                {testDataLoading && (
+                  <div className="fixed inset-0 bg-black bg-opacity-20 z-40 flex items-center justify-center">
+                    <div className="bg-white rounded-lg p-4 shadow-lg flex items-center">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600 mr-3"></div>
+                      <span className="text-gray-700">Atualizando dados do teste...</span>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="space-y-6">
+                  {test.testStages
+                    .sort((a, b) => a.order - b.order)
+                    .map((testStage, index) => (
+                      <div key={testStage.id} className="flex items-stretch">
+                        <div className="bg-white rounded-lg shadow-md overflow-hidden flex-grow relative">
+                          {/* Overlay de carregamento para operações com etapas */}
+                          {stageLoading && (
+                            <div className="absolute inset-0 bg-white bg-opacity-70 z-10 flex items-center justify-center">
+                              <div className="flex items-center rounded-lg p-2 bg-white shadow-md">
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-600 mr-2"></div>
+                                <span className="text-sm text-gray-700">Atualizando etapa...</span>
+                              </div>
+                            </div>
+                          )}
+                          <div className="bg-secondary-50 px-6 py-4 flex justify-between items-center">
+                            <div>
+                              <h3 className="text-lg font-medium text-secondary-800">
+                                {index + 1}. {editingStageId === testStage.id ? (
+                                  <input
                                   type="text"
                                   value={editingStageName}
                                   onChange={(e) => setEditingStageName(e.target.value)}
@@ -1292,8 +1326,9 @@ const TestDetail: NextPage = () => {
                         </div>
                       </div>
                     </div>
-                  ))}
-              </div>
+                    ))}
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -1423,7 +1458,16 @@ const TestDetail: NextPage = () => {
               </div>
             </div>
             
-            <div className="overflow-y-auto flex-1 mb-4 border border-secondary-200 rounded-md">
+            <div className="overflow-y-auto flex-1 mb-4 border border-secondary-200 rounded-md relative">
+              {/* Overlay de carregamento para operações com perguntas */}
+              {questionLoading && (
+                <div className="absolute inset-0 bg-white bg-opacity-70 z-10 flex items-center justify-center">
+                  <div className="flex items-center rounded-lg p-3 bg-white shadow-md">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-600 mr-2"></div>
+                    <span className="text-sm text-gray-700">Processando perguntas...</span>
+                  </div>
+                </div>
+              )}
               {filteredQuestions.length === 0 ? (
                 <div className="p-6 text-center text-secondary-500">
                   Nenhuma pergunta encontrada com os filtros selecionados.
@@ -1540,7 +1584,7 @@ const TestDetail: NextPage = () => {
                 Adicionar {selectedQuestions.length} pergunta(s)
               </button>
               <button
-                onClick={() => setShowNewQuestionForm(true)}
+                onClick={() => setShowQuestionTypeModal(true)}
                 className="px-4 py-2 text-sm text-white bg-primary-600 rounded-md hover:bg-primary-700"
               >
                 Criar Nova Pergunta
@@ -1550,22 +1594,107 @@ const TestDetail: NextPage = () => {
         </div>
       )}
       
-      {showNewQuestionForm && (
+      {/* Modal para escolher o tipo de pergunta */}
+      {showQuestionTypeModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-            <h2 className="text-xl font-semibold text-secondary-800 mb-4">Criar Nova Pergunta</h2>
+            <h2 className="text-xl font-semibold text-secondary-800 mb-4">Escolha o Tipo de Pergunta</h2>
             
-            <QuestionForm
-              stages={stages}
-              categories={categories}
-              preSelectedStageId={selectedStageId || undefined}
-              onSubmit={handleCreateQuestion}
-              onCancel={() => setShowNewQuestionForm(false)}
-              onSuccess={() => {
-                notify.showSuccess('Pergunta criada com sucesso!');
-              }}
-              hideStageField={true}
-            />
+            <div className="space-y-4">
+              <div 
+                className="p-4 border border-blue-300 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors flex items-center"
+                onClick={() => {
+                  setSelectedQuestionType(QuestionType.MULTIPLE_CHOICE);
+                  setShowQuestionTypeModal(false);
+                  setShowNewQuestionForm(true);
+                }}
+              >
+                <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 mr-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-medium text-gray-800">Múltipla Escolha</h3>
+                  <p className="text-sm text-gray-600">Pergunta com uma única resposta correta</p>
+                </div>
+              </div>
+              
+              <div 
+                className="p-4 border border-purple-300 rounded-lg cursor-pointer hover:bg-purple-50 transition-colors flex items-center"
+                onClick={() => {
+                  setSelectedQuestionType(QuestionType.OPINION_MULTIPLE);
+                  setShowQuestionTypeModal(false);
+                  // Redirecionar para a página de criação de perguntas opinativas
+                  router.push({
+                    pathname: '/admin/questions/add-opinion',
+                    query: { stageId: selectedStageId }
+                  });
+                }}
+              >
+                <div className="flex-shrink-0 w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 mr-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-medium text-gray-800">Opinativa</h3>
+                  <p className="text-sm text-gray-600">Avalia o perfil e personalidade do candidato</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setShowQuestionTypeModal(false)}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Modal para criar nova pergunta de múltipla escolha */}
+      {showNewQuestionForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-3xl mx-auto my-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-secondary-800">Adicionar Pergunta de Múltipla Escolha</h2>
+              <button 
+                onClick={() => setShowNewQuestionForm(false)}
+                className="text-gray-500 hover:text-gray-700 focus:outline-none"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="overflow-y-auto max-h-[70vh]">
+              <QuestionForm
+                stages={stages}
+                categories={categories}
+                preSelectedStageId={selectedStageId || undefined}
+                onSubmit={handleCreateQuestion}
+                onCancel={() => setShowNewQuestionForm(false)}
+                onSuccess={() => {
+                  notify.showSuccess('Pergunta criada com sucesso!');
+                  setShowNewQuestionForm(false);
+                }}
+                hideStageField={true}
+                initialValues={{
+                  type: selectedQuestionType || QuestionType.MULTIPLE_CHOICE,
+                  text: '',
+                  options: [
+                    { text: '', isCorrect: false },
+                    { text: '', isCorrect: false }
+                  ],
+                  difficulty: 'MEDIUM'
+                }}
+              />
+            </div>
           </div>
         </div>
       )}
