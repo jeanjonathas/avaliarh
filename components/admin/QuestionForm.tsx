@@ -14,13 +14,23 @@ interface QuestionFormProps {
   isEditing?: boolean;
   initialValues?: any;
   categories?: any[];
+  stages?: any[];
+  preSelectedStageId?: string;
+  onCancel?: () => void;
+  onSuccess?: () => void;
+  hideStageField?: boolean;
 }
 
 const QuestionForm: React.FC<QuestionFormProps> = ({
   onSubmit,
   isEditing = false,
   initialValues = null,
-  categories = []
+  categories = [],
+  stages = [],
+  preSelectedStageId = '',
+  onCancel,
+  onSuccess,
+  hideStageField = false
 }) => {
   const notify = useNotificationSystem();
   const [existingOpinions, setExistingOpinions] = useState<string[]>([]);
@@ -29,7 +39,9 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
   useEffect(() => {
     console.log('QuestionForm - Valores iniciais:', initialValues);
     console.log('QuestionForm - Categorias disponíveis:', categories);
-  }, [initialValues, categories]);
+    console.log('QuestionForm - Etapas disponíveis:', stages);
+    console.log('QuestionForm - Etapa pré-selecionada:', preSelectedStageId);
+  }, [initialValues, categories, stages, preSelectedStageId]);
 
   // Validação do formulário
   const validationSchema = Yup.object().shape({

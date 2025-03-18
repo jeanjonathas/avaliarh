@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { Formik, Form, Field, ErrorMessage, FieldArray } from 'formik'
 import * as Yup from 'yup'
-import Navbar from '../../../components/admin/Navbar'
+import AdminLayout from '../../../components/admin/AdminLayout'
 import QuestionForm from '../../../components/admin/QuestionForm'
 import { useNotification } from '../../../contexts/NotificationContext'
 import { useNotificationSystem } from '../../../hooks/useNotificationSystem'
@@ -861,272 +861,275 @@ const TestDetail: NextPage = () => {
 
   if (!test) {
     return (
-      <div className="min-h-screen bg-secondary-50 p-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h1 className="text-xl font-semibold text-red-600">Teste não encontrado</h1>
-            <p className="mt-2 text-secondary-600">O teste solicitado não existe ou você não tem permissão para acessá-lo.</p>
-            <div className="mt-4">
-              <Link href="/admin/tests" className="text-primary-600 hover:text-primary-800">
-                Voltar para lista de testes
+      <AdminLayout activeSection="selecao">
+        <div className="p-6">
+          <div className="container mx-auto">
+            <div className="bg-white rounded-lg shadow-md p-6 text-center">
+              <h2 className="text-xl font-semibold text-secondary-800 mb-2">Teste não encontrado</h2>
+              <p className="text-secondary-600 mb-4">O teste solicitado não foi encontrado ou você não tem permissão para acessá-lo.</p>
+              <Link 
+                href="/admin/tests"
+                className="px-4 py-2 text-sm text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50"
+              >
+                Voltar para a lista de testes
               </Link>
             </div>
           </div>
         </div>
-      </div>
+      </AdminLayout>
     )
   }
 
   return (
-    <div className="min-h-screen bg-secondary-50">
-      <Navbar />
-
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-6">
-          <Link href="/admin/tests" className="text-primary-600 hover:text-primary-800 flex items-center">
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Voltar para lista de testes
-          </Link>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h1 className="text-2xl font-bold text-secondary-800">{test.title}</h1>
-              {test.description && (
-                <p className="mt-2 text-secondary-600">{test.description}</p>
-              )}
-              <div className="mt-2 flex items-center space-x-4">
-                <span className={`px-2 py-1 text-xs rounded-full ${test.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                  {test.active ? 'Ativo' : 'Inativo'}
-                </span>
-                {test.timeLimit && (
-                  <span className="text-sm text-secondary-600">
-                    Tempo limite: {test.timeLimit} minutos
-                  </span>
-                )}
-              </div>
-            </div>
-            <Link 
-              href={`/admin/tests`}
-              className="px-4 py-2 text-sm text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50"
-            >
-              Editar teste
+    <AdminLayout activeSection="selecao">
+      <div className="p-6">
+        <div className="container mx-auto">
+          <div className="mb-6">
+            <Link href="/admin/tests" className="text-primary-600 hover:text-primary-800 flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Voltar para a lista de testes
             </Link>
           </div>
-        </div>
-
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-secondary-800">Etapas do Teste</h2>
-            <button
-              onClick={() => setShowAddStageModal(true)}
-              className="px-4 py-2 text-sm text-white bg-primary-600 rounded-md hover:bg-primary-700"
-            >
-              Adicionar Etapa
-            </button>
+          
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h1 className="text-2xl font-bold text-secondary-800">{test.title}</h1>
+                {test.description && (
+                  <p className="mt-2 text-secondary-600">{test.description}</p>
+                )}
+                <div className="mt-2 flex items-center space-x-4">
+                  <span className={`px-2 py-1 text-xs rounded-full ${test.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {test.active ? 'Ativo' : 'Inativo'}
+                  </span>
+                  {test.timeLimit && (
+                    <span className="text-sm text-secondary-600">
+                      Tempo limite: {test.timeLimit} minutos
+                    </span>
+                  )}
+                </div>
+              </div>
+              <Link 
+                href={`/admin/tests`}
+                className="px-4 py-2 text-sm text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50"
+              >
+                Editar teste
+              </Link>
+            </div>
           </div>
 
-          {!test || !test.testStages || test.testStages.length === 0 ? (
-            <div className="bg-white rounded-lg shadow-md p-6 text-center">
-              <p className="text-secondary-600">Este teste ainda não possui etapas.</p>
+          <div className="mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-secondary-800">Etapas do Teste</h2>
               <button
                 onClick={() => setShowAddStageModal(true)}
-                className="mt-4 px-4 py-2 text-sm text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50"
+                className="px-4 py-2 text-sm text-white bg-primary-600 rounded-md hover:bg-primary-700"
               >
-                Adicionar uma etapa
+                Adicionar Etapa
               </button>
             </div>
-          ) : (
-            <div className="space-y-6">
-              {test.testStages
-                .sort((a, b) => a.order - b.order)
-                .map((testStage, index) => (
-                  <div key={testStage.id} className="flex items-stretch">
-                    <div className="bg-white rounded-lg shadow-md overflow-hidden flex-grow">
-                      <div className="bg-secondary-50 px-6 py-4 flex justify-between items-center">
-                        <div>
-                          <h3 className="text-lg font-medium text-secondary-800">
-                            {index + 1}. {editingStageId === testStage.id ? (
-                              <input
-                                type="text"
-                                value={editingStageName}
-                                onChange={(e) => setEditingStageName(e.target.value)}
-                                className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                                placeholder="Digite o nome da etapa"
-                                autoFocus
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    updateStageName(testStage.id, editingStageName);
-                                  } else if (e.key === 'Escape') {
-                                    cancelEditingStageName();
-                                  }
-                                }}
-                              />
-                            ) : (
-                              <div className="flex items-center">
-                                <span>{testStage.stage.title}</span>
-                                <button 
-                                  onClick={() => startEditingStageName(testStage.id, testStage.stage.title)}
-                                  className="ml-2 text-primary-600 hover:text-primary-800 focus:outline-none"
-                                  title="Editar nome da etapa"
+
+            {!test || !test.testStages || test.testStages.length === 0 ? (
+              <div className="bg-white rounded-lg shadow-md p-6 text-center">
+                <p className="text-secondary-600">Este teste ainda não possui etapas.</p>
+                <button
+                  onClick={() => setShowAddStageModal(true)}
+                  className="mt-4 px-4 py-2 text-sm text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50"
+                >
+                  Adicionar uma etapa
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {test.testStages
+                  .sort((a, b) => a.order - b.order)
+                  .map((testStage, index) => (
+                    <div key={testStage.id} className="flex items-stretch">
+                      <div className="bg-white rounded-lg shadow-md overflow-hidden flex-grow">
+                        <div className="bg-secondary-50 px-6 py-4 flex justify-between items-center">
+                          <div>
+                            <h3 className="text-lg font-medium text-secondary-800">
+                              {index + 1}. {editingStageId === testStage.id ? (
+                                <input
+                                  type="text"
+                                  value={editingStageName}
+                                  onChange={(e) => setEditingStageName(e.target.value)}
+                                  className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                  placeholder="Digite o nome da etapa"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      updateStageName(testStage.id, editingStageName);
+                                    } else if (e.key === 'Escape') {
+                                      cancelEditingStageName();
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                <div className="flex items-center">
+                                  <span>{testStage.stage.title}</span>
+                                  <button 
+                                    onClick={() => startEditingStageName(testStage.id, testStage.stage.title)}
+                                    className="ml-2 text-primary-600 hover:text-primary-800 focus:outline-none"
+                                    title="Editar nome da etapa"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              )}
+                            </h3>
+                            {testStage.stage.description && (
+                              <p className="mt-1 text-sm text-secondary-600">{testStage.stage.description}</p>
+                            )}
+                          </div>
+                          <div>
+                            {editingStageId === testStage.id ? (
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => updateStageName(testStage.id, editingStageName)}
+                                  className="px-3 py-1 text-xs text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50"
                                 >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                  </svg>
+                                  Salvar
+                                </button>
+                                <button
+                                  onClick={cancelEditingStageName}
+                                  className="px-3 py-1 text-xs text-secondary-600 border border-secondary-300 rounded-md hover:bg-secondary-50"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            ) : (
+                              <div>
+                                <button
+                                  onClick={() => openAddQuestionsModal(testStage.stage.id)}
+                                  className="px-3 py-1 text-xs text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50 mb-2 block w-full"
+                                >
+                                  Adicionar Perguntas
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteStage(testStage.stage.id)}
+                                  className="px-3 py-1 text-xs text-red-600 border border-red-600 rounded-md hover:bg-red-50 block w-full"
+                                >
+                                  Remover Etapa
                                 </button>
                               </div>
                             )}
-                          </h3>
-                          {testStage.stage.description && (
-                            <p className="mt-1 text-sm text-secondary-600">{testStage.stage.description}</p>
-                          )}
+                          </div>
                         </div>
-                        <div>
-                          {editingStageId === testStage.id ? (
-                            <div className="flex space-x-2">
+                        
+                        <div className="p-6">
+                          <h4 className="text-sm font-medium text-secondary-500 mb-3">
+                            Perguntas ({testStage.stage.questionStages.length})
+                          </h4>
+                          
+                          {testStage.stage.questionStages.length === 0 ? (
+                            <div className="text-center py-4 text-secondary-500">
+                              <p>Nenhuma pergunta nesta etapa.</p>
                               <button
-                                onClick={() => updateStageName(testStage.id, editingStageName)}
-                                className="px-3 py-1 text-xs text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50"
+                                onClick={() => openAddQuestionsModal(testStage.stage.id)}
+                                className="mt-2 text-sm text-primary-600 hover:text-primary-800"
                               >
-                                Salvar
-                              </button>
-                              <button
-                                onClick={cancelEditingStageName}
-                                className="px-3 py-1 text-xs text-secondary-600 border border-secondary-300 rounded-md hover:bg-secondary-50"
-                              >
-                                Cancelar
+                                Adicionar perguntas
                               </button>
                             </div>
                           ) : (
-                            <div>
-                              <button
-                                onClick={() => openAddQuestionsModal(testStage.stage.id)}
-                                className="px-3 py-1 text-xs text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50 mb-2 block w-full"
-                              >
-                                Adicionar Perguntas
-                              </button>
-                              <button
-                                onClick={() => handleDeleteStage(testStage.stage.id)}
-                                className="px-3 py-1 text-xs text-red-600 border border-red-600 rounded-md hover:bg-red-50 block w-full"
-                              >
-                                Remover Etapa
-                              </button>
+                            <div className="space-y-4">
+                              {testStage.stage.questionStages
+                                .sort((a, b) => a.order - b.order)
+                                .map((questionStage, qIndex) => (
+                                  <div key={questionStage.id} className="border border-secondary-200 rounded-md p-4">
+                                    <div className="flex justify-between">
+                                      <div className="flex-1">
+                                        <div className="font-medium text-secondary-800">
+                                          {qIndex + 1}. {questionStage.question.text}
+                                        </div>
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                          {/* Dificuldade temporariamente desativada */}
+                                          <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
+                                            Sem dificuldade
+                                          </span>
+                                          {questionStage.question.categories && questionStage.question.categories.length > 0 && 
+                                            questionStage.question.categories.map(category => (
+                                              <span 
+                                                key={category.id}
+                                                className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full"
+                                              >
+                                                {category.name}
+                                              </span>
+                                            ))
+                                          }
+                                        </div>
+                                      </div>
+                                      <button
+                                        onClick={() => removeQuestionFromStage(questionStage.stageId, questionStage.questionId)}
+                                        className="text-red-600 hover:text-red-800"
+                                      >
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
                             </div>
                           )}
                         </div>
                       </div>
                       
-                      <div className="p-6">
-                        <h4 className="text-sm font-medium text-secondary-500 mb-3">
-                          Perguntas ({testStage.stage.questionStages.length})
-                        </h4>
-                        
-                        {testStage.stage.questionStages.length === 0 ? (
-                          <div className="text-center py-4 text-secondary-500">
-                            <p>Nenhuma pergunta nesta etapa.</p>
-                            <button
-                              onClick={() => openAddQuestionsModal(testStage.stage.id)}
-                              className="mt-2 text-sm text-primary-600 hover:text-primary-800"
-                            >
-                              Adicionar perguntas
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="space-y-4">
-                            {testStage.stage.questionStages
-                              .sort((a, b) => a.order - b.order)
-                              .map((questionStage, qIndex) => (
-                                <div key={questionStage.id} className="border border-secondary-200 rounded-md p-4">
-                                  <div className="flex justify-between">
-                                    <div className="flex-1">
-                                      <div className="font-medium text-secondary-800">
-                                        {qIndex + 1}. {questionStage.question.text}
-                                      </div>
-                                      <div className="mt-2 flex flex-wrap gap-2">
-                                        {/* Dificuldade temporariamente desativada */}
-                                        <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
-                                          Sem dificuldade
-                                        </span>
-                                        {questionStage.question.categories && questionStage.question.categories.length > 0 && 
-                                          questionStage.question.categories.map(category => (
-                                            <span 
-                                              key={category.id}
-                                              className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full"
-                                            >
-                                              {category.name}
-                                            </span>
-                                          ))
-                                        }
-                                      </div>
-                                    </div>
-                                    <button
-                                      onClick={() => removeQuestionFromStage(questionStage.stageId, questionStage.questionId)}
-                                      className="text-red-600 hover:text-red-800"
-                                    >
-                                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                      </svg>
-                                    </button>
-                                  </div>
-                                </div>
-                              ))}
-                          </div>
-                        )}
+                      {/* Botões de reordenação */}
+                      <div className="ml-4 flex flex-col justify-center">
+                        <div className="flex flex-col border border-secondary-300 rounded-md overflow-hidden bg-white shadow-sm">
+                          <button
+                            onClick={() => moveStageToTop(testStage)}
+                            title="Mover para o topo"
+                            className="px-2 py-2 text-xs text-secondary-600 hover:bg-secondary-100 flex items-center justify-center"
+                            disabled={index === 0}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 11l7-7 7 7" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => moveStageUp(testStage, index)}
+                            title="Mover para cima"
+                            className="px-2 py-2 text-xs text-secondary-600 hover:bg-secondary-100 flex items-center justify-center border-t border-secondary-300"
+                            disabled={index === 0}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => moveStageDown(testStage, index)}
+                            title="Mover para baixo"
+                            className="px-2 py-2 text-xs text-secondary-600 hover:bg-secondary-100 flex items-center justify-center border-t border-secondary-300"
+                            disabled={index === test.testStages.length - 1}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => moveStageToBottom(testStage)}
+                            title="Mover para o final"
+                            className="px-2 py-2 text-xs text-secondary-600 hover:bg-secondary-100 flex items-center justify-center border-t border-secondary-300"
+                            disabled={index === test.testStages.length - 1}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 13l-7 7-7-7" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                     </div>
-                    
-                    {/* Botões de reordenação */}
-                    <div className="ml-4 flex flex-col justify-center">
-                      <div className="flex flex-col border border-secondary-300 rounded-md overflow-hidden bg-white shadow-sm">
-                        <button
-                          onClick={() => moveStageToTop(testStage)}
-                          title="Mover para o topo"
-                          className="px-2 py-2 text-xs text-secondary-600 hover:bg-secondary-100 flex items-center justify-center"
-                          disabled={index === 0}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 11l7-7 7 7" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => moveStageUp(testStage, index)}
-                          title="Mover para cima"
-                          className="px-2 py-2 text-xs text-secondary-600 hover:bg-secondary-100 flex items-center justify-center border-t border-secondary-300"
-                          disabled={index === 0}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => moveStageDown(testStage, index)}
-                          title="Mover para baixo"
-                          className="px-2 py-2 text-xs text-secondary-600 hover:bg-secondary-100 flex items-center justify-center border-t border-secondary-300"
-                          disabled={index === test.testStages.length - 1}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => moveStageToBottom(testStage)}
-                          title="Mover para o final"
-                          className="px-2 py-2 text-xs text-secondary-600 hover:bg-secondary-100 flex items-center justify-center border-t border-secondary-300"
-                          disabled={index === test.testStages.length - 1}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 13l-7 7-7-7" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          )}
+                  ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1327,7 +1330,7 @@ const TestDetail: NextPage = () => {
           </div>
         </div>
       )}
-    </div>
+    </AdminLayout>
   )
 }
 
