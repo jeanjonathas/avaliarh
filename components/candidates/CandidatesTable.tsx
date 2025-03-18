@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import { Rating } from '@mui/material'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { Candidate, Test, CandidatesTableProps } from './types'
+import { Candidate, Test, CandidatesTableProps, CandidateScore } from './types'
 import AddCandidateModal from './modals/AddCandidateModal'
 import DeleteCandidateModal from './modals/DeleteCandidateModal'
 import InviteModal from './modals/InviteModal'
@@ -70,6 +70,13 @@ export const CandidatesTable = ({
     }
   }
 
+  // Função para obter a porcentagem do score
+  const getScorePercentage = (score: number | CandidateScore | undefined): number => {
+    if (!score) return 0
+    if (typeof score === 'number') return score
+    return score.percentage
+  }
+
   // Filtrar candidatos
   const filteredCandidates = candidates.filter(candidate => {
     const searchMatch = searchTerm === '' || 
@@ -96,12 +103,13 @@ export const CandidatesTable = ({
 
     let scoreMatch = true
     if (showScoreFilter && scoreFilter !== 'ALL') {
+      const scorePercentage = getScorePercentage(candidate.score)
       if (scoreFilter === 'HIGH') {
-        scoreMatch = candidate.score !== undefined && candidate.score >= 80
+        scoreMatch = scorePercentage >= 80
       } else if (scoreFilter === 'MEDIUM') {
-        scoreMatch = candidate.score !== undefined && candidate.score >= 60 && candidate.score < 80
+        scoreMatch = scorePercentage >= 60 && scorePercentage < 80
       } else if (scoreFilter === 'LOW') {
-        scoreMatch = candidate.score !== undefined && candidate.score < 60
+        scoreMatch = scorePercentage < 60
       }
     }
 
@@ -263,7 +271,18 @@ export const CandidatesTable = ({
                 <td className="px-4 py-2">
                   {candidate.testDate ? format(new Date(candidate.testDate), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
                 </td>
-                <td className="px-4 py-2">{candidate.score?.toFixed(1) || '-'}</td>
+                <td className="px-4 py-2">
+                  {candidate.score ? (
+                    <span className={`text-green-500`}>
+                      {typeof candidate.score === 'number' ? 
+                        `${candidate.score}%` : 
+                        `${candidate.score.correct}/${candidate.score.total} (${candidate.score.percentage.toFixed(1)}%)`
+                      }
+                    </span>
+                  ) : (
+                    '-'
+                  )}
+                </td>
                 <td className="px-4 py-2">
                   <Rating
                     value={candidate.rating || 0}

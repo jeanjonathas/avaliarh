@@ -12,11 +12,20 @@ const routePermissions: Record<string, Role[]> = {
   '/api/instructor': ['SUPER_ADMIN', 'COMPANY_ADMIN', 'INSTRUCTOR'],
   '/api/student': ['SUPER_ADMIN', 'COMPANY_ADMIN', 'INSTRUCTOR', 'STUDENT'],
   '/api/user': ['SUPER_ADMIN', 'COMPANY_ADMIN', 'INSTRUCTOR', 'STUDENT', 'USER'],
+  '/superadmin': ['SUPER_ADMIN'],
+  '/admin': ['SUPER_ADMIN', 'COMPANY_ADMIN'],
 };
 
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  
+  // Se for a página de login, permite o acesso
+  if (pathname === '/admin/login' || pathname === '/superadmin/login') {
+    return NextResponse.next();
+  }
+
   // Log da URL sendo acessada
-  console.log(`Middleware: Acessando ${request.nextUrl.pathname}`);
+  console.log(`Middleware: Acessando ${pathname}`);
   
   // Obtém o token da requisição
   const token = await getToken({
@@ -32,7 +41,7 @@ export async function middleware(request: NextRequest) {
 
   // Determinar qual rota está sendo acessada
   const routePrefix = Object.keys(routePermissions).find(
-    prefix => request.nextUrl.pathname.startsWith(prefix)
+    prefix => pathname.startsWith(prefix)
   );
 
   // Se a rota não estiver no mapeamento, permite o acesso
@@ -43,18 +52,29 @@ export async function middleware(request: NextRequest) {
 
   console.log(`Middleware: Verificando acesso a rota ${routePrefix}`);
   
-  // Se não houver token, retorna 401 (Não autenticado)
+  // Se não houver token, redireciona para login ou retorna 401 para APIs
   if (!token) {
-    console.log('Middleware: Token não encontrado, retornando 401');
-    return new NextResponse(
-      JSON.stringify({ message: 'Não autenticado' }),
-      {
-        status: 401,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    console.log('Middleware: Token não encontrado');
+    
+    // Se for uma rota de API, retorna 401
+    if (pathname.startsWith('/api/')) {
+      return new NextResponse(
+        JSON.stringify({ message: 'Não autenticado' }),
+        {
+          status: 401,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+    }
+    
+    // Se for uma página, redireciona para login
+    const loginUrl = pathname.startsWith('/superadmin/') 
+      ? '/superadmin/login' 
+      : '/admin/login';
+    
+    return NextResponse.redirect(new URL(loginUrl, request.url));
   }
 
   // Obter os papéis permitidos para a rota
@@ -62,22 +82,32 @@ export async function middleware(request: NextRequest) {
   
   // Verificar se o papel do usuário está na lista de papéis permitidos
   if (!allowedRoles.includes(token.role as Role)) {
-    console.log(`Middleware: Papel ${token.role} não autorizado para ${routePrefix}, retornando 403`);
+    console.log(`Middleware: Papel ${token.role} não autorizado para ${routePrefix}`);
     
     // Formatar a mensagem de erro com os papéis permitidos
     const rolesMessage = allowedRoles.join(' ou ');
     
-    return new NextResponse(
-      JSON.stringify({ 
-        message: `Não autorizado - Apenas ${rolesMessage} podem acessar este recurso` 
-      }),
-      {
-        status: 403,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    // Se for uma rota de API, retorna 403
+    if (pathname.startsWith('/api/')) {
+      return new NextResponse(
+        JSON.stringify({ 
+          message: `Não autorizado - Apenas ${rolesMessage} podem acessar este recurso` 
+        }),
+        {
+          status: 403,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+    }
+    
+    // Se for uma página, redireciona para o dashboard apropriado
+    const dashboardUrl = token.role === 'SUPER_ADMIN' 
+      ? '/superadmin/dashboard'
+      : '/admin/dashboard';
+    
+    return NextResponse.redirect(new URL(dashboardUrl, request.url));
   }
   
   console.log(`Middleware: Acesso autorizado para ${routePrefix}`);
@@ -92,5 +122,7 @@ export const config = {
     '/api/instructor/:path*',
     '/api/student/:path*',
     '/api/user/:path*',
+    '/superadmin/:path*',
+    '/admin/:path*',
   ],
 }

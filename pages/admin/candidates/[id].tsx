@@ -6,6 +6,7 @@ import { CandidateInfoTab } from '../../../components/candidates/tabs/CandidateI
 import { CandidateAnswersTab } from '../../../components/candidates/tabs/CandidateAnswersTab'
 import { CandidateResultsTab } from '../../../components/candidates/tabs/CandidateResultsTab'
 import { CandidateObservationsTab } from '../../../components/candidates/tabs/CandidateObservationsTab'
+import AdminLayout from '../../../components/admin/AdminLayout'
 
 function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(' ')
@@ -60,20 +61,20 @@ export default function CandidateDetails() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
+      <AdminLayout>
+        <div className="p-6">
           <div className="text-center">
             <p className="text-gray-500">Carregando dados do candidato...</p>
           </div>
         </div>
-      </div>
+      </AdminLayout>
     )
   }
 
   if (error || !candidate) {
     return (
-      <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
+      <AdminLayout>
+        <div className="p-6">
           <div className="text-center">
             <p className="text-red-500">{error || 'Candidato não encontrado'}</p>
             <button
@@ -84,7 +85,7 @@ export default function CandidateDetails() {
             </button>
           </div>
         </div>
-      </div>
+      </AdminLayout>
     )
   }
 
@@ -96,65 +97,63 @@ export default function CandidateDetails() {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="bg-white rounded-lg shadow">
-            <div className="px-4 py-5 sm:p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold text-gray-900">{candidate.name}</h1>
-                <button
-                  onClick={() => router.push('/admin/candidates')}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded"
-                >
-                  Voltar
-                </button>
-              </div>
-
-              <Tab.Group>
-                <Tab.List className="flex space-x-1 rounded-xl bg-blue-900/20 p-1">
-                  {tabs.map((tab) => (
-                    <Tab
-                      key={tab.name}
-                      className={({ selected }) =>
-                        classNames(
-                          'w-full rounded-lg py-2.5 text-sm font-medium leading-5',
-                          'ring-white ring-opacity-60 ring-offset-2 ring-offset-blue-400 focus:outline-none focus:ring-2',
-                          selected
-                            ? 'bg-white text-blue-700 shadow'
-                            : 'text-blue-500 hover:bg-white/[0.12] hover:text-blue-600'
-                        )
-                      }
-                    >
-                      {tab.name}
-                    </Tab>
-                  ))}
-                </Tab.List>
-                <Tab.Panels className="mt-4">
-                  {tabs.map((tab, index) => {
-                    const TabComponent = tab.Component
-                    return (
-                      <Tab.Panel
-                        key={tab.name}
-                        className={classNames(
-                          'rounded-xl bg-white p-3',
-                          'ring-white ring-opacity-60 ring-offset-2 ring-offset-blue-400 focus:outline-none focus:ring-2'
-                        )}
-                      >
-                        {index === 3 ? (
-                          <TabComponent candidate={candidate} onUpdate={handleUpdate} />
-                        ) : (
-                          <TabComponent candidate={candidate} />
-                        )}
-                      </Tab.Panel>
-                    )
-                  })}
-                </Tab.Panels>
-              </Tab.Group>
+    <AdminLayout>
+      <div className="p-6">
+        <div className="bg-white rounded-lg shadow">
+          <div className="px-4 py-5 sm:p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h1 className="text-2xl font-bold text-gray-900">{candidate.name}</h1>
+              <button
+                onClick={() => router.push('/admin/candidates')}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded"
+              >
+                Voltar
+              </button>
             </div>
+
+            <Tab.Group>
+              <Tab.List className="flex space-x-1 rounded-xl bg-blue-900/20 p-1">
+                {tabs.map((tab) => (
+                  <Tab
+                    key={tab.name}
+                    className={({ selected }) =>
+                      classNames(
+                        'w-full rounded-lg py-2.5 text-sm font-medium leading-5',
+                        'ring-white ring-opacity-60 ring-offset-2 ring-offset-blue-400 focus:outline-none focus:ring-2',
+                        selected
+                          ? 'bg-white text-blue-700 shadow'
+                          : 'text-blue-500 hover:bg-white/[0.12] hover:text-blue-600'
+                      )
+                    }
+                  >
+                    {tab.name}
+                  </Tab>
+                ))}
+              </Tab.List>
+              <Tab.Panels className="mt-4">
+                {tabs.map((tab, index) => {
+                  const TabComponent = tab.Component
+                  return (
+                    <Tab.Panel
+                      key={tab.name}
+                      className={classNames(
+                        'rounded-xl bg-white p-3',
+                        'ring-white ring-opacity-60 ring-offset-2 ring-offset-blue-400 focus:outline-none focus:ring-2'
+                      )}
+                    >
+                      {index === 3 ? (
+                        <TabComponent candidate={candidate} onUpdate={handleUpdate} />
+                      ) : (
+                        <TabComponent candidate={candidate} />
+                      )}
+                    </Tab.Panel>
+                  )
+                })}
+              </Tab.Panels>
+            </Tab.Group>
           </div>
         </div>
       </div>
-    </div>
+    </AdminLayout>
   )
 }

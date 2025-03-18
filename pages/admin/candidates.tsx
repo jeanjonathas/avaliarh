@@ -42,7 +42,15 @@ const CandidatesPage: NextPage = () => {
   }, [session])
 
   if (status === 'loading' || loading) {
-    return <div>Carregando...</div>
+    return (
+      <AdminLayout>
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center">
+            <p className="text-gray-500">Carregando...</p>
+          </div>
+        </div>
+      </AdminLayout>
+    )
   }
 
   return (
