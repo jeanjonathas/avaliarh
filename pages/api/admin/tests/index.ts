@@ -38,20 +38,17 @@ export default async function handler(
             // Contar etapas (stages) usando Prisma
             const stagesCount = await prisma.stage.count({
               where: {
-                OR: [
-                  { testId: test.id },
-                  { TestStage: { some: { testId: test.id } } }
-                ]
-              },
-              distinct: ['id']
+                testId: test.id
+              }
             });
             
             // Contar perguntas em todas as etapas do teste usando Prisma
-            const questionsCount = await prisma.testQuestion.count({
+            const questionsCount = await prisma.question.count({
               where: {
-                testId: test.id
-              },
-              distinct: ['questionId']
+                stage: {
+                  testId: test.id
+                }
+              }
             });
             
             return {
@@ -81,17 +78,48 @@ export default async function handler(
     try {
       const { title, description, timeLimit, active } = req.body;
 
+      console.log('Dados recebidos:', { title, description, timeLimit, active });
+      console.log('Sessão do usuário:', JSON.stringify(session, null, 2));
+
       if (!title) {
         return res.status(400).json({ error: 'Título do teste é obrigatório' });
       }
 
-      // Criar o teste usando Prisma Client
+      // Obter o companyId do usuário da sessão
+      let companyId = session.user?.companyId;
+      
+      console.log('CompanyId obtido da sessão:', companyId);
+      
+      // Se o companyId não estiver na sessão, buscar do banco de dados
+      if (!companyId) {
+        console.log('CompanyId não encontrado na sessão, buscando do banco de dados...');
+        
+        // Buscar o usuário no banco de dados para obter o companyId
+        const user = await prisma.user.findUnique({
+          where: {
+            id: session.user.id
+          },
+          select: {
+            companyId: true
+          }
+        });
+        
+        companyId = user?.companyId;
+        console.log('CompanyId obtido do banco de dados:', companyId);
+      }
+      
+      if (!companyId) {
+        return res.status(400).json({ error: 'ID da empresa não encontrado. O usuário precisa estar associado a uma empresa para criar testes.' });
+      }
+
+      // Criar o teste usando Prisma Client incluindo o companyId
       const newTest = await prisma.test.create({
         data: {
           title,
           description,
           timeLimit: timeLimit ? parseInt(timeLimit) : null,
-          active: active !== undefined ? active : true
+          active: active !== undefined ? active : true,
+          companyId: companyId
         }
       });
 
@@ -102,6 +130,6 @@ export default async function handler(
     }
   } else {
     res.setHeader('Allow', ['GET', 'POST']);
-    res.status(405).end(`Method ${req.method} Not Allowed`);
+    return res.status(405).json({ error: `Método ${req.method} não permitido` });
   }
 }

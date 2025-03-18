@@ -9,6 +9,7 @@ declare module 'next-auth' {
     name: string
     email: string
     role: string
+    companyId?: string
     company?: string
     position?: string
     phone?: string
@@ -24,6 +25,7 @@ declare module 'next-auth' {
       name: string
       email: string
       role: string
+      companyId?: string
       company?: string
       position?: string
       phone?: string
@@ -37,6 +39,7 @@ declare module 'next-auth' {
   interface JWT {
     id: string
     role: string
+    companyId?: string
     company?: string
     position?: string
     phone?: string

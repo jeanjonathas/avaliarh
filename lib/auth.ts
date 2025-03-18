@@ -1,6 +1,6 @@
 import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Role } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
@@ -44,6 +44,7 @@ export const authOptions: NextAuthOptions = {
             email: user.email,
             name: user.name,
             role: user.role,
+            companyId: user.companyId,
           }
         } catch (error) {
           console.error('Erro na autenticação:', error)
@@ -59,6 +60,7 @@ export const authOptions: NextAuthOptions = {
         token.email = user.email
         token.name = user.name
         token.role = user.role
+        token.companyId = user.companyId
       }
       return token
     },
@@ -67,7 +69,8 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string
         session.user.email = token.email as string
         session.user.name = token.name as string
-        session.user.role = token.role as string
+        session.user.role = token.role as Role
+        session.user.companyId = token.companyId as string
       }
       return session
     },
