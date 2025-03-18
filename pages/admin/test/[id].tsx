@@ -38,6 +38,8 @@ interface Question {
   categoryId?: string
   categoryName?: string
   categories?: Category[] // Mantido para compatibilidade com código existente
+  difficulty?: string // EASY, MEDIUM, HARD
+  type?: string // MULTIPLE_CHOICE, OPINION_MULTIPLE
 }
 
 interface Option {
@@ -608,7 +610,21 @@ const TestDetail: NextPage = () => {
   const openAddQuestionsModal = (stageId: string) => {
     setSelectedStageId(stageId)
     setSelectedQuestions([])
+    
+    // Encontrar a etapa selecionada para obter o tipo de pergunta
+    const selectedTestStage = test?.testStages?.find(ts => ts.id === stageId);
+    if (selectedTestStage && selectedTestStage.stage.questionType) {
+      console.log(`[OpenModal] Definindo tipo de pergunta: ${selectedTestStage.stage.questionType}`);
+      setSelectedStageQuestionType(selectedTestStage.stage.questionType);
+    } else {
+      console.log('[OpenModal] Etapa não encontrada ou sem tipo de pergunta definido');
+      setSelectedStageQuestionType(null);
+    }
+    
     setShowAddQuestionsModal(true)
+    
+    // Buscar perguntas disponíveis após abrir o modal
+    fetchAvailableQuestions(stageId)
   }
 
   // Identificar todas as perguntas que já estão sendo usadas no teste atual
@@ -628,16 +644,26 @@ const TestDetail: NextPage = () => {
       const stageData = await stageResponse.json();
       const questionType = stageData.questionType;
       
+      console.log(`[AddQuestions] Tipo de pergunta da etapa: ${questionType}`);
+      
       // Armazenar o tipo de pergunta da etapa selecionada
       setSelectedStageQuestionType(questionType);
       
-      // Buscar perguntas disponíveis, filtrando pelo tipo se especificado
-      const response = await fetch(`/api/admin/questions?${questionType ? `type=${questionType}` : ''}`);
+      // Buscar todas as perguntas disponíveis - não filtramos na API para garantir que o filtro seja aplicado corretamente no frontend
+      const response = await fetch(`/api/admin/questions`);
       if (!response.ok) {
         throw new Error('Erro ao buscar perguntas disponíveis');
       }
       
       const data = await response.json();
+      console.log(`[AddQuestions] Perguntas recebidas: ${data.length}`);
+      console.log(`[AddQuestions] Exemplo de pergunta:`, data.length > 0 ? {
+        id: data[0].id,
+        text: data[0].text,
+        type: data[0].type,
+        difficulty: data[0].difficulty
+      } : 'Nenhuma pergunta encontrada');
+      
       setAvailableQuestions(data);
     } catch (error) {
       console.error('Erro ao buscar perguntas disponíveis:', error);
@@ -650,23 +676,44 @@ const TestDetail: NextPage = () => {
   const filteredQuestions = availableQuestions.filter(question => {
     // Excluir perguntas que já estão sendo usadas no teste
     if (questionsAlreadyInTest.includes(question.id)) {
+      console.log(`[Filter] Pergunta ${question.id} rejeitada: já está sendo usada no teste`);
       return false;
+    }
+    
+    // Filtrar pelo tipo de pergunta da etapa selecionada
+    // Verificação mais robusta para garantir que o tipo corresponda
+    if (selectedStageQuestionType) {
+      // Garantir que estamos comparando strings
+      const questionType = String(question.type || '').toUpperCase();
+      const stageType = String(selectedStageQuestionType).toUpperCase();
+      
+      console.log(`[Filter] Comparando tipos: pergunta=${questionType}, etapa=${stageType}`);
+      
+      if (questionType !== stageType) {
+        console.log(`[Filter] Pergunta ${question.id} rejeitada: tipo ${questionType} não corresponde ao tipo da etapa ${stageType}`);
+        return false;
+      }
     }
     
     // Filtro por categoria
     if (selectedCategory !== 'all') {
-      if (!question.categoryId || question.categoryId !== selectedCategory) {
-        return false
+      if (!question.categories || !question.categories.some(cat => cat.id === selectedCategory)) {
+        console.log(`[Filter] Pergunta ${question.id} rejeitada: categoria não corresponde`);
+        return false;
       }
     }
     
-    // Filtro por dificuldade (temporariamente desativado)
-    // if (selectedDifficulty !== 'all' && question.difficulty !== selectedDifficulty) {
-    //   return false
-    // }
+    // Filtro por dificuldade
+    if (selectedDifficulty !== 'all') {
+      if (question.difficulty !== selectedDifficulty) {
+        console.log(`[Filter] Pergunta ${question.id} rejeitada: dificuldade não corresponde`);
+        return false;
+      }
+    }
     
-    return true
-  })
+    console.log(`[Filter] Pergunta ${question.id} aceita: tipo ${question.type}, etapa ${selectedStageQuestionType}`);
+    return true;
+  });
 
   const toggleQuestionSelection = (questionId: string) => {
     if (selectedQuestions.includes(questionId)) {
@@ -787,7 +834,7 @@ const TestDetail: NextPage = () => {
             // Encontrar o testStage que contém a etapa afetada
             const updatedTestStages = test.testStages.map(testStage => {
               // Se não for a etapa que estamos modificando, retorna sem alterações
-              if (testStage.stageId !== stageId) return testStage;
+              if (testStage.stageId !== stageId) return testStage
               
               // Se for a etapa afetada, remove a pergunta da lista de questionStages
               return {
@@ -824,7 +871,7 @@ const TestDetail: NextPage = () => {
         cancelText: 'Cancelar',
       }
     )
-  }
+  };
 
   const handleCreateQuestion = async (values: any, formikHelpers?: any) => {
     try {
