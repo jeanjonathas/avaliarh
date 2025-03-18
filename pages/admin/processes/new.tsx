@@ -12,6 +12,8 @@ interface ProcessStage {
   order: number;
   type: string;
   testId?: string;
+  requestCandidatePhoto?: boolean;
+  showResultsToCandidate?: boolean;
 }
 
 interface FormDraft {
@@ -19,6 +21,7 @@ interface FormDraft {
   description?: string;
   evaluationType: string;
   cutoffScore?: number;
+  jobPosition?: string;
   stages: ProcessStage[];
 }
 
@@ -27,6 +30,7 @@ interface FormData {
   description?: string;
   cutoffScore?: number;
   evaluationType: string;
+  jobPosition?: string;
   stages: ProcessStage[];
 }
 
@@ -73,13 +77,16 @@ const NewProcess: React.FC = () => {
       description: '',
       evaluationType: 'SCORE_BASED',
       cutoffScore: 70,
+      jobPosition: '',
       stages: [
         {
           name: '',
           description: '',
           order: 1,
           type: 'TEST',
-          testId: ''
+          testId: '',
+          requestCandidatePhoto: false,
+          showResultsToCandidate: false,
         }
       ]
     }
@@ -134,7 +141,9 @@ const NewProcess: React.FC = () => {
       description: '',
       order: fields.length + 1,
       type: 'TEST',
-      testId: ''
+      testId: '',
+      requestCandidatePhoto: false,
+      showResultsToCandidate: false,
     });
   };
 
@@ -162,12 +171,15 @@ const NewProcess: React.FC = () => {
       description: '',
       evaluationType: 'SCORE_BASED',
       cutoffScore: 70,
+      jobPosition: '',
       stages: [{
         name: '',
         description: '',
         order: 1,
         type: 'TEST',
-        testId: ''
+        testId: '',
+        requestCandidatePhoto: false,
+        showResultsToCandidate: false,
       }]
     });
   }, [reset]);
@@ -189,12 +201,15 @@ const NewProcess: React.FC = () => {
             description: draftData.description || '',
             evaluationType: draftData.evaluationType || 'SCORE_BASED',
             cutoffScore: draftData.cutoffScore || 70,
+            jobPosition: draftData.jobPosition || '',
             stages: draftData.stages?.length > 0 ? draftData.stages : [{
               name: '',
               description: '',
               order: 1,
               type: 'TEST',
-              testId: ''
+              testId: '',
+              requestCandidatePhoto: false,
+              showResultsToCandidate: false,
             }]
           });
         } catch (error) {
@@ -254,6 +269,21 @@ const NewProcess: React.FC = () => {
               />
               {errors.name && (
                 <p className="mt-1 text-sm text-red-600">Nome é obrigatório</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-secondary-700 mb-1">
+                Cargo *
+              </label>
+              <input
+                type="text"
+                placeholder="Ex: Desenvolvedor Full Stack"
+                {...register('jobPosition', { required: 'Cargo é obrigatório' })}
+                className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+              />
+              {errors.jobPosition && (
+                <p className="mt-1 text-sm text-red-600">Cargo é obrigatório</p>
               )}
             </div>
 
@@ -483,11 +513,23 @@ const NewProcess: React.FC = () => {
                                                     <div className="pl-4 border-l-2 border-secondary-200">
                                                       <h6 className="text-xs font-medium text-secondary-700 mb-1">Questões ({stage.questions.length}):</h6>
                                                       <ul className="space-y-1">
-                                                        {stage.questions.map((question, qIdx) => (
-                                                          <li key={question.id} className="text-xs text-secondary-600">
-                                                            {qIdx + 1}. {question.text.length > 50 ? `${question.text.substring(0, 50)}...` : question.text}
-                                                          </li>
-                                                        ))}
+                                                        {stage.questions.map((question, qIdx) => {
+                                                          // Function to strip HTML tags
+                                                          const stripHtml = (html) => {
+                                                            const tmp = document.createElement("DIV");
+                                                            tmp.innerHTML = html;
+                                                            return tmp.textContent || tmp.innerText || "";
+                                                          };
+                                                          
+                                                          const plainText = stripHtml(question.text);
+                                                          const displayText = plainText.length > 50 ? `${plainText.substring(0, 50)}...` : plainText;
+                                                          
+                                                          return (
+                                                            <li key={question.id} className="text-xs text-secondary-600">
+                                                              {qIdx + 1}. {displayText}
+                                                            </li>
+                                                          );
+                                                        })}
                                                       </ul>
                                                     </div>
                                                   ) : (
@@ -523,6 +565,28 @@ const NewProcess: React.FC = () => {
                       placeholder="Descreva os objetivos e requisitos desta etapa"
                       rows={3}
                       className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-secondary-700 mb-1">
+                      Solicitar Foto do Candidato
+                    </label>
+                    <input
+                      type="checkbox"
+                      {...register(`stages.${index}.requestCandidatePhoto`)}
+                      className="h-4 w-4 text-primary-600 border-secondary-300 focus:ring-primary-500 cursor-pointer"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-secondary-700 mb-1">
+                      Mostrar Resultados ao Candidato
+                    </label>
+                    <input
+                      type="checkbox"
+                      {...register(`stages.${index}.showResultsToCandidate`)}
+                      className="h-4 w-4 text-primary-600 border-secondary-300 focus:ring-primary-500 cursor-pointer"
                     />
                   </div>
                 </div>
