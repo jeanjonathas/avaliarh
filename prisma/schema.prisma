@@ -94,18 +94,22 @@ model Candidate {
 }
 
 model SelectionProcess {
-  id              String         @id @default(uuid())
-  name            String
-  description     String?
-  cutoffScore     Int?
-  expectedProfile Json?
-  evaluationType  String         @default("SCORE_BASED")
-  companyId       String
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  candidates      Candidate[]
-  stages          ProcessStage[]
-  company         Company        @relation(fields: [companyId], references: [id])
+  id                String         @id @default(uuid())
+  name              String         // Nome do processo (ex: "Processo Seletivo Veterinário 2025")
+  jobPosition       String         // Cargo específico (ex: "Veterinário Plantonista")
+  description       String?
+  vacancyCount      Int            @default(1)  // Número de vagas disponíveis
+  registrationStart DateTime?      // Data de início das inscrições
+  registrationEnd   DateTime?      // Data de término das inscrições
+  cutoffScore       Int?
+  expectedProfile   Json?
+  evaluationType    String         @default("SCORE_BASED")
+  companyId         String
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  candidates        Candidate[]
+  stages            ProcessStage[]
+  company           Company        @relation(fields: [companyId], references: [id])
 }
 
 model ProcessStage {
@@ -114,17 +118,19 @@ model ProcessStage {
   description            String?
   order                  Int
   type                   String              @default("TEST")
-  duration               Int?
+  scheduledDate          DateTime?           // Data agendada para a etapa
+  duration               Int?                // Duração em minutos
+  weight                 Int                 @default(1)  // Peso na avaliação final
   requestCandidatePhoto  Boolean             @default(false)
   showResultsToCandidate Boolean             @default(false)
   processId              String
   testId                 String?             // ID do teste associado quando type = "TEST"
-  expectedProfile        Json?              // Perfil esperado para perguntas opinativas
+  expectedProfile        Json?               // Perfil esperado para perguntas opinativas
   createdAt              DateTime            @default(now())
   updatedAt              DateTime            @updatedAt
   progresses             CandidateProgress[]
   process                SelectionProcess    @relation(fields: [processId], references: [id])
-  test                   Test?              @relation(fields: [testId], references: [id])  // Relação com o teste
+  test                   Test?               @relation(fields: [testId], references: [id])  // Relação com o teste
 
   @@index([order])
 }
