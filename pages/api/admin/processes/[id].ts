@@ -114,7 +114,7 @@ export default async function handler(
                   description: stage.description,
                   order: stage.order,
                   type: stage.type,
-                  testId: stage.testId
+                  testId: stage.testId || null // Garantir que testId seja null quando vazio
                 })),
               },
             },

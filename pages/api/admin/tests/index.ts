@@ -27,48 +27,37 @@ export default async function handler(
           timeLimit: true,
           active: true,
           createdAt: true,
-          updatedAt: true
+          updatedAt: true,
+          stages: {
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              order: true,
+              questions: {
+                select: {
+                  id: true,
+                  text: true,
+                  type: true,
+                  options: {
+                    select: {
+                      id: true,
+                      text: true,
+                      isCorrect: true
+                    }
+                  }
+                }
+              }
+            },
+            orderBy: {
+              order: 'asc'
+            }
+          }
         }
       });
       
-      // Para cada teste, buscar a contagem de etapas e perguntas
-      const testsWithCounts = await Promise.all(
-        tests.map(async (test) => {
-          try {
-            // Contar etapas (stages) usando Prisma
-            const stagesCount = await prisma.stage.count({
-              where: {
-                testId: test.id
-              }
-            });
-            
-            // Contar perguntas em todas as etapas do teste usando Prisma
-            const questionsCount = await prisma.question.count({
-              where: {
-                stage: {
-                  testId: test.id
-                }
-              }
-            });
-            
-            return {
-              ...test,
-              sectionsCount: stagesCount,
-              questionsCount
-            };
-          } catch (countError) {
-            console.error('Erro ao contar etapas para teste:', test.id, countError);
-            return {
-              ...test,
-              sectionsCount: 0,
-              questionsCount: 0
-            };
-          }
-        })
-      );
-
       // Corrigir o formato da resposta para incluir a propriedade 'tests'
-      return res.status(200).json({ tests: testsWithCounts });
+      return res.status(200).json({ tests });
     } catch (error) {
       console.error('Erro ao buscar testes:', error);
       // Retornar array vazio em vez de erro para não quebrar a UI

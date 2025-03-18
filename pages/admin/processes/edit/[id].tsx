@@ -61,6 +61,7 @@ const EditProcess: React.FC = () => {
       if (!id) return;
 
       try {
+        setIsLoading(true);
         const response = await fetch(`/api/admin/processes/${id}`);
         if (response.ok) {
           const process = await response.json();
@@ -121,6 +122,7 @@ const EditProcess: React.FC = () => {
     if (testId) {
       // Salvar o estado atual do formulário em localStorage
       const currentFormData = {
+        id: id as string,
         name: watch('name'),
         description: watch('description'),
         evaluationType: watch('evaluationType'),
@@ -139,13 +141,21 @@ const EditProcess: React.FC = () => {
 
     try {
       setIsSubmitting(true);
+      showToast('Salvando alterações...', 'info');
 
       const response = await fetch(`/api/admin/processes/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          stages: data.stages.map((stage, index) => ({
+            ...stage,
+            order: index + 1,
+            testId: stage.type === 'TEST' && stage.testId ? stage.testId : null
+          }))
+        }),
       });
 
       if (response.ok) {

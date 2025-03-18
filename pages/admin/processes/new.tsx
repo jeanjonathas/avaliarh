@@ -3,6 +3,8 @@ import { useRouter } from 'next/router';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import AdminLayout from '../../../components/admin/AdminLayout';
 import { useNotification } from '../../../contexts/NotificationContext';
+import Link from 'next/link';
+import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 
 interface ProcessStage {
   name: string;
@@ -31,6 +33,23 @@ interface FormData {
 interface Test {
   id: string;
   title: string;
+  description?: string;
+  sectionsCount?: number;
+  questionsCount?: number;
+  stages?: TestStage[];
+}
+
+interface TestStage {
+  id: string;
+  title: string;
+  description?: string;
+  questions?: TestQuestion[];
+}
+
+interface TestQuestion {
+  id: string;
+  text: string;
+  type?: string;
 }
 
 const stageTypes = [
@@ -45,18 +64,22 @@ const NewProcess: React.FC = () => {
   const { showToast } = useNotification();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tests, setTests] = useState<Test[]>([]);
+  const [isLoadingTests, setIsLoadingTests] = useState(false);
+  const [expandedTests, setExpandedTests] = useState<Record<string, boolean>>({});
 
-  const { control, handleSubmit, register, formState: { errors }, watch, setValue } = useForm<FormData>({
+  const { control, handleSubmit, register, formState: { errors }, watch, setValue, reset } = useForm<FormData>({
     defaultValues: {
       name: '',
       description: '',
       evaluationType: 'SCORE_BASED',
+      cutoffScore: 70,
       stages: [
         {
           name: '',
           description: '',
           order: 1,
-          type: 'TEST'
+          type: 'TEST',
+          testId: ''
         }
       ]
     }
@@ -68,66 +91,119 @@ const NewProcess: React.FC = () => {
   });
 
   useEffect(() => {
-    // Carregar testes disponíveis
+    // Buscar testes disponíveis
     const fetchTests = async () => {
       try {
+        setIsLoadingTests(true);
         const response = await fetch('/api/admin/tests');
         if (response.ok) {
           const { tests: testsData } = await response.json();
           setTests(testsData.map(test => ({
             id: test.id,
-            title: test.title
+            title: test.title,
+            description: test.description,
+            sectionsCount: test.stages?.length || 0,
+            questionsCount: test.stages?.reduce((acc, stage) => acc + (stage.questions?.length || 0), 0) || 0,
+            stages: test.stages?.map(stage => ({
+              id: stage.id,
+              title: stage.title,
+              description: stage.description,
+              questions: stage.questions?.map(question => ({
+                id: question.id,
+                text: question.text,
+                type: question.type
+              }))
+            }))
           })));
         }
       } catch (error) {
         console.error('Erro ao carregar testes:', error);
-        showToast('Erro ao carregar testes disponíveis', 'error');
+        showToast('Erro ao carregar testes', 'error');
+      } finally {
+        setIsLoadingTests(false);
       }
     };
 
     fetchTests();
   }, [showToast]);
 
-  const handleTestSelect = async (testId: string, stageIndex: number) => {
-    if (testId) {
-      // Salvar o estado atual do formulário em localStorage
-      const currentFormData = {
-        name: watch('name'),
-        description: watch('description'),
-        evaluationType: watch('evaluationType'),
-        cutoffScore: watch('cutoffScore'),
-        stages: watch('stages')
-      };
-      localStorage.setItem('processDraft', JSON.stringify(currentFormData));
-      
-      // Redirecionar para a página do teste
-      router.push(`/admin/test/${testId}`);
-    }
+  // Função para adicionar uma nova etapa
+  const addStage = () => {
+    append({
+      name: '',
+      description: '',
+      order: fields.length + 1,
+      type: 'TEST',
+      testId: ''
+    });
   };
 
-  // Recuperar rascunho ao montar o componente
+  // Função para remover uma etapa
+  const removeStage = (index: number) => {
+    remove(index);
+  };
+
+  // Função para alternar a expansão de um teste
+  const toggleTestExpansion = (testId: string) => {
+    setExpandedTests(prev => ({
+      ...prev,
+      [testId]: !prev[testId]
+    }));
+  };
+
+  // Limpar rascunho e inicializar formulário ao montar o componente
   useEffect(() => {
-    const draft = localStorage.getItem('processDraft');
-    if (draft) {
-      try {
-        const draftData = JSON.parse(draft) as FormDraft;
-        
-        // Atualizar os campos do formulário com os dados do rascunho
-        setValue('name', draftData.name);
-        setValue('description', draftData.description);
-        setValue('evaluationType', draftData.evaluationType);
-        setValue('cutoffScore', draftData.cutoffScore);
-        
-        // Atualizar as etapas
-        draftData.stages.forEach((stage, index) => {
-          setValue(`stages.${index}`, stage);
-        });
-      } catch (error) {
-        console.error('Erro ao carregar rascunho:', error);
-        localStorage.removeItem('processDraft');
+    // Limpar qualquer rascunho anterior ao acessar a página de novo processo
+    localStorage.removeItem('processDraft');
+    
+    // Inicializar o formulário com valores padrão
+    reset({
+      name: '',
+      description: '',
+      evaluationType: 'SCORE_BASED',
+      cutoffScore: 70,
+      stages: [{
+        name: '',
+        description: '',
+        order: 1,
+        type: 'TEST',
+        testId: ''
+      }]
+    });
+  }, [reset]);
+
+  // Recuperar rascunho apenas quando retornar da página de teste
+  useEffect(() => {
+    // Verificar se estamos retornando da página de teste
+    const isReturningFromTest = router.query.from === 'test';
+    
+    if (isReturningFromTest) {
+      const draft = localStorage.getItem('processDraft');
+      if (draft) {
+        try {
+          const draftData = JSON.parse(draft) as FormDraft;
+          
+          // Atualizar os campos do formulário com os dados do rascunho
+          reset({
+            name: draftData.name || '',
+            description: draftData.description || '',
+            evaluationType: draftData.evaluationType || 'SCORE_BASED',
+            cutoffScore: draftData.cutoffScore || 70,
+            stages: draftData.stages?.length > 0 ? draftData.stages : [{
+              name: '',
+              description: '',
+              order: 1,
+              type: 'TEST',
+              testId: ''
+            }]
+          });
+        } catch (error) {
+          console.error('Erro ao carregar rascunho:', error);
+          localStorage.removeItem('processDraft');
+        }
       }
     }
-  }, [setValue]);
+  }, [router.query.from, reset]);
 
   const onSubmit = async (data: FormData) => {
     try {
@@ -230,7 +306,7 @@ const NewProcess: React.FC = () => {
                 </h2>
                 <button
                   type="button"
-                  onClick={() => append({ name: '', description: '', order: fields.length + 1, type: 'TEST' })}
+                  onClick={addStage}
                   className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                 >
                   Adicionar Etapa
@@ -246,7 +322,7 @@ const NewProcess: React.FC = () => {
                     {fields.length > 1 && (
                       <button
                         type="button"
-                        onClick={() => remove(index)}
+                        onClick={() => removeStage(index)}
                         className="text-red-600 hover:text-red-800"
                       >
                         Remover
@@ -289,20 +365,152 @@ const NewProcess: React.FC = () => {
                   </div>
 
                   {watch(`stages.${index}.type`) === 'TEST' && (
-                    <div className="mb-4">
+                    <div>
                       <label className="block text-sm font-medium text-secondary-700 mb-1">
                         Selecionar Teste
                       </label>
-                      <select
-                        {...register(`stages.${index}.testId`)}
-                        onChange={(e) => handleTestSelect(e.target.value, index)}
-                        className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      >
-                        <option value="">Selecione um teste</option>
-                        {Array.isArray(tests) && tests.map(test => (
-                          <option key={test.id} value={test.id}>{test.title}</option>
-                        ))}
-                      </select>
+                      
+                      <div className="mt-2 overflow-x-auto shadow-sm rounded-lg">
+                        {isLoadingTests ? (
+                          <div className="flex justify-center items-center p-8 bg-white border border-secondary-200 rounded-lg">
+                            <div className="text-center">
+                              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary-400 border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
+                              <p className="mt-2 text-sm text-secondary-600">Carregando testes...</p>
+                            </div>
+                          </div>
+                        ) : (
+                        <table className="min-w-full divide-y divide-secondary-200 border border-secondary-200 rounded-lg">
+                          <thead className="bg-secondary-50">
+                            <tr>
+                              <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider w-24">
+                                Selecionar
+                              </th>
+                              <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
+                                Título
+                              </th>
+                              <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
+                                Descrição
+                              </th>
+                              <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider w-24">
+                                Etapas
+                              </th>
+                              <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider w-24">
+                                Questões
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-secondary-200">
+                            {tests.length === 0 ? (
+                              <tr>
+                                <td colSpan={5} className="px-4 py-4 text-center text-sm text-secondary-500">
+                                  Nenhum teste disponível. <Link href="/admin/tests/new" className="text-primary-600 hover:text-primary-800">Criar um novo teste</Link>
+                                </td>
+                              </tr>
+                            ) : (
+                              tests.map(test => (
+                                <>
+                                <tr key={test.id} className={watch(`stages.${index}.testId`) === test.id ? "bg-primary-50 hover:bg-primary-100" : "hover:bg-secondary-50"}>
+                                  <td className="px-4 py-4 whitespace-nowrap text-center">
+                                    <input
+                                      type="radio"
+                                      id={`test-${test.id}-${index}`}
+                                      name={`stages.${index}.testId`}
+                                      value={test.id}
+                                      checked={watch(`stages.${index}.testId`) === test.id}
+                                      onChange={() => setValue(`stages.${index}.testId`, test.id)}
+                                      className="h-4 w-4 text-primary-600 border-secondary-300 focus:ring-primary-500 cursor-pointer"
+                                    />
+                                  </td>
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="flex items-center">
+                                      <label htmlFor={`test-${test.id}-${index}`} className="block text-sm font-medium text-secondary-900 cursor-pointer">
+                                        {test.title}
+                                      </label>
+                                      <button 
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          toggleTestExpansion(test.id);
+                                        }}
+                                        className="ml-2 text-secondary-500 hover:text-secondary-700 focus:outline-none"
+                                      >
+                                        {expandedTests[test.id] ? <ChevronUpIcon className="w-4 h-4" /> : <ChevronDownIcon className="w-4 h-4" />}
+                                      </button>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-4">
+                                    <div className="text-sm text-secondary-500 max-w-xs truncate">
+                                      {test.description || "Sem descrição"}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-4 whitespace-nowrap text-sm text-secondary-500 text-center">
+                                    {test.sectionsCount}
+                                  </td>
+                                  <td className="px-4 py-4 whitespace-nowrap text-sm text-secondary-500 text-center">
+                                    {test.questionsCount}
+                                  </td>
+                                </tr>
+                                
+                                {/* Detalhes expandidos do teste */}
+                                {expandedTests[test.id] && (
+                                  <tr className="bg-secondary-50">
+                                    <td colSpan={5} className="px-4 py-4">
+                                      <div className="rounded-md bg-white p-4 border border-secondary-200">
+                                        <h4 className="text-lg font-medium text-secondary-900 mb-2">Detalhes do Teste</h4>
+                                        
+                                        {/* Descrição completa */}
+                                        <div className="mb-4">
+                                          <h5 className="text-sm font-medium text-secondary-700">Descrição:</h5>
+                                          <p className="text-sm text-secondary-500">{test.description || "Sem descrição"}</p>
+                                        </div>
+                                        
+                                        {/* Lista de etapas */}
+                                        <div className="mb-4">
+                                          <h5 className="text-sm font-medium text-secondary-700 mb-2">Etapas:</h5>
+                                          {test.stages && test.stages.length > 0 ? (
+                                            <div className="space-y-2">
+                                              {test.stages.map((stage, stageIdx) => (
+                                                <div key={stage.id} className="border border-secondary-200 rounded-md p-3">
+                                                  <div className="flex justify-between items-center mb-2">
+                                                    <h6 className="text-sm font-medium text-secondary-800">
+                                                      {stageIdx + 1}. {stage.title || "Sem título"}
+                                                    </h6>
+                                                  </div>
+                                                  <p className="text-xs text-secondary-500 mb-2">{stage.description || "Sem descrição"}</p>
+                                                  
+                                                  {/* Lista de questões */}
+                                                  {stage.questions && stage.questions.length > 0 ? (
+                                                    <div className="pl-4 border-l-2 border-secondary-200">
+                                                      <h6 className="text-xs font-medium text-secondary-700 mb-1">Questões ({stage.questions.length}):</h6>
+                                                      <ul className="space-y-1">
+                                                        {stage.questions.map((question, qIdx) => (
+                                                          <li key={question.id} className="text-xs text-secondary-600">
+                                                            {qIdx + 1}. {question.text.length > 50 ? `${question.text.substring(0, 50)}...` : question.text}
+                                                          </li>
+                                                        ))}
+                                                      </ul>
+                                                    </div>
+                                                  ) : (
+                                                    <p className="text-xs text-secondary-400">Sem questões</p>
+                                                  )}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <p className="text-sm text-secondary-400">Sem etapas</p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                                </>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                        )}
+                      </div>
                     </div>
                   )}
 
