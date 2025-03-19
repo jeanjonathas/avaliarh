@@ -16,13 +16,15 @@ interface CandidateSelectionModalProps {
   onClose: () => void;
   processId: string;
   onSuccess: () => void;
+  onAddNewCandidate?: () => void;
 }
 
 const CandidateSelectionModal: React.FC<CandidateSelectionModalProps> = ({
   isOpen,
   onClose,
   processId,
-  onSuccess
+  onSuccess,
+  onAddNewCandidate
 }) => {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,11 +105,20 @@ const CandidateSelectionModal: React.FC<CandidateSelectionModalProps> = ({
   };
 
   const handleCreateNewCandidate = () => {
-    setIsAddCandidateModalOpen(true);
+    // Se tiver um callback para adicionar novo candidato, use-o
+    if (onAddNewCandidate) {
+      onAddNewCandidate();
+    } else {
+      // Caso contrário, use o comportamento padrão
+      // Fechar a modal atual antes de abrir a modal de cadastro
+      onClose();
+      // Abrir a modal de cadastro de candidato
+      setIsAddCandidateModalOpen(true);
+    }
   };
 
   const handleNewCandidateSuccess = () => {
-    fetchAvailableCandidates();
+    // Reabrir a modal de seleção após o cadastro bem-sucedido
     onSuccess();
   };
 
@@ -151,16 +162,6 @@ const CandidateSelectionModal: React.FC<CandidateSelectionModalProps> = ({
               Tentar novamente
             </button>
           </div>
-        ) : candidates.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-gray-500 mb-4">Não há candidatos disponíveis para adicionar a este processo.</p>
-            <button
-              onClick={handleCreateNewCandidate}
-              className="px-4 py-2 bg-primary-500 text-white rounded hover:bg-primary-600"
-            >
-              Cadastrar Novo Candidato
-            </button>
-          </div>
         ) : (
           <>
             <div className="flex justify-end mb-4">
@@ -172,69 +173,75 @@ const CandidateSelectionModal: React.FC<CandidateSelectionModalProps> = ({
               </button>
             </div>
             
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Nome
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Email
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Data de Cadastro
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ações
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {candidates.map((candidate) => (
-                    <tr key={candidate.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{candidate.name}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">{candidate.email}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          candidate.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
-                          candidate.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
-                          'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {candidate.status === 'APPROVED' ? 'Aprovado' :
-                           candidate.status === 'REJECTED' ? 'Rejeitado' :
-                           'Pendente'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(candidate.createdAt)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          onClick={() => handleAddCandidateToProcess(candidate.id)}
-                          className="text-primary-600 hover:text-primary-900 mr-4"
-                        >
-                          Adicionar ao Processo
-                        </button>
-                        <button
-                          onClick={() => router.push(`/admin/candidates/${candidate.id}`)}
-                          className="text-gray-600 hover:text-gray-900"
-                        >
-                          Ver Detalhes
-                        </button>
-                      </td>
+            {candidates.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500 mb-4">Não há candidatos disponíveis para adicionar a este processo.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Nome
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Email
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Data de Cadastro
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ações
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {candidates.map((candidate) => (
+                      <tr key={candidate.id}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">{candidate.name}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-500">{candidate.email}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            candidate.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
+                            candidate.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {candidate.status === 'APPROVED' ? 'Aprovado' :
+                             candidate.status === 'REJECTED' ? 'Rejeitado' :
+                             'Pendente'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatDate(candidate.createdAt)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button
+                            onClick={() => handleAddCandidateToProcess(candidate.id)}
+                            className="text-primary-600 hover:text-primary-900 mr-4"
+                          >
+                            Adicionar ao Processo
+                          </button>
+                          <button
+                            onClick={() => router.push(`/admin/candidates/${candidate.id}`)}
+                            className="text-gray-600 hover:text-gray-900"
+                          >
+                            Ver Detalhes
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </>
         )}
       </div>

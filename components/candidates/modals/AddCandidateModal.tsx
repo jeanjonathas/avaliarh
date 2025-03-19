@@ -13,7 +13,7 @@ interface TestsResponse {
   tests: Test[];
 }
 
-const AddCandidateModal = ({ isOpen, onClose, onSuccess }: AddCandidateModalProps) => {
+const AddCandidateModal = ({ isOpen, onClose, onSuccess, processId }: AddCandidateModalProps) => {
   const { showToast } = useNotification();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tests, setTests] = useState<Test[]>([]);
@@ -23,7 +23,8 @@ const AddCandidateModal = ({ isOpen, onClose, onSuccess }: AddCandidateModalProp
     email: '',
     phone: '',
     position: '',
-    testId: ''
+    testId: '',
+    processId: processId || ''
   })
 
   // Carregar testes disponíveis
@@ -89,7 +90,7 @@ const AddCandidateModal = ({ isOpen, onClose, onSuccess }: AddCandidateModalProp
       showToast('Candidato adicionado com sucesso!', 'success');
       onSuccess();
       onClose();
-      setNewCandidate({ name: '', email: '', phone: '', position: '', testId: '' });
+      setNewCandidate({ name: '', email: '', phone: '', position: '', testId: '', processId: processId || '' });
     } catch (error) {
       console.error('Erro ao adicionar candidato:', error);
       showToast(

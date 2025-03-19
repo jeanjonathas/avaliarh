@@ -1,12 +1,12 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import { getSession } from 'next-auth/react'
-import prisma from '../../../../../lib/prisma'
+import { prisma } from '../../../../../lib/prisma'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const session = await getSession({ req })
-    if (!session || !['ADMIN', 'SUPER_ADMIN'].includes(session.user?.role as string)) {
-      return res.status(401).json({ message: 'Não autorizado' })
+    if (!session || !['ADMIN', 'SUPER_ADMIN', 'COMPANY_ADMIN'].includes(session.user?.role as string)) {
+      return res.status(401).json({ message: 'Não autenticado' })
     }
 
     const { id } = req.query
@@ -17,7 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         include: {
           test: {
             include: {
-              TestStage: {
+              testStages: {
                 include: {
                   stage: true
                 }
@@ -28,7 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             include: {
               question: {
                 include: {
-                  Stage: true
+                  stage: true
                 }
               },
               option: true
@@ -43,40 +43,49 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Calcular estatísticas de desempenho
       const totalQuestions = candidate.responses.length
-      const correctAnswers = candidate.responses.filter(r => r.option?.isCorrect).length
+      const correctAnswers = candidate.responses.filter(r => r.isCorrect).length
       const incorrectAnswers = totalQuestions - correctAnswers
       const accuracy = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0
 
       // Agrupar desempenho por etapa
-      const stagePerformance = candidate.test?.TestStage.map(testStage => {
+      const stagePerformance = candidate.test?.testStages.map(testStage => {
         const stageResponses = candidate.responses.filter(
-          r => r.question?.Stage?.id === testStage.stage.id
+          r => r.question?.stageId === testStage.stage.id
         )
-        const stageCorrect = stageResponses.filter(r => r.option?.isCorrect).length
-        const stageTotal = stageResponses.length
-        const stageAccuracy = stageTotal > 0 ? (stageCorrect / stageTotal) * 100 : 0
-
+        
+        const stageQuestions = stageResponses.length
+        const stageCorrect = stageResponses.filter(r => r.isCorrect).length
+        const stageAccuracy = stageQuestions > 0 ? (stageCorrect / stageQuestions) * 100 : 0
+        
         return {
           stageId: testStage.stage.id,
           stageName: testStage.stage.title,
-          totalQuestions: stageTotal,
+          totalQuestions: stageQuestions,
           correctAnswers: stageCorrect,
-          incorrectAnswers: stageTotal - stageCorrect,
-          accuracy: stageAccuracy
+          incorrectAnswers: stageQuestions - stageCorrect,
+          accuracy: stageAccuracy,
+          weight: testStage.weight || 1
         }
       }) || []
 
+      // Calcular tempo médio por questão
+      const avgTimePerQuestion = totalQuestions > 0 
+        ? candidate.responses.reduce((sum, r) => sum + (r.timeSpent || 0), 0) / totalQuestions 
+        : 0
+
+      // Calcular tempo total do teste
+      const totalTime = candidate.timeSpent || 0
+
       return res.status(200).json({
-        summary: {
-          totalQuestions,
-          correctAnswers,
-          incorrectAnswers,
-          accuracy
-        },
+        totalQuestions,
+        correctAnswers,
+        incorrectAnswers,
+        accuracy,
         stagePerformance,
-        testCompleted: candidate.completed,
-        startTime: candidate.startTime,
-        endTime: candidate.endTime
+        avgTimePerQuestion,
+        totalTime,
+        testStartTime: candidate.testDate,
+        testEndTime: candidate.completed ? new Date(candidate.testDate?.getTime() + (totalTime * 1000)) : null
       })
     }
 

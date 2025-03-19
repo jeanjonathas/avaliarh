@@ -1,12 +1,12 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import { getSession } from 'next-auth/react'
-import prisma from '../../../../../lib/prisma'
+import { prisma } from '../../../../../lib/prisma'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const session = await getSession({ req })
-    if (!session || !['ADMIN', 'SUPER_ADMIN'].includes(session.user?.role as string)) {
-      return res.status(401).json({ message: 'Não autorizado' })
+    if (!session || !['ADMIN', 'SUPER_ADMIN', 'COMPANY_ADMIN'].includes(session.user?.role as string)) {
+      return res.status(401).json({ message: 'Não autenticado' })
     }
 
     const { id } = req.query
@@ -17,7 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         include: {
           test: {
             include: {
-              TestStage: {
+              testStages: {
                 include: {
                   stage: true
                 }
@@ -28,7 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             include: {
               question: {
                 include: {
-                  Stage: true,
+                  stage: true,
                   options: true
                 }
               },
@@ -64,7 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           questionSnapshot,
           questionText: response.question?.text,
           optionText: response.option?.text,
-          stageName: response.question?.Stage?.title,
+          stageName: response.question?.stage?.title,
           categoryName: response.question?.categoryName,
           isCorrectOption: response.option?.isCorrect
         }

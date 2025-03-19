@@ -5,6 +5,7 @@ import AdminLayout from '../../../components/admin/AdminLayout';
 import { useNotification } from '../../../contexts/NotificationContext';
 import CandidateSelectionModal from '../../../components/admin/processes/CandidateSelectionModal';
 import GenerateInviteButton from '../../../components/admin/processes/GenerateInviteButton';
+import AddCandidateModal from '../../../components/candidates/modals/AddCandidateModal';
 
 interface ProcessStage {
   id: string;
@@ -55,6 +56,7 @@ const ProcessDetails: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAddCandidateModalOpen, setIsAddCandidateModalOpen] = useState(false);
+  const [isNewCandidateModalOpen, setIsNewCandidateModalOpen] = useState(false);
   const [candidateInviteCodes, setCandidateInviteCodes] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -474,6 +476,23 @@ const ProcessDetails: React.FC = () => {
             onClose={() => setIsAddCandidateModalOpen(false)}
             processId={process.id}
             onSuccess={fetchProcessDetails}
+            onAddNewCandidate={() => {
+              setIsAddCandidateModalOpen(false);
+              setIsNewCandidateModalOpen(true);
+            }}
+          />
+        )}
+
+        {isNewCandidateModalOpen && (
+          <AddCandidateModal
+            isOpen={isNewCandidateModalOpen}
+            onClose={() => setIsNewCandidateModalOpen(false)}
+            onSuccess={() => {
+              fetchProcessDetails();
+              setIsNewCandidateModalOpen(false);
+              setIsAddCandidateModalOpen(true);
+            }}
+            processId={process.id}
           />
         )}
       </div>

@@ -121,6 +121,7 @@ export interface AddCandidateModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
+  processId?: string
 }
 
 export interface DeleteCandidateModalProps {
