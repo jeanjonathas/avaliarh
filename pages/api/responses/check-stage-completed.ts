@@ -36,16 +36,17 @@ export default async function handler(
     // Verificar se existem respostas para esta etapa usando SQL raw para contornar limitações do tipo
     const responseCountResult = await prisma.$queryRaw`
       SELECT COUNT(*) as count 
-      FROM "Response" 
-      WHERE "candidateId" = ${candidateId} 
-      AND "stageId" = ${stageUUID}
+      FROM "Response" r
+      JOIN "Question" q ON r."questionId" = q.id
+      WHERE r."candidateId" = ${candidateId} 
+      AND q."stageId" = ${stageUUID}
     `;
     
     // Extrair o número de respostas do resultado
     const responseCount = Number(responseCountResult[0]?.count || 0);
     
     // Buscar o número total de questões nesta etapa
-    const questionCount = await prisma.stageQuestion.count({
+    const questionCount = await prisma.question.count({
       where: {
         stageId: stageUUID
       }

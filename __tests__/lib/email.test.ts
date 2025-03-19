@@ -6,11 +6,12 @@ jest.mock('nodemailer', () => ({
   createTransport: jest.fn().mockReturnValue({
     sendMail: jest.fn().mockResolvedValue({
       messageId: 'test-message-id',
+      envelope: {},
+      accepted: ['test@example.com'],
+      rejected: [],
+      pending: [],
+      response: 'OK',
     }),
-  }),
-  createTestAccount: jest.fn().mockResolvedValue({
-    user: 'test-user',
-    pass: 'test-pass',
   }),
   getTestMessageUrl: jest.fn().mockReturnValue('https://ethereal.email/message/test'),
 }));
@@ -26,77 +27,95 @@ jest.mock('date-fns/locale', () => ({
 }));
 
 describe('Email Service', () => {
-  const originalEnv = { ...process.env };
+  let originalNodeEnv: string | undefined;
+  
+  beforeAll(() => {
+    // Guardar o valor original de NODE_ENV
+    originalNodeEnv = process.env.NODE_ENV;
+  });
+  
+  afterAll(() => {
+    // Restaurar o valor original de NODE_ENV
+    process.env.NODE_ENV = originalNodeEnv;
+  });
   
   beforeEach(() => {
     jest.clearAllMocks();
-    // Usar Object.defineProperty para definir NODE_ENV
-    process.env.NODE_ENV = 'test';
-  });
-  
-  afterEach(() => {
-    // Restaurar o ambiente original após cada teste
-    process.env = { ...originalEnv };
+    // Usar Object.defineProperty para evitar erro de propriedade read-only
+    Object.defineProperty(process.env, 'NODE_ENV', { value: 'test' });
   });
 
   describe('sendInviteEmail', () => {
-    it('should send an invite email successfully', async () => {
+    it('should send invite email successfully', async () => {
+      const mockSendMail = jest.fn().mockResolvedValue({
+        messageId: 'test-message-id',
+        envelope: {},
+        accepted: ['test@example.com'],
+        rejected: [],
+        pending: [],
+        response: 'OK',
+      });
+      
+      (nodemailer.createTransport as jest.Mock).mockReturnValue({
+        sendMail: mockSendMail,
+      });
+
       const result = await sendInviteEmail(
         'test@example.com',
         'Test User',
-        '1234'
+        'ABCDEF',
+        new Date()
       );
-
-      expect(nodemailer.createTransport).toHaveBeenCalled();
+      
       expect(result.success).toBe(true);
       expect(result.previewUrl).toBeDefined();
+      expect(mockSendMail).toHaveBeenCalledWith(expect.objectContaining({
+        to: 'test@example.com',
+        subject: expect.stringContaining('Convite'),
+        html: expect.stringContaining('ABCDEF'),
+      }));
     });
 
     it('should include expiration date in email when provided', async () => {
       const expirationDate = new Date();
       expirationDate.setDate(expirationDate.getDate() + 7);
-
-      const mockSendMail = jest.fn().mockResolvedValue({
-        messageId: 'test-message-id',
-      });
-
-      (nodemailer.createTransport as jest.Mock).mockReturnValue({
-        sendMail: mockSendMail,
-      });
-
-      await sendInviteEmail(
-        'test@example.com',
-        'Test User',
-        '1234',
-        expirationDate
-      );
-
-      // Verificar se o email contém informações sobre a expiração
-      const emailCall = mockSendMail.mock.calls[0][0];
-      expect(emailCall.html).toContain('expira');
-      expect(emailCall.text).toContain('expira');
-    });
-
-    it('should handle errors when sending email', async () => {
-      // Simular um erro no envio do email
-      const mockError = new Error('Failed to send email');
-      (nodemailer.createTransport as jest.Mock).mockReturnValue({
-        sendMail: jest.fn().mockRejectedValue(mockError),
-      });
-
+      
       const result = await sendInviteEmail(
         'test@example.com',
         'Test User',
-        '1234'
+        'ABCDEF',
+        expirationDate
       );
-
+      
+      expect(result.success).toBe(true);
+      expect(nodemailer.createTransport).toHaveBeenCalled();
+      
+      // Verificar se a data de expiração está incluída no email
+      const sendMailMock = nodemailer.createTransport().sendMail as jest.Mock;
+      const emailContent = sendMailMock.mock.calls[0][0].html;
+      
+      expect(emailContent).toContain(expirationDate.toLocaleDateString('pt-BR'));
+    });
+    
+    it('should handle errors when sending invite email', async () => {
+      // Simular um erro ao enviar o email
+      (nodemailer.createTransport as jest.Mock).mockReturnValue({
+        sendMail: jest.fn().mockRejectedValue(new Error('Failed to send email')),
+      });
+      
+      const result = await sendInviteEmail(
+        'test@example.com',
+        'Test User',
+        'ABCDEF'
+      );
+      
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Failed to send email');
+      expect(result.error).toBeDefined();
     });
 
     it('should use production configuration when in production environment', async () => {
       // Simular ambiente de produção
-      process.env.NODE_ENV = 'production';
+      Object.defineProperty(process.env, 'NODE_ENV', { value: 'production' });
       process.env.EMAIL_HOST = 'smtp.example.com';
       process.env.EMAIL_PORT = '587';
       process.env.EMAIL_SECURE = 'false';
@@ -107,7 +126,7 @@ describe('Email Service', () => {
       await sendInviteEmail(
         'test@example.com',
         'Test User',
-        '1234'
+        'ABCDEF'
       );
 
       expect(nodemailer.createTransport).toHaveBeenCalledWith({

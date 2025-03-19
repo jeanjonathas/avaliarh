@@ -129,10 +129,10 @@ const Home: NextPage = () => {
                     <input
                       type="text"
                       value={inviteCode}
-                      onChange={(e) => setInviteCode(e.target.value)}
-                      placeholder="Digite o código de 4 dígitos"
+                      onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                      placeholder="Digite o código de 6 caracteres"
                       className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-center text-xl sm:text-2xl tracking-widest"
-                      maxLength={4}
+                      maxLength={6}
                       required
                     />
                   </div>

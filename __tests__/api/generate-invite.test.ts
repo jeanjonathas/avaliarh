@@ -133,7 +133,7 @@ describe('Generate Invite API', () => {
       id: 'test-candidate-id',
       name: 'Test User',
       email: 'test@example.com',
-      inviteCode: '1234',
+      inviteCode: 'ABCDEF',
       inviteSent: true,
       inviteExpires: expect.any(Date),
       inviteAttempts: 0,
@@ -185,7 +185,7 @@ describe('Generate Invite API', () => {
     
     mockPrisma.candidate.update.mockResolvedValue({
       id: 'test-candidate-id',
-      inviteCode: '1234',
+      inviteCode: 'ABCDEF',
     });
     
     // Simular falha no envio de email

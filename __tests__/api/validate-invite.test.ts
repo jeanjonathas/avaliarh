@@ -28,7 +28,7 @@ describe('Validate Invite API', () => {
     // Mock de request e response
     req = {
       method: 'POST',
-      body: { inviteCode: '1234' },
+      body: { inviteCode: 'ABCDEF' },
     };
     
     res = {
@@ -64,7 +64,7 @@ describe('Validate Invite API', () => {
     await handler(req as NextApiRequest, res as NextApiResponse);
     
     expect(mockPrisma.candidate.findUnique).toHaveBeenCalledWith({
-      where: { inviteCode: '1234' },
+      where: { inviteCode: 'ABCDEF' },
       select: expect.any(Object),
     });
     expect(res.status).toHaveBeenCalledWith(404);

@@ -214,7 +214,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Buscar informações básicas do teste
       const tests = await prisma.$queryRaw`
         SELECT id, title, description, "timeLimit"
-        FROM tests
+        FROM "Test"
         WHERE id = ${candidate.testId}
       `;
       

@@ -57,7 +57,7 @@ export default async function handler(
             testId = candidate.testId;
             
             // Buscar detalhes do teste para diagnóstico
-            const test = await prisma.tests.findUnique({
+            const test = await prisma.test.findUnique({
               where: { id: testId }
             });
             
