@@ -142,13 +142,20 @@ export default async function handler(
 
         // Atualizar o processo seletivo
         const updatedProcess = await prisma.$transaction(async (tx) => {
-          // Excluir etapas existentes
-          await tx.processStage.deleteMany({
+          // Buscar as etapas existentes
+          const existingStages = await tx.processStage.findMany({
             where: { processId: id },
+            select: { id: true, order: true, name: true }
           });
-
-          // Atualizar o processo
-          return tx.selectionProcess.update({
+          
+          // Mapeamento de ordem para ID da etapa existente
+          const existingStageMap = new Map();
+          existingStages.forEach(stage => {
+            existingStageMap.set(stage.order, stage.id);
+          });
+          
+          // Atualizar o processo básico primeiro
+          const updatedProcessData = await tx.selectionProcess.update({
             where: { id },
             data: {
               name,
@@ -156,8 +163,34 @@ export default async function handler(
               cutoffScore,
               evaluationType,
               jobPosition,
-              stages: {
-                create: stages.map((stage: any) => ({
+            },
+          });
+          
+          // Para cada etapa no payload
+          for (const stage of stages) {
+            const existingStageId = existingStageMap.get(stage.order);
+            
+            if (existingStageId) {
+              // Se existe uma etapa com essa ordem, atualizar
+              await tx.processStage.update({
+                where: { id: existingStageId },
+                data: {
+                  name: stage.name,
+                  description: stage.description,
+                  type: stage.type,
+                  testId: stage.testId || null,
+                  requestCandidatePhoto: typeof stage.requestCandidatePhoto === 'boolean' ? stage.requestCandidatePhoto : false,
+                  showResultsToCandidate: typeof stage.showResultsToCandidate === 'boolean' ? stage.showResultsToCandidate : false
+                }
+              });
+              
+              // Remover da lista de etapas existentes que foram processadas
+              existingStageMap.delete(stage.order);
+            } else {
+              // Se não existe, criar nova etapa
+              await tx.processStage.create({
+                data: {
+                  processId: id,
                   name: stage.name,
                   description: stage.description,
                   order: stage.order,
@@ -165,9 +198,43 @@ export default async function handler(
                   testId: stage.testId || null,
                   requestCandidatePhoto: typeof stage.requestCandidatePhoto === 'boolean' ? stage.requestCandidatePhoto : false,
                   showResultsToCandidate: typeof stage.showResultsToCandidate === 'boolean' ? stage.showResultsToCandidate : false
-                })),
-              },
-            },
+                }
+              });
+            }
+          }
+          
+          // Se sobraram etapas no mapa que não foram atualizadas, significa que foram removidas
+          // Verificar se alguma dessas etapas tem progresso de candidato
+          if (existingStageMap.size > 0) {
+            const stageIdsToRemove = Array.from(existingStageMap.values());
+            
+            // Verificar se há progresso de candidato para essas etapas
+            const progressCount = await tx.candidateProgress.count({
+              where: {
+                stageId: {
+                  in: stageIdsToRemove
+                }
+              }
+            });
+            
+            if (progressCount > 0) {
+              // Se houver progresso, não excluir as etapas
+              console.log(`Não é possível excluir ${stageIdsToRemove.length} etapas pois há ${progressCount} registros de progresso associados`);
+            } else {
+              // Se não houver progresso, excluir as etapas
+              await tx.processStage.deleteMany({
+                where: {
+                  id: {
+                    in: stageIdsToRemove
+                  }
+                }
+              });
+            }
+          }
+          
+          // Retornar o processo atualizado com as etapas
+          return tx.selectionProcess.findUnique({
+            where: { id },
             include: {
               stages: {
                 orderBy: { order: 'asc' },
@@ -184,7 +251,7 @@ export default async function handler(
             },
           });
         });
-
+        
         return res.status(200).json(updatedProcess);
       } catch (error) {
         console.error('Erro ao atualizar processo seletivo:', error);
@@ -197,27 +264,73 @@ export default async function handler(
           return res.status(403).json({ message: 'Acesso negado' });
         }
 
-        // Verificar se existem candidatos associados
-        const candidatesCount = await prisma.candidate.count({
-          where: { processId: id },
-        });
-
-        if (candidatesCount > 0) {
-          // Atualizar candidatos para remover a associação com o processo
-          await prisma.candidate.updateMany({
+        // Executar todas as operações em uma transação
+        await prisma.$transaction(async (tx) => {
+          // Buscar as etapas do processo
+          const existingStages = await tx.processStage.findMany({
             where: { processId: id },
-            data: { processId: null },
+            select: { id: true }
           });
-        }
-
-        // Excluir etapas do processo
-        await prisma.processStage.deleteMany({
-          where: { id: { in: (await prisma.processStage.findMany({ where: { id } })).map(s => s.id) } },
-        });
-
-        // Excluir o processo
-        await prisma.selectionProcess.delete({
-          where: { id },
+          
+          const stageIds = existingStages.map(stage => stage.id);
+          
+          // Buscar candidatos associados ao processo
+          const candidates = await tx.candidate.findMany({
+            where: { processId: id },
+            select: { id: true }
+          });
+          
+          const candidateIds = candidates.map(candidate => candidate.id);
+          
+          // 1. Excluir os registros de progresso dos candidatos relacionados às etapas
+          if (stageIds.length > 0) {
+            await tx.candidateProgress.deleteMany({
+              where: { 
+                stageId: { 
+                  in: stageIds 
+                } 
+              }
+            });
+          }
+          
+          // 2. Excluir as respostas dos candidatos relacionadas ao processo
+          if (candidateIds.length > 0 && stageIds.length > 0) {
+            // Buscar respostas que pertencem aos candidatos deste processo
+            await tx.response.deleteMany({
+              where: {
+                candidateId: {
+                  in: candidateIds
+                }
+              }
+            });
+          }
+          
+          // 3. Atualizar candidatos para remover a associação com o processo
+          if (candidateIds.length > 0) {
+            await tx.candidate.updateMany({
+              where: { 
+                id: {
+                  in: candidateIds
+                }
+              },
+              data: { 
+                processId: null,
+                // Resetar outros campos relacionados ao processo se necessário
+                score: null,
+                timeSpent: null
+              },
+            });
+          }
+          
+          // 4. Excluir as etapas do processo
+          await tx.processStage.deleteMany({
+            where: { processId: id },
+          });
+          
+          // 5. Finalmente, excluir o processo seletivo
+          await tx.selectionProcess.delete({
+            where: { id },
+          });
         });
 
         return res.status(200).json({ message: 'Processo seletivo excluído com sucesso' });

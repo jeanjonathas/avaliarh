@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 import Image from 'next/image'
+import Head from 'next/head'
 
 interface ResponseData {
   id: string;
@@ -29,6 +30,13 @@ interface CompletedResponsesData {
   showResults?: boolean;
   scoreData?: ScoreData;
   candidateEmail?: string;
+}
+
+// Função para sanitizar HTML (versão simples)
+const sanitizeHtml = (html: string) => {
+  // Esta é uma implementação básica
+  // Em produção, considere usar bibliotecas como DOMPurify
+  return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
 }
 
 const RespostasAnteriores: NextPage = () => {
@@ -362,10 +370,20 @@ const RespostasAnteriores: NextPage = () => {
                 <div className="space-y-4">
                   {responses.map((response) => (
                     <div key={response.id} className="p-4 bg-white rounded-lg shadow-sm border border-gray-100">
-                      <h3 className="font-medium text-secondary-800 mb-2">{response.questionText}</h3>
-                      <p className="text-secondary-600">
-                        <span className="font-medium">Sua resposta:</span> {response.optionText}
-                      </p>
+                      <h3 
+                        className="font-medium text-secondary-800 mb-2"
+                        dangerouslySetInnerHTML={{ 
+                          __html: sanitizeHtml(response.questionText) 
+                        }}
+                      />
+                      <div className="text-secondary-600">
+                        <span className="font-medium">Sua resposta:</span>{' '}
+                        <span
+                          dangerouslySetInnerHTML={{ 
+                            __html: sanitizeHtml(response.optionText) 
+                          }}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>

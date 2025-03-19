@@ -97,6 +97,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         console.log(`Encontrados ${responsesWithSnapshots.length} snapshots para o candidato ${candidate.id}`);
         
+        // Verificar se o candidato está associado a um processo seletivo e buscar a configuração showResults
+        let showResultsToCandidate = candidate.showResults === true; // Valor padrão do candidato
+        
+        if (candidate.processId) {
+          // Buscar a configuração do processo seletivo
+          const process = await prisma.selectionProcess.findUnique({
+            where: { id: candidate.processId },
+            include: {
+              stages: {
+                select: { showResultsToCandidate: true }
+              }
+            }
+          });
+          
+          if (process && process.stages.length > 0) {
+            // Se qualquer etapa do processo tiver showResultsToCandidate como false, não mostrar resultados
+            const allStagesShowResults = process.stages.every(stage => stage.showResultsToCandidate === true);
+            showResultsToCandidate = allStagesShowResults;
+            
+            console.log(`Configuração showResultsToCandidate do processo: ${showResultsToCandidate}`);
+          }
+        }
+        
         // Combinar os resultados
         const combinedResponses = responses.map(response => {
           const snapshot = responsesWithSnapshots.find(r => r.id === response.id);
@@ -197,7 +220,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           candidateName: candidate.name,
           candidateEmail: candidate.email,
           responsesByStage,
-          showResults: candidate.showResults === true, // Garantir que seja um booleano
+          showResults: showResultsToCandidate,
           scoreData
         });
       } catch (error) {
