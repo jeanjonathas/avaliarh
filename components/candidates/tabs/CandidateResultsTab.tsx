@@ -450,107 +450,100 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
 
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Gráfico de Desempenho por Etapa (apenas múltipla escolha) */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Desempenho por Etapa</h3>
-          {performance?.stagePerformance && performance.stagePerformance.length > 0 ? (
-            <Bar data={{
-              labels: performance.stagePerformance.map(stage => stage.stageName),
-              datasets: [
-                {
-                  label: 'Porcentagem de Acertos',
-                  data: performance.stagePerformance.map(stage => stage.accuracy),
-                  backgroundColor: 'rgba(59, 130, 246, 0.5)',
-                  borderColor: 'rgb(59, 130, 246)',
-                  borderWidth: 1,
-                }
-              ]
-            }} options={{
-              responsive: true,
-              plugins: {
-                legend: {
-                  position: 'top' as const,
-                },
-                title: {
-                  display: true,
-                  text: 'Desempenho por Etapa (Múltipla Escolha)'
-                }
-              },
-              scales: {
-                y: {
-                  beginAtZero: true,
-                  max: 100,
-                  ticks: {
-                    callback: (value: number) => `${value}%`
-                  }
-                }
-              }
-            }} />
-          ) : (
-            <div className="flex flex-col items-center justify-center p-8 text-gray-500">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p>Não há dados de desempenho por etapa disponíveis</p>
-            </div>
-          )}
-        </div>
+        {/* Seção removida - substituída pelos novos gráficos abaixo */}
+      </div>
 
-        {/* Gráfico de Desempenho por Habilidade */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Desempenho por Habilidade</h3>
-          {results?.skillScores && results.skillScores.length > 0 ? (
-            <Radar data={{
-              labels: results.skillScores.map(score => score.skill),
-              datasets: [
-                {
-                  label: 'Desempenho do Candidato',
-                  data: results.skillScores.map(score => score.percentage),
-                  backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                  borderColor: 'rgb(59, 130, 246)',
-                  borderWidth: 2,
-                  pointBackgroundColor: 'rgb(59, 130, 246)',
-                  pointBorderColor: '#fff',
-                  pointHoverBackgroundColor: '#fff',
-                  pointHoverBorderColor: 'rgb(59, 130, 246)'
-                }
-              ]
-            }} options={{
-              responsive: true,
-              scales: {
-                r: {
-                  beginAtZero: true,
-                  max: 100,
-                  ticks: {
-                    stepSize: 20
+      {/* Gráficos de Desempenho (Múltipla Escolha) */}
+      <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Desempenho em Perguntas de Múltipla Escolha</h3>
+        
+        {performance?.stagePerformance && performance.stagePerformance.length > 0 ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Gráfico de Barras */}
+            <div>
+              <h4 className="text-md font-medium text-gray-700 mb-4 text-center">Desempenho por Etapa (Barras)</h4>
+              <Bar data={{
+                labels: performance.stagePerformance.map(stage => stage.stageName),
+                datasets: [
+                  {
+                    label: 'Porcentagem de Acertos',
+                    data: performance.stagePerformance.map(stage => stage.accuracy),
+                    backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                    borderColor: 'rgb(59, 130, 246)',
+                    borderWidth: 1,
+                  }
+                ]
+              }} options={{
+                responsive: true,
+                plugins: {
+                  legend: {
+                    position: 'top' as const,
+                  }
+                },
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                      callback: (value: number) => `${value}%`
+                    }
                   }
                 }
-              },
-              plugins: {
-                legend: {
-                  position: 'top' as const,
-                },
-                title: {
-                  display: true,
-                  text: 'Desempenho por Habilidade'
-                }
-              }
-            }} />
-          ) : (
-            <div className="flex flex-col items-center justify-center p-8 text-gray-500">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p>Não há dados de habilidades disponíveis</p>
+              }} />
             </div>
-          )}
-        </div>
+            
+            {/* Gráfico de Radar */}
+            <div>
+              <h4 className="text-md font-medium text-gray-700 mb-4 text-center">Desempenho por Etapa (Radar)</h4>
+              <Radar data={{
+                labels: performance.stagePerformance.map(stage => stage.stageName),
+                datasets: [
+                  {
+                    label: 'Desempenho por Etapa',
+                    data: performance.stagePerformance.map(stage => stage.accuracy),
+                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                    borderColor: 'rgb(59, 130, 246)',
+                    borderWidth: 2,
+                    pointBackgroundColor: 'rgb(59, 130, 246)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgb(59, 130, 246)'
+                  }
+                ]
+              }} options={{
+                responsive: true,
+                scales: {
+                  r: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                      stepSize: 20
+                    }
+                  }
+                },
+                plugins: {
+                  legend: {
+                    position: 'top' as const,
+                  }
+                }
+              }} />
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center p-8 text-gray-500">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p>Não há dados de desempenho por etapa disponíveis</p>
+            <p className="text-sm mt-2">O candidato não respondeu perguntas de múltipla escolha ou os dados não foram processados corretamente</p>
+          </div>
+        )}
       </div>
 
       {/* Gráfico de Análise de Personalidade */}
       {performance?.personalityAnalysis && performance.personalityAnalysis.allPersonalities && performance.personalityAnalysis.allPersonalities.length > 0 ? (
         <div className="bg-white p-6 rounded-lg shadow-md mt-8">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Análise de Personalidade</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Análise de Personalidade (Perguntas Opinativas)</h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Gráfico de pizza para personalidades */}
             <div>
@@ -604,49 +597,92 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
               />
             </div>
             
-            {/* Detalhes da personalidade dominante e lista */}
-            <div className="flex flex-col justify-center">
-              <div className="bg-blue-50 p-6 rounded-lg mb-6">
-                <h4 className="text-lg font-medium text-blue-800 mb-2">Traço Dominante</h4>
-                <div className="flex items-center">
-                  <div className="w-16 h-16 rounded-full bg-blue-500 text-white flex items-center justify-center text-2xl font-bold">
-                    {performance.personalityAnalysis.dominantPersonality.percentage}%
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-xl font-semibold text-blue-900">{performance.personalityAnalysis.dominantPersonality.trait}</p>
-                    <p className="text-sm text-blue-700">
-                      {performance.personalityAnalysis.dominantPersonality.count} de {performance.personalityAnalysis.totalResponses} respostas
-                    </p>
-                  </div>
+            {/* Gráfico de radar para personalidades */}
+            <div>
+              <Radar 
+                data={{
+                  labels: performance.personalityAnalysis.allPersonalities.map(p => p.trait),
+                  datasets: [
+                    {
+                      label: 'Traços de Personalidade',
+                      data: performance.personalityAnalysis.allPersonalities.map(p => p.percentage),
+                      backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                      borderColor: 'rgb(255, 99, 132)',
+                      borderWidth: 2,
+                      pointBackgroundColor: 'rgb(255, 99, 132)',
+                      pointBorderColor: '#fff',
+                      pointHoverBackgroundColor: '#fff',
+                      pointHoverBorderColor: 'rgb(255, 99, 132)'
+                    }
+                  ]
+                }}
+                options={{
+                  responsive: true,
+                  scales: {
+                    r: {
+                      beginAtZero: true,
+                      max: 100,
+                      ticks: {
+                        stepSize: 20
+                      }
+                    }
+                  },
+                  plugins: {
+                    legend: {
+                      position: 'top' as const,
+                    },
+                    title: {
+                      display: true,
+                      text: 'Perfil de Personalidade'
+                    }
+                  }
+                }}
+              />
+            </div>
+          </div>
+          
+          {/* Detalhes da personalidade dominante e lista */}
+          <div className="mt-8">
+            <div className="bg-blue-50 p-6 rounded-lg mb-6">
+              <h4 className="text-lg font-medium text-blue-800 mb-2">Traço Dominante</h4>
+              <div className="flex items-center">
+                <div className="w-16 h-16 rounded-full bg-blue-500 text-white flex items-center justify-center text-2xl font-bold">
+                  {performance.personalityAnalysis.dominantPersonality.percentage}%
+                </div>
+                <div className="ml-4">
+                  <p className="text-xl font-semibold text-blue-900">{performance.personalityAnalysis.dominantPersonality.trait}</p>
+                  <p className="text-sm text-blue-700">
+                    {performance.personalityAnalysis.dominantPersonality.count} de {performance.personalityAnalysis.totalResponses} respostas
+                  </p>
                 </div>
               </div>
-              
-              <h4 className="text-md font-medium text-gray-700 mb-2">Todos os Traços de Personalidade</h4>
-              <div className="space-y-2">
-                {performance.personalityAnalysis.allPersonalities.map((trait, index) => (
-                  <div key={trait.trait} className="flex items-center">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium text-white"
-                      style={{ backgroundColor: 
-                        ['rgba(54, 162, 235, 1)', 'rgba(255, 99, 132, 1)', 'rgba(255, 206, 86, 1)', 
-                         'rgba(75, 192, 192, 1)', 'rgba(153, 102, 255, 1)', 'rgba(255, 159, 64, 1)',
-                         'rgba(159, 159, 159, 1)', 'rgba(83, 102, 255, 1)', 'rgba(40, 159, 64, 1)', 
-                         'rgba(210, 199, 199, 1)'][index % 10] 
-                      }}
-                    >
-                      {index + 1}
+            </div>
+            
+            <h4 className="text-md font-medium text-gray-700 mb-2">Todos os Traços de Personalidade</h4>
+            <div className="space-y-2">
+              {performance.personalityAnalysis.allPersonalities.map((trait, index) => (
+                <div key={trait.trait} className="flex items-center">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium text-white"
+                    style={{ backgroundColor: 
+                      ['rgba(54, 162, 235, 1)', 'rgba(255, 99, 132, 1)', 'rgba(255, 206, 86, 1)', 
+                       'rgba(75, 192, 192, 1)', 'rgba(153, 102, 255, 1)', 'rgba(255, 159, 64, 1)',
+                       'rgba(159, 159, 159, 1)', 'rgba(83, 102, 255, 1)', 'rgba(40, 159, 64, 1)', 
+                       'rgba(210, 199, 199, 1)'][index % 10] 
+                    }}
+                  >
+                    {index + 1}
+                  </div>
+                  <div className="ml-2 flex-1">
+                    <div className="flex justify-between">
+                      <span className="text-sm font-medium text-gray-700">{trait.trait}</span>
+                      <span className="text-sm font-medium text-gray-900">{trait.percentage}%</span>
                     </div>
-                    <div className="ml-2 flex-1">
-                      <div className="flex justify-between">
-                        <span className="text-sm font-medium text-gray-700">{trait.trait}</span>
-                        <span className="text-sm font-medium text-gray-900">{trait.percentage}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                        <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${trait.percentage}%` }}></div>
-                      </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${trait.percentage}%` }}></div>
                     </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
