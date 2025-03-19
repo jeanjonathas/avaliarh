@@ -1,9 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useForm } from 'react-hook-form';
 import AdminLayout from '../../../components/admin/AdminLayout';
 import { useNotification } from '../../../contexts/NotificationContext';
 import Link from 'next/link';
+
+interface Test {
+  id: string;
+  title: string;
+}
 
 interface FormData {
   name: string;
@@ -13,12 +18,15 @@ interface FormData {
   resumeUrl?: string;
   requestPhoto: boolean;
   showResults: boolean;
+  testId: string;
 }
 
 const NewCandidate: React.FC = () => {
   const router = useRouter();
   const { processId } = router.query;
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [tests, setTests] = useState<Test[]>([]);
+  const [isLoadingTests, setIsLoadingTests] = useState(false);
   const { showToast } = useNotification();
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
     defaultValues: {
@@ -27,28 +35,62 @@ const NewCandidate: React.FC = () => {
     }
   });
 
+  // Carregar testes disponíveis
+  useEffect(() => {
+    const fetchTests = async () => {
+      try {
+        setIsLoadingTests(true);
+        const response = await fetch('/api/admin/tests?active=true');
+        if (response.ok) {
+          const data = await response.json();
+          setTests(data);
+          console.log('Testes carregados:', data);
+        } else {
+          console.error('Erro ao carregar testes');
+        }
+      } catch (error) {
+        console.error('Erro ao carregar testes:', error);
+      } finally {
+        setIsLoadingTests(false);
+      }
+    };
+
+    fetchTests();
+  }, []);
+
   const onSubmit = async (data: FormData) => {
     try {
       setIsSubmitting(true);
+      console.log('Enviando dados do formulário:', data);
       
       const endpoint = processId 
         ? '/api/admin/processes/candidates/add'
         : '/api/admin/candidates/create';
+      
+      console.log('Usando endpoint:', endpoint);
+
+      const requestBody = {
+        ...data,
+        ...(processId && { processId })
+      };
+      
+      console.log('Corpo da requisição:', requestBody);
 
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ...data,
-          ...(processId && { processId })
-        }),
+        body: JSON.stringify(requestBody),
       });
 
+      console.log('Status da resposta:', response.status);
+      
+      const responseData = await response.json();
+      console.log('Dados da resposta:', responseData);
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Erro ao adicionar candidato');
+        throw new Error(responseData.error || 'Erro ao adicionar candidato');
       }
 
       showToast('Candidato adicionado com sucesso!', 'success');
@@ -56,7 +98,8 @@ const NewCandidate: React.FC = () => {
       if (processId) {
         router.push(`/admin/processes/${processId}`);
       } else {
-        router.push('/admin/candidates');
+        // Redirecionar para a página do candidato recém-criado
+        router.push(`/admin/candidates/${responseData.id}`);
       }
     } catch (error) {
       console.error('Erro ao adicionar candidato:', error);
@@ -159,6 +202,31 @@ const NewCandidate: React.FC = () => {
                     placeholder="usuario"
                   />
                 </div>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label htmlFor="testId" className="block text-sm font-medium text-gray-700">
+                  Teste *
+                </label>
+                <select
+                  id="testId"
+                  {...register('testId', { required: 'Teste é obrigatório' })}
+                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm rounded-md"
+                  disabled={isLoadingTests}
+                >
+                  <option value="">Selecione um teste</option>
+                  {tests.map((test) => (
+                    <option key={test.id} value={test.id}>
+                      {test.title}
+                    </option>
+                  ))}
+                </select>
+                {errors.testId && (
+                  <p className="mt-1 text-sm text-red-600">{errors.testId.message}</p>
+                )}
+                {isLoadingTests && (
+                  <p className="mt-1 text-sm text-gray-500">Carregando testes...</p>
+                )}
               </div>
 
               <div className="sm:col-span-2">

@@ -20,11 +20,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   
   try {
     console.log('Recebendo requisição para criar candidato:', req.body);
-    const { name, email, phone, position, instagram, resumeUrl, requestPhoto, showResults } = req.body;
+    const { name, email, phone, position, instagram, resumeUrl, requestPhoto, showResults, processId, testId } = req.body;
     
     if (!name || !email) {
       console.error('Erro: Nome e email são obrigatórios');
       return res.status(400).json({ error: 'Nome e email são obrigatórios' });
+    }
+    
+    // Obter o ID da empresa do usuário da sessão
+    const userEmail = session.user?.email;
+    if (!userEmail) {
+      return res.status(400).json({ error: 'Email do usuário não encontrado na sessão' });
+    }
+    
+    // Buscar o usuário para obter o ID da empresa
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: { companyId: true }
+    });
+    
+    if (!user || !user.companyId) {
+      return res.status(400).json({ error: 'Usuário não está associado a uma empresa' });
     }
     
     // Preparar os dados do candidato
@@ -46,7 +62,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       observations: JSON.stringify({
         requestPhoto: requestPhoto !== undefined ? requestPhoto : true,
         showResults: showResults !== undefined ? showResults : true
-      })
+      }),
+      // Adicionar o ID da empresa do usuário
+      companyId: user.companyId,
+      // Adicionar processId e testId se fornecidos
+      processId: processId || null,
+      testId: testId || null
     };
     
     console.log('Criando candidato com os dados:', candidateData);
