@@ -547,143 +547,159 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Gráfico de pizza para personalidades */}
             <div>
-              <Doughnut 
-                data={{
-                  labels: performance.personalityAnalysis.allPersonalities.map(p => p.trait),
-                  datasets: [
-                    {
-                      label: 'Traços de Personalidade',
-                      data: performance.personalityAnalysis.allPersonalities.map(p => p.percentage),
-                      backgroundColor: [
-                        'rgba(54, 162, 235, 0.6)',
-                        'rgba(255, 99, 132, 0.6)',
-                        'rgba(255, 206, 86, 0.6)',
-                        'rgba(75, 192, 192, 0.6)',
-                        'rgba(153, 102, 255, 0.6)',
-                        'rgba(255, 159, 64, 0.6)',
-                        'rgba(199, 199, 199, 0.6)',
-                        'rgba(83, 102, 255, 0.6)',
-                        'rgba(40, 159, 64, 0.6)',
-                        'rgba(210, 199, 199, 0.6)',
-                      ],
-                      borderColor: [
-                        'rgba(54, 162, 235, 1)',
-                        'rgba(255, 99, 132, 1)',
-                        'rgba(255, 206, 86, 1)',
-                        'rgba(75, 192, 192, 1)',
-                        'rgba(153, 102, 255, 1)',
-                        'rgba(255, 159, 64, 1)',
-                        'rgba(159, 159, 159, 1)',
-                        'rgba(83, 102, 255, 1)',
-                        'rgba(40, 159, 64, 1)',
-                        'rgba(210, 199, 199, 1)',
-                      ],
-                      borderWidth: 1,
-                    },
-                  ],
-                }}
-                options={{
-                  responsive: true,
-                  plugins: {
-                    legend: {
-                      position: 'right' as const,
-                    },
-                    title: {
-                      display: true,
-                      text: 'Distribuição de Traços de Personalidade'
-                    }
-                  }
-                }}
-              />
-            </div>
-            
-            {/* Gráfico de radar para personalidades */}
-            <div>
-              <Radar 
-                data={{
-                  labels: performance.personalityAnalysis.allPersonalities.map(p => p.trait),
-                  datasets: [
-                    {
-                      label: 'Traços de Personalidade',
-                      data: performance.personalityAnalysis.allPersonalities.map(p => p.percentage),
-                      backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                      borderColor: 'rgb(255, 99, 132)',
-                      borderWidth: 2,
-                      pointBackgroundColor: 'rgb(255, 99, 132)',
-                      pointBorderColor: '#fff',
-                      pointHoverBackgroundColor: '#fff',
-                      pointHoverBorderColor: 'rgb(255, 99, 132)'
-                    }
-                  ]
-                }}
-                options={{
-                  responsive: true,
-                  scales: {
-                    r: {
-                      beginAtZero: true,
-                      max: 100,
-                      ticks: {
-                        stepSize: 20
+              <h4 className="text-md font-medium text-gray-700 mb-4 text-center">Distribuição de Personalidade</h4>
+              <Pie data={{
+                labels: performance.personalityAnalysis.allPersonalities.map(p => p.trait),
+                datasets: [
+                  {
+                    data: performance.personalityAnalysis.allPersonalities.map(p => p.percentage),
+                    backgroundColor: [
+                      'rgba(255, 99, 132, 0.5)',
+                      'rgba(54, 162, 235, 0.5)',
+                      'rgba(255, 206, 86, 0.5)',
+                      'rgba(75, 192, 192, 0.5)',
+                      'rgba(153, 102, 255, 0.5)',
+                      'rgba(255, 159, 64, 0.5)',
+                      'rgba(199, 199, 199, 0.5)',
+                      'rgba(83, 102, 255, 0.5)',
+                      'rgba(40, 159, 64, 0.5)',
+                      'rgba(210, 199, 199, 0.5)',
+                    ],
+                    borderColor: [
+                      'rgba(255, 99, 132, 1)',
+                      'rgba(54, 162, 235, 1)',
+                      'rgba(255, 206, 86, 1)',
+                      'rgba(75, 192, 192, 1)',
+                      'rgba(153, 102, 255, 1)',
+                      'rgba(255, 159, 64, 1)',
+                      'rgba(199, 199, 199, 1)',
+                      'rgba(83, 102, 255, 1)',
+                      'rgba(40, 159, 64, 1)',
+                      'rgba(210, 199, 199, 1)',
+                    ],
+                    borderWidth: 1,
+                  },
+                ],
+              }} options={{
+                responsive: true,
+                plugins: {
+                  legend: {
+                    position: 'right' as const,
+                  },
+                  tooltip: {
+                    callbacks: {
+                      label: function(context) {
+                        const label = context.label || '';
+                        const value = context.raw as number;
+                        return `${label}: ${value}%`;
                       }
                     }
-                  },
-                  plugins: {
-                    legend: {
-                      position: 'top' as const,
-                    },
-                    title: {
-                      display: true,
-                      text: 'Perfil de Personalidade'
+                  }
+                },
+              }} />
+            </div>
+
+            {/* Gráfico de radar para personalidades */}
+            <div>
+              <h4 className="text-md font-medium text-gray-700 mb-4 text-center">Radar de Traços de Personalidade</h4>
+              <Radar data={{
+                labels: performance.personalityAnalysis.allPersonalities.map(p => p.trait),
+                datasets: [
+                  {
+                    label: 'Traços de Personalidade',
+                    data: performance.personalityAnalysis.allPersonalities.map(p => p.percentage),
+                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                    borderColor: 'rgb(255, 99, 132)',
+                    borderWidth: 2,
+                    pointBackgroundColor: 'rgb(255, 99, 132)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgb(255, 99, 132)'
+                  }
+                ]
+              }} options={{
+                responsive: true,
+                scales: {
+                  r: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                      stepSize: 20
                     }
                   }
-                }}
-              />
+                },
+                plugins: {
+                  legend: {
+                    position: 'top' as const,
+                  },
+                  tooltip: {
+                    callbacks: {
+                      label: function(context) {
+                        const label = context.dataset.label || '';
+                        const value = context.raw as number;
+                        return `${label}: ${value}%`;
+                      }
+                    }
+                  }
+                }
+              }} />
             </div>
           </div>
-          
-          {/* Detalhes da personalidade dominante e lista */}
+
+          {/* Tabela de Personalidades */}
           <div className="mt-8">
-            <div className="bg-blue-50 p-6 rounded-lg mb-6">
-              <h4 className="text-lg font-medium text-blue-800 mb-2">Traço Dominante</h4>
-              <div className="flex items-center">
-                <div className="w-16 h-16 rounded-full bg-blue-500 text-white flex items-center justify-center text-2xl font-bold">
-                  {performance.personalityAnalysis.dominantPersonality.percentage}%
-                </div>
-                <div className="ml-4">
-                  <p className="text-xl font-semibold text-blue-900">{performance.personalityAnalysis.dominantPersonality.trait}</p>
-                  <p className="text-sm text-blue-700">
-                    {performance.personalityAnalysis.dominantPersonality.count} de {performance.personalityAnalysis.totalResponses} respostas
-                  </p>
-                </div>
-              </div>
+            <h4 className="text-md font-medium text-gray-700 mb-4">Detalhamento de Traços de Personalidade</h4>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Traço de Personalidade
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Porcentagem
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Contagem
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {performance.personalityAnalysis.allPersonalities.map((personality, index) => (
+                    <tr key={index} className={index === 0 ? "bg-blue-50" : ""}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {personality.trait} {index === 0 && <span className="text-xs text-blue-600 ml-2">(Dominante)</span>}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <div className="flex items-center">
+                          <div className="w-full bg-gray-200 rounded-full h-2.5">
+                            <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${personality.percentage}%` }}></div>
+                          </div>
+                          <span className="ml-2">{personality.percentage}%</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {personality.count} respostas
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            
-            <h4 className="text-md font-medium text-gray-700 mb-2">Todos os Traços de Personalidade</h4>
-            <div className="space-y-2">
-              {performance.personalityAnalysis.allPersonalities.map((trait, index) => (
-                <div key={trait.trait} className="flex items-center">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium text-white"
-                    style={{ backgroundColor: 
-                      ['rgba(54, 162, 235, 1)', 'rgba(255, 99, 132, 1)', 'rgba(255, 206, 86, 1)', 
-                       'rgba(75, 192, 192, 1)', 'rgba(153, 102, 255, 1)', 'rgba(255, 159, 64, 1)',
-                       'rgba(159, 159, 159, 1)', 'rgba(83, 102, 255, 1)', 'rgba(40, 159, 64, 1)', 
-                       'rgba(210, 199, 199, 1)'][index % 10] 
-                    }}
-                  >
-                    {index + 1}
-                  </div>
-                  <div className="ml-2 flex-1">
-                    <div className="flex justify-between">
-                      <span className="text-sm font-medium text-gray-700">{trait.trait}</span>
-                      <span className="text-sm font-medium text-gray-900">{trait.percentage}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${trait.percentage}%` }}></div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+          </div>
+
+          {/* Personalidade Dominante */}
+          <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-100">
+            <h4 className="text-md font-medium text-gray-700 mb-2">Personalidade Dominante</h4>
+            <p className="text-lg font-semibold text-blue-800">
+              {performance.personalityAnalysis.dominantPersonality.trait} 
+              <span className="text-sm font-normal text-blue-600 ml-2">
+                ({performance.personalityAnalysis.dominantPersonality.percentage}%)
+              </span>
+            </p>
+            <p className="text-sm text-gray-600 mt-2">
+              Baseado em {performance.personalityAnalysis.totalResponses} respostas de perguntas opinativas.
+            </p>
           </div>
         </div>
       ) : (
@@ -693,7 +709,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
             <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <p>Não há dados de personalidade disponíveis para este candidato</p>
+            <p>Não há dados de personalidade disponíveis</p>
             <p className="text-sm mt-2">O candidato não respondeu perguntas opinativas ou os dados não foram processados corretamente</p>
           </div>
         </div>
