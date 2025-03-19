@@ -116,10 +116,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const {
         name,
         email,
+        phone,
         position,
         status,
         observations,
         testId,
+        processId,
+        requestPhoto,
+        showResults,
       } = req.body;
 
       // Validar campos obrigatórios
@@ -138,10 +142,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         data: {
           name,
           email,
+          phone,
           position,
           status: status as Status,
           observations,
           testId,
+          processId,
+          requestPhoto: requestPhoto !== undefined ? requestPhoto : true,
+          showResults: showResults !== undefined ? showResults : true,
           updatedAt: new Date(),
         },
       });

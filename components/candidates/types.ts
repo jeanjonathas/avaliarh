@@ -57,6 +57,7 @@ export interface Candidate {
   testDate?: string
   interviewDate?: string
   testId?: string
+  processId?: string
   completed?: boolean
   score?: CandidateScore
   rating?: number
@@ -74,6 +75,8 @@ export interface Candidate {
   resumeUrl?: string
   photoUrl?: string
   timeSpent?: number
+  requestPhoto?: boolean
+  showResults?: boolean
   stageScores?: StageScore[]
   responses?: Response[]
   test?: {

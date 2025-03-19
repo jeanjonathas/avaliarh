@@ -36,11 +36,14 @@ export const CandidateInfoTab = ({ candidate, onUpdate }: CandidateInfoTabProps)
   const [formData, setFormData] = useState({
     name: candidate.name || '',
     email: candidate.email || '',
+    phone: candidate.phone || '',
     position: candidate.position || '',
     status: candidate.status || 'PENDING',
     observations: candidate.observations || '',
     testId: candidate.testId || '',
-    processId: candidate.processId || ''
+    processId: candidate.processId || '',
+    requestPhoto: candidate.requestPhoto !== undefined ? candidate.requestPhoto : true,
+    showResults: candidate.showResults !== undefined ? candidate.showResults : true
   })
 
   const [loading, setLoading] = useState(true)
@@ -103,6 +106,13 @@ export const CandidateInfoTab = ({ candidate, onUpdate }: CandidateInfoTabProps)
       }))
     }
   }
+
+  const handleSwitchChange = (name: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({
+      ...prev,
+      [name]: e.target.checked
+    }));
+  };
 
   const handleLinkTypeChange = (type: 'process' | 'test') => {
     setLinkType(type);
@@ -243,6 +253,19 @@ export const CandidateInfoTab = ({ candidate, onUpdate }: CandidateInfoTabProps)
             
             <div>
               <label className="block text-sm font-medium text-secondary-700 mb-1">
+                Telefone
+              </label>
+              <input
+                type="text"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-secondary-300 rounded-md"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-secondary-700 mb-1">
                 Cargo Pretendido
               </label>
               <input
@@ -281,6 +304,36 @@ export const CandidateInfoTab = ({ candidate, onUpdate }: CandidateInfoTabProps)
                 rows={5}
                 className="w-full px-3 py-2 border border-secondary-300 rounded-md"
               ></textarea>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="requestPhoto"
+                  name="requestPhoto"
+                  checked={formData.requestPhoto}
+                  onChange={handleSwitchChange('requestPhoto')}
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-secondary-300 rounded"
+                />
+                <label htmlFor="requestPhoto" className="ml-2 block text-sm text-secondary-700">
+                  Solicitar foto do candidato
+                </label>
+              </div>
+              
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="showResults"
+                  name="showResults"
+                  checked={formData.showResults}
+                  onChange={handleSwitchChange('showResults')}
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-secondary-300 rounded"
+                />
+                <label htmlFor="showResults" className="ml-2 block text-sm text-secondary-700">
+                  Mostrar resultados ao candidato
+                </label>
+              </div>
             </div>
 
             <div className="flex justify-end">
