@@ -32,6 +32,38 @@ interface ProcessedResponse {
   optionCharacteristic?: string;
 }
 
+// Interface para o objeto de resposta do Prisma
+interface PrismaResponse {
+  id: string;
+  questionId: string;
+  questionText: string;
+  optionText: string;
+  isCorrect: boolean;
+  timeSpent: number;
+  createdAt: Date;
+  // Campos opcionais que podem não estar definidos no tipo do Prisma
+  stageId?: string;
+  stageName?: string;
+  categoryName?: string;
+  optionId?: string;
+  optionCharacteristic?: string;
+  // Campo question com a relação
+  question?: {
+    id?: string;
+    text?: string;
+    stage?: {
+      id: string;
+      title: string;
+    };
+    options: {
+      id: string;
+      text: string;
+      isCorrect: boolean;
+      categoryName?: string;
+    }[];
+  };
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const session = await getSession({ req })
@@ -77,7 +109,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Processar as respostas para incluir informações adicionais
-      const processedResponses: ProcessedResponse[] = candidate.responses.map(response => {
+      const processedResponses: ProcessedResponse[] = candidate.responses.map((response: PrismaResponse) => {
         // Criar um snapshot da questão para cada resposta, incluindo informações de personalidade
         const questionSnapshot: QuestionSnapshot = {
           id: response.question?.id,

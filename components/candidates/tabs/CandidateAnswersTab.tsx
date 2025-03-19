@@ -161,13 +161,13 @@ export const CandidateAnswersTab = ({ candidate }: CandidateAnswersTabProps) => 
                                         Esta é uma pergunta opinativa sem resposta certa ou errada.
                                       </p>
                                       <div className="overflow-hidden border border-gray-200 rounded-lg">
-                                        <table className="min-w-full divide-y divide-gray-200">
+                                        <table className="min-w-full divide-y divide-gray-200 table-auto">
                                           <thead className="bg-gray-50">
                                             <tr>
-                                              <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                              <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                                                 Personalidade
                                               </th>
-                                              <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                              <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-full">
                                                 Alternativa
                                               </th>
                                             </tr>
@@ -195,7 +195,7 @@ export const CandidateAnswersTab = ({ candidate }: CandidateAnswersTabProps) => 
                                                       {personality}
                                                     </span>
                                                   </td>
-                                                  <td className="px-4 py-2">
+                                                  <td className="px-4 py-2 w-full">
                                                     <div className="flex items-center">
                                                       <span className={isSelected ? 'font-medium' : ''}>
                                                         {formattedText}
