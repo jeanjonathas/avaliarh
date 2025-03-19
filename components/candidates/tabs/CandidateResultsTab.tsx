@@ -89,6 +89,36 @@ interface CandidateResults {
   status: string
 }
 
+interface PerformanceSummary {
+  totalQuestions: number;
+  correctAnswers: number;
+  incorrectAnswers: number;
+  accuracy: number;
+}
+
+interface StagePerformance {
+  stageId: string;
+  stageName: string;
+  totalQuestions: number;
+  correctAnswers: number;
+  incorrectAnswers: number;
+  accuracy: number;
+  weight: number;
+  stageType: 'MULTIPLE_CHOICE' | 'OPINION_MULTIPLE';
+  avgTimePerQuestion?: number;
+  totalTime?: number;
+}
+
+interface Performance {
+  summary: PerformanceSummary;
+  stagePerformance: StagePerformance[];
+  personalityAnalysis?: PersonalityAnalysis;
+  opinionQuestionsCount: number;
+  multipleChoiceQuestionsCount: number;
+  showResults: boolean;
+  avgTimePerQuestion: number;
+}
+
 interface CandidatePerformance {
   summary: {
     totalQuestions: number;
@@ -104,6 +134,9 @@ interface CandidatePerformance {
     incorrectAnswers: number;
     accuracy: number;
     weight: number;
+    stageType: 'MULTIPLE_CHOICE' | 'OPINION_MULTIPLE';
+    avgTimePerQuestion?: number;
+    totalTime?: number;
   }>;
   personalityAnalysis?: PersonalityAnalysis;
   opinionQuestionsCount: number;
@@ -147,51 +180,44 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
 
     const fetchPerformance = async () => {
       try {
+        setLoadingPerformance(true)
         const response = await fetch(`/api/admin/candidates/${candidate.id}/performance`, {
           credentials: 'include'
         })
 
         if (!response.ok) {
-          throw new Error('Erro ao buscar dados de desempenho')
+          throw new Error('Erro ao buscar desempenho')
         }
 
         const data = await response.json()
-        console.log('Dados de performance:', data);
-        console.log('Análise de personalidade recebida:', data.personalityAnalysis);
+        console.log('Dados de performance recebidos:', data);
         
-        // Se não houver análise de personalidade, criar dados de exemplo
-        if (!data.personalityAnalysis || !data.personalityAnalysis.allPersonalities || data.personalityAnalysis.allPersonalities.length === 0) {
-          console.log('Criando dados de personalidade de exemplo');
+        // Verificar se os dados de desempenho por etapa estão corretos
+        if (data.stagePerformance) {
+          console.log(`Número de etapas recebidas: ${data.stagePerformance.length}`);
           
-          // Criar dados de exemplo para demonstração
-          data.personalityAnalysis = {
-            dominantPersonality: {
-              trait: "Analítico",
-              count: 3,
-              percentage: 60
-            },
-            allPersonalities: [
-              { trait: "Analítico", count: 3, percentage: 60 },
-              { trait: "Comunicativo", count: 1, percentage: 20 },
-              { trait: "Criativo", count: 1, percentage: 20 }
-            ],
-            totalResponses: 5
-          };
+          // Filtrar explicitamente para garantir que apenas etapas de múltipla escolha sejam exibidas
+          data.stagePerformance = data.stagePerformance.filter((stage: any) => 
+            stage.stageType === 'MULTIPLE_CHOICE' && stage.totalQuestions > 0
+          );
+          
+          console.log(`Número de etapas após filtragem: ${data.stagePerformance.length}`);
         }
         
         setPerformance(data)
       } catch (error) {
-        console.error('Erro ao buscar dados de desempenho:', error)
+        console.error('Erro ao buscar desempenho:', error)
+        toast.error('Erro ao carregar dados de desempenho')
       } finally {
         setLoadingPerformance(false)
       }
     }
 
-    if (candidate.id) {
+    if (candidate?.id) {
       fetchResults()
       fetchPerformance()
     }
-  }, [candidate.id])
+  }, [candidate])
 
   // Processar dados de personalidade para o gráfico de radar
   useEffect(() => {
@@ -333,8 +359,8 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
 
   return (
     <div className="space-y-8">
-            {/* Cabeçalho do Processo Seletivo */}
-            <div className="bg-white p-6 rounded-lg shadow-md">
+      {/* Cabeçalho do Processo Seletivo */}
+      <div className="bg-white p-6 rounded-lg shadow-md">
         <div className="flex justify-between items-start">
           <div>
             <h2 className="text-xl font-semibold text-gray-900">
@@ -357,7 +383,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
       {/* Seção de Desempenho */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Desempenho do Candidato</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Desempenho em Perguntas de Múltipla Escolha</h3>
           
           {loadingPerformance ? (
             <div className="flex justify-center items-center p-4">
@@ -412,7 +438,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
 
                 {performance.stagePerformance && performance.stagePerformance.length > 0 && (
                   <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Desempenho por Etapa</h3>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Desempenho por Etapa (Apenas Múltipla Escolha)</h3>
                     <div className="space-y-4">
                       {performance.stagePerformance.map((stage: any) => (
                         <div key={stage.stageId} className="bg-white p-4 rounded-lg shadow border">

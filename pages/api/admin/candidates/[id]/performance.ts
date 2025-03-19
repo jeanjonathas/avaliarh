@@ -41,60 +41,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(404).json({ message: 'Candidato não encontrado' })
       }
 
-      // Separar perguntas de múltipla escolha e perguntas opinativas
-      const multipleChoiceResponses = candidate.responses.filter(r => {
-        // Verificar se a pergunta tem opções corretas/incorretas
-        return r.question?.options.some(opt => opt.isCorrect === true);
-      });
+      // Separar respostas por tipo de pergunta
+      const opinionResponses = candidate.responses.filter(
+        r => r.question?.type === 'OPINION_MULTIPLE'
+      )
       
-      const opinionResponses = candidate.responses.filter(r => {
-        // Verificar se a pergunta NÃO tem opções corretas/incorretas (todas as opções são válidas)
-        if (!r.question) return false;
-        
-        const hasCorrectOptions = r.question.options.some(opt => opt.isCorrect === true);
-        
-        // Verificar se o tipo da pergunta é opinativa (sem verificar valores específicos para evitar erros de tipo)
-        const questionType = r.question.type as string;
-        const isOpinionType = questionType && 
-          (questionType.includes('OPINION') || questionType.includes('PERSONALITY'));
-        
-        // Verificar se alguma opção tem texto que parece ser uma personalidade (entre parênteses)
-        const hasPersonalityOptions = r.question.options.some(opt => 
-          opt.text.includes('(') && opt.text.includes(')') || opt.categoryName
-        );
-        
-        return !hasCorrectOptions || isOpinionType || hasPersonalityOptions;
-      });
-
-      console.log('Respostas de múltipla escolha:', multipleChoiceResponses.length);
-      console.log('Respostas opinativas:', opinionResponses.length);
+      const multipleChoiceResponses = candidate.responses.filter(
+        r => r.question?.type === 'MULTIPLE_CHOICE'
+      )
       
-      // Verificar se há perguntas opinativas
-      if (opinionResponses.length === 0) {
-        // Se não houver perguntas opinativas explícitas, tentar identificar por outros meios
-        // Por exemplo, perguntas sem respostas corretas/incorretas podem ser opinativas
-        const potentialOpinionResponses = candidate.responses.filter(r => {
-          if (!r.question) return false;
-          
-          // Se todas as opções têm isCorrect como null ou false, pode ser uma pergunta opinativa
-          const allOptionsNeutral = r.question.options.every(opt => opt.isCorrect !== true);
-          
-          return allOptionsNeutral && r.question.options.length > 0;
-        });
-        
-        console.log('Potenciais respostas opinativas adicionais:', potentialOpinionResponses.length);
-        
-        // Adicionar estas respostas às opinativas se não estiverem já incluídas
-        potentialOpinionResponses.forEach(response => {
-          if (!opinionResponses.some(r => r.id === response.id)) {
-            opinionResponses.push(response);
-          }
-        });
-        
-        console.log('Total de respostas opinativas após análise adicional:', opinionResponses.length);
-      }
+      console.log('Número de respostas opinativas:', opinionResponses.length)
+      console.log('Número de respostas de múltipla escolha:', multipleChoiceResponses.length)
 
-      // Calcular estatísticas de desempenho para perguntas de múltipla escolha
+      // Calcular desempenho geral (apenas para perguntas de múltipla escolha)
       const totalQuestions = multipleChoiceResponses.length
       const correctAnswers = multipleChoiceResponses.filter(r => r.isCorrect).length
       const incorrectAnswers = totalQuestions - correctAnswers
@@ -102,13 +61,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Agrupar desempenho por etapa (apenas para perguntas de múltipla escolha)
       const stagePerformance = candidate.test?.testStages.map(testStage => {
-        const stageResponses = multipleChoiceResponses.filter(
+        // Obter todas as respostas de múltipla escolha para esta etapa
+        const stageMultipleChoiceResponses = multipleChoiceResponses.filter(
           r => r.question?.stageId === testStage.stage.id
-        )
+        );
         
-        const stageQuestions = stageResponses.length
-        const stageCorrect = stageResponses.filter(r => r.isCorrect).length
-        const stageAccuracy = stageQuestions > 0 ? (stageCorrect / stageQuestions) * 100 : 0
+        // Verificar se a etapa tem perguntas de múltipla escolha
+        if (stageMultipleChoiceResponses.length === 0) {
+          console.log(`Etapa ${testStage.stage.title} não tem perguntas de múltipla escolha - ignorando`);
+          return null; // Pular etapas sem perguntas de múltipla escolha
+        }
+        
+        console.log(`Etapa ${testStage.stage.title} tem ${stageMultipleChoiceResponses.length} perguntas de múltipla escolha - incluindo`);
+        
+        // Calcular métricas de desempenho para esta etapa
+        const stageQuestions = stageMultipleChoiceResponses.length;
+        const stageCorrect = stageMultipleChoiceResponses.filter(r => r.isCorrect).length;
+        const stageAccuracy = stageQuestions > 0 ? (stageCorrect / stageQuestions) * 100 : 0;
+        
+        // Calcular tempo médio e total para esta etapa
+        const stageTotalTime = stageMultipleChoiceResponses.reduce((sum, r) => sum + (r.timeSpent || 0), 0);
+        const stageAvgTime = stageQuestions > 0 ? stageTotalTime / stageQuestions : 0;
         
         return {
           stageId: testStage.stage.id,
@@ -117,9 +90,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           correctAnswers: stageCorrect,
           incorrectAnswers: stageQuestions - stageCorrect,
           accuracy: stageAccuracy,
-          weight: 1 // Valor padrão se não existir
+          weight: 1, // Valor padrão se não existir
+          stageType: 'MULTIPLE_CHOICE', // Usar o tipo exato do schema
+          avgTimePerQuestion: stageAvgTime,
+          totalTime: stageTotalTime
         }
-      }).filter(stage => stage.totalQuestions > 0) || [] // Filtrar apenas etapas com perguntas
+      }).filter(stage => stage !== null) || [] // Filtrar apenas etapas válidas
 
       // Analisar personalidades/opiniões das perguntas opinativas
       const personalityAnalysis = analyzePersonalities(opinionResponses);
