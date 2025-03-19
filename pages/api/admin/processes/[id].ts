@@ -51,7 +51,18 @@ export default async function handler(
           where: { id },
           include: {
             stages: {
-              orderBy: { order: 'asc' }
+              orderBy: { order: 'asc' },
+              include: {
+                personalityConfig: {
+                  include: {
+                    traitWeights: {
+                      orderBy: {
+                        order: 'asc'
+                      }
+                    }
+                  }
+                }
+              }
             },
             candidates: {
               include: {
@@ -84,11 +95,40 @@ export default async function handler(
           }
         });
 
+        // Mapear os estágios para incluir os traços de personalidade
+        const stagesWithPersonalityTraits = processDetails.stages.map(stage => {
+          // Converter para objeto plano para poder adicionar propriedades
+          const plainStage = JSON.parse(JSON.stringify(stage));
+          
+          // Se o estágio tem configuração de personalidade, adicionar os traços
+          if (plainStage.personalityConfig && plainStage.personalityConfig.traitWeights) {
+            plainStage.personalityTraits = plainStage.personalityConfig.traitWeights.map((weight: any) => ({
+              id: weight.id,
+              traitName: weight.traitName,
+              weight: weight.weight,
+              order: weight.order || 0
+            }));
+            
+            // Remover a configuração de personalidade para não duplicar dados
+            delete plainStage.personalityConfig;
+          } else {
+            plainStage.personalityTraits = [];
+          }
+          
+          return plainStage;
+        });
+
+        // Substituir os estágios originais pelos mapeados
+        const processWithPersonalityTraits = {
+          ...JSON.parse(JSON.stringify(processDetails)),
+          stages: stagesWithPersonalityTraits
+        };
+
         // Transformar os dados dos candidatos para incluir o status geral
-        const candidatesWithOverallStatus = processDetails.candidates.map(candidate => {
+        const candidatesWithOverallStatus = processWithPersonalityTraits.candidates.map(candidate => {
           // Calcular o status geral com base nos progressos
           const completedStages = candidate.progresses.filter(p => p.status === 'COMPLETED').length;
-          const totalStages = processDetails.stages.length;
+          const totalStages = processWithPersonalityTraits.stages.length;
           
           // Criar um status personalizado para a UI
           let overallStatus = candidate.status;
@@ -115,7 +155,7 @@ export default async function handler(
 
         // Retornar o processo com os candidatos atualizados e o teste associado
         return res.status(200).json({
-          ...processDetails,
+          ...processWithPersonalityTraits,
           candidates: candidatesWithOverallStatus,
           test: processTest
         });
@@ -184,11 +224,52 @@ export default async function handler(
                 }
               });
               
+              // Atualizar os pesos dos traços de personalidade
+              if (stage.personalityTraits && Array.isArray(stage.personalityTraits) && stage.personalityTraits.length > 0) {
+                console.log(`Processando ${stage.personalityTraits.length} traços de personalidade para a etapa ${stage.name}`);
+                
+                try {
+                  // Atualizar a etapa com a nova configuração de personalidade
+                  // Isso vai substituir a configuração existente, se houver
+                  await tx.processStage.update({
+                    where: { id: existingStageId },
+                    data: {
+                      personalityConfig: {
+                        // Deletar a configuração existente, se houver
+                        delete: true,
+                      }
+                    }
+                  });
+                  
+                  // Agora criar uma nova configuração
+                  await tx.processStage.update({
+                    where: { id: existingStageId },
+                    data: {
+                      personalityConfig: {
+                        create: {
+                          traitWeights: {
+                            create: stage.personalityTraits.map((trait: any) => ({
+                              traitName: trait.traitName,
+                              weight: trait.weight,
+                              order: trait.order || 0,
+                            }))
+                          }
+                        }
+                      }
+                    }
+                  });
+                  
+                  console.log(`Atualizada configuração com ${stage.personalityTraits.length} pesos para a etapa ${stage.name}`);
+                } catch (error) {
+                  console.error(`Erro ao processar traços de personalidade para etapa ${stage.name}:`, error);
+                }
+              }
+              
               // Remover da lista de etapas existentes que foram processadas
               existingStageMap.delete(stage.order);
             } else {
               // Se não existe, criar nova etapa
-              await tx.processStage.create({
+              const newStage = await tx.processStage.create({
                 data: {
                   processId: id,
                   name: stage.name,
@@ -200,6 +281,35 @@ export default async function handler(
                   showResultsToCandidate: typeof stage.showResultsToCandidate === 'boolean' ? stage.showResultsToCandidate : false
                 }
               });
+              
+              // Criar configuração de personalidade se houver traços
+              if (stage.personalityTraits && Array.isArray(stage.personalityTraits) && stage.personalityTraits.length > 0) {
+                try {
+                  console.log(`Criando configuração de personalidade para nova etapa ${stage.name}`);
+                  
+                  // Atualizar a etapa com a configuração de personalidade
+                  await tx.processStage.update({
+                    where: { id: newStage.id },
+                    data: {
+                      personalityConfig: {
+                        create: {
+                          traitWeights: {
+                            create: stage.personalityTraits.map((trait: any) => ({
+                              traitName: trait.traitName,
+                              weight: trait.weight,
+                              order: trait.order || 0,
+                            }))
+                          }
+                        }
+                      }
+                    }
+                  });
+                  
+                  console.log(`Criada configuração de personalidade para nova etapa ${stage.name} com ${stage.personalityTraits.length} traços`);
+                } catch (error) {
+                  console.error(`Erro ao criar configuração de personalidade para nova etapa ${stage.name}:`, error);
+                }
+              }
             }
           }
           
@@ -223,11 +333,7 @@ export default async function handler(
             } else {
               // Se não houver progresso, excluir as etapas
               await tx.processStage.deleteMany({
-                where: {
-                  id: {
-                    in: stageIdsToRemove
-                  }
-                }
+                where: { id: { in: stageIdsToRemove } }
               });
             }
           }
@@ -238,6 +344,17 @@ export default async function handler(
             include: {
               stages: {
                 orderBy: { order: 'asc' },
+                include: {
+                  personalityConfig: {
+                    include: {
+                      traitWeights: {
+                        orderBy: {
+                          order: 'asc'
+                        }
+                      }
+                    }
+                  }
+                }
               },
               candidates: {
                 include: {
@@ -252,7 +369,36 @@ export default async function handler(
           });
         });
         
-        return res.status(200).json(updatedProcess);
+        // Mapear os estágios para incluir os traços de personalidade
+        const stagesWithPersonalityTraits = updatedProcess.stages.map(stage => {
+          // Converter para objeto plano para poder adicionar propriedades
+          const plainStage = JSON.parse(JSON.stringify(stage));
+          
+          // Se o estágio tem configuração de personalidade, adicionar os traços
+          if (plainStage.personalityConfig && plainStage.personalityConfig.traitWeights) {
+            plainStage.personalityTraits = plainStage.personalityConfig.traitWeights.map((weight: any) => ({
+              id: weight.id,
+              traitName: weight.traitName,
+              weight: weight.weight,
+              order: weight.order || 0
+            }));
+            
+            // Remover a configuração de personalidade para não duplicar dados
+            delete plainStage.personalityConfig;
+          } else {
+            plainStage.personalityTraits = [];
+          }
+          
+          return plainStage;
+        });
+
+        // Substituir os estágios originais pelos mapeados
+        const processWithPersonalityTraits = {
+          ...JSON.parse(JSON.stringify(updatedProcess)),
+          stages: stagesWithPersonalityTraits
+        };
+
+        return res.status(200).json(processWithPersonalityTraits);
       } catch (error) {
         console.error('Erro ao atualizar processo seletivo:', error);
         return res.status(500).json({ message: 'Erro ao atualizar processo seletivo' });

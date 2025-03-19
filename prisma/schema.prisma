@@ -95,12 +95,12 @@ model Candidate {
 
 model SelectionProcess {
   id                String         @id @default(uuid())
-  name              String         // Nome do processo (ex: "Processo Seletivo Veterinário 2025")
-  jobPosition       String         // Cargo específico (ex: "Veterinário Plantonista")
+  name              String // Nome do processo (ex: "Processo Seletivo Veterinário 2025")
+  jobPosition       String // Cargo específico (ex: "Veterinário Plantonista")
   description       String?
-  vacancyCount      Int            @default(1)  // Número de vagas disponíveis
-  registrationStart DateTime?      // Data de início das inscrições
-  registrationEnd   DateTime?      // Data de término das inscrições
+  vacancyCount      Int            @default(1) // Número de vagas disponíveis
+  registrationStart DateTime? // Data de início das inscrições
+  registrationEnd   DateTime? // Data de término das inscrições
   cutoffScore       Int?
   expectedProfile   Json?
   evaluationType    String         @default("SCORE_BASED")
@@ -113,49 +113,49 @@ model SelectionProcess {
 }
 
 model ProcessStage {
-  id                     String              @id @default(uuid())
+  id                     String                    @id @default(uuid())
   name                   String
   description            String?
   order                  Int
-  type                   String              @default("TEST")
-  scheduledDate          DateTime?           // Data agendada para a etapa
-  duration               Int?                // Duração em minutos
-  weight                 Int                 @default(1)  // Peso na avaliação final
-  requestCandidatePhoto  Boolean             @default(false)
-  showResultsToCandidate Boolean             @default(false)
+  type                   String                    @default("TEST")
+  scheduledDate          DateTime? // Data agendada para a etapa
+  duration               Int? // Duração em minutos
+  weight                 Int                       @default(1) // Peso na avaliação final
+  requestCandidatePhoto  Boolean                   @default(false)
+  showResultsToCandidate Boolean                   @default(false)
   processId              String
-  testId                 String?             // ID do teste associado quando type = "TEST"
-  expectedProfile        Json?               // Perfil esperado para perguntas opinativas
-  createdAt              DateTime            @default(now())
-  updatedAt              DateTime            @updatedAt
+  testId                 String? // ID do teste associado quando type = "TEST"
+  expectedProfile        Json? // Perfil esperado para perguntas opinativas
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
   progresses             CandidateProgress[]
-  process                SelectionProcess    @relation(fields: [processId], references: [id])
-  test                   Test?               @relation(fields: [testId], references: [id])  // Relação com o teste
+  process                SelectionProcess          @relation(fields: [processId], references: [id])
+  test                   Test?                     @relation(fields: [testId], references: [id]) // Relação com o teste
   personalityConfig      ProcessPersonalityConfig?
 
   @@index([order])
 }
 
 model ProcessPersonalityConfig {
-  id                 String                 @id @default(uuid())
-  processStageId     String                 @unique
-  emotionGroupId     String?
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
-  stage              ProcessStage           @relation(fields: [processStageId], references: [id])
-  emotionGroup       EmotionGroup?          @relation(fields: [emotionGroupId], references: [id])
-  traitWeights       PersonalityTraitWeight[]
+  id             String                   @id @default(uuid())
+  processStageId String                   @unique
+  emotionGroupId String?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  stage          ProcessStage             @relation(fields: [processStageId], references: [id])
+  emotionGroup   EmotionGroup?            @relation(fields: [emotionGroupId], references: [id])
+  traitWeights   PersonalityTraitWeight[]
 }
 
 model PersonalityTraitWeight {
-  id                     String                 @id @default(uuid())
-  traitName              String                 // Nome do traço de personalidade
-  weight                 Int                    // Peso do traço (5 para o mais importante, 4 para o segundo, etc.)
-  order                  Int                    // Ordem de importância (1 para o mais importante)
+  id                         String                   @id @default(uuid())
+  traitName                  String // Nome do traço de personalidade
+  weight                     Int // Peso do traço (5 para o mais importante, 4 para o segundo, etc.)
+  order                      Int // Ordem de importância (1 para o mais importante)
   processPersonalityConfigId String
-  createdAt              DateTime               @default(now())
-  updatedAt              DateTime               @updatedAt
-  processPersonalityConfig ProcessPersonalityConfig @relation(fields: [processPersonalityConfigId], references: [id], onDelete: Cascade)
+  createdAt                  DateTime                 @default(now())
+  updatedAt                  DateTime                 @updatedAt
+  processPersonalityConfig   ProcessPersonalityConfig @relation(fields: [processPersonalityConfigId], references: [id], onDelete: Cascade)
 }
 
 model CandidateProgress {
@@ -195,24 +195,24 @@ model Test {
   globalVersions  GlobalAccess[]
   stages          Stage[]
   testStages      TestStage[]
-  processStages   ProcessStage[]   // Relação inversa com ProcessStage
+  processStages   ProcessStage[] // Relação inversa com ProcessStage
   company         Company          @relation(fields: [companyId], references: [id])
   testInvitations TestInvitation[]
   usedInviteCodes UsedInviteCode[]
 }
 
 model Stage {
-  id           String       @id @default(uuid())
+  id           String      @id @default(uuid())
   title        String
   description  String?
   order        Int
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
   testId       String?
-  requestPhoto Boolean      @default(false)
-  questionType String?      // Tipo de pergunta permitido nesta etapa
+  requestPhoto Boolean     @default(false)
+  questionType String? // Tipo de pergunta permitido nesta etapa
   questions    Question[]
-  test         Test?        @relation(fields: [testId], references: [id])
+  test         Test?       @relation(fields: [testId], references: [id])
   TestStage    TestStage[]
 }
 
@@ -239,7 +239,7 @@ model Question {
   showResults      Boolean         @default(true)
   type             QuestionType    @default(MULTIPLE_CHOICE)
   categoryId       String?         @db.Uuid
-  emotionGroupId   String?         // ID do grupo de emoções para perguntas opinativas
+  emotionGroupId   String? // ID do grupo de emoções para perguntas opinativas
   options          Option[]
   company          Company?        @relation(fields: [companyId], references: [id])
   globalQuestion   GlobalQuestion? @relation(fields: [globalQuestionId], references: [id])
@@ -250,47 +250,47 @@ model Question {
 }
 
 model Option {
-  id              String    @id @default(uuid())
-  text            String
-  isCorrect       Boolean   @default(false)
-  questionId      String
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  categoryId      String?
-  weight          Int?      @default(0)
-  position        Int?      @default(0)
-  categoryName    String?   // Nome da categoria/personalidade
-  categoryNameUuid String?  // UUID único para a categoria/personalidade
-  emotionGroupId  String?   // ID do grupo de emoções a que esta opção pertence
-  explanation     String?   // Explicação sobre esta opção/personalidade
-  category        Category? @relation(fields: [categoryId], references: [id])
-  question        Question  @relation(fields: [questionId], references: [id])
+  id               String    @id @default(uuid())
+  text             String
+  isCorrect        Boolean   @default(false)
+  questionId       String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  categoryId       String?
+  weight           Int?      @default(0)
+  position         Int?      @default(0)
+  categoryName     String? // Nome da categoria/personalidade
+  categoryNameUuid String? // UUID único para a categoria/personalidade
+  emotionGroupId   String? // ID do grupo de emoções a que esta opção pertence
+  explanation      String? // Explicação sobre esta opção/personalidade
+  category         Category? @relation(fields: [categoryId], references: [id])
+  question         Question  @relation(fields: [questionId], references: [id])
 }
 
 model Response {
-  id                  String    @id @default(uuid())
-  candidateId         String
-  questionId          String
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  questionText        String
-  optionText          String
-  timeSpent           Int       @default(0)
-  allOptions          Json?
-  companyId           String
-  isCorrect           Boolean
-  questionSnapshot    Json?     // Snapshot completo da questão
-  optionId            String?   // ID da opção selecionada
-  stageId             String?   // ID da etapa
-  stageName           String?   // Nome da etapa
-  categoryName        String?   // Nome da categoria
-  optionCharacteristic String?   // Característica/personalidade associada à opção selecionada
-  optionOriginalOrder Int?       // Posição original da opção antes do embaralhamento
-  optionsOrder        Json?      // Ordem em que as opções foram apresentadas ao candidato
-  questionType        String?    // Tipo da questão (múltipla escolha, opinativa, etc.)
-  candidate           Candidate @relation(fields: [candidateId], references: [id])
-  company             Company   @relation(fields: [companyId], references: [id])
-  question            Question  @relation(fields: [questionId], references: [id])
+  id                   String    @id @default(uuid())
+  candidateId          String
+  questionId           String
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  questionText         String
+  optionText           String
+  timeSpent            Int       @default(0)
+  allOptions           Json?
+  companyId            String
+  isCorrect            Boolean
+  questionSnapshot     Json? // Snapshot completo da questão
+  optionId             String? // ID da opção selecionada
+  stageId              String? // ID da etapa
+  stageName            String? // Nome da etapa
+  categoryName         String? // Nome da categoria
+  optionCharacteristic String? // Característica/personalidade associada à opção selecionada
+  optionOriginalOrder  Int? // Posição original da opção antes do embaralhamento
+  optionsOrder         Json? // Ordem em que as opções foram apresentadas ao candidato
+  questionType         String? // Tipo da questão (múltipla escolha, opinativa, etc.)
+  candidate            Candidate @relation(fields: [candidateId], references: [id])
+  company              Company   @relation(fields: [companyId], references: [id])
+  question             Question  @relation(fields: [questionId], references: [id])
 
   @@unique([candidateId, questionId])
 }
@@ -473,12 +473,12 @@ model CompanyBackup {
 }
 
 model EmotionGroup {
-  id                    String                  @id @default(uuid())
-  name                  String
-  description           String?
-  createdAt             DateTime                @default(now())
-  updatedAt             DateTime                @updatedAt
-  questions             Question[]
+  id                        String                     @id @default(uuid())
+  name                      String
+  description               String?
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  questions                 Question[]
   processPersonalityConfigs ProcessPersonalityConfig[]
 }
 

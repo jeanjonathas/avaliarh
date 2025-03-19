@@ -33,19 +33,314 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
   const [isLoadingTraits, setIsLoadingTraits] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Calcular o peso com base na ordem
+  const calculateWeight = (position: number, totalTraits: number): number => {
+    const W_max = 5;
+    const W_min = 1;
+    const N_g = totalTraits || 1; // Evitar divisão por zero
+    
+    if (N_g === 1) return W_max; // Se houver apenas um traço, ele tem o peso máximo
+    
+    // Aplicar a fórmula de normalização
+    const weight = W_max - ((position - 1) * (W_max - W_min)) / (N_g - 1);
+    
+    // Arredondar para 2 casas decimais para evitar problemas de precisão
+    const roundedWeight = Math.round(weight * 100) / 100;
+    
+    // Garantir que o peso esteja dentro dos limites
+    return Math.max(W_min, Math.min(W_max, roundedWeight));
+  };
+
+  // Notificar o componente pai sobre a mudança
+  const notifyParentOfChanges = useCallback((updatedGroups: TraitGroup[]) => {
+    // Extrair todos os traços de todos os grupos
+    const allTraits = updatedGroups.flatMap(group => group.selectedTraits);
+    
+    // Garantir que cada traço tenha todas as propriedades necessárias
+    const completeTraits = allTraits.map(trait => ({
+      id: trait.id,
+      traitName: trait.traitName,
+      weight: trait.weight,
+      order: trait.order,
+      groupId: trait.groupId,
+      groupName: trait.groupName
+    }));
+    
+    // Agrupar traços por grupo para melhor visualização nos logs
+    const traitsByGroup = updatedGroups.reduce((acc, group) => {
+      if (group.selectedTraits.length > 0) {
+        acc[group.name] = group.selectedTraits.map(trait => ({
+          traitName: trait.traitName,
+          weight: trait.weight,
+          order: trait.order
+        }));
+      }
+      return acc;
+    }, {} as Record<string, any[]>);
+    
+    console.log('=== VALORES DE PESO CAPTURADOS ===');
+    console.log('Traços atualizados:', completeTraits);
+    
+    // Log detalhado por categoria
+    console.log('=== VALORES DE PESO POR CATEGORIA ===');
+    Object.entries(traitsByGroup).forEach(([groupName, traits]) => {
+      console.log(`Categoria: ${groupName}`);
+      console.table(traits.map(t => ({
+        'Traço': t.traitName,
+        'Peso': t.weight,
+        'Ordem': t.order
+      })));
+    });
+    
+    // Log de resumo
+    console.log('=== RESUMO DE PESOS SALVOS ===');
+    console.log(`Total de traços: ${completeTraits.length}`);
+    console.log(`Total de categorias: ${Object.keys(traitsByGroup).length}`);
+    console.log('Valores de peso por categoria salvos:', traitsByGroup);
+    
+    // Enviar os traços completos para o componente pai
+    onChange(completeTraits);
+  }, [onChange]);
+
+  // Adicionar um traço ao grupo
+  const handleAddTrait = useCallback((groupId: string, traitName: string) => {
+    // Encontrar o grupo
+    const groupIndex = traitGroups.findIndex(g => g.id === groupId);
+    if (groupIndex === -1) return;
+    
+    // Verificar se o traço já está selecionado no grupo
+    const isAlreadySelected = traitGroups[groupIndex].selectedTraits.some(t => t.traitName === traitName);
+    if (isAlreadySelected) return;
+    
+    // Criar uma cópia dos grupos
+    const updatedGroups = [...traitGroups];
+    
+    // Adicionar o traço ao grupo
+    const newOrder = updatedGroups[groupIndex].selectedTraits.length + 1;
+    
+    // Calcular o peso inicial com base na ordem
+    const newWeight = calculateWeight(newOrder, newOrder);
+    
+    // Adicionar o novo traço
+    updatedGroups[groupIndex].selectedTraits.push({
+      id: `trait-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      traitName,
+      weight: newWeight,
+      order: newOrder,
+      groupId,
+      groupName: updatedGroups[groupIndex].name
+    });
+    
+    // Atualizar o estado
+    setTraitGroups(updatedGroups);
+    
+    console.log(`Traço "${traitName}" adicionado ao grupo "${updatedGroups[groupIndex].name}" com peso ${newWeight} e ordem ${newOrder}`);
+    
+    // Recalcular os pesos para todos os traços no grupo
+    const groupTraits = updatedGroups[groupIndex].selectedTraits;
+    if (groupTraits.length > 1) {
+      // Ordenar os traços pela ordem atual
+      const sortedTraits = [...groupTraits].sort((a, b) => a.order - b.order);
+      
+      // Recalcular os pesos para todos os traços
+      updatedGroups[groupIndex].selectedTraits = sortedTraits.map((trait, index) => {
+        const calculatedWeight = calculateWeight(index + 1, sortedTraits.length);
+        return { ...trait, order: index + 1, weight: calculatedWeight };
+      });
+      
+      console.log(`Pesos recalculados para ${sortedTraits.length} traços no grupo "${updatedGroups[groupIndex].name}"`);
+    }
+    
+    // Notificar o componente pai sobre a mudança
+    notifyParentOfChanges(updatedGroups);
+  }, [traitGroups, notifyParentOfChanges]);
+
+  // Remover um traço de um grupo
+  const handleRemoveTrait = useCallback((traitId: string, groupId: string) => {
+    // Encontrar o grupo
+    const groupIndex = traitGroups.findIndex(g => g.id === groupId);
+    if (groupIndex === -1) return;
+    
+    // Criar uma cópia dos grupos
+    const updatedGroups = [...traitGroups];
+    
+    // Encontrar o traço a ser removido
+    const traitIndex = updatedGroups[groupIndex].selectedTraits.findIndex(t => t.id === traitId);
+    if (traitIndex === -1) return;
+    
+    // Obter o nome do traço para logging
+    const traitName = updatedGroups[groupIndex].selectedTraits[traitIndex].traitName;
+    const groupName = updatedGroups[groupIndex].name;
+    
+    // Remover o traço
+    updatedGroups[groupIndex].selectedTraits.splice(traitIndex, 1);
+    
+    console.log(`Traço "${traitName}" removido do grupo "${groupName}"`);
+    
+    // Recalcular os pesos para todos os traços restantes no grupo
+    if (updatedGroups[groupIndex].selectedTraits.length > 0) {
+      // Reordenar os traços restantes
+      const reorderedTraits = updatedGroups[groupIndex].selectedTraits.map((trait, index) => ({
+        ...trait,
+        order: index + 1
+      }));
+      
+      // Recalcular os pesos com base na nova ordem
+      const totalTraits = reorderedTraits.length;
+      updatedGroups[groupIndex].selectedTraits = reorderedTraits.map((trait, index) => {
+        const calculatedWeight = calculateWeight(index + 1, totalTraits);
+        return { ...trait, weight: calculatedWeight };
+      });
+      
+      console.log(`Pesos recalculados para ${totalTraits} traços restantes no grupo "${groupName}"`);
+    }
+    
+    // Atualizar o estado
+    setTraitGroups(updatedGroups);
+    
+    // Notificar o componente pai sobre a mudança
+    notifyParentOfChanges(updatedGroups);
+  }, [traitGroups, notifyParentOfChanges]);
+
+  // Função para normalizar os pesos de todos os traços em todos os grupos
+  const normalizeAllWeights = useCallback(() => {
+    if (traitGroups.length === 0) return;
+    
+    const updatedGroups = [...traitGroups];
+    let anyChanges = false;
+    
+    // Para cada grupo, recalcular os pesos com base na ordem atual
+    updatedGroups.forEach(group => {
+      if (group.selectedTraits.length > 0) {
+        // Ordenar os traços pela ordem atual
+        const sortedTraits = [...group.selectedTraits].sort((a, b) => a.order - b.order);
+        
+        // Recalcular os pesos
+        const updatedTraits = sortedTraits.map((trait, index) => {
+          const newWeight = calculateWeight(index + 1, sortedTraits.length);
+          if (trait.weight !== newWeight) {
+            anyChanges = true;
+            return { ...trait, order: index + 1, weight: newWeight };
+          }
+          return trait;
+        });
+        
+        group.selectedTraits = updatedTraits;
+      }
+    });
+    
+    if (anyChanges) {
+      setTraitGroups(updatedGroups);
+      
+      // Notificar o componente pai sobre a mudança
+      notifyParentOfChanges(updatedGroups);
+    }
+  }, [traitGroups, notifyParentOfChanges]);
+
+  // Executar a normalização quando o componente for montado ou quando os grupos mudarem
+  useEffect(() => {
+    if (traitGroups.length > 0) {
+      normalizeAllWeights();
+    }
+  }, [normalizeAllWeights]);
+
+  // Lidar com o reordenamento por drag and drop dentro de um grupo
+  const handleDragEnd = useCallback((result: DropResult) => {
+    // Se não houver destino ou se a origem e o destino forem iguais, não fazer nada
+    if (!result.destination) return;
+    
+    // Extrair o ID do grupo do droppableId
+    const groupId = result.source.droppableId.replace('droppable-', '');
+    
+    // Encontrar o grupo
+    const groupIndex = traitGroups.findIndex(g => g.id === groupId);
+    if (groupIndex === -1) return;
+    
+    // Criar uma cópia dos grupos
+    const updatedGroups = [...traitGroups];
+    
+    // Reordenar os traços dentro do grupo
+    const items = Array.from(updatedGroups[groupIndex].selectedTraits);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+    
+    // Atualizar as ordens e pesos dos traços
+    const updatedTraits = items.map((trait, index) => {
+      const newOrder = index + 1;
+      const newWeight = calculateWeight(newOrder, items.length);
+      
+      // Verificar se houve mudança na ordem ou no peso
+      if (trait.order !== newOrder || trait.weight !== newWeight) {
+        console.log(`Traço "${trait.traitName}" reordenado: ordem ${trait.order} -> ${newOrder}, peso ${trait.weight} -> ${newWeight}`);
+        return { ...trait, order: newOrder, weight: newWeight };
+      }
+      
+      return trait;
+    });
+    
+    // Atualizar os traços do grupo
+    updatedGroups[groupIndex].selectedTraits = updatedTraits;
+    
+    // Atualizar o estado
+    setTraitGroups(updatedGroups);
+    
+    console.log(`Reordenamento concluído no grupo "${updatedGroups[groupIndex].name}"`);
+    console.log('Nova ordem dos traços:', updatedTraits.map(t => ({ nome: t.traitName, ordem: t.order, peso: t.weight })));
+    
+    // Notificar o componente pai sobre a mudança
+    notifyParentOfChanges(updatedGroups);
+  }, [traitGroups, notifyParentOfChanges]);
+
   // Inicializar os grupos com os traços já selecionados
   useEffect(() => {
-    if (traitGroups.length > 0 && value.length > 0) {
-      const updatedGroups = traitGroups.map(group => {
-        const groupTraits = value.filter(trait => trait.groupId === group.id);
-        return {
-          ...group,
-          selectedTraits: groupTraits
-        };
+    if (testId && traitGroups.length > 0 && value.length > 0) {
+      console.log('Valores iniciais recebidos:', value);
+      
+      // Criar uma cópia dos grupos
+      const updatedGroups = [...traitGroups];
+      
+      // Para cada traço no valor inicial
+      value.forEach(trait => {
+        // Encontrar o grupo correspondente
+        const groupIndex = updatedGroups.findIndex(g => g.id === trait.groupId || g.name === trait.groupName);
+        if (groupIndex !== -1) {
+          // Verificar se o traço já existe no grupo
+          const existingTraitIndex = updatedGroups[groupIndex].selectedTraits.findIndex(t => 
+            t.traitName === trait.traitName || t.id === trait.id
+          );
+          
+          if (existingTraitIndex === -1) {
+            // Se o traço não existe, adicionar
+            updatedGroups[groupIndex].selectedTraits.push({
+              id: trait.id || `trait-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              traitName: trait.traitName,
+              weight: trait.weight || 0,
+              order: trait.order || updatedGroups[groupIndex].selectedTraits.length + 1,
+              groupId: trait.groupId || updatedGroups[groupIndex].id,
+              groupName: trait.groupName || updatedGroups[groupIndex].name
+            });
+          } else {
+            // Se o traço já existe, atualizar
+            updatedGroups[groupIndex].selectedTraits[existingTraitIndex] = {
+              ...updatedGroups[groupIndex].selectedTraits[existingTraitIndex],
+              weight: trait.weight || updatedGroups[groupIndex].selectedTraits[existingTraitIndex].weight,
+              order: trait.order || updatedGroups[groupIndex].selectedTraits[existingTraitIndex].order
+            };
+          }
+        }
       });
+      
+      // Ordenar os traços em cada grupo por ordem
+      updatedGroups.forEach(group => {
+        group.selectedTraits.sort((a, b) => a.order - b.order);
+      });
+      
+      // Atualizar o estado
       setTraitGroups(updatedGroups);
+      
+      console.log('Grupos atualizados com valores iniciais:', updatedGroups);
     }
-  }, [value]);
+  }, [testId, traitGroups.length, value]);
 
   // Buscar traços de personalidade do teste selecionado
   useEffect(() => {
@@ -63,6 +358,9 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
       setIsLoadingTraits(true);
       setError(null);
       
+      console.log('Buscando traços para o teste:', testId);
+      console.log('Valores atuais:', value);
+      
       // Buscar as questões do teste
       const response = await fetch(`/api/admin/questions?testId=${testId}&type=OPINION_MULTIPLE`);
       
@@ -71,6 +369,7 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
       }
       
       const data = await response.json();
+      console.log('Questões opinativas encontradas:', data);
       
       // Mapa para agrupar traços por conjunto de traços, não por questão
       const traitSets = new Map<string, Set<string>>();
@@ -141,6 +440,8 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
       
       // Associar traços existentes aos seus respectivos grupos
       if (value.length > 0) {
+        console.log('Associando traços existentes aos grupos:', value);
+        
         // Primeiro, mapeamos os IDs dos grupos antigos para os novos
         const groupMapping = new Map<string, string>();
         
@@ -181,7 +482,10 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
           });
           
           if (groupTraits.length > 0) {
-            group.selectedTraits = [...groupTraits].sort((a, b) => a.order - b.order);
+            // Ordenar os traços pela ordem
+            const sortedTraits = [...groupTraits].sort((a, b) => a.order - b.order);
+            
+            group.selectedTraits = sortedTraits;
           }
         });
       }
@@ -197,126 +501,6 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
 
   // Gerar um ID único
   const generateId = () => `trait-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-  // Adicionar um traço a um grupo específico
-  const addTraitToGroup = (traitName: string, groupId: string, groupName: string) => {
-    // Encontrar o grupo
-    const groupIndex = traitGroups.findIndex(g => g.id === groupId);
-    if (groupIndex === -1) return;
-    
-    // Verificar se o traço já existe no grupo
-    if (traitGroups[groupIndex].selectedTraits.some(t => t.traitName.toLowerCase() === traitName.toLowerCase())) {
-      return;
-    }
-
-    // Criar uma cópia dos grupos
-    const updatedGroups = [...traitGroups];
-    
-    // Adicionar o traço ao grupo específico
-    const newTrait: PersonalityTrait = {
-      id: generateId(),
-      traitName,
-      weight: calculateWeight(updatedGroups[groupIndex].selectedTraits.length + 1, updatedGroups[groupIndex].selectedTraits.length + 1),
-      order: updatedGroups[groupIndex].selectedTraits.length + 1,
-      groupId,
-      groupName
-    };
-    
-    updatedGroups[groupIndex].selectedTraits.push(newTrait);
-    
-    // Recalcular os pesos para todos os traços do grupo
-    updatedGroups[groupIndex].selectedTraits = updatedGroups[groupIndex].selectedTraits
-      .map((trait, idx) => ({
-        ...trait,
-        order: idx + 1,
-        weight: calculateWeight(idx + 1, updatedGroups[groupIndex].selectedTraits.length)
-      }));
-    
-    // Atualizar o estado
-    setTraitGroups(updatedGroups);
-    
-    // Notificar o componente pai sobre a mudança
-    const allTraits = updatedGroups.flatMap(group => group.selectedTraits);
-    onChange(allTraits);
-  };
-
-  // Remover um traço de um grupo específico
-  const removeTraitFromGroup = (traitId: string, groupId: string) => {
-    // Encontrar o grupo
-    const groupIndex = traitGroups.findIndex(g => g.id === groupId);
-    if (groupIndex === -1) return;
-    
-    // Criar uma cópia dos grupos
-    const updatedGroups = [...traitGroups];
-    
-    // Filtrar o traço a ser removido
-    const remainingTraits = updatedGroups[groupIndex].selectedTraits.filter(t => t.id !== traitId);
-    
-    // Recalcular a ordem e os pesos para todos os traços restantes
-    updatedGroups[groupIndex].selectedTraits = remainingTraits.map((trait, idx) => ({
-      ...trait,
-      order: idx + 1,
-      weight: calculateWeight(idx + 1, remainingTraits.length)
-    }));
-    
-    // Atualizar o estado
-    setTraitGroups(updatedGroups);
-    
-    // Notificar o componente pai sobre a mudança
-    const allTraits = updatedGroups.flatMap(group => group.selectedTraits);
-    onChange(allTraits);
-  };
-
-  // Calcular o peso com base na ordem
-  const calculateWeight = (position: number, totalTraits: number): number => {
-    // Implementação da fórmula: W_a = W_max - ((P_a - 1) * (W_max - W_min)) / (N_g - 1)
-    const W_max = 5;
-    const W_min = 1;
-    const N_g = totalTraits || 1; // Evitar divisão por zero
-    
-    if (N_g === 1) return W_max; // Se houver apenas um traço, ele tem o peso máximo
-    
-    // Aplicar a fórmula de normalização
-    const weight = W_max - ((position - 1) * (W_max - W_min)) / (N_g - 1);
-    
-    // Garantir que o peso esteja dentro dos limites
-    return Math.max(W_min, Math.min(W_max, weight));
-  };
-
-  // Lidar com o reordenamento por drag and drop dentro de um grupo
-  const handleDragEnd = useCallback((result: DropResult) => {
-    // Se não houver destino ou se a origem e o destino forem iguais, não fazer nada
-    if (!result.destination) return;
-    
-    // Extrair o ID do grupo do droppableId
-    const groupId = result.source.droppableId.replace('droppable-', '');
-    
-    // Encontrar o grupo
-    const groupIndex = traitGroups.findIndex(g => g.id === groupId);
-    if (groupIndex === -1) return;
-    
-    // Criar uma cópia dos grupos
-    const updatedGroups = [...traitGroups];
-    
-    // Reordenar os traços dentro do grupo
-    const items = Array.from(updatedGroups[groupIndex].selectedTraits);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
-    
-    // Atualizar a ordem e os pesos
-    updatedGroups[groupIndex].selectedTraits = items.map((trait, index) => ({
-      ...trait,
-      order: index + 1,
-      weight: calculateWeight(index + 1, items.length)
-    }));
-    
-    // Atualizar o estado
-    setTraitGroups(updatedGroups);
-    
-    // Notificar o componente pai sobre a mudança
-    const allTraits = updatedGroups.flatMap(group => group.selectedTraits);
-    onChange(allTraits);
-  }, [traitGroups, onChange]);
 
   // Verificar se um traço já foi adicionado a um grupo
   const isTraitAddedToGroup = (traitName: string, groupId: string) => {
@@ -361,7 +545,7 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
                             <button
                               key={`${group.id}-${trait}`}
                               type="button"
-                              onClick={() => addTraitToGroup(trait, group.id, group.name)}
+                              onClick={() => handleAddTrait(group.id, trait)}
                               disabled={isTraitAddedToGroup(trait, group.id)}
                               className={`px-3 py-2 text-sm rounded-full transition-colors ${
                                 isTraitAddedToGroup(trait, group.id)
@@ -429,7 +613,7 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
                                         </div>
                                         <button
                                           type="button"
-                                          onClick={() => removeTraitFromGroup(trait.id, group.id)}
+                                          onClick={() => handleRemoveTrait(trait.id, group.id)}
                                           className="text-secondary-400 hover:text-red-600 ml-4"
                                         >
                                           <XMarkIcon className="h-6 w-6" />
