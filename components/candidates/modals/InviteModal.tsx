@@ -5,41 +5,58 @@ import toast from 'react-hot-toast'
 
 const InviteModal = ({ isOpen, onClose, candidate, onSuccess }: InviteModalProps) => {
   const [tests, setTests] = useState<{ id: string; title: string }[]>([])
+  const [processes, setProcesses] = useState<{ id: string; name: string }[]>([])
   const [selectedTest, setSelectedTest] = useState('')
+  const [selectedProcess, setSelectedProcess] = useState('')
+  const [linkType, setLinkType] = useState<'process' | 'test'>('test')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    const fetchTests = async () => {
+    const fetchData = async () => {
       try {
-        const response = await fetch('/api/admin/tests', {
-          credentials: 'include'
-        })
-        if (!response.ok) {
+        const [testsResponse, processesResponse] = await Promise.all([
+          fetch('/api/admin/tests', { credentials: 'include' }),
+          fetch('/api/admin/processes', { credentials: 'include' })
+        ]);
+
+        if (!testsResponse.ok) {
           throw new Error('Erro ao carregar testes')
         }
-        const data = await response.json()
+
+        const testsData = await testsResponse.json()
         
         // Verificar o formato da resposta e extrair os testes
-        if (data.success && Array.isArray(data.tests)) {
-          setTests(data.tests)
-          if (data.tests.length > 0) {
-            setSelectedTest(data.tests[0].id)
+        if (testsData.success && Array.isArray(testsData.tests)) {
+          setTests(testsData.tests)
+          if (testsData.tests.length > 0) {
+            setSelectedTest(testsData.tests[0].id)
           }
-        } else if (Array.isArray(data)) {
+        } else if (Array.isArray(testsData)) {
           // Fallback para o caso da API retornar diretamente um array
-          setTests(data)
-          if (data.length > 0) {
-            setSelectedTest(data[0].id)
+          setTests(testsData)
+          if (testsData.length > 0) {
+            setSelectedTest(testsData[0].id)
           }
         } else {
-          console.error('Formato de resposta inesperado:', data)
+          console.error('Formato de resposta inesperado:', testsData)
           throw new Error('Formato de resposta inesperado')
         }
+
+        // Processar dados de processos seletivos
+        if (processesResponse.ok) {
+          const processesData = await processesResponse.json()
+          setProcesses(processesData)
+          if (processesData.length > 0) {
+            setSelectedProcess(processesData[0].id)
+          }
+        } else {
+          console.warn('Não foi possível carregar processos seletivos')
+        }
       } catch (error) {
-        console.error('Erro ao carregar testes:', error)
-        setError('Erro ao carregar testes')
-        toast.error('Erro ao carregar testes', {
+        console.error('Erro ao carregar dados:', error)
+        setError('Erro ao carregar dados necessários')
+        toast.error('Erro ao carregar dados necessários', {
           position: 'bottom-center',
         })
       } finally {
@@ -48,16 +65,30 @@ const InviteModal = ({ isOpen, onClose, candidate, onSuccess }: InviteModalProps
     }
 
     if (isOpen) {
-      fetchTests()
+      fetchData()
     }
   }, [isOpen])
 
+  const handleLinkTypeChange = (type: 'process' | 'test') => {
+    setLinkType(type)
+  }
+
   const handleGenerateInvite = async () => {
     try {
+      if ((linkType === 'process' && !selectedProcess) || (linkType === 'test' && !selectedTest)) {
+        toast.error('Selecione um processo ou teste antes de gerar o convite', {
+          position: 'bottom-center',
+        });
+        return;
+      }
+
       const response = await fetch(`/api/admin/candidates/${candidate.id}/invite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ testId: selectedTest }),
+        body: JSON.stringify({
+          processId: linkType === 'process' ? selectedProcess : null,
+          testId: linkType === 'test' ? selectedTest : null,
+        }),
         credentials: 'include'
       })
 
@@ -91,42 +122,108 @@ const InviteModal = ({ isOpen, onClose, candidate, onSuccess }: InviteModalProps
     >
       <div className="space-y-4">
         {loading ? (
-          <div className="text-center py-4">Carregando testes...</div>
+          <div className="text-center py-4">Carregando dados...</div>
         ) : error ? (
           <div className="text-red-600 py-4">{error}</div>
-        ) : tests.length === 0 ? (
-          <div className="text-amber-600 py-4">Nenhum teste disponível. Por favor, crie um teste primeiro.</div>
+        ) : tests.length === 0 && processes.length === 0 ? (
+          <div className="text-amber-600 py-4">Nenhum teste ou processo seletivo disponível. Por favor, crie um primeiro.</div>
         ) : (
           <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Selecione o Teste
+            <div className="bg-white p-3 rounded-md border border-gray-200">
+              <label className="block text-sm text-gray-700 mb-1">
+                Tipo de Vínculo:
               </label>
-              <select
-                value={selectedTest}
-                onChange={(e) => setSelectedTest(e.target.value)}
-                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500"
-              >
-                {tests.map((test) => (
-                  <option key={test.id} value={test.id}>
-                    {test.title}
-                  </option>
-                ))}
-              </select>
+              <div className="flex space-x-4 mb-3">
+                <button
+                  type="button"
+                  onClick={() => handleLinkTypeChange('process')}
+                  className={`px-3 py-2 text-sm rounded-md ${
+                    linkType === 'process'
+                      ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                      : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                  }`}
+                >
+                  Processo Seletivo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleLinkTypeChange('test')}
+                  className={`px-3 py-2 text-sm rounded-md ${
+                    linkType === 'test'
+                      ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                      : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                  }`}
+                >
+                  Teste Avulso
+                </button>
+              </div>
             </div>
 
-            <div className="flex justify-end space-x-2">
+            {linkType === 'process' && (
+              <div className="bg-white p-3 rounded-md border border-gray-200">
+                <label className="block text-sm text-gray-700 mb-1">
+                  Processo Seletivo:
+                </label>
+                {processes.length === 0 ? (
+                  <div className="text-amber-600 py-2">Nenhum processo seletivo disponível.</div>
+                ) : (
+                  <select
+                    value={selectedProcess}
+                    onChange={(e) => setSelectedProcess(e.target.value)}
+                    className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500"
+                  >
+                    {processes.map((process) => (
+                      <option key={process.id} value={process.id}>
+                        {process.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
+
+            {linkType === 'test' && (
+              <div className="bg-white p-3 rounded-md border border-gray-200">
+                <label className="block text-sm text-gray-700 mb-1">
+                  Teste:
+                </label>
+                {tests.length === 0 ? (
+                  <div className="text-amber-600 py-2">Nenhum teste disponível.</div>
+                ) : (
+                  <select
+                    value={selectedTest}
+                    onChange={(e) => setSelectedTest(e.target.value)}
+                    className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500"
+                  >
+                    {tests.map((test) => (
+                      <option key={test.id} value={test.id}>
+                        {test.title}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-end space-x-2 pt-2">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded"
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded hover:bg-gray-300"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={handleGenerateInvite}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded"
+                disabled={(linkType === 'process' && (!selectedProcess || processes.length === 0)) || 
+                         (linkType === 'test' && (!selectedTest || tests.length === 0))}
+                className={`px-4 py-2 text-white rounded ${
+                  (linkType === 'process' && (!selectedProcess || processes.length === 0)) || 
+                  (linkType === 'test' && (!selectedTest || tests.length === 0))
+                    ? 'bg-blue-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
               >
                 Gerar Convite
               </button>

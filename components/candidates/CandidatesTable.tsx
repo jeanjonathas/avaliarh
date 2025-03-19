@@ -237,10 +237,10 @@ export const CandidatesTable = ({
               <th className="px-4 py-2 text-left w-1/6">Nome</th>
               <th className="px-4 py-2 text-left w-1/6">Cargo</th>
               <th className="px-4 py-2 text-center w-1/12">Status</th>
-              <th className="px-4 py-2 text-center w-1/6">Código de Convite</th>
+              <th className="px-4 py-2 text-center w-1/4">Código de Convite</th>
               <th className="px-4 py-2 text-center w-1/12">Nota</th>
               <th className="px-4 py-2 text-center w-1/6">Avaliação</th>
-              <th className="px-4 py-2 text-center w-1/6">Ações</th>
+              <th className="px-4 py-2 text-center w-1/12">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -286,18 +286,20 @@ export const CandidatesTable = ({
                       </button>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => {
-                        setSelectedCandidate(candidate);
-                        setShowInviteModal(true);
-                      }}
-                      className="bg-green-500 text-white px-3 py-2 rounded-md hover:bg-green-600 transition-colors duration-200 flex items-center justify-center space-x-1"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
-                      <span>Gerar Convite</span>
-                    </button>
+                    <div className="flex justify-center">
+                      <button
+                        onClick={() => {
+                          setSelectedCandidate(candidate);
+                          setShowInviteModal(true);
+                        }}
+                        className="bg-green-500 text-white px-3 py-1.5 rounded-md hover:bg-green-600 transition-colors duration-200 flex items-center justify-center space-x-1 text-sm"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        <span>Gerar Convite</span>
+                      </button>
+                    </div>
                   )}
                 </td>
                 <td className="px-4 py-2 text-center">
@@ -315,7 +317,8 @@ export const CandidatesTable = ({
                 <td className="px-4 py-2 flex justify-center">
                   <Rating
                     value={candidate.rating || 0}
-                    onChange={(_, newValue) => handleRatingChange(candidate.id, newValue)}
+                    readOnly
+                    size="small"
                   />
                 </td>
                 <td className="px-4 py-2 text-center">
