@@ -123,7 +123,7 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
     
     // Adicionar o novo traço
     updatedGroups[groupIndex].selectedTraits.push({
-      id: `trait-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `trait-${groupId}-${traitName.replace(/\s+/g, '-').toLowerCase()}`,
       traitName,
       weight: newWeight,
       order: newOrder,
@@ -510,6 +510,86 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
     return group.selectedTraits.some(t => t.traitName.toLowerCase() === traitName.toLowerCase());
   };
 
+  // Componente de item arrastável memoizado para melhor performance
+  const DraggableItem = React.memo(({ trait, index, groupId, onRemove }: {
+    trait: PersonalityTrait;
+    index: number;
+    groupId: string;
+    onRemove: (id: string, groupId: string) => void;
+  }) => {
+    return (
+      <Draggable
+        key={trait.id}
+        draggableId={trait.id}
+        index={index}
+      >
+        {(provided, snapshot) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.draggableProps}
+            {...provided.dragHandleProps}
+            style={provided.draggableProps.style}
+            className={`flex items-center justify-between p-4 rounded-md border ${
+              snapshot.isDragging 
+                ? 'bg-blue-50 border-blue-300 shadow-lg' 
+                : 'bg-white border-secondary-200'
+            }`}
+          >
+            <div className="flex items-center space-x-4">
+              <div className="cursor-move text-secondary-400 hover:text-secondary-600">
+                <ArrowsUpDownIcon className="h-6 w-6" />
+              </div>
+              <div>
+                <span className="font-medium text-secondary-800 text-base">{trait.traitName}</span>
+                <div className="text-sm text-secondary-500 mt-1">
+                  Peso: {trait.weight.toFixed(1)} (Posição: {index + 1})
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onRemove(trait.id, groupId)}
+              className="text-secondary-400 hover:text-red-600 ml-4"
+            >
+              <XMarkIcon className="h-6 w-6" />
+            </button>
+          </div>
+        )}
+      </Draggable>
+    );
+  });
+
+  // Componente de área soltável memoizado para melhor performance
+  const DroppableArea = React.memo(({ group, onRemoveTrait }: {
+    group: TraitGroup;
+    onRemoveTrait: (id: string, groupId: string) => void;
+  }) => {
+    return (
+      <Droppable droppableId={`droppable-${group.id}`}>
+        {(provided) => (
+          <div
+            {...provided.droppableProps}
+            ref={provided.innerRef}
+            className="space-y-2 bg-secondary-50 p-3 rounded-md"
+          >
+            {group.selectedTraits
+              .sort((a, b) => a.order - b.order)
+              .map((trait, index) => (
+                <DraggableItem 
+                  key={trait.id} 
+                  trait={trait} 
+                  index={index} 
+                  groupId={group.id} 
+                  onRemove={onRemoveTrait} 
+                />
+              ))}
+            {provided.placeholder}
+          </div>
+        )}
+      </Droppable>
+    );
+  });
+
   return (
     <div className="space-y-6">
       {isLoadingTraits ? (
@@ -575,57 +655,10 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
                             <p className="text-sm text-secondary-500">Arraste para reordenar por importância</p>
                           </div>
                           
-                          <Droppable droppableId={`droppable-${group.id}`}>
-                            {(provided) => (
-                              <div
-                                {...provided.droppableProps}
-                                ref={provided.innerRef}
-                                className="space-y-2 bg-secondary-50 p-3 rounded-md"
-                              >
-                                {group.selectedTraits.map((trait, index) => (
-                                  <Draggable
-                                    key={trait.id || `trait-${group.id}-${index}`}
-                                    draggableId={trait.id || `trait-${group.id}-${index}`}
-                                    index={index}
-                                  >
-                                    {(provided, snapshot) => (
-                                      <div
-                                        ref={provided.innerRef}
-                                        {...provided.draggableProps}
-                                        {...provided.dragHandleProps}
-                                        style={{
-                                          ...provided.draggableProps.style
-                                        }}
-                                        className={`flex items-center justify-between p-4 rounded-md border ${
-                                          snapshot.isDragging ? 'bg-blue-50 border-blue-300' : 'bg-white border-secondary-200'
-                                        }`}
-                                      >
-                                        <div className="flex items-center space-x-4">
-                                          <div className="cursor-move text-secondary-400 hover:text-secondary-600">
-                                            <ArrowsUpDownIcon className="h-6 w-6" />
-                                          </div>
-                                          <div>
-                                            <span className="font-medium text-secondary-800 text-base">{trait.traitName}</span>
-                                            <div className="text-sm text-secondary-500 mt-1">
-                                              Peso: {trait.weight.toFixed(1)} (Posição: {index + 1})
-                                            </div>
-                                          </div>
-                                        </div>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleRemoveTrait(trait.id, group.id)}
-                                          className="text-secondary-400 hover:text-red-600 ml-4"
-                                        >
-                                          <XMarkIcon className="h-6 w-6" />
-                                        </button>
-                                      </div>
-                                    )}
-                                  </Draggable>
-                                ))}
-                                {provided.placeholder}
-                              </div>
-                            )}
-                          </Droppable>
+                          <DroppableArea 
+                            group={group} 
+                            onRemoveTrait={handleRemoveTrait} 
+                          />
                         </div>
                       ) : (
                         <div className="bg-secondary-50 p-5 rounded-lg text-center text-secondary-500 mt-4">
