@@ -1,5 +1,6 @@
 import Modal from '../../common/Modal'
 import { DeleteCandidateModalProps } from '../types'
+import toast from 'react-hot-toast'
 
 const DeleteCandidateModal = ({ isOpen, onClose, candidate, onSuccess }: DeleteCandidateModalProps) => {
   const handleDelete = async () => {
@@ -13,10 +14,19 @@ const DeleteCandidateModal = ({ isOpen, onClose, candidate, onSuccess }: DeleteC
         throw new Error('Erro ao excluir candidato')
       }
 
+      toast.success(`Candidato ${candidate.name} excluído com sucesso!`, {
+        position: 'bottom-center',
+      });
       onSuccess()
       onClose()
     } catch (error) {
       console.error('Erro ao excluir candidato:', error)
+      toast.error(
+        error instanceof Error ? error.message : 'Erro ao excluir candidato',
+        {
+          position: 'bottom-center',
+        }
+      );
     }
   }
 

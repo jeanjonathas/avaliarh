@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import Modal from '../../common/Modal'
 import { AddCandidateModalProps } from '../types'
-import { useNotification } from '../../../contexts/NotificationContext'
+import toast from 'react-hot-toast'
 
 interface Test {
   id: string;
@@ -14,7 +14,6 @@ interface TestsResponse {
 }
 
 const AddCandidateModal = ({ isOpen, onClose, onSuccess, processId }: AddCandidateModalProps) => {
-  const { showToast } = useNotification();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tests, setTests] = useState<Test[]>([]);
   const [isLoadingTests, setIsLoadingTests] = useState(false);
@@ -65,7 +64,9 @@ const AddCandidateModal = ({ isOpen, onClose, onSuccess, processId }: AddCandida
     e.preventDefault()
     
     if (!newCandidate.name || !newCandidate.email) {
-      showToast('Nome e email são obrigatórios', 'error');
+      toast.error('Nome e email são obrigatórios', {
+        position: 'bottom-center',
+      });
       return;
     }
     
@@ -87,15 +88,19 @@ const AddCandidateModal = ({ isOpen, onClose, onSuccess, processId }: AddCandida
         throw new Error(responseData.error || 'Erro ao adicionar candidato');
       }
 
-      showToast('Candidato adicionado com sucesso!', 'success');
+      toast.success('Candidato adicionado com sucesso!', {
+        position: 'bottom-center',
+      });
       onSuccess();
       onClose();
       setNewCandidate({ name: '', email: '', phone: '', position: '', testId: '', processId: processId || '' });
     } catch (error) {
       console.error('Erro ao adicionar candidato:', error);
-      showToast(
+      toast.error(
         error instanceof Error ? error.message : 'Erro ao adicionar candidato',
-        'error'
+        {
+          position: 'bottom-center',
+        }
       );
     } finally {
       setIsSubmitting(false);

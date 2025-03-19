@@ -9,6 +9,7 @@ import DeleteCandidateModal from './modals/DeleteCandidateModal'
 import InviteModal from './modals/InviteModal'
 import SuccessModal from './modals/SuccessModal'
 import { CandidateDetails } from './CandidateDetails'
+import toast from 'react-hot-toast'
 
 export const CandidatesTable = ({
   onCandidateAdded,
@@ -81,7 +82,6 @@ export const CandidatesTable = ({
   const filteredCandidates = candidates.filter(candidate => {
     const searchMatch = searchTerm === '' || 
       candidate.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      candidate.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (candidate.position && candidate.position.toLowerCase().includes(searchTerm.toLowerCase()))
 
     const statusMatch = !showStatusFilter || statusFilter === 'ALL' || candidate.status === statusFilter
@@ -231,23 +231,22 @@ export const CandidatesTable = ({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="min-w-full bg-white">
+        <table className="min-w-full bg-white border-collapse">
           <thead>
-            <tr className="bg-gray-100">
-              <th className="px-4 py-2">Nome</th>
-              <th className="px-4 py-2">Email</th>
-              <th className="px-4 py-2">Cargo</th>
-              <th className="px-4 py-2">Status</th>
-              <th className="px-4 py-2">Data do Teste</th>
-              <th className="px-4 py-2">Nota</th>
-              <th className="px-4 py-2">Avaliação</th>
-              <th className="px-4 py-2">Ações</th>
+            <tr className="bg-gray-100 text-base">
+              <th className="px-4 py-2 text-left w-1/6">Nome</th>
+              <th className="px-4 py-2 text-left w-1/6">Cargo</th>
+              <th className="px-4 py-2 text-center w-1/12">Status</th>
+              <th className="px-4 py-2 text-center w-1/6">Código de Convite</th>
+              <th className="px-4 py-2 text-center w-1/12">Nota</th>
+              <th className="px-4 py-2 text-center w-1/6">Avaliação</th>
+              <th className="px-4 py-2 text-center w-1/6">Ações</th>
             </tr>
           </thead>
           <tbody>
             {filteredCandidates.map((candidate) => (
               <tr key={candidate.id} className="border-b hover:bg-gray-50">
-                <td className="px-4 py-2">
+                <td className="px-4 py-2 text-lg text-left">
                   <button
                     onClick={() => handleCandidateClick(candidate)}
                     className="text-blue-600 hover:text-blue-800 hover:underline"
@@ -255,10 +254,9 @@ export const CandidatesTable = ({
                     {candidate.name}
                   </button>
                 </td>
-                <td className="px-4 py-2">{candidate.email}</td>
-                <td className="px-4 py-2">{candidate.position || '-'}</td>
-                <td className="px-4 py-2">
-                  <span className={`px-2 py-1 rounded ${
+                <td className="px-4 py-2 text-left">{candidate.position || '-'}</td>
+                <td className="px-4 py-2 text-center">
+                  <span className={`px-2 py-1 rounded inline-block ${
                     candidate.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
                     candidate.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
                     'bg-yellow-100 text-yellow-800'
@@ -268,10 +266,41 @@ export const CandidatesTable = ({
                      'Pendente'}
                   </span>
                 </td>
-                <td className="px-4 py-2">
-                  {candidate.testDate ? format(new Date(candidate.testDate), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
+                <td className="px-4 py-2 text-center">
+                  {candidate.inviteCode ? (
+                    <div className="flex items-center justify-center">
+                      <span className="font-mono text-base bg-gray-100 px-2 py-1 rounded">{candidate.inviteCode}</span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${window.location.origin}/test/${candidate.inviteCode}`);
+                          toast.success('Link copiado para a área de transferência!', {
+                            position: 'bottom-center',
+                          });
+                        }}
+                        className="ml-2 text-blue-500 hover:text-blue-700"
+                        title="Copiar link"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setSelectedCandidate(candidate);
+                        setShowInviteModal(true);
+                      }}
+                      className="bg-green-500 text-white px-3 py-2 rounded-md hover:bg-green-600 transition-colors duration-200 flex items-center justify-center space-x-1"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                      <span>Gerar Convite</span>
+                    </button>
+                  )}
                 </td>
-                <td className="px-4 py-2">
+                <td className="px-4 py-2 text-center">
                   {candidate.score ? (
                     <span className={`text-green-500`}>
                       {typeof candidate.score === 'number' ? 
@@ -283,23 +312,14 @@ export const CandidatesTable = ({
                     '-'
                   )}
                 </td>
-                <td className="px-4 py-2">
+                <td className="px-4 py-2 flex justify-center">
                   <Rating
                     value={candidate.rating || 0}
                     onChange={(_, newValue) => handleRatingChange(candidate.id, newValue)}
                   />
                 </td>
-                <td className="px-4 py-2">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        setSelectedCandidate(candidate)
-                        setShowInviteModal(true)
-                      }}
-                      className="bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
-                    >
-                      Convidar
-                    </button>
+                <td className="px-4 py-2 text-center">
+                  <div className="flex gap-2 justify-center">
                     {showDeleteButton && (
                       <button
                         onClick={() => {

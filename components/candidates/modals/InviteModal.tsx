@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import Modal from '../../common/Modal'
 import { InviteModalProps } from '../types'
+import toast from 'react-hot-toast'
 
 const InviteModal = ({ isOpen, onClose, candidate, onSuccess }: InviteModalProps) => {
   const [tests, setTests] = useState<{ id: string; title: string }[]>([])
@@ -18,13 +19,29 @@ const InviteModal = ({ isOpen, onClose, candidate, onSuccess }: InviteModalProps
           throw new Error('Erro ao carregar testes')
         }
         const data = await response.json()
-        setTests(data)
-        if (data.length > 0) {
-          setSelectedTest(data[0].id)
+        
+        // Verificar o formato da resposta e extrair os testes
+        if (data.success && Array.isArray(data.tests)) {
+          setTests(data.tests)
+          if (data.tests.length > 0) {
+            setSelectedTest(data.tests[0].id)
+          }
+        } else if (Array.isArray(data)) {
+          // Fallback para o caso da API retornar diretamente um array
+          setTests(data)
+          if (data.length > 0) {
+            setSelectedTest(data[0].id)
+          }
+        } else {
+          console.error('Formato de resposta inesperado:', data)
+          throw new Error('Formato de resposta inesperado')
         }
       } catch (error) {
         console.error('Erro ao carregar testes:', error)
         setError('Erro ao carregar testes')
+        toast.error('Erro ao carregar testes', {
+          position: 'bottom-center',
+        })
       } finally {
         setLoading(false)
       }
@@ -49,10 +66,19 @@ const InviteModal = ({ isOpen, onClose, candidate, onSuccess }: InviteModalProps
       }
 
       const data = await response.json()
+      toast.success(`Convite gerado com sucesso! Código: ${data.inviteCode}`, {
+        position: 'bottom-center',
+      });
       onSuccess(`Convite gerado com sucesso! Código: ${data.inviteCode}`)
       onClose()
     } catch (error) {
       console.error('Erro ao gerar convite:', error)
+      toast.error(
+        error instanceof Error ? error.message : 'Erro ao gerar convite',
+        {
+          position: 'bottom-center',
+        }
+      );
       setError('Erro ao gerar convite')
     }
   }
@@ -68,6 +94,8 @@ const InviteModal = ({ isOpen, onClose, candidate, onSuccess }: InviteModalProps
           <div className="text-center py-4">Carregando testes...</div>
         ) : error ? (
           <div className="text-red-600 py-4">{error}</div>
+        ) : tests.length === 0 ? (
+          <div className="text-amber-600 py-4">Nenhum teste disponível. Por favor, crie um teste primeiro.</div>
         ) : (
           <>
             <div>
