@@ -148,6 +148,47 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json(updatedCandidate);
     }
 
+    // DELETE - Excluir candidato
+    if (req.method === 'DELETE') {
+      // Verificar se o candidato existe
+      const candidate = await prisma.candidate.findUnique({
+        where: { id },
+      });
+      
+      if (!candidate) {
+        return res.status(404).json({ error: 'Candidato não encontrado' });
+      }
+
+      // Excluir registros relacionados em ordem para evitar violações de chave estrangeira
+      
+      // 1. Excluir progresso do candidato
+      await prisma.candidateProgress.deleteMany({
+        where: { candidateId: id },
+      });
+      
+      // 2. Excluir respostas do candidato
+      await prisma.response.deleteMany({
+        where: { candidateId: id },
+      });
+      
+      // 3. Excluir convites de teste associados ao candidato
+      await prisma.testInvitation.deleteMany({
+        where: { candidateId: id },
+      });
+      
+      // 4. Excluir histórico de códigos de convite usados
+      await prisma.usedInviteCode.deleteMany({
+        where: { candidateId: id },
+      });
+
+      // 5. Finalmente excluir o candidato
+      await prisma.candidate.delete({
+        where: { id },
+      });
+
+      return res.status(200).json({ success: true, message: 'Candidato excluído com sucesso' });
+    }
+
     // POST - Gerar novo código de convite
     if (req.method === 'POST' && req.body.action === 'generateInvite') {
       const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
