@@ -589,9 +589,66 @@ const TestStage: NextPage = () => {
   }, [stageId, candidateId, router]);
 
   // Função para salvar o progresso
-  const handleSaveProgress = (values: Record<string, string>) => {
+  const handleSaveProgress = async (values: Record<string, string>) => {
+    // Salvar no localStorage como antes
     saveResponsesToLocalStorage(values);
-    showToast('Progresso salvo com sucesso! Você pode continuar mais tarde.', 'success');
+    
+    try {
+      // Verificar se todas as perguntas têm respostas (não é obrigatório para salvar progresso)
+      const answeredQuestions = questions.filter(q => values[q.id]);
+      
+      if (answeredQuestions.length === 0) {
+        showToast('Nenhuma resposta para salvar.', 'info');
+        return;
+      }
+      
+      // Calcular o tempo gasto em segundos
+      const timeSpentSeconds = Math.floor((Date.now() - startTime) / 1000);
+      console.log(`Tempo gasto até o momento: ${timeSpentSeconds} segundos`);
+      
+      // Converter o objeto de valores para o formato de array esperado pela API
+      // Incluir apenas as perguntas que foram respondidas
+      const formattedResponses = answeredQuestions.map(question => {
+        const optionId = values[question.id];
+        console.log(`Salvando resposta para questão ${question.id}: optionId=${optionId}`);
+        
+        return {
+          questionId: question.id,
+          optionId: optionId,
+          timeSpent: timeSpentSeconds
+        };
+      });
+      
+      console.log('Salvando respostas no servidor:', formattedResponses);
+      
+      // Enviar para a API com flag indicando que é apenas um salvamento de progresso
+      const response = await fetch('/api/responses/save-progress', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          candidateId,
+          stageId,
+          responses: formattedResponses,
+          timeSpent: timeSpentSeconds,
+          isProgressSave: true // Indicar que é apenas um salvamento de progresso
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Erro ao salvar progresso no servidor:', errorText);
+        showToast('Progresso salvo localmente, mas houve um erro ao salvar no servidor.', 'warning');
+        return;
+      }
+      
+      console.log('Progresso salvo com sucesso no servidor!');
+      showToast('Progresso salvo com sucesso! Você pode continuar mais tarde.', 'success');
+    } catch (error) {
+      console.error('Erro ao salvar progresso no servidor:', error);
+      showToast('Progresso salvo localmente, mas houve um erro ao salvar no servidor.', 'warning');
+    }
   };
 
   // Função para finalizar o teste

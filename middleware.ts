@@ -24,6 +24,22 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Endpoints públicos que não exigem autenticação
+  const publicEndpoints = [
+    '/api/responses/save-progress',
+    '/api/responses',
+    '/api/questions',
+    '/api/stages/next',
+    '/api/stages/uuid',
+    '/api/responses/check-stage-completed'
+  ];
+  
+  // Verificar se é um endpoint público
+  if (publicEndpoints.some(endpoint => pathname.startsWith(endpoint))) {
+    console.log(`Middleware: Endpoint público ${pathname}, permitindo acesso sem autenticação`);
+    return NextResponse.next();
+  }
+
   // Log da URL sendo acessada
   console.log(`Middleware: Acessando ${pathname}`);
   
