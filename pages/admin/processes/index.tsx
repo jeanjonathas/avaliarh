@@ -1,8 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { useNotification } from '../../../contexts/NotificationContext';
+import toast, { Toaster } from 'react-hot-toast';
 import AdminLayout from '../../../components/admin/AdminLayout';
+import { 
+  IconButton, 
+  Tooltip, 
+  Dialog, 
+  DialogTitle, 
+  DialogContent, 
+  DialogContentText, 
+  DialogActions, 
+  Button 
+} from '@mui/material';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
 
 interface ProcessStage {
   id: string;
@@ -28,10 +41,11 @@ interface SelectionProcess {
 
 const ProcessList: React.FC = () => {
   const router = useRouter();
-  const { showToast, showModal } = useNotification();
   const [processes, setProcesses] = useState<SelectionProcess[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [processToDelete, setProcessToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProcesses();
@@ -56,44 +70,58 @@ const ProcessList: React.FC = () => {
     }
   };
 
-  const handleDelete = (id: string) => {
-    showModal(
-      'Confirmar exclusão',
-      'Tem certeza que deseja excluir este processo seletivo? Esta ação não pode ser desfeita.',
-      async () => {
-        try {
-          const response = await fetch(`/api/admin/processes/${id}`, {
-            method: 'DELETE',
-          });
-          
-          if (!response.ok) {
-            throw new Error('Erro ao excluir processo seletivo');
-          }
-          
-          showToast('Processo seletivo excluído com sucesso!', 'success');
-          
-          // Atualizar a lista de processos
-          setProcesses(processes.filter(process => process.id !== id));
-        } catch (err) {
-          console.error('Erro ao excluir processo:', err);
-          showToast('Não foi possível excluir o processo seletivo. Tente novamente mais tarde.', 'error');
-        }
-      },
-      {
-        type: 'warning',
-        confirmText: 'Excluir',
-        cancelText: 'Cancelar'
+  const openDeleteDialog = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Impede que o clique propague para a linha
+    setProcessToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const closeDeleteDialog = () => {
+    setDeleteDialogOpen(false);
+    setProcessToDelete(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!processToDelete) return;
+    
+    try {
+      const response = await fetch(`/api/admin/processes/${processToDelete}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Erro ao excluir processo seletivo');
       }
-    );
+      
+      toast.success('Processo seletivo excluído com sucesso!', {
+        position: 'bottom-center',
+      });
+      
+      // Atualizar a lista de processos
+      setProcesses(processes.filter(process => process.id !== processToDelete));
+      closeDeleteDialog();
+    } catch (err) {
+      console.error('Erro ao excluir processo:', err);
+      toast.error('Não foi possível excluir o processo seletivo. Tente novamente mais tarde.', {
+        position: 'bottom-center',
+      });
+      closeDeleteDialog();
+    }
+  };
+
+  const navigateToProcessDetails = (id: string) => {
+    router.push(`/admin/processes/${id}`);
   };
 
   return (
     <AdminLayout activeSection="selecao">
+      <Toaster position="bottom-center" />
       <main className="flex-1 p-6">
         <div className="mb-6 flex justify-between items-center">
           <h1 className="text-2xl font-semibold text-gray-900">Processos Seletivos</h1>
           <Link href="/admin/processes/new">
-            <button className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2">
+            <button className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 flex items-center">
+              <AddIcon className="h-4 w-4 mr-2" />
               Novo Processo
             </button>
           </Link>
@@ -117,9 +145,7 @@ const ProcessList: React.FC = () => {
             <div className="mt-6">
               <Link href="/admin/processes/new">
                 <button className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-                  <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-                  </svg>
+                  <AddIcon className="h-5 w-5 mr-2" />
                   Criar Processo Seletivo
                 </button>
               </Link>
@@ -145,14 +171,18 @@ const ProcessList: React.FC = () => {
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Data de Criação
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Ações
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {processes.map((process) => (
-                  <tr key={process.id}>
+                  <tr 
+                    key={process.id} 
+                    onClick={() => navigateToProcessDetails(process.id)}
+                    className="hover:bg-gray-50 cursor-pointer transition-colors duration-150"
+                  >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{process.name}</div>
                       {process.description && (
@@ -175,23 +205,26 @@ const ProcessList: React.FC = () => {
                         {new Date(process.createdAt).toLocaleDateString('pt-BR')}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Link href={`/admin/processes/${process.id}`}>
-                        <button className="text-indigo-600 hover:text-indigo-900 mr-4">
-                          Visualizar
-                        </button>
-                      </Link>
-                      <Link href={`/admin/processes/edit/${process.id}`}>
-                        <button className="text-primary-600 hover:text-primary-900 mr-4">
-                          Editar
-                        </button>
-                      </Link>
-                      <button
-                        onClick={() => handleDelete(process.id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Excluir
-                      </button>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <div className="flex justify-center space-x-2" onClick={(e) => e.stopPropagation()}>
+                        <Tooltip title="Editar">
+                          <Link href={`/admin/processes/edit/${process.id}`}>
+                            <IconButton size="small" color="primary">
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Link>
+                        </Tooltip>
+                        
+                        <Tooltip title="Excluir">
+                          <IconButton 
+                            size="small" 
+                            color="error" 
+                            onClick={(e) => openDeleteDialog(process.id, e)}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -200,6 +233,27 @@ const ProcessList: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* Diálogo de confirmação de exclusão */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={closeDeleteDialog}
+      >
+        <DialogTitle>Confirmar exclusão</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Tem certeza que deseja excluir este processo seletivo? Esta ação não pode ser desfeita.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeDeleteDialog} color="primary">
+            Cancelar
+          </Button>
+          <Button onClick={confirmDelete} color="error" autoFocus>
+            Excluir
+          </Button>
+        </DialogActions>
+      </Dialog>
     </AdminLayout>
   );
 };
