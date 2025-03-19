@@ -333,6 +333,27 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
 
   return (
     <div className="space-y-8">
+            {/* Cabeçalho do Processo Seletivo */}
+            <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="flex justify-between items-start">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">
+              {results?.processName || 'Processo Seletivo'}
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              {results?.jobPosition || 'Cargo não especificado'}
+            </p>
+          </div>
+          <div className="text-right">
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(results?.processStatus?.overallStatus)}`}>
+              {translateStatus(results?.processStatus?.overallStatus)}
+            </span>
+            <p className="text-sm text-gray-600 mt-1">
+              Etapa Atual: {results?.processStatus?.currentStage}
+            </p>
+          </div>
+        </div>
+      </div>
       {/* Seção de Desempenho */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="p-6">
@@ -441,110 +462,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
             </div>
           )}
         </div>
-      </div>
-
-      {/* Cards de resumo de desempenho */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Card de Pontuação Geral */}
-        <div className="bg-white p-5 rounded-lg shadow-md border-l-4 border-primary-500">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-primary-100 text-primary-600">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 00-2-2h-2a2 2 0 00-2 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
-              </svg>
-            </div>
-            <div className="ml-4">
-              <h4 className="text-sm font-medium text-secondary-500">Pontuação Geral</h4>
-              <div className="flex items-baseline">
-                <span className="text-2xl font-semibold text-secondary-900">
-                  {typeof results?.score === 'object' 
-                    ? (results.score.percentage !== null && results.score.percentage !== undefined 
-                        ? Number(results.score.percentage).toFixed(1) 
-                        : '0') 
-                    : (results?.score 
-                        ? Number(results?.score).toFixed(1) 
-                        : '0')}%
-                </span>
-                <span className="ml-2 text-sm text-secondary-500">
-                  ({typeof results?.score === 'object' 
-                    ? (results.score.total != null && results.score.correct != null 
-                       ? `${results.score.correct}/${results.score.total}` 
-                       : '0/0')
-                    : '0/0'})
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Card de Status do Teste */}
-        <div className="bg-white p-5 rounded-lg shadow-md border-l-4 border-blue-500">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-blue-100 text-blue-600">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div className="ml-4">
-              <h4 className="text-sm font-medium text-secondary-500">Status do Teste</h4>
-              <div className="flex items-baseline">
-                <span className="text-2xl font-semibold text-secondary-900">
-                  {!results?.completed ? 'Pendente' : (() => {
-                    const totalCorrect = results?.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0;
-                    const totalQuestions = results?.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0;
-                    const percentage = totalQuestions > 0 ? parseFloat((totalCorrect / totalQuestions * 100).toFixed(1)) : 0;
-                    
-                    if (percentage >= 80) return 'Aprovado';
-                    if (percentage >= 60) return 'Consideração';
-                    return 'Reprovado';
-                  })()}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Card de Tempo Gasto */}
-        <div className="bg-white p-5 rounded-lg shadow-md border-l-4 border-amber-500">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-amber-100 text-amber-600">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div className="ml-4">
-              <h4 className="text-sm font-medium text-secondary-500">Tempo Gasto</h4>
-              <div className="flex items-baseline">
-                <span className="text-2xl font-semibold text-secondary-900">
-                  {formatTime(results?.timeSpent)}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Cabeçalho do Processo Seletivo */}
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <div className="flex justify-between items-start">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">
-              {results?.processName || 'Processo Seletivo'}
-            </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              {results?.jobPosition || 'Cargo não especificado'}
-            </p>
-          </div>
-          <div className="text-right">
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(results?.processStatus?.overallStatus)}`}>
-              {translateStatus(results?.processStatus?.overallStatus)}
-            </span>
-            <p className="text-sm text-gray-600 mt-1">
-              Etapa Atual: {results?.processStatus?.currentStage}
-            </p>
-          </div>
-        </div>
-      </div>
+      </div>  
 
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
