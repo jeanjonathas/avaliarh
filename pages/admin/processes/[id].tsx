@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import AdminLayout from '../../../components/admin/AdminLayout';
 import { useNotification } from '../../../contexts/NotificationContext';
-import AddCandidateModal from '../../../components/admin/processes/AddCandidateModal';
+import CandidateSelectionModal from '../../../components/admin/processes/CandidateSelectionModal';
 import GenerateInviteButton from '../../../components/admin/processes/GenerateInviteButton';
 
 interface ProcessStage {
@@ -219,8 +219,21 @@ const ProcessDetails: React.FC = () => {
           <div className="flex space-x-3">
             <button
               onClick={() => setIsAddCandidateModalOpen(true)}
-              className="px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors"
+              className="ml-3 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
             >
+              <svg
+                className="-ml-1 mr-2 h-5 w-5"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                  clipRule="evenodd"
+                />
+              </svg>
               Adicionar Candidato
             </button>
             <Link href={`/admin/processes/edit/${process.id}`}>
@@ -455,13 +468,14 @@ const ProcessDetails: React.FC = () => {
           )}
         </div>
 
-        {/* Modal de Adicionar Candidato */}
-        <AddCandidateModal
-          isOpen={isAddCandidateModalOpen}
-          onClose={() => setIsAddCandidateModalOpen(false)}
-          processId={process.id}
-          onSuccess={fetchProcessDetails}
-        />
+        {isAddCandidateModalOpen && (
+          <CandidateSelectionModal
+            isOpen={isAddCandidateModalOpen}
+            onClose={() => setIsAddCandidateModalOpen(false)}
+            processId={process.id}
+            onSuccess={fetchProcessDetails}
+          />
+        )}
       </div>
     </AdminLayout>
   );

@@ -18,11 +18,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   
   try {
     console.log('Recebendo requisição para adicionar candidato ao processo:', req.body);
-    const { name, email, phone, position, instagram, resumeUrl, requestPhoto, showResults, processId } = req.body;
+    const { name, email, phone, position, instagram, resumeUrl, requestPhoto, showResults, processId, candidateId } = req.body;
     
-    if (!name || !email || !processId) {
-      console.error('Erro: Nome, email e ID do processo são obrigatórios');
-      return res.status(400).json({ error: 'Nome, email e ID do processo são obrigatórios' });
+    if (!processId) {
+      console.error('Erro: ID do processo é obrigatório');
+      return res.status(400).json({ error: 'ID do processo é obrigatório' });
     }
 
     // Buscar o processo seletivo para verificar se existe
@@ -35,49 +35,99 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'Processo seletivo não encontrado' });
     }
     
-    // Preparar os dados do candidato
-    const candidateData = {
-      name,
-      email,
-      phone: phone || null,
-      position: position || process.jobPosition, // Usar o cargo do processo seletivo se não for especificado
-      status: Status.PENDING,
-      completed: false,
-      inviteAttempts: 0,
-      inviteSent: false,
-      testDate: new Date(),
-      instagram: instagram || null,
-      resumeUrl: resumeUrl || null,
-      requestPhoto: requestPhoto !== undefined ? requestPhoto : true,
-      showResults: showResults !== undefined ? showResults : true,
-      processId, // Vincular ao processo seletivo
-      companyId: process.companyId, // Usar a mesma empresa do processo seletivo
-      observations: JSON.stringify({
+    let candidate;
+    
+    // Verificar se estamos adicionando um candidato existente ou criando um novo
+    if (candidateId) {
+      // Adicionar candidato existente ao processo
+      const existingCandidate = await prisma.candidate.findUnique({
+        where: { id: candidateId },
+        select: { id: true, processId: true, companyId: true }
+      });
+      
+      if (!existingCandidate) {
+        return res.status(404).json({ error: 'Candidato não encontrado' });
+      }
+      
+      if (existingCandidate.processId === processId) {
+        return res.status(400).json({ error: 'Candidato já está associado a este processo' });
+      }
+      
+      if (existingCandidate.companyId !== process.companyId) {
+        return res.status(403).json({ error: 'Candidato não pertence à mesma empresa do processo' });
+      }
+      
+      // Atualizar o candidato para associá-lo ao processo
+      candidate = await prisma.candidate.update({
+        where: { id: candidateId },
+        data: { processId }
+      });
+    } else {
+      // Criar um novo candidato
+      if (!name || !email) {
+        console.error('Erro: Nome e email são obrigatórios para criar um novo candidato');
+        return res.status(400).json({ error: 'Nome e email são obrigatórios para criar um novo candidato' });
+      }
+      
+      // Preparar os dados do candidato
+      const candidateData = {
+        name,
+        email,
+        phone: phone || null,
+        position: position || process.jobPosition, // Usar o cargo do processo seletivo se não for especificado
+        status: Status.PENDING,
+        completed: false,
+        inviteAttempts: 0,
+        inviteSent: false,
+        testDate: new Date(),
+        instagram: instagram || null,
+        resumeUrl: resumeUrl || null,
         requestPhoto: requestPhoto !== undefined ? requestPhoto : true,
-        showResults: showResults !== undefined ? showResults : true
-      })
-    };
-    
-    console.log('Criando candidato com os dados:', candidateData);
-    
-    // Criar o candidato
-    const candidate = await prisma.candidate.create({
-      data: candidateData,
-    });
+        showResults: showResults !== undefined ? showResults : true,
+        processId, // Vincular ao processo seletivo
+        companyId: process.companyId, // Usar a mesma empresa do processo seletivo
+        observations: JSON.stringify({
+          requestPhoto: requestPhoto !== undefined ? requestPhoto : true,
+          showResults: showResults !== undefined ? showResults : true
+        })
+      };
+      
+      console.log('Criando candidato com os dados:', candidateData);
+      
+      // Criar o candidato
+      candidate = await prisma.candidate.create({
+        data: candidateData,
+      });
+    }
 
-    // Criar os progressos do candidato para cada etapa do processo
-    const progressPromises = process.stages.map(stage => 
-      prisma.candidateProgress.create({
-        data: {
-          candidateId: candidate.id,
-          stageId: stage.id,
-          status: 'PENDING',
-          companyId: process.companyId,
+    // Criar os progressos do candidato para cada etapa do processo (apenas se não existirem)
+    const existingProgresses = await prisma.candidateProgress.findMany({
+      where: {
+        candidateId: candidate.id,
+        stage: {
+          processId
         }
-      })
-    );
-
-    await Promise.all(progressPromises);
+      }
+    });
+    
+    // Criar progressos apenas para as etapas que o candidato ainda não tem
+    const existingStageIds = existingProgresses.map(p => p.stageId);
+    const stagesToCreate = process.stages.filter(stage => !existingStageIds.includes(stage.id));
+    
+    if (stagesToCreate.length > 0) {
+      const progressPromises = stagesToCreate.map(stage => 
+        prisma.candidateProgress.create({
+          data: {
+            candidateId: candidate.id,
+            stageId: stage.id,
+            status: 'PENDING',
+            companyId: process.companyId,
+          }
+        })
+      );
+  
+      await Promise.all(progressPromises);
+    }
     
     console.log('Candidato adicionado com sucesso ao processo:', candidate);
     
