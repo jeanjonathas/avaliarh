@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useForm, Controller, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import toast from 'react-hot-toast';
 import AdminLayout from '../../../../components/admin/AdminLayout';
-import { useNotification } from '../../../../contexts/NotificationContext';
+import { Switch, FormControlLabel, FormGroup } from '@mui/material';
 import CollapsibleTestTable from '../../../../components/admin/processes/CollapsibleTestTable';
 
 interface ProcessStage {
@@ -60,7 +61,6 @@ const stageTypes = [
 const EditProcess: React.FC = () => {
   const router = useRouter();
   const { id } = router.query;
-  const { showToast } = useNotification();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tests, setTests] = useState<Test[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -112,12 +112,12 @@ const EditProcess: React.FC = () => {
             }))
           });
         } else {
-          showToast('Erro ao carregar processo seletivo', 'error');
+          toast.error('Erro ao carregar processo seletivo');
           router.push('/admin/processes');
         }
       } catch (error) {
         console.error('Erro ao carregar processo:', error);
-        showToast('Erro ao carregar processo seletivo', 'error');
+        toast.error('Erro ao carregar processo seletivo');
         router.push('/admin/processes');
       } finally {
         setIsLoading(false);
@@ -125,7 +125,7 @@ const EditProcess: React.FC = () => {
     };
 
     fetchProcess();
-  }, [id, reset, router, showToast]);
+  }, [id, reset, router]);
 
   // Carregar testes disponíveis
   useEffect(() => {
@@ -139,14 +139,14 @@ const EditProcess: React.FC = () => {
         }
       } catch (error) {
         console.error('Erro ao carregar testes:', error);
-        showToast('Erro ao carregar testes disponíveis', 'error');
+        toast.error('Erro ao carregar testes disponíveis');
       } finally {
         setIsLoadingTests(false);
       }
     };
 
     fetchTests();
-  }, [showToast]);
+  }, []);
 
   // Carregar detalhes dos testes quando necessário
   const loadTestDetails = async (testId: string) => {
@@ -180,7 +180,7 @@ const EditProcess: React.FC = () => {
 
     try {
       setIsSubmitting(true);
-      showToast('Salvando alterações...', 'info');
+      toast('Salvando alterações...', { icon: 'info' });
 
       const response = await fetch(`/api/admin/processes/${id}`, {
         method: 'PUT',
@@ -198,16 +198,16 @@ const EditProcess: React.FC = () => {
       });
 
       if (response.ok) {
-        showToast('Processo seletivo atualizado com sucesso!', 'success');
+        toast.success('Processo seletivo atualizado com sucesso!');
         localStorage.removeItem('processDraft');
         router.push('/admin/processes');
       } else {
         const error = await response.json();
-        showToast(error.message || 'Erro ao atualizar processo seletivo', 'error');
+        toast.error(error.message || 'Erro ao atualizar processo seletivo');
       }
     } catch (error) {
       console.error('Erro ao atualizar processo seletivo:', error);
-      showToast('Erro ao atualizar processo seletivo', 'error');
+      toast.error('Erro ao atualizar processo seletivo');
     } finally {
       setIsSubmitting(false);
     }
@@ -402,35 +402,41 @@ const EditProcess: React.FC = () => {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id={`requestCandidatePhoto-${index}`}
-                        {...register(`stages.${index}.requestCandidatePhoto` as const)}
-                        className="w-4 h-4 text-primary-600 bg-gray-100 rounded border-gray-300 focus:ring-primary-500"
+                    <FormGroup>
+                      <Controller
+                        name={`stages.${index}.requestCandidatePhoto` as const}
+                        control={control}
+                        render={({ field }) => (
+                          <FormControlLabel 
+                            control={
+                              <Switch 
+                                checked={field.value} 
+                                onChange={field.onChange} 
+                              />
+                            } 
+                            label="Solicitar foto do candidato" 
+                          />
+                        )}
                       />
-                      <label 
-                        htmlFor={`requestCandidatePhoto-${index}`}
-                        className="text-sm font-medium text-secondary-700"
-                      >
-                        Solicitar foto do candidato
-                      </label>
-                    </div>
+                    </FormGroup>
 
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id={`showResultsToCandidate-${index}`}
-                        {...register(`stages.${index}.showResultsToCandidate` as const)}
-                        className="w-4 h-4 text-primary-600 bg-gray-100 rounded border-gray-300 focus:ring-primary-500"
+                    <FormGroup>
+                      <Controller
+                        name={`stages.${index}.showResultsToCandidate` as const}
+                        control={control}
+                        render={({ field }) => (
+                          <FormControlLabel 
+                            control={
+                              <Switch 
+                                checked={field.value} 
+                                onChange={field.onChange} 
+                              />
+                            } 
+                            label="Exibir resultados ao candidato" 
+                          />
+                        )}
                       />
-                      <label 
-                        htmlFor={`showResultsToCandidate-${index}`}
-                        className="text-sm font-medium text-secondary-700"
-                      >
-                        Exibir resultados ao candidato
-                      </label>
-                    </div>
+                    </FormGroup>
                   </div>
 
                   {watch(`stages.${index}.type`) === 'TEST' && (
