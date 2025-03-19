@@ -6,6 +6,29 @@ import toast from 'react-hot-toast';
 import CandidateSelectionModal from '../../../components/admin/processes/CandidateSelectionModal';
 import GenerateInviteButton from '../../../components/admin/processes/GenerateInviteButton';
 import AddCandidateModal from '../../../components/candidates/modals/AddCandidateModal';
+import { 
+  DataGrid, 
+  GridColDef, 
+  GridRenderCellParams,
+  GridRowSelectionModel
+} from '@mui/x-data-grid';
+import { 
+  Button, 
+  Chip, 
+  IconButton, 
+  Tooltip, 
+  Dialog, 
+  DialogActions, 
+  DialogContent, 
+  DialogContentText, 
+  DialogTitle 
+} from '@mui/material';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import DeleteIcon from '@mui/icons-material/Delete';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import EditIcon from '@mui/icons-material/Edit';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 interface ProcessStage {
   id: string;
@@ -57,6 +80,8 @@ const ProcessDetails: React.FC = () => {
   const [isAddCandidateModalOpen, setIsAddCandidateModalOpen] = useState(false);
   const [isNewCandidateModalOpen, setIsNewCandidateModalOpen] = useState(false);
   const [candidateInviteCodes, setCandidateInviteCodes] = useState<Record<string, string>>({});
+  const [confirmRemoveDialogOpen, setConfirmRemoveDialogOpen] = useState(false);
+  const [candidateToRemove, setCandidateToRemove] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -156,6 +181,51 @@ const ProcessDetails: React.FC = () => {
     };
     
     return statusMap[status] || status;
+  };
+
+  const handleRemoveCandidate = async () => {
+    if (!candidateToRemove) return;
+    
+    try {
+      const response = await fetch(`/api/admin/processes/candidates/remove`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          candidateId: candidateToRemove,
+          processId: process?.id
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao remover candidato do processo');
+      }
+
+      toast.success('Candidato removido do processo com sucesso!', {
+        position: 'bottom-center',
+      });
+      
+      // Atualizar a lista de candidatos
+      fetchProcessDetails();
+      
+      // Fechar o diálogo de confirmação
+      setConfirmRemoveDialogOpen(false);
+      setCandidateToRemove(null);
+    } catch (error) {
+      console.error('Erro ao remover candidato:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'Erro ao remover candidato do processo',
+        {
+          position: 'bottom-center',
+        }
+      );
+    }
+  };
+
+  const openRemoveConfirmDialog = (candidateId: string) => {
+    setCandidateToRemove(candidateId);
+    setConfirmRemoveDialogOpen(true);
   };
 
   if (loading) {
@@ -322,9 +392,14 @@ const ProcessDetails: React.FC = () => {
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-gray-800">Candidatos</h2>
             <Link href={`/admin/candidates?processId=${process.id}`}>
-              <button className="px-3 py-1 bg-primary-500 text-white rounded-md hover:bg-primary-600 transition-colors text-sm">
+              <Button 
+                variant="contained" 
+                color="primary" 
+                size="small" 
+                startIcon={<PersonAddIcon />}
+              >
                 Gerenciar Candidatos
-              </button>
+              </Button>
             </Link>
           </div>
           
@@ -351,7 +426,7 @@ const ProcessDetails: React.FC = () => {
               <div className="mt-6">
                 <button
                   onClick={() => setIsAddCandidateModalOpen(true)}
-                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                 >
                   <svg
                     className="-ml-1 mr-2 h-5 w-5"
@@ -371,100 +446,131 @@ const ProcessDetails: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Nome
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Email
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Progresso
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Data de Inscrição
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Convite
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ações
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {process.candidates.map((candidate) => (
-                    <tr key={candidate.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {candidate.name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {candidate.email}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span key={`status-${candidate.id}`} className={`px-2 py-1 text-xs rounded-full ${getStatusBadgeColor(candidate.overallStatus)}`}>
-                          {getStatusLabel(candidate.overallStatus)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+            <div style={{ height: 400, width: '100%' }}>
+              <DataGrid
+                rows={process.candidates.map(candidate => ({
+                  ...candidate,
+                  progress: Math.round((candidate.progresses.filter(p => p.status === 'COMPLETED').length / process.stages.length) * 100)
+                }))}
+                columns={[
+                  { field: 'name', headerName: 'Nome', flex: 1 },
+                  { field: 'email', headerName: 'Email', flex: 1 },
+                  { 
+                    field: 'overallStatus', 
+                    headerName: 'Status', 
+                    width: 150,
+                    renderCell: (params: GridRenderCellParams) => {
+                      const status = params.value as string;
+                      return (
+                        <Chip 
+                          label={getStatusLabel(status)}
+                          color={
+                            status === 'APPROVED' ? 'success' :
+                            status === 'REJECTED' ? 'error' :
+                            status === 'IN_PROGRESS' ? 'info' :
+                            'warning'
+                          }
+                          size="small"
+                          variant="outlined"
+                        />
+                      );
+                    }
+                  },
+                  { 
+                    field: 'progress', 
+                    headerName: 'Progresso', 
+                    width: 150,
+                    renderCell: (params: GridRenderCellParams) => (
+                      <div className="w-full">
                         <div className="w-full bg-gray-200 rounded-full h-2.5">
                           <div 
                             className="bg-primary-500 h-2.5 rounded-full" 
-                            style={{ 
-                              width: `${Math.round((candidate.progresses.filter(p => p.status === 'COMPLETED').length / process.stages.length) * 100)}%` 
-                            }}
+                            style={{ width: `${params.value}%` }}
                           ></div>
                         </div>
                         <span className="text-xs text-gray-500 mt-1 block">
-                          {candidate.progresses.filter(p => p.status === 'COMPLETED').length} de {process.stages.length} etapas
+                          {params.row.progresses.filter((p: any) => p.status === 'COMPLETED').length} de {process.stages.length} etapas
                         </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(candidate.createdAt)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {candidateInviteCodes[candidate.id] ? (
-                          <div className="flex items-center space-x-2">
-                            <span className="font-medium text-gray-900">{candidateInviteCodes[candidate.id]}</span>
-                            <button
+                      </div>
+                    )
+                  },
+                  { 
+                    field: 'createdAt', 
+                    headerName: 'Data de Cadastro', 
+                    width: 150,
+                    renderCell: (params) => (
+                      <span>{formatDate(String(params.value))}</span>
+                    )
+                  },
+                  { 
+                    field: 'inviteCode', 
+                    headerName: 'Convite', 
+                    width: 200,
+                    renderCell: (params: GridRenderCellParams) => {
+                      const candidateId = params.row.id;
+                      const inviteCode = candidateInviteCodes[candidateId];
+                      
+                      return inviteCode ? (
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium text-gray-900">{inviteCode}</span>
+                          <Tooltip title="Copiar código">
+                            <IconButton
+                              size="small"
                               onClick={() => {
-                                navigator.clipboard.writeText(candidateInviteCodes[candidate.id]);
+                                navigator.clipboard.writeText(inviteCode);
                                 toast.success('Código copiado para a área de transferência!');
                               }}
-                              className="text-gray-500 hover:text-gray-700"
-                              title="Copiar código"
                             >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                              </svg>
-                            </button>
-                          </div>
-                        ) : (
-                          <GenerateInviteButton
-                            candidateId={candidate.id}
-                            processId={process.id}
-                            testId={process.test?.id || ''}
-                            onSuccess={(inviteCode) => handleInviteSuccess(candidate.id, inviteCode)}
-                          />
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Link href={`/admin/candidates/${candidate.id}?returnTo=/admin/processes/${process.id}`}>
-                          <button className="text-primary-600 hover:text-primary-900">
-                            Ver Detalhes
-                          </button>
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                              <ContentCopyIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </div>
+                      ) : (
+                        <GenerateInviteButton
+                          candidateId={candidateId}
+                          processId={process.id}
+                          testId={process.test?.id || ''}
+                          onSuccess={(inviteCode) => handleInviteSuccess(candidateId, inviteCode)}
+                        />
+                      );
+                    }
+                  },
+                  {
+                    field: 'actions',
+                    headerName: 'Ações',
+                    width: 120,
+                    sortable: false,
+                    renderCell: (params: GridRenderCellParams) => (
+                      <div className="flex space-x-1">
+                        <Tooltip title="Ver detalhes">
+                          <IconButton
+                            size="small"
+                            onClick={() => router.push(`/admin/candidates/${params.id}?returnTo=/admin/processes/${process.id}`)}
+                          >
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Remover do processo">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => openRemoveConfirmDialog(params.id.toString())}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </div>
+                    )
+                  }
+                ]}
+                initialState={{
+                  pagination: {
+                    paginationModel: { pageSize: 5 }
+                  }
+                }}
+                pageSizeOptions={[5, 10, 20]}
+                disableRowSelectionOnClick
+              />
             </div>
           )}
         </div>
@@ -494,6 +600,28 @@ const ProcessDetails: React.FC = () => {
             processId={process.id}
           />
         )}
+
+        {/* Diálogo de confirmação para remover candidato */}
+        <Dialog
+          open={confirmRemoveDialogOpen}
+          onClose={() => setConfirmRemoveDialogOpen(false)}
+        >
+          <DialogTitle>Remover candidato</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Tem certeza que deseja remover este candidato do processo seletivo? 
+              Esta ação não pode ser desfeita.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setConfirmRemoveDialogOpen(false)} color="primary">
+              Cancelar
+            </Button>
+            <Button onClick={handleRemoveCandidate} color="error" variant="contained">
+              Remover
+            </Button>
+          </DialogActions>
+        </Dialog>
       </div>
     </AdminLayout>
   );
