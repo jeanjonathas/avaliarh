@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import AdminLayout from '../../../components/admin/AdminLayout';
-import { useNotification } from '../../../contexts/NotificationContext';
+import toast from 'react-hot-toast';
 import CandidateSelectionModal from '../../../components/admin/processes/CandidateSelectionModal';
 import GenerateInviteButton from '../../../components/admin/processes/GenerateInviteButton';
 import AddCandidateModal from '../../../components/candidates/modals/AddCandidateModal';
@@ -51,7 +51,6 @@ interface SelectionProcess {
 const ProcessDetails: React.FC = () => {
   const router = useRouter();
   const { id } = router.query;
-  const { showToast } = useNotification();
   const [process, setProcess] = useState<SelectionProcess | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -436,7 +435,7 @@ const ProcessDetails: React.FC = () => {
                             <button
                               onClick={() => {
                                 navigator.clipboard.writeText(candidateInviteCodes[candidate.id]);
-                                showToast('Código copiado para a área de transferência!', 'success');
+                                toast.success('Código copiado para a área de transferência!');
                               }}
                               className="text-gray-500 hover:text-gray-700"
                               title="Copiar código"

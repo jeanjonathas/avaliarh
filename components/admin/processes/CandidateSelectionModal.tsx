@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useNotification } from '../../../contexts/NotificationContext';
 import AddCandidateModal from '../../candidates/modals/AddCandidateModal';
+import { 
+  DataGrid, 
+  GridColDef, 
+  GridRenderCellParams, 
+  GridRowSelectionModel 
+} from '@mui/x-data-grid';
+import { Button, Chip } from '@mui/material';
+import toast from 'react-hot-toast';
 
 interface Candidate {
   id: string;
@@ -30,7 +37,7 @@ const CandidateSelectionModal: React.FC<CandidateSelectionModalProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAddCandidateModalOpen, setIsAddCandidateModalOpen] = useState(false);
-  const { showToast } = useNotification();
+  const [selectionModel, setSelectionModel] = useState<GridRowSelectionModel>([]);
   const router = useRouter();
 
   useEffect(() => {
@@ -61,47 +68,82 @@ const CandidateSelectionModal: React.FC<CandidateSelectionModalProps> = ({
     }
   };
 
-  const handleAddCandidateToProcess = async (candidateId: string) => {
-    try {
-      const response = await fetch('/api/admin/processes/candidates/add', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          candidateId,
-          processId
-        }),
+  const handleAddSelectedCandidates = async () => {
+    if (selectionModel.length === 0) {
+      toast.error('Selecione pelo menos um candidato para adicionar ao processo', {
+        position: 'bottom-center',
       });
+      return;
+    }
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Erro ao adicionar candidato ao processo');
+    try {
+      // Adicionar cada candidato selecionado ao processo
+      for (const candidateId of selectionModel) {
+        await addCandidateToProcess(candidateId.toString());
       }
 
-      showToast('Candidato adicionado ao processo com sucesso!', 'success');
+      toast.success(`${selectionModel.length} candidato(s) adicionado(s) ao processo com sucesso!`, {
+        position: 'bottom-center',
+      });
       
-      // Remover o candidato da lista
-      setCandidates(candidates.filter(c => c.id !== candidateId));
+      // Limpar seleção
+      setSelectionModel([]);
       
       // Atualizar a lista de candidatos do processo
       onSuccess();
+      
+      // Fechar o modal após adicionar
+      onClose();
     } catch (error) {
-      console.error('Erro ao adicionar candidato ao processo:', error);
-      showToast(
-        error instanceof Error ? error.message : 'Erro ao adicionar candidato ao processo',
-        'error'
+      console.error('Erro ao adicionar candidatos ao processo:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'Erro ao adicionar candidatos ao processo',
+        {
+          position: 'bottom-center',
+        }
       );
     }
   };
 
+  const addCandidateToProcess = async (candidateId: string) => {
+    const response = await fetch('/api/admin/processes/candidates/add', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        candidateId,
+        processId
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Erro ao adicionar candidato ao processo');
+    }
+    
+    // Remover o candidato da lista
+    setCandidates(candidates.filter(c => c.id !== candidateId));
+  };
+
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    }).format(date);
+    try {
+      const date = new Date(dateString);
+      
+      // Verificar se a data é válida
+      if (isNaN(date.getTime())) {
+        return 'Data inválida';
+      }
+      
+      return new Intl.DateTimeFormat('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      }).format(date);
+    } catch (error) {
+      console.error('Erro ao formatar data:', error);
+      return 'Data inválida';
+    }
   };
 
   const handleCreateNewCandidate = () => {
@@ -121,6 +163,57 @@ const CandidateSelectionModal: React.FC<CandidateSelectionModalProps> = ({
     // Reabrir a modal de seleção após o cadastro bem-sucedido
     onSuccess();
   };
+
+  const columns: GridColDef[] = [
+    { field: 'name', headerName: 'Nome', flex: 1 },
+    { 
+      field: 'status', 
+      headerName: 'Status', 
+      width: 150,
+      renderCell: (params: GridRenderCellParams) => {
+        const status = params.value as string;
+        return (
+          <Chip 
+            label={
+              status === 'APPROVED' ? 'Aprovado' :
+              status === 'REJECTED' ? 'Rejeitado' :
+              'Pendente'
+            }
+            color={
+              status === 'APPROVED' ? 'success' :
+              status === 'REJECTED' ? 'error' :
+              'warning'
+            }
+            size="small"
+            variant="outlined"
+          />
+        );
+      }
+    },
+    { 
+      field: 'createdAt', 
+      headerName: 'Data de Cadastro', 
+      width: 180,
+      renderCell: (params) => (
+        <span>{formatDate(String(params.value))}</span>
+      )
+    },
+    {
+      field: 'actions',
+      headerName: 'Ações',
+      width: 150,
+      sortable: false,
+      renderCell: (params: GridRenderCellParams) => (
+        <Button
+          variant="text"
+          size="small"
+          onClick={() => router.push(`/admin/candidates/${params.id}`)}
+        >
+          Ver Detalhes
+        </Button>
+      )
+    }
+  ];
 
   if (!isOpen) return null;
 
@@ -164,13 +257,30 @@ const CandidateSelectionModal: React.FC<CandidateSelectionModalProps> = ({
           </div>
         ) : (
           <>
-            <div className="flex justify-end mb-4">
-              <button
+            <div className="flex justify-between mb-4">
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleAddSelectedCandidates}
+                disabled={selectionModel.length === 0}
+                sx={{ 
+                  opacity: selectionModel.length === 0 ? 0.7 : 1,
+                  '&.Mui-disabled': {
+                    color: 'white',
+                    backgroundColor: 'rgba(25, 118, 210, 0.5)',
+                  }
+                }}
+              >
+                Adicionar Selecionados ({selectionModel.length})
+              </Button>
+              
+              <Button
+                variant="outlined"
+                color="primary"
                 onClick={handleCreateNewCandidate}
-                className="px-4 py-2 bg-primary-500 text-white rounded hover:bg-primary-600"
               >
                 Cadastrar Novo Candidato
-              </button>
+              </Button>
             </div>
             
             {candidates.length === 0 ? (
@@ -178,68 +288,25 @@ const CandidateSelectionModal: React.FC<CandidateSelectionModalProps> = ({
                 <p className="text-gray-500 mb-4">Não há candidatos disponíveis para adicionar a este processo.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Nome
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Email
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Data de Cadastro
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Ações
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {candidates.map((candidate) => (
-                      <tr key={candidate.id}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{candidate.name}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-500">{candidate.email}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            candidate.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
-                            candidate.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
-                            'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            {candidate.status === 'APPROVED' ? 'Aprovado' :
-                             candidate.status === 'REJECTED' ? 'Rejeitado' :
-                             'Pendente'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {formatDate(candidate.createdAt)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button
-                            onClick={() => handleAddCandidateToProcess(candidate.id)}
-                            className="text-primary-600 hover:text-primary-900 mr-4"
-                          >
-                            Adicionar ao Processo
-                          </button>
-                          <button
-                            onClick={() => router.push(`/admin/candidates/${candidate.id}`)}
-                            className="text-gray-600 hover:text-gray-900"
-                          >
-                            Ver Detalhes
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div style={{ height: 400, width: '100%' }}>
+                <DataGrid
+                  rows={candidates}
+                  columns={columns}
+                  initialState={{
+                    pagination: {
+                      paginationModel: { pageSize: 5 }
+                    }
+                  }}
+                  pageSizeOptions={[5, 10, 20]}
+                  checkboxSelection
+                  disableRowSelectionOnClick
+                  rowSelectionModel={selectionModel}
+                  onRowSelectionModelChange={(newSelectionModel) => {
+                    console.log('Seleção alterada:', newSelectionModel);
+                    setSelectionModel(newSelectionModel);
+                  }}
+                  loading={loading}
+                />
               </div>
             )}
           </>

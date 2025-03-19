@@ -24,6 +24,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'ID do processo é obrigatório' });
     }
     
+    console.log(`Buscando candidatos disponíveis para o processo: ${processId}`);
+    
     // Obter o usuário atual e sua empresa
     const user = await prisma.user.findUnique({
       where: { email: session.user?.email as string },
@@ -33,6 +35,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!user?.companyId) {
       return res.status(403).json({ error: 'Usuário não está associado a uma empresa' });
     }
+    
+    console.log(`Empresa do usuário: ${user.companyId}`);
     
     // Verificar se o processo pertence à empresa do usuário
     const process = await prisma.selectionProcess.findUnique({
@@ -48,14 +52,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(403).json({ error: 'Acesso negado a este processo seletivo' });
     }
     
+    // Primeiro, vamos verificar quantos candidatos existem na empresa
+    const totalCandidates = await prisma.candidate.count({
+      where: {
+        companyId: user.companyId
+      }
+    });
+    
+    console.log(`Total de candidatos na empresa: ${totalCandidates}`);
+    
     // Buscar candidatos da empresa que NÃO estão associados ao processo atual
     const availableCandidates = await prisma.candidate.findMany({
       where: {
         companyId: user.companyId,
-        // Não incluir candidatos que já estão no processo
-        NOT: {
-          processId: processId
-        }
+        OR: [
+          { processId: null },
+          { processId: { not: processId } }
+        ]
       },
       select: {
         id: true,
@@ -68,6 +81,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         createdAt: 'desc'
       }
     });
+    
+    console.log(`Candidatos disponíveis encontrados: ${availableCandidates.length}`);
     
     return res.status(200).json(availableCandidates);
     

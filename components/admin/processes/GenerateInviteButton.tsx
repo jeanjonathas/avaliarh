@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNotification } from '../../../contexts/NotificationContext';
+import toast from 'react-hot-toast';
 
 interface GenerateInviteButtonProps {
   candidateId: string;
@@ -10,7 +10,6 @@ interface GenerateInviteButtonProps {
 
 const GenerateInviteButton = ({ candidateId, processId, testId, onSuccess }: GenerateInviteButtonProps) => {
   const [loading, setLoading] = useState(false);
-  const { showToast } = useNotification();
 
   const handleGenerateInvite = async () => {
     try {
@@ -32,10 +31,14 @@ const GenerateInviteButton = ({ candidateId, processId, testId, onSuccess }: Gen
 
       const data = await response.json();
       onSuccess(data.inviteCode);
-      showToast('Convite gerado com sucesso!', 'success');
+      toast.success('Convite gerado com sucesso!', {
+        position: 'bottom-center',
+      });
     } catch (error) {
       console.error('Erro ao gerar convite:', error);
-      showToast('Erro ao gerar convite. Tente novamente.', 'error');
+      toast.error('Erro ao gerar convite. Tente novamente.', {
+        position: 'bottom-center',
+      });
     } finally {
       setLoading(false);
     }
