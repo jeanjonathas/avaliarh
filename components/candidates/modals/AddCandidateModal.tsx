@@ -154,34 +154,6 @@ const AddCandidateModal = ({ isOpen, onClose, onSuccess }: AddCandidateModalProp
             className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Teste (opcional)
-          </label>
-          <select
-            value={newCandidate.testId}
-            onChange={(e) => setNewCandidate({ ...newCandidate, testId: e.target.value })}
-            className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500"
-            disabled={isLoadingTests}
-          >
-            <option value="">Selecione um teste</option>
-            {tests && tests.length > 0 ? (
-              tests.map((test) => (
-                <option key={test.id} value={test.id}>
-                  {test.title}
-                </option>
-              ))
-            ) : (
-              <option value="" disabled>Nenhum teste disponível</option>
-            )}
-          </select>
-          {isLoadingTests && (
-            <p className="mt-1 text-sm text-gray-500">Carregando testes...</p>
-          )}
-          {!isLoadingTests && tests.length === 0 && (
-            <p className="mt-1 text-sm text-gray-500">Nenhum teste ativo encontrado</p>
-          )}
-        </div>
         <div className="flex justify-end space-x-2">
           <button
             type="button"

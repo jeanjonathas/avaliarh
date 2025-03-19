@@ -4,6 +4,7 @@ import Link from 'next/link';
 import AdminLayout from '../../../components/admin/AdminLayout';
 import { useNotification } from '../../../contexts/NotificationContext';
 import AddCandidateModal from '../../../components/admin/processes/AddCandidateModal';
+import GenerateInviteButton from '../../../components/admin/processes/GenerateInviteButton';
 
 interface ProcessStage {
   id: string;
@@ -20,6 +21,8 @@ interface Candidate {
   status: string;
   overallStatus: string;
   createdAt: string;
+  inviteCode?: string;
+  testId?: string;
   progresses: Array<{
     id: string;
     status: string;
@@ -38,6 +41,10 @@ interface SelectionProcess {
   updatedAt: string;
   stages: ProcessStage[];
   candidates: Candidate[];
+  test?: {
+    id: string;
+    title: string;
+  };
 }
 
 const ProcessDetails: React.FC = () => {
@@ -48,6 +55,7 @@ const ProcessDetails: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAddCandidateModalOpen, setIsAddCandidateModalOpen] = useState(false);
+  const [candidateInviteCodes, setCandidateInviteCodes] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (id) {
@@ -66,12 +74,28 @@ const ProcessDetails: React.FC = () => {
       
       const data = await response.json();
       setProcess(data);
+      
+      // Inicializar o estado dos códigos de convite
+      const inviteCodes: Record<string, string> = {};
+      data.candidates.forEach((candidate: Candidate) => {
+        if (candidate.inviteCode) {
+          inviteCodes[candidate.id] = candidate.inviteCode;
+        }
+      });
+      setCandidateInviteCodes(inviteCodes);
     } catch (err) {
       console.error('Erro ao buscar detalhes do processo seletivo:', err);
       setError('Erro ao carregar detalhes do processo seletivo. Tente novamente mais tarde.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleInviteSuccess = (candidateId: string, inviteCode: string) => {
+    setCandidateInviteCodes(prev => ({
+      ...prev,
+      [candidateId]: inviteCode
+    }));
   };
 
   const getStatusBadgeColor = (status: string) => {
@@ -353,6 +377,9 @@ const ProcessDetails: React.FC = () => {
                       Data de Inscrição
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Convite
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Ações
                     </th>
                   </tr>
@@ -387,8 +414,34 @@ const ProcessDetails: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {formatDate(candidate.createdAt)}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {candidateInviteCodes[candidate.id] ? (
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium text-gray-900">{candidateInviteCodes[candidate.id]}</span>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(candidateInviteCodes[candidate.id]);
+                                showToast('Código copiado para a área de transferência!', 'success');
+                              }}
+                              className="text-gray-500 hover:text-gray-700"
+                              title="Copiar código"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                              </svg>
+                            </button>
+                          </div>
+                        ) : (
+                          <GenerateInviteButton
+                            candidateId={candidate.id}
+                            processId={process.id}
+                            testId={process.test?.id || ''}
+                            onSuccess={(inviteCode) => handleInviteSuccess(candidate.id, inviteCode)}
+                          />
+                        )}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Link href={`/admin/candidates/${candidate.id}`}>
+                        <Link href={`/admin/candidates/${candidate.id}?returnTo=/admin/processes/${process.id}`}>
                           <button className="text-primary-600 hover:text-primary-900">
                             Ver Detalhes
                           </button>

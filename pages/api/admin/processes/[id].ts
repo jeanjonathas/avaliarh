@@ -2,6 +2,10 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
 import { prisma } from '../../../../lib/prisma';
+import { Prisma, Status } from '@prisma/client';
+
+// Tipo personalizado para o status de exibição na UI
+type DisplayStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'IN_PROGRESS';
 
 export default async function handler(
   req: NextApiRequest,
@@ -65,7 +69,56 @@ export default async function handler(
           return res.status(404).json({ message: 'Processo seletivo não encontrado' });
         }
 
-        return res.status(200).json(processDetails);
+        // Verificar se o processo tem um teste associado
+        const processTest = await prisma.test.findFirst({
+          where: {
+            processStages: {
+              some: {
+                processId: id
+              }
+            }
+          },
+          select: {
+            id: true,
+            title: true
+          }
+        });
+
+        // Transformar os dados dos candidatos para incluir o status geral
+        const candidatesWithOverallStatus = processDetails.candidates.map(candidate => {
+          // Calcular o status geral com base nos progressos
+          const completedStages = candidate.progresses.filter(p => p.status === 'COMPLETED').length;
+          const totalStages = processDetails.stages.length;
+          
+          // Criar um status personalizado para a UI
+          let overallStatus = candidate.status;
+          let displayStatus: DisplayStatus = candidate.status;
+          
+          // Se o candidato não tiver um status definido, determinar com base no progresso
+          if (overallStatus === Status.PENDING && completedStages > 0) {
+            // Mantemos o status original no banco de dados, mas exibimos um status personalizado na UI
+            displayStatus = 'IN_PROGRESS';
+          }
+          
+          return {
+            id: candidate.id,
+            name: candidate.name,
+            email: candidate.email,
+            status: candidate.status,
+            createdAt: candidate.createdAt,
+            inviteCode: candidate.inviteCode,
+            testId: candidate.testId,
+            overallStatus: displayStatus,
+            progresses: candidate.progresses
+          };
+        });
+
+        // Retornar o processo com os candidatos atualizados e o teste associado
+        return res.status(200).json({
+          ...processDetails,
+          candidates: candidatesWithOverallStatus,
+          test: processTest
+        });
       } catch (error) {
         console.error('Erro ao buscar detalhes do processo seletivo:', error);
         return res.status(500).json({ message: 'Erro ao buscar detalhes do processo seletivo' });
