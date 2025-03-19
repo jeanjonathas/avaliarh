@@ -2,6 +2,36 @@ import { NextApiRequest, NextApiResponse } from 'next'
 import { getSession } from 'next-auth/react'
 import { prisma } from '../../../../../lib/prisma'
 
+// Definir interfaces para tipar corretamente os dados
+interface ResponseOption {
+  id: string;
+  text: string;
+  isCorrect: boolean;
+  categoryName?: string | null;
+}
+
+interface QuestionSnapshot {
+  id?: string;
+  text?: string;
+  options?: ResponseOption[];
+}
+
+interface ProcessedResponse {
+  id: string;
+  questionId: string;
+  questionText: string;
+  optionText: string;
+  isCorrect: boolean;
+  timeSpent: number;
+  createdAt: Date;
+  stageId?: string;
+  stageName?: string;
+  categoryName?: string;
+  question: QuestionSnapshot;
+  optionId?: string;
+  optionCharacteristic?: string;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const session = await getSession({ req })
@@ -47,17 +77,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Processar as respostas para incluir informações adicionais
-      const processedResponses = candidate.responses.map(response => {
-        // Criar um snapshot da questão para cada resposta
-        const questionSnapshot = {
+      const processedResponses: ProcessedResponse[] = candidate.responses.map(response => {
+        // Criar um snapshot da questão para cada resposta, incluindo informações de personalidade
+        const questionSnapshot: QuestionSnapshot = {
           id: response.question?.id,
           text: response.question?.text,
           options: response.question?.options.map(opt => ({
             id: opt.id,
             text: opt.text,
-            isCorrect: opt.isCorrect
+            isCorrect: opt.isCorrect,
+            categoryName: opt.categoryName || null // Incluir o nome da categoria/personalidade
           }))
         }
+
+        // Encontrar a opção selecionada para extrair a personalidade
+        const selectedOption = response.question?.options.find(
+          opt => opt.id === response.optionId || opt.text === response.optionText
+        )
 
         // Retornar a resposta com informações adicionais
         return {
@@ -70,9 +106,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           createdAt: response.createdAt,
           stageId: response.stageId || response.question?.stage?.id,
           stageName: response.stageName || response.question?.stage?.title,
-          categoryName: response.categoryName,
+          categoryName: response.categoryName || selectedOption?.categoryName,
           question: questionSnapshot,
-          optionId: response.optionId
+          optionId: response.optionId,
+          optionCharacteristic: response.optionCharacteristic || selectedOption?.categoryName
         }
       })
 
@@ -81,7 +118,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(405).json({ message: 'Método não permitido' })
   } catch (error) {
-    console.error('Erro ao buscar respostas do candidato:', error)
-    return res.status(500).json({ message: 'Erro interno do servidor' })
+    console.error('Erro na API de respostas do candidato:', error)
+    return res.status(500).json({ message: 'Erro interno do servidor', error })
   }
 }

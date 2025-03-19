@@ -299,8 +299,13 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
               <div className="flex items-baseline">
                 <span className="text-2xl font-semibold text-secondary-900">
                   {typeof results?.score === 'object' 
-                    ? (results.score.percentage !== null && results.score.percentage !== undefined ? results.score.percentage.toFixed(1) : '0') 
-                    : (results?.score !== null && results?.score !== undefined ? results?.score.toFixed(1) : '0')}%</span>
+                    ? (results.score.percentage !== null && results.score.percentage !== undefined 
+                        ? Number(results.score.percentage).toFixed(1) 
+                        : '0') 
+                    : (results?.score 
+                        ? Number(results?.score).toFixed(1) 
+                        : '0')}%
+                </span>
                 <span className="ml-2 text-sm text-secondary-500">
                   ({typeof results?.score === 'object' 
                     ? (results.score.total != null && results.score.correct != null 
