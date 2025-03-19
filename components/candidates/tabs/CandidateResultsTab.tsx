@@ -48,6 +48,12 @@ interface CandidateResults {
     total: number
     correct: number
     percentage: number
+    status: string
+    type: string
+    testScore?: number
+    interviewScore?: number
+    interviewNotes?: string
+    finalDecision: string
   }>
   skillScores: Array<{
     skill: string
@@ -57,6 +63,18 @@ interface CandidateResults {
   }>
   completed: boolean
   timeSpent: number
+  processStatus: {
+    currentStage: string
+    overallStatus: string
+    cutoffScore?: number
+    evaluationType: string
+    expectedProfile?: any
+  }
+  processName?: string
+  jobPosition?: string
+  observations?: string
+  rating?: number
+  status: string
 }
 
 export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => {
@@ -86,6 +104,41 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
 
     fetchResults()
   }, [candidate.id])
+
+  // Função para obter a cor do status
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'APPROVED':
+        return 'bg-green-100 text-green-800'
+      case 'PENDING':
+        return 'bg-yellow-100 text-yellow-800'
+      case 'REJECTED':
+        return 'bg-red-100 text-red-800'
+      default:
+        return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  // Função para traduzir o status
+  const translateStatus = (status: string) => {
+    const statusMap: { [key: string]: string } = {
+      'APPROVED': 'Aprovado',
+      'PENDING': 'Pendente',
+      'REJECTED': 'Reprovado',
+      'PENDING_EVALUATION': 'Aguardando Avaliação',
+      'IN_PROGRESS': 'Em Andamento',
+      'SCORE_BASED': 'Baseado em Pontuação',
+      'CUSTOM': 'Personalizado'
+    }
+    return statusMap[status] || status
+  }
+
+  // Função para formatar o tempo
+  const formatTime = (minutes: number) => {
+    const hours = Math.floor(minutes / 60)
+    const remainingMinutes = minutes % 60
+    return `${hours}h ${remainingMinutes}min`
+  }
 
   if (loading) {
     return (
@@ -186,41 +239,11 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
     }
   }
 
-  // Função para formatar o tempo gasto
-  const formatTimeSpent = (minutes: number) => {
-    const hours = Math.floor(minutes / 60)
-    const remainingMinutes = minutes % 60
-    return `${hours}h ${remainingMinutes}min`
-  }
-
-  // Função para determinar o status baseado na porcentagem
-  const getStatusInfo = (percentage: number) => {
-    if (percentage >= 80) {
-      return {
-        text: 'Excelente',
-        color: 'bg-green-100 text-green-800',
-        progressColor: 'bg-green-500'
-      }
-    } else if (percentage >= 60) {
-      return {
-        text: 'Satisfatório',
-        color: 'bg-yellow-100 text-yellow-800',
-        progressColor: 'bg-yellow-500'
-      }
-    } else {
-      return {
-        text: 'Precisa Melhorar',
-        color: 'bg-red-100 text-red-800',
-        progressColor: 'bg-red-500'
-      }
-    }
-  }
-
-  const statusInfo = getStatusInfo(results.score.percentage)
-
   return (
     <div className="space-y-8">
       <Toaster position="top-right" />
+
+      {/* Cards de resumo de desempenho */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Card de Pontuação Geral */}
         <div className="bg-white p-5 rounded-lg shadow-md border-l-4 border-primary-500">
@@ -234,17 +257,20 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
               <h4 className="text-sm font-medium text-secondary-500">Pontuação Geral</h4>
               <div className="flex items-baseline">
                 <span className="text-2xl font-semibold text-secondary-900">
-                  {results.score.percentage.toFixed(1)}%
-                </span>
+                  {typeof results.score === 'object' 
+                    ? results.score.percentage.toFixed(1) 
+                    : parseFloat((results.score || 0).toFixed(1))}%</span>
                 <span className="ml-2 text-sm text-secondary-500">
-                  ({results.score.correct}/{results.score.total})
+                  ({typeof results.score === 'object' 
+                    ? `${results.score.correct}/${results.score.total}` 
+                    : '0/0'})
                 </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Card de Status */}
+        {/* Card de Status do Teste */}
         <div className="bg-white p-5 rounded-lg shadow-md border-l-4 border-blue-500">
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-blue-100 text-blue-600">
@@ -253,28 +279,62 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
               </svg>
             </div>
             <div className="ml-4">
-              <h4 className="text-sm font-medium text-secondary-500">Status</h4>
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusInfo.color}`}>
-                {statusInfo.text}
-              </span>
+              <h4 className="text-sm font-medium text-secondary-500">Status do Teste</h4>
+              <div className="flex items-baseline">
+                <span className="text-2xl font-semibold text-secondary-900">
+                  {!results.completed ? 'Pendente' : (() => {
+                    const totalCorrect = results.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0;
+                    const totalQuestions = results.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0;
+                    const percentage = totalQuestions > 0 ? parseFloat((totalCorrect / totalQuestions * 100).toFixed(1)) : 0;
+                    
+                    if (percentage >= 80) return 'Aprovado';
+                    if (percentage >= 60) return 'Consideração';
+                    return 'Reprovado';
+                  })()}
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Card de Tempo */}
-        <div className="bg-white p-5 rounded-lg shadow-md border-l-4 border-green-500">
+        {/* Card de Tempo Gasto */}
+        <div className="bg-white p-5 rounded-lg shadow-md border-l-4 border-amber-500">
           <div className="flex items-center">
-            <div className="p-3 rounded-full bg-green-100 text-green-600">
+            <div className="p-3 rounded-full bg-amber-100 text-amber-600">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
             <div className="ml-4">
-              <h4 className="text-sm font-medium text-secondary-500">Tempo Total</h4>
-              <span className="text-2xl font-semibold text-secondary-900">
-                {formatTimeSpent(results.timeSpent)}
-              </span>
+              <h4 className="text-sm font-medium text-secondary-500">Tempo Gasto</h4>
+              <div className="flex items-baseline">
+                <span className="text-2xl font-semibold text-secondary-900">
+                  {formatTime(results.timeSpent)}
+                </span>
+              </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Cabeçalho do Processo Seletivo */}
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="flex justify-between items-start">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">
+              {results.processName || 'Processo Seletivo'}
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              {results.jobPosition || 'Cargo não especificado'}
+            </p>
+          </div>
+          <div className="text-right">
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(results.processStatus.overallStatus)}`}>
+              {translateStatus(results.processStatus.overallStatus)}
+            </span>
+            <p className="text-sm text-gray-600 mt-1">
+              Etapa Atual: {results.processStatus.currentStage}
+            </p>
           </div>
         </div>
       </div>
@@ -286,6 +346,193 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
         </div>
         <div className="bg-white p-6 rounded-lg shadow-md">
           <Radar data={radarData} options={radarOptions} />
+        </div>
+      </div>
+
+      {/* Tabela de Etapas */}
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Progresso por Etapa</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Etapa
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Tipo
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Pontuação
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Decisão
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {results.stageScores.map((stage, index) => (
+                <tr key={stage.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {stage.name}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {translateStatus(stage.type)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(stage.status)}`}>
+                      {translateStatus(stage.status)}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {stage.type === 'TEST' ? (
+                      <div className="flex items-center">
+                        <span className="mr-2">{stage.percentage.toFixed(1)}%</span>
+                        <div className="w-24 bg-gray-200 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full ${
+                              stage.percentage >= 80 ? 'bg-green-500' :
+                              stage.percentage >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                            }`}
+                            style={{ width: `${stage.percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    ) : stage.interviewScore ? (
+                      `${stage.interviewScore}/10`
+                    ) : (
+                      'N/A'
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(stage.finalDecision)}`}>
+                      {translateStatus(stage.finalDecision)}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Observações */}
+      {results.observations && (
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Observações</h3>
+          <p className="text-gray-700 whitespace-pre-line">
+            {results.observations}
+          </p>
+        </div>
+      )}
+
+      {/* Desempenho por Etapa */}
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <h3 className="text-lg font-semibold text-secondary-800 mb-4">Desempenho por Etapa</h3>
+        <div className="space-y-4">
+          {results.stageScores.map((stage) => (
+            <div key={stage.id} className="border border-secondary-200 rounded-lg p-4">
+              <h4 className="font-medium text-secondary-700 mb-2">{stage.name}</h4>
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                <div>
+                  <p className="text-secondary-500">Total de Questões</p>
+                  <p className="font-medium text-secondary-900">{stage.total}</p>
+                </div>
+                <div>
+                  <p className="text-secondary-500">Respostas Corretas</p>
+                  <p className="font-medium text-secondary-900">{stage.correct}</p>
+                </div>
+                <div>
+                  <p className="text-secondary-500">Taxa de Acerto</p>
+                  <p className="font-medium text-secondary-900">{stage.percentage.toFixed(1)}%</p>
+                </div>
+              </div>
+              {/* Barra de progresso */}
+              <div className="mt-3 h-2 bg-secondary-100 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full rounded-full ${
+                    stage.percentage >= 80 ? 'bg-green-500' : 
+                    stage.percentage >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                  }`}
+                  style={{ width: `${stage.percentage}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Recomendações baseadas no desempenho */}
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <h3 className="text-lg font-semibold text-secondary-800 mb-4">Recomendações</h3>
+        <div className="space-y-4">
+          {(() => {
+            const totalCorrect = results.stageScores.reduce((acc, stage) => acc + stage.correct, 0);
+            const totalQuestions = results.stageScores.reduce((acc, stage) => acc + stage.total, 0);
+            const percentage = totalQuestions > 0 ? parseFloat((totalCorrect / totalQuestions * 100).toFixed(1)) : 0;
+            
+            if (percentage >= 80) {
+              return (
+                <div className="p-4 bg-green-50 border-l-4 border-green-500 rounded">
+                  <h4 className="font-medium text-green-800">Candidato Recomendado</h4>
+                  <p className="mt-2 text-green-700">
+                    Este candidato demonstrou excelente desempenho na avaliação. Recomendamos prosseguir com o processo de contratação.
+                  </p>
+                </div>
+              );
+            } else if (percentage >= 60) {
+              return (
+                <div className="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
+                  <h4 className="font-medium text-yellow-800">Candidato para Consideração</h4>
+                  <p className="mt-2 text-yellow-700">
+                    Este candidato demonstrou desempenho satisfatório. Recomendamos avaliar outros aspectos como experiência e entrevista antes de tomar uma decisão.
+                  </p>
+                </div>
+              );
+            } else {
+              return (
+                <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded">
+                  <h4 className="font-medium text-red-800">Candidato Não Recomendado</h4>
+                  <p className="mt-2 text-red-700">
+                    Este candidato não atingiu a pontuação mínima necessária. Recomendamos considerar outros candidatos.
+                  </p>
+                </div>
+              );
+            }
+          })()}
+          
+          {/* Áreas para desenvolvimento */}
+          <div className="mt-4">
+            <h4 className="font-medium text-secondary-800">Áreas para Desenvolvimento:</h4>
+            <ul className="mt-2 space-y-1 list-disc list-inside text-secondary-600">
+              {results.stageScores.filter(stage => stage.percentage < 60).map(stage => (
+                <li key={stage.id}>
+                  {stage.name} ({stage.percentage.toFixed(1)}%) - Necessita aprimoramento
+                </li>
+              ))}
+              {results.stageScores.filter(stage => stage.percentage < 60).length === 0 && (
+                <li>Não foram identificadas áreas críticas para desenvolvimento.</li>
+              )}
+            </ul>
+          </div>
+          
+          {/* Pontos fortes */}
+          <div className="mt-4">
+            <h4 className="font-medium text-secondary-800">Pontos Fortes:</h4>
+            <ul className="mt-2 space-y-1 list-disc list-inside text-secondary-600">
+              {results.stageScores.filter(stage => stage.percentage >= 80).map(stage => (
+                <li key={stage.id}>
+                  {stage.name} ({stage.percentage.toFixed(1)}%) - Excelente desempenho
+                </li>
+              ))}
+              {results.stageScores.filter(stage => stage.percentage >= 80).length === 0 && (
+                <li>Não foram identificados pontos de excelência.</li>
+              )}
+            </ul>
+          </div>
         </div>
       </div>
     </div>

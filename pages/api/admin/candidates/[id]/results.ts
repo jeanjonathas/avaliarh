@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import { getSession } from 'next-auth/react'
-import prisma from '@/lib/prisma'
+import { prisma } from '@/lib/prisma'
 
 export default async function handler(
   req: NextApiRequest,
@@ -26,21 +26,38 @@ export default async function handler(
       include: {
         progresses: {
           include: {
-            stage: true
+            stage: {
+              include: {
+                test: true
+              }
+            }
           }
         },
         responses: {
           include: {
             question: {
               include: {
-                options: true
+                options: true,
+                stage: true
               }
             }
           }
         },
         process: {
           include: {
-            stages: true
+            stages: {
+              include: {
+                test: true,
+                progresses: {
+                  where: {
+                    candidateId: String(id)
+                  }
+                }
+              },
+              orderBy: {
+                order: 'asc'
+              }
+            }
           }
         }
       }
@@ -65,6 +82,7 @@ export default async function handler(
 
     // Calcular pontuação por etapa
     const stageScores = candidate.process?.stages.map(stage => {
+      const progress = stage.progresses[0]
       const stageResponses = candidate.responses.filter(response => 
         response.question.stageId === stage.id
       )
@@ -76,12 +94,18 @@ export default async function handler(
 
       return {
         id: stage.id,
-        name: stage.name,
+        name: stage.name || stage.test?.title || 'Etapa sem nome',
         total: stageResponses.length,
         correct: stageCorrect,
         percentage: stageResponses.length > 0 
           ? (stageCorrect / stageResponses.length) * 100 
-          : 0
+          : 0,
+        status: progress?.status || 'PENDING',
+        type: stage.type || 'TEST',
+        testScore: progress?.testScore,
+        interviewScore: progress?.interviewScore,
+        interviewNotes: progress?.interviewNotes,
+        finalDecision: progress?.finalDecision || 'PENDING_EVALUATION'
       }
     }) || []
 
@@ -117,13 +141,28 @@ export default async function handler(
       }
     })
 
+    // Calcular status geral do processo
+    const processStatus = {
+      currentStage: stageScores.find(stage => stage.status === 'PENDING')?.name || 'Processo Finalizado',
+      overallStatus: candidate.overallStatus || 'PENDING_EVALUATION',
+      cutoffScore: candidate.process?.cutoffScore,
+      evaluationType: candidate.process?.evaluationType || 'SCORE_BASED',
+      expectedProfile: candidate.process?.expectedProfile
+    }
+
     // Retornar os resultados compilados
     return res.status(200).json({
       score,
       stageScores,
       skillScores,
       completed: candidate.completed,
-      timeSpent: candidate.timeSpent || 0
+      timeSpent: candidate.timeSpent || 0,
+      processStatus,
+      processName: candidate.process?.name,
+      jobPosition: candidate.process?.jobPosition,
+      observations: candidate.observations,
+      rating: candidate.rating,
+      status: candidate.status
     })
 
   } catch (error) {
