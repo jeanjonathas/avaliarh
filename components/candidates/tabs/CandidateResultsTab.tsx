@@ -393,9 +393,36 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
 
   // Função para formatar o tempo
   const formatTime = (minutes: number) => {
+    if (minutes < 1/60) {
+      // Menos de 1 segundo
+      return '< 1 segundo'
+    }
+    
+    if (minutes < 1) {
+      // Menos de 1 minuto, mostrar em segundos
+      const seconds = Math.round(minutes * 60)
+      return `${seconds} ${seconds === 1 ? 'segundo' : 'segundos'}`
+    }
+    
     const hours = Math.floor(minutes / 60)
-    const remainingMinutes = minutes % 60
-    return `${hours}h ${remainingMinutes}min`
+    const remainingMinutes = Math.floor(minutes % 60)
+    const seconds = Math.round((minutes * 60) % 60)
+    
+    let timeString = ''
+    
+    if (hours > 0) {
+      timeString += `${hours}h `
+    }
+    
+    if (remainingMinutes > 0 || (hours > 0 && seconds > 0)) {
+      timeString += `${remainingMinutes}min `
+    }
+    
+    if (seconds > 0 && hours === 0) {
+      timeString += `${seconds}s`
+    }
+    
+    return timeString.trim()
   }
 
   if (loading && loadingPerformance) {
@@ -409,6 +436,27 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
   return (
     <div className="space-y-6 py-4">
       <Toaster position="top-right" />
+            {/* Cabeçalho do Processo Seletivo */}
+            <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="flex justify-between items-start">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">
+              {results?.processName || 'Processo Seletivo'}
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              {results?.jobPosition || 'Cargo não especificado'}
+            </p>
+          </div>
+          <div className="text-right">
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(results?.processStatus?.overallStatus)}`}>
+              {translateStatus(results?.processStatus?.overallStatus)}
+            </span>
+            <p className="text-sm text-gray-600 mt-1">
+              Etapa Atual: {results?.processStatus?.currentStage}
+            </p>
+          </div>
+        </div>
+      </div>
       
       {/* Seção de Desempenho do Candidato */}
       <div className="bg-white shadow rounded-lg p-6">
@@ -612,6 +660,9 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                     <div className="text-2xl font-bold text-gray-800">
                       {formatTime(performance.totalTime)}
                     </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Tempo calculado com base nas respostas
+                    </p>
                   </div>
                   
                   <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
@@ -619,12 +670,36 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                     <div className="text-2xl font-bold text-gray-800">
                       {formatTime(performance.avgTimePerQuestion)}
                     </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Média de tempo gasto em cada questão
+                    </p>
                   </div>
                   
                   <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                     <h3 className="text-lg font-medium text-gray-700 mb-2">Conclusão do Teste</h3>
                     <div className="text-2xl font-bold text-gray-800">
                       {performance.testEndTime ? new Date(performance.testEndTime).toLocaleString('pt-BR') : 'Não concluído'}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Data e hora de conclusão do teste
+                    </p>
+                  </div>
+                </div>
+
+                {/* Card de informação sobre o cálculo de tempo */}
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 mt-4">
+                  <div className="flex items-start">
+                    <div className="p-2 rounded-full bg-blue-100 text-blue-600 mr-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-blue-800">Sobre o cálculo de tempo</h4>
+                      <p className="text-sm text-blue-700 mt-1">
+                        O tempo total é calculado somando o tempo gasto em cada questão. Isso pode diferir do tempo entre o início e o fim do teste, 
+                        pois considera apenas o tempo ativo de resposta, ignorando pausas ou períodos de inatividade.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -653,27 +728,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
         )}
       </div>
 
-      {/* Cabeçalho do Processo Seletivo */}
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <div className="flex justify-between items-start">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">
-              {results?.processName || 'Processo Seletivo'}
-            </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              {results?.jobPosition || 'Cargo não especificado'}
-            </p>
-          </div>
-          <div className="text-right">
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(results?.processStatus?.overallStatus)}`}>
-              {translateStatus(results?.processStatus?.overallStatus)}
-            </span>
-            <p className="text-sm text-gray-600 mt-1">
-              Etapa Atual: {results?.processStatus?.currentStage}
-            </p>
-          </div>
-        </div>
-      </div>
+
       {/* Seção de Desempenho */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="p-6">
@@ -1041,112 +1096,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
             <p className="text-sm mt-2">O candidato não respondeu perguntas opinativas ou os dados não foram processados corretamente</p>
           </div>
         </div>
-      )}
-      {/* Tabela de Etapas */}
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Progresso por Etapa</h3>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Etapa
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Tipo
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Pontuação
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Decisão
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {results?.stageScores?.map((stage, index) => (
-                <tr key={stage.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {stage.name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {translateStatus(stage.type)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(stage.status)}`}>
-                      {translateStatus(stage.status)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {stage.type === 'TEST' ? (
-                      <div className="flex items-center">
-                        <span className="mr-2">{stage.percentage !== null && stage.percentage !== undefined ? stage.percentage.toFixed(1) : '0'}%</span>
-                        <div className="w-24 bg-gray-200 rounded-full h-2">
-                          <div 
-                            className={`h-full rounded-full ${
-                              stage.percentage >= 80 ? 'bg-green-500' : 
-                              stage.percentage >= 60 ? 'bg-yellow-500' : 'bg-red-500'
-                            }`}
-                            style={{ width: `${stage.percentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    ) : stage.interviewScore ? (
-                      `${stage.interviewScore}/10`
-                    ) : (
-                      'N/A'
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(stage.finalDecision)}`}>
-                      {translateStatus(stage.finalDecision)}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Desempenho por Etapa */}
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h3 className="text-lg font-medium text-secondary-800 mb-4">Desempenho por Etapa</h3>
-        <div className="space-y-4">
-          {results?.stageScores?.map((stage) => (
-            <div key={stage.id} className="border border-secondary-200 rounded-lg p-4">
-              <h4 className="font-medium text-secondary-700">{stage.name}</h4>
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div>
-                  <p className="text-secondary-500">Total de Questões</p>
-                  <p className="font-medium text-secondary-900">{stage.total}</p>
-                </div>
-                <div>
-                  <p className="text-secondary-500">Respostas Corretas</p>
-                  <p className="font-medium text-secondary-900">{stage.correct}</p>
-                </div>
-                <div>
-                  <p className="text-secondary-500">Taxa de Acerto</p>
-                  <p className="font-medium text-secondary-900">{stage.percentage !== null && stage.percentage !== undefined ? stage.percentage.toFixed(1) : '0'}%</p>
-                </div>
-              </div>
-              {/* Barra de progresso */}
-              <div className="mt-3 h-2 bg-secondary-100 rounded-full overflow-hidden">
-                <div 
-                  className={`h-full rounded-full ${
-                    stage.percentage >= 80 ? 'bg-green-500' : 
-                    stage.percentage >= 60 ? 'bg-yellow-500' : 'bg-red-500'
-                  }`}
-                  style={{ width: `${stage.percentage}%` }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      )}         
 
       {/* Recomendações baseadas no desempenho */}
       <div className="bg-white p-6 rounded-lg shadow-md">

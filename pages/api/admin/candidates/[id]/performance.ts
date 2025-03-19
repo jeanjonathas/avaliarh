@@ -137,7 +137,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ? candidate.responses.reduce((sum, r) => sum + (r.timeSpent || 0), 0) / candidate.responses.length 
         : 0
 
-      const totalTime = candidate.timeSpent || 0
+      // Calcular o tempo total com base nas respostas reais
+      // Em vez de usar candidate.timeSpent, vamos calcular com base nas respostas
+      console.log('Calculando tempo total com base nas respostas individuais:');
+      
+      // Ordenar respostas por data para análise
+      const sortedResponses = [...(candidate.responses || [])].sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateA - dateB;
+      });
+      
+      // Registrar informações detalhadas sobre cada resposta
+      sortedResponses.forEach((r, index) => {
+        console.log(`Resposta ${index + 1}:`, {
+          pergunta: r.question?.text?.substring(0, 30) + '...',
+          tipo: r.question?.type,
+          tempoGasto: r.timeSpent || 0,
+          tempoGastoFormatado: `${Math.floor((r.timeSpent || 0) / 60)}min ${(r.timeSpent || 0) % 60}s`,
+          dataHora: r.createdAt ? new Date(r.createdAt).toISOString() : 'N/A'
+        });
+      });
+      
+      const responseTotalTime = candidate.responses?.reduce((sum, r) => sum + (r.timeSpent || 0), 0) || 0;
+      
+      // Converter de segundos para minutos para manter a compatibilidade com a interface
+      const totalTime = Math.round(responseTotalTime / 60);
+      
+      console.log('Tempo total calculado a partir das respostas (segundos):', responseTotalTime);
+      console.log('Tempo total calculado a partir das respostas (minutos):', totalTime);
+      console.log('Tempo total armazenado no candidato (minutos):', candidate.timeSpent || 0);
+      
+      // Verificar se há uma grande discrepância
+      if (Math.abs(totalTime - (candidate.timeSpent || 0)) > 5) {
+        console.log('ALERTA: Grande discrepância detectada entre o tempo calculado e o tempo armazenado!');
+      }
 
       const multipleChoiceScore = accuracy;
       const opinionScore = personalityAnalysis.weightedScore || 0;
@@ -150,6 +184,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } else if (opinionResponses.length > 0) {
         overallScore = opinionScore;
       }
+
+      // Calcular a data de término com base na data de início e no tempo real gasto
+      // Usamos o tempo em segundos (responseTotalTime) para maior precisão
+      const testEndTime = candidate.completed && candidate.testDate 
+        ? new Date(candidate.testDate.getTime() + (responseTotalTime * 1000))
+        : null;
 
       return res.status(200).json({
         summary: {
@@ -168,7 +208,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         avgTimePerQuestion,
         totalTime,
         testStartTime: candidate.testDate,
-        testEndTime: candidate.completed ? new Date(candidate.testDate?.getTime() + (totalTime * 1000)) : null,
+        testEndTime,
         showResults: candidate.showResults
       })
     }
