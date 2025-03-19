@@ -468,12 +468,47 @@ export default async function handler(
             });
           }
           
-          // 4. Excluir as etapas do processo
+          // 4. Excluir os pesos de traços de personalidade associados às configurações de personalidade
+          if (stageIds.length > 0) {
+            // Primeiro, encontrar todas as configurações de personalidade associadas às etapas
+            const personalityConfigs = await tx.processPersonalityConfig.findMany({
+              where: {
+                processStageId: {
+                  in: stageIds
+                }
+              },
+              select: { id: true }
+            });
+            
+            const configIds = personalityConfigs.map(config => config.id);
+            
+            // Excluir os pesos de traços de personalidade
+            if (configIds.length > 0) {
+              await tx.personalityTraitWeight.deleteMany({
+                where: {
+                  processPersonalityConfigId: {
+                    in: configIds
+                  }
+                }
+              });
+            }
+            
+            // Excluir as configurações de personalidade
+            await tx.processPersonalityConfig.deleteMany({
+              where: {
+                processStageId: {
+                  in: stageIds
+                }
+              }
+            });
+          }
+          
+          // 5. Excluir as etapas do processo
           await tx.processStage.deleteMany({
             where: { processId: id },
           });
           
-          // 5. Finalmente, excluir o processo seletivo
+          // 6. Finalmente, excluir o processo seletivo
           await tx.selectionProcess.delete({
             where: { id },
           });
