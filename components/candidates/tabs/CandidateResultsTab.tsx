@@ -40,12 +40,16 @@ interface PersonalityTrait {
   trait: string;
   count: number;
   percentage: number;
+  weight?: number;
+  weightedScore?: number;
 }
 
 interface PersonalityAnalysis {
   dominantPersonality: PersonalityTrait;
   allPersonalities: PersonalityTrait[];
   totalResponses: number;
+  hasTraitWeights?: boolean;
+  weightedScore?: number;
 }
 
 interface CandidateResults {
@@ -94,6 +98,9 @@ interface PerformanceSummary {
   correctAnswers: number;
   incorrectAnswers: number;
   accuracy: number;
+  multipleChoiceScore?: number;
+  opinionScore?: number;
+  overallScore?: number;
 }
 
 interface StagePerformance {
@@ -125,6 +132,9 @@ interface CandidatePerformance {
     correctAnswers: number;
     incorrectAnswers: number;
     accuracy: number;
+    multipleChoiceScore?: number;
+    opinionScore?: number;
+    overallScore?: number;
   };
   stagePerformance: Array<{
     stageId: string;
@@ -154,7 +164,8 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
   const [loading, setLoading] = useState(true)
   const [loadingPerformance, setLoadingPerformance] = useState(true)
 
-  // Dados para o gráfico de radar de personalidade
+  // Dados para os gráficos
+  const [stagePerformanceData, setStagePerformanceData] = useState<any>(null);
   const [personalityRadarData, setPersonalityRadarData] = useState<any>(null);
 
   useEffect(() => {
@@ -201,13 +212,51 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
             stage.stageType === 'MULTIPLE_CHOICE' && stage.totalQuestions > 0
           );
           
-          console.log(`Número de etapas após filtragem: ${data.stagePerformance.length}`);
+          // Preparar dados para o gráfico de barras de desempenho por etapa
+          const stageLabels = data.stagePerformance.map((stage: any) => stage.stageName);
+          const stageAccuracies = data.stagePerformance.map((stage: any) => stage.accuracy);
+          
+          setStagePerformanceData({
+            labels: stageLabels,
+            datasets: [
+              {
+                label: 'Acertos (%)',
+                data: stageAccuracies,
+                backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1,
+              }
+            ]
+          });
+        }
+        
+        // Preparar dados para o gráfico de radar de personalidade
+        if (data.personalityAnalysis && data.personalityAnalysis.allPersonalities) {
+          const personalityLabels = data.personalityAnalysis.allPersonalities.map((p: any) => p.trait);
+          const personalityValues = data.personalityAnalysis.allPersonalities.map((p: any) => p.percentage);
+          
+          setPersonalityRadarData({
+            labels: personalityLabels,
+            datasets: [
+              {
+                label: 'Perfil de Personalidade',
+                data: personalityValues,
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1,
+                pointBackgroundColor: 'rgba(75, 192, 192, 1)',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgba(75, 192, 192, 1)',
+              }
+            ]
+          });
         }
         
         setPerformance(data)
       } catch (error) {
         console.error('Erro ao buscar desempenho:', error)
-        toast.error('Erro ao carregar dados de desempenho')
+        toast.error('Não foi possível carregar os dados de desempenho')
       } finally {
         setLoadingPerformance(false)
       }
@@ -358,7 +407,252 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 py-4">
+      <Toaster position="top-right" />
+      
+      {/* Seção de Desempenho do Candidato */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <h2 className="text-xl font-semibold text-gray-800 mb-4">Desempenho do Candidato</h2>
+        
+        {loadingPerformance ? (
+          <div className="flex justify-center items-center h-40">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
+          </div>
+        ) : performance ? (
+          <>
+            {performance.showResults === true ? (
+              <div className="space-y-6">
+                {/* Resumo de Pontuação */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Pontuação Geral */}
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <h3 className="text-lg font-medium text-gray-700 mb-2">Pontuação Geral</h3>
+                    <div className="flex items-center">
+                      <div className="text-3xl font-bold text-primary-600">
+                        {performance.summary.overallScore !== undefined 
+                          ? `${performance.summary.overallScore.toFixed(1)}%` 
+                          : 'N/A'}
+                      </div>
+                      <div className="ml-4 text-sm text-gray-500">
+                        Combinação ponderada de múltipla escolha e perfil
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Pontuação de Múltipla Escolha */}
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <h3 className="text-lg font-medium text-gray-700 mb-2">Múltipla Escolha</h3>
+                    <div className="flex items-center">
+                      <div className="text-3xl font-bold text-blue-600">
+                        {performance.summary.multipleChoiceScore !== undefined && performance.multipleChoiceQuestionsCount > 0
+                          ? `${performance.summary.multipleChoiceScore.toFixed(1)}%` 
+                          : 'N/A'}
+                      </div>
+                      <div className="ml-4 text-sm text-gray-500">
+                        {performance.multipleChoiceQuestionsCount} perguntas
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Pontuação de Perfil */}
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <h3 className="text-lg font-medium text-gray-700 mb-2">Perfil de Personalidade</h3>
+                    <div className="flex items-center">
+                      <div className="text-3xl font-bold text-green-600">
+                        {performance.summary.opinionScore !== undefined && performance.opinionQuestionsCount > 0
+                          ? `${performance.summary.opinionScore.toFixed(1)}%` 
+                          : 'N/A'}
+                      </div>
+                      <div className="ml-4 text-sm text-gray-500">
+                        {performance.opinionQuestionsCount} perguntas
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Estatísticas Detalhadas */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Gráfico de Barras de Desempenho por Etapa */}
+                  <div className="bg-white rounded-lg p-4 border border-gray-200">
+                    <h3 className="text-lg font-medium text-gray-700 mb-4">Desempenho por Etapa</h3>
+                    {performance.stagePerformance && performance.stagePerformance.length > 0 ? (
+                      <div className="h-64">
+                        <Bar 
+                          data={stagePerformanceData} 
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                              legend: {
+                                position: 'top' as const,
+                              },
+                              title: {
+                                display: false,
+                              },
+                            },
+                            scales: {
+                              y: {
+                                beginAtZero: true,
+                                max: 100,
+                                title: {
+                                  display: true,
+                                  text: 'Acertos (%)'
+                                }
+                              }
+                            }
+                          }} 
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex justify-center items-center h-40 text-gray-500">
+                        Não há dados de desempenho por etapa disponíveis
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Gráfico de Radar de Personalidade */}
+                  <div className="bg-white rounded-lg p-4 border border-gray-200">
+                    <h3 className="text-lg font-medium text-gray-700 mb-4">Perfil de Personalidade</h3>
+                    {performance.personalityAnalysis && performance.personalityAnalysis.allPersonalities && performance.personalityAnalysis.allPersonalities.length > 0 ? (
+                      <div className="h-64">
+                        <Radar 
+                          data={personalityRadarData} 
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                              r: {
+                                angleLines: {
+                                  display: true
+                                },
+                                suggestedMin: 0,
+                                suggestedMax: 100
+                              }
+                            },
+                            plugins: {
+                              legend: {
+                                display: false
+                              },
+                              tooltip: {
+                                callbacks: {
+                                  label: function(context) {
+                                    return `${context.label}: ${context.raw}%`;
+                                  }
+                                }
+                              }
+                            }
+                          }} 
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex justify-center items-center h-40 text-gray-500">
+                        Não há dados de personalidade disponíveis
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Tabela de Traços de Personalidade com Pesos */}
+                {performance.personalityAnalysis && performance.personalityAnalysis.allPersonalities && performance.personalityAnalysis.allPersonalities.length > 0 && (
+                  <div className="bg-white rounded-lg p-4 border border-gray-200">
+                    <h3 className="text-lg font-medium text-gray-700 mb-4">Detalhamento de Traços de Personalidade</h3>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Traço de Personalidade
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Porcentagem
+                            </th>
+                            {performance.personalityAnalysis.hasTraitWeights && (
+                              <>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  Peso
+                                </th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  Pontuação Ponderada
+                                </th>
+                              </>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {performance.personalityAnalysis.allPersonalities.map((trait, index) => (
+                            <tr key={index} className={index === 0 ? "bg-green-50" : ""}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {trait.trait} {index === 0 && <span className="text-xs text-green-600 font-medium ml-1">(Dominante)</span>}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {trait.percentage}%
+                              </td>
+                              {performance.personalityAnalysis?.hasTraitWeights && (
+                                <>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {trait.weight || 1}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {trait.weightedScore?.toFixed(1) || (trait.percentage).toFixed(1)}
+                                  </td>
+                                </>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Estatísticas de Tempo */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <h3 className="text-lg font-medium text-gray-700 mb-2">Tempo Total</h3>
+                    <div className="text-2xl font-bold text-gray-800">
+                      {formatTime(performance.totalTime)}
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <h3 className="text-lg font-medium text-gray-700 mb-2">Tempo Médio por Questão</h3>
+                    <div className="text-2xl font-bold text-gray-800">
+                      {formatTime(performance.avgTimePerQuestion)}
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <h3 className="text-lg font-medium text-gray-700 mb-2">Conclusão do Teste</h3>
+                    <div className="text-2xl font-bold text-gray-800">
+                      {performance.testEndTime ? new Date(performance.testEndTime).toLocaleString('pt-BR') : 'Não concluído'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-yellow-700">
+                      Os resultados deste teste não estão configurados para serem exibidos ao candidato.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="bg-gray-50 p-4 rounded-lg text-center text-gray-500">
+            Não há dados de desempenho disponíveis para este candidato
+          </div>
+        )}
+      </div>
+
       {/* Cabeçalho do Processo Seletivo */}
       <div className="bg-white p-6 rounded-lg shadow-md">
         <div className="flex justify-between items-start">

@@ -44,7 +44,11 @@ export default async function handler(
             include: {
               stage: true,
               categories: true,
-              options: true
+              options: {
+                include: {
+                  category: true
+                }
+              }
             },
             orderBy: [
               { 
@@ -58,8 +62,34 @@ export default async function handler(
         } else if (testId) {
           console.log(`Buscando perguntas para o teste ${testId}`);
           // Buscar perguntas de um teste específico
-          // Implementar lógica específica para testes quando necessário
-          questions = [];
+          const test = await prisma.test.findUnique({
+            where: { id: testId as string },
+            include: {
+              stages: {
+                include: {
+                  questions: {
+                    where: whereCondition,
+                    include: {
+                      stage: true,
+                      categories: true,
+                      options: {
+                        include: {
+                          category: true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          });
+          
+          if (test && test.stages) {
+            // Extrair todas as perguntas de todas as etapas do teste
+            questions = test.stages.flatMap(stage => stage.questions);
+          } else {
+            questions = [];
+          }
         } else if (categoryId) {
           console.log(`Buscando perguntas para a categoria ${categoryId}`);
           // Buscar perguntas de uma categoria específica
@@ -75,7 +105,11 @@ export default async function handler(
             include: {
               stage: true,
               categories: true,
-              options: true
+              options: {
+                include: {
+                  category: true
+                }
+              }
             },
             orderBy: [
               { 
@@ -100,7 +134,11 @@ export default async function handler(
             include: {
               stage: true,
               categories: true,
-              options: true
+              options: {
+                include: {
+                  category: true
+                }
+              }
             },
             orderBy: [
               { 
@@ -119,7 +157,11 @@ export default async function handler(
             include: {
               stage: true,
               categories: true,
-              options: true
+              options: {
+                include: {
+                  category: true
+                }
+              }
             },
             orderBy: [
               { 
@@ -163,7 +205,12 @@ export default async function handler(
           options: question.options.map((option: any) => ({
             id: option.id,
             text: option.text,
-            isCorrect: option.isCorrect
+            isCorrect: option.isCorrect,
+            categoryName: option.categoryName || option.category?.name || null,
+            categoryId: option.categoryId || option.category?.id || null,
+            weight: option.weight || 0,
+            position: option.position || 0,
+            explanation: option.explanation || null
           })),
           difficulty: question.difficulty || 'MEDIUM',
           type: question.type || 'MULTIPLE_CHOICE'
@@ -326,7 +373,11 @@ export default async function handler(
           include: {
             categories: true,
             stage: true,
-            options: true
+            options: {
+              include: {
+                category: true
+              }
+            }
           }
         });
 
@@ -380,7 +431,11 @@ export default async function handler(
             id: newQuestion.id
           },
           include: {
-            options: true,
+            options: {
+              include: {
+                category: true
+              }
+            },
             stage: true,
             categories: true
           }
@@ -405,8 +460,8 @@ export default async function handler(
             isCorrect: option.isCorrect,
             weight: option.weight || 0,
             position: option.position || 0,
-            categoryName: option.categoryName || null,
-            categoryNameUuid: option.categoryNameUuid || null,
+            categoryName: option.categoryName || option.category?.name || null,
+            categoryId: option.categoryId || option.category?.id || null,
             explanation: option.explanation || null
           })) : [],
           stage: {

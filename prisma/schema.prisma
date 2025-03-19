@@ -131,8 +131,31 @@ model ProcessStage {
   progresses             CandidateProgress[]
   process                SelectionProcess    @relation(fields: [processId], references: [id])
   test                   Test?               @relation(fields: [testId], references: [id])  // Relação com o teste
+  personalityConfig      ProcessPersonalityConfig?
 
   @@index([order])
+}
+
+model ProcessPersonalityConfig {
+  id                 String                 @id @default(uuid())
+  processStageId     String                 @unique
+  emotionGroupId     String?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  stage              ProcessStage           @relation(fields: [processStageId], references: [id])
+  emotionGroup       EmotionGroup?          @relation(fields: [emotionGroupId], references: [id])
+  traitWeights       PersonalityTraitWeight[]
+}
+
+model PersonalityTraitWeight {
+  id                     String                 @id @default(uuid())
+  traitName              String                 // Nome do traço de personalidade
+  weight                 Int                    // Peso do traço (5 para o mais importante, 4 para o segundo, etc.)
+  order                  Int                    // Ordem de importância (1 para o mais importante)
+  processPersonalityConfigId String
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+  processPersonalityConfig ProcessPersonalityConfig @relation(fields: [processPersonalityConfigId], references: [id], onDelete: Cascade)
 }
 
 model CandidateProgress {
@@ -450,12 +473,13 @@ model CompanyBackup {
 }
 
 model EmotionGroup {
-  id          String     @id @default(uuid())
-  name        String
-  description String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  questions   Question[]
+  id                    String                  @id @default(uuid())
+  name                  String
+  description           String?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  questions             Question[]
+  processPersonalityConfigs ProcessPersonalityConfig[]
 }
 
 enum Role {

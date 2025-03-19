@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import AdminLayout from '../../../../components/admin/AdminLayout';
 import { Switch, FormControlLabel, FormGroup } from '@mui/material';
 import CollapsibleTestTable from '../../../../components/admin/processes/CollapsibleTestTable';
+import PersonalityTraitWeightConfig from '../../../../components/admin/PersonalityTraitWeightConfig';
 
 interface ProcessStage {
   id?: string;
@@ -15,6 +16,12 @@ interface ProcessStage {
   testId?: string;
   requestCandidatePhoto?: boolean;
   showResultsToCandidate?: boolean;
+  personalityTraits?: Array<{
+    id?: string;
+    traitName: string;
+    weight: number;
+    order: number;
+  }>;
 }
 
 interface FormData {
@@ -108,7 +115,8 @@ const EditProcess: React.FC = () => {
               type: stage.type,
               testId: stage.testId,
               requestCandidatePhoto: stage.requestCandidatePhoto === true,
-              showResultsToCandidate: stage.showResultsToCandidate === true
+              showResultsToCandidate: stage.showResultsToCandidate === true,
+              personalityTraits: stage.personalityTraits
             }))
           });
         } else {
@@ -470,6 +478,25 @@ const EditProcess: React.FC = () => {
                           <p className="text-sm font-medium text-blue-800">
                             Teste selecionado: {tests.find(t => t.id === watch(`stages.${index}.testId`))?.title || 'Carregando...'}
                           </p>
+                          
+                          {/* Configuração de traços de personalidade */}
+                          <div className="mt-4">
+                            <h3 className="text-sm font-medium text-secondary-700 mb-2">
+                              Configuração de Traços de Personalidade
+                            </h3>
+                            <Controller
+                              name={`stages.${index}.personalityTraits` as const}
+                              control={control}
+                              defaultValue={[]}
+                              render={({ field }) => (
+                                <PersonalityTraitWeightConfig
+                                  value={field.value || []}
+                                  onChange={field.onChange}
+                                  testId={watch(`stages.${index}.testId`)}
+                                />
+                              )}
+                            />
+                          </div>
                         </div>
                       )}
                     </div>

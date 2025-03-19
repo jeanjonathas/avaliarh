@@ -6,6 +6,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { Switch, FormControlLabel, FormGroup } from '@mui/material';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
+import PersonalityTraitWeightConfig from '../../../components/admin/PersonalityTraitWeightConfig';
 
 interface ProcessStage {
   name: string;
@@ -15,6 +16,12 @@ interface ProcessStage {
   testId?: string;
   requestCandidatePhoto?: boolean;
   showResultsToCandidate?: boolean;
+  personalityTraits?: {
+    id: string;
+    traitName: string;
+    weight: number;
+    order: number;
+  }[];
 }
 
 interface FormDraft {
@@ -41,14 +48,27 @@ interface Test {
   description?: string;
   sectionsCount?: number;
   questionsCount?: number;
-  stages?: TestStage[];
+  stages?: {
+    id: string;
+    title: string;
+    description?: string;
+    questions?: {
+      id: string;
+      text: string;
+      type?: string;
+    }[];
+  }[];
 }
 
 interface TestStage {
   id: string;
   title: string;
   description?: string;
-  questions?: TestQuestion[];
+  questions?: {
+    id: string;
+    text: string;
+    type?: string;
+  }[];
 }
 
 interface TestQuestion {
@@ -87,6 +107,7 @@ const NewProcess: React.FC = () => {
           testId: '',
           requestCandidatePhoto: true,
           showResultsToCandidate: true,
+          personalityTraits: [],
         }
       ]
     }
@@ -144,6 +165,7 @@ const NewProcess: React.FC = () => {
       testId: '',
       requestCandidatePhoto: true,
       showResultsToCandidate: true,
+      personalityTraits: [],
     });
   };
 
@@ -180,6 +202,7 @@ const NewProcess: React.FC = () => {
         testId: '',
         requestCandidatePhoto: true,
         showResultsToCandidate: true,
+        personalityTraits: [],
       }]
     });
   }, [reset]);
@@ -202,7 +225,10 @@ const NewProcess: React.FC = () => {
             evaluationType: draftData.evaluationType || 'SCORE_BASED',
             cutoffScore: draftData.cutoffScore || 70,
             jobPosition: draftData.jobPosition || '',
-            stages: draftData.stages?.length > 0 ? draftData.stages : [{
+            stages: draftData.stages?.length > 0 ? draftData.stages.map(stage => ({
+              ...stage,
+              personalityTraits: stage.personalityTraits || []
+            })) : [{
               name: '',
               description: '',
               order: 1,
@@ -210,6 +236,7 @@ const NewProcess: React.FC = () => {
               testId: '',
               requestCandidatePhoto: true,
               showResultsToCandidate: true,
+              personalityTraits: [],
             }]
           });
         } catch (error) {
@@ -603,6 +630,32 @@ const NewProcess: React.FC = () => {
                       )}
                     />
                   </div>
+
+                  {/* Configuração de pesos de traços de personalidade */}
+                  {watch(`stages.${index}.type`) === 'TEST' && watch(`stages.${index}.testId`) && (
+                    <div className="mt-6">
+                      <h4 className="text-md font-medium text-secondary-800 mb-3">
+                        Priorização de Traços de Personalidade
+                      </h4>
+                      <p className="text-sm text-secondary-600 mb-4">
+                        Adicione e ordene os traços de personalidade que você considera mais importantes para este cargo.
+                        Os traços no topo terão maior peso na avaliação do candidato.
+                      </p>
+                      
+                      <Controller
+                        name={`stages.${index}.personalityTraits`}
+                        control={control}
+                        defaultValue={[]}
+                        render={({ field }) => (
+                          <PersonalityTraitWeightConfig
+                            value={field.value}
+                            onChange={field.onChange}
+                            testId={watch(`stages.${index}.testId`)}
+                          />
+                        )}
+                      />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
