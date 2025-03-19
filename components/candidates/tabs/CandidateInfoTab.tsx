@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Candidate } from '../types'
-import { toast } from 'react-toastify'
+import toast from 'react-hot-toast'
 
 interface Test {
   id: string;
@@ -77,7 +77,9 @@ export const CandidateInfoTab = ({ candidate, onUpdate }: CandidateInfoTabProps)
         }
       } catch (error) {
         console.error('Erro ao carregar dados:', error);
-        toast.error('Erro ao carregar dados necessários');
+        toast.error('Erro ao carregar dados necessários', {
+          position: 'bottom-center',
+        });
       } finally {
         setLoading(false);
       }
@@ -140,15 +142,21 @@ export const CandidateInfoTab = ({ candidate, onUpdate }: CandidateInfoTabProps)
       })
 
       if (response.ok) {
-        toast.success('Informações atualizadas com sucesso')
+        toast.success('Informações do candidato atualizadas com sucesso!', {
+          position: 'bottom-center',
+        });
         onUpdate?.()
       } else {
         const error = await response.json()
-        toast.error(error.error || 'Erro ao atualizar informações')
+        toast.error(error.error || 'Erro ao atualizar informações', {
+          position: 'bottom-center',
+        });
       }
     } catch (error) {
       console.error('Erro ao atualizar candidato:', error)
-      toast.error('Erro ao atualizar informações')
+      toast.error('Erro ao atualizar informações', {
+        position: 'bottom-center',
+      });
     } finally {
       setIsSaving(false)
     }
@@ -157,17 +165,22 @@ export const CandidateInfoTab = ({ candidate, onUpdate }: CandidateInfoTabProps)
   const generateNewInvite = async () => {
     // Prevent generating a new code if one already exists
     if (currentInviteCode) {
-      toast.info('Este candidato já possui um código de convite');
+      toast('Este candidato já possui um código de convite', {
+        icon: 'ℹ️',
+        style: {
+          background: '#EFF6FF',
+          border: '1px solid #3B82F6',
+          color: '#1E40AF',
+        },
+        position: 'bottom-center',
+      });
       return;
     }
 
-    if (linkType === 'process' && !formData.processId) {
-      toast.error('Selecione um processo seletivo antes de gerar o convite');
-      return;
-    }
-
-    if (linkType === 'test' && !formData.testId) {
-      toast.error('Selecione um teste antes de gerar o convite');
+    if ((linkType === 'process' && !formData.processId) || (linkType === 'test' && !formData.testId)) {
+      toast.error('Selecione um processo ou teste antes de gerar o convite', {
+        position: 'bottom-center',
+      });
       return;
     }
 
@@ -180,40 +193,52 @@ export const CandidateInfoTab = ({ candidate, onUpdate }: CandidateInfoTabProps)
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ 
+        body: JSON.stringify({
+          processId: linkType === 'process' ? formData.processId : null,
           testId: formData.testId,
-          processId: formData.processId,
-          action: 'generateInvite' 
         }),
-      })
+      });
 
       if (response.ok) {
-        const data = await response.json()
-        if (data.success) {
-          setIsNewCodeGenerated(true)
-          setIsShareModalOpen(true)
-          setCurrentInviteCode(data.inviteCode || '')
-          onUpdate?.()
-        } else {
-          toast.error(data.error || 'Erro ao gerar código de convite')
-        }
+        const data = await response.json();
+        setCurrentInviteCode(data.inviteCode);
+        toast.success('Convite gerado com sucesso!', {
+          position: 'bottom-center',
+        });
+        onUpdate?.();
       } else {
-        const error = await response.json()
-        toast.error(error.error || 'Erro ao gerar código de convite')
+        const error = await response.json();
+        toast.error(error.error || 'Erro ao gerar convite', {
+          position: 'bottom-center',
+        });
       }
     } catch (error) {
-      console.error('Erro ao gerar convite:', error)
-      toast.error('Erro ao gerar código de convite')
+      console.error('Erro ao gerar convite:', error);
+      toast.error('Erro ao gerar convite', {
+        position: 'bottom-center',
+      });
     } finally {
-      setIsGeneratingInvite(false)
+      setIsGeneratingInvite(false);
     }
-  }
+  };
 
   const shareByWhatsApp = () => {
-    const testUrl = `${window.location.origin}/test/${currentInviteCode}`
-    const message = encodeURIComponent(`Olá ${candidate.name}, você foi convidado para realizar um teste em nosso processo seletivo. Acesse o link: ${testUrl}`)
-    window.open(`https://wa.me/?text=${message}`, '_blank')
-  }
+    if (!currentInviteCode) {
+      toast.error('Nenhum código de convite disponível', {
+        position: 'bottom-center',
+      });
+      return;
+    }
+
+    const testLink = `${window.location.origin}/test/${currentInviteCode}`;
+    const message = `Olá ${formData.name}, você foi convidado para participar de um teste em nossa plataforma. Acesse: ${testLink}`;
+    const whatsappLink = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    
+    window.open(whatsappLink, '_blank');
+    toast.success('Link preparado para compartilhamento via WhatsApp', {
+      position: 'bottom-center',
+    });
+  };
 
   // Update currentInviteCode when candidate.inviteCode changes
   useEffect(() => {
@@ -374,129 +399,191 @@ export const CandidateInfoTab = ({ candidate, onUpdate }: CandidateInfoTabProps)
             <div className="bg-white border border-secondary-200 rounded-lg p-4 mb-4">
               <h3 className="text-lg font-semibold text-secondary-800 mb-3">Informações do Convite</h3>
               
-              <div className="space-y-3">
-                <div className="bg-white p-3 rounded-md border border-secondary-200">
-                  <label className="block text-sm text-secondary-600 mb-1">
-                    Tipo de Vínculo:
-                  </label>
-                  <div className="flex space-x-4 mb-3">
+              {!currentInviteCode ? (
+                // Exibir opções de configuração apenas se não houver convite gerado
+                <div className="space-y-3">
+                  <div className="bg-white p-3 rounded-md border border-secondary-200">
+                    <label className="block text-sm text-secondary-600 mb-1">
+                      Tipo de Vínculo:
+                    </label>
+                    <div className="flex space-x-4 mb-3">
+                      <button
+                        type="button"
+                        onClick={() => handleLinkTypeChange('process')}
+                        className={`px-3 py-2 text-sm rounded-md ${
+                          linkType === 'process'
+                            ? 'bg-primary-100 text-primary-700 border border-primary-300'
+                            : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                        }`}
+                      >
+                        Processo Seletivo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleLinkTypeChange('test')}
+                        className={`px-3 py-2 text-sm rounded-md ${
+                          linkType === 'test'
+                            ? 'bg-primary-100 text-primary-700 border border-primary-300'
+                            : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                        }`}
+                      >
+                        Teste Avulso
+                      </button>
+                    </div>
+                  </div>
+
+                  {linkType === 'process' && (
+                    <div className="bg-white p-3 rounded-md border border-secondary-200">
+                      <label className="block text-sm text-secondary-600 mb-1">
+                        Processo Seletivo:
+                      </label>
+                      <select
+                        name="processId"
+                        value={formData.processId}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-secondary-300 rounded-md"
+                        disabled={loading}
+                      >
+                        <option value="">Selecione um processo seletivo</option>
+                        {processes.map((process) => (
+                          <option key={process.id} value={process.id}>
+                            {process.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {linkType === 'test' && (
+                    <div className="bg-white p-3 rounded-md border border-secondary-200">
+                      <label className="block text-sm text-secondary-600 mb-1">
+                        Teste:
+                      </label>
+                      <select
+                        name="testId"
+                        value={formData.testId}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-secondary-300 rounded-md"
+                        disabled={loading}
+                      >
+                        <option value="">Selecione um teste</option>
+                        {tests.map((test) => (
+                          <option key={test.id} value={test.id}>
+                            {test.title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  
+                  {linkType === 'process' && formData.processId && (
+                    <div className="bg-white p-3 rounded-md border border-secondary-200">
+                      <label className="block text-sm text-secondary-600 mb-1">
+                        Teste associado ao processo:
+                      </label>
+                      <p className="px-3 py-2 bg-gray-50 rounded-md text-secondary-700">
+                        {tests.find(t => t.id === formData.testId)?.title || 'Nenhum teste associado'}
+                      </p>
+                    </div>
+                  )}
+                  
+                  <div className="mt-4">
                     <button
                       type="button"
-                      onClick={() => handleLinkTypeChange('process')}
-                      className={`px-3 py-2 text-sm rounded-md ${
-                        linkType === 'process'
-                          ? 'bg-primary-100 text-primary-700 border border-primary-300'
-                          : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                      onClick={generateNewInvite}
+                      disabled={isGeneratingInvite || (linkType === 'process' && !formData.processId) || (linkType === 'test' && !formData.testId)}
+                      className={`w-full px-4 py-2 text-white rounded-md ${
+                        isGeneratingInvite || (linkType === 'process' && !formData.processId) || (linkType === 'test' && !formData.testId)
+                          ? 'bg-primary-400 cursor-not-allowed'
+                          : 'bg-primary-600 hover:bg-primary-700'
                       }`}
                     >
-                      Processo Seletivo
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleLinkTypeChange('test')}
-                      className={`px-3 py-2 text-sm rounded-md ${
-                        linkType === 'test'
-                          ? 'bg-primary-100 text-primary-700 border border-primary-300'
-                          : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
-                      }`}
-                    >
-                      Teste Avulso
+                      {isGeneratingInvite ? 'Gerando...' : 'Gerar Convite'}
                     </button>
                   </div>
                 </div>
-
-                {linkType === 'process' && (
+              ) : (
+                // Exibir informações do convite já gerado
+                <div className="space-y-3">
                   <div className="bg-white p-3 rounded-md border border-secondary-200">
-                    <label className="block text-sm text-secondary-600 mb-1">
-                      Processo Seletivo:
+                    <label className="block text-sm font-medium text-secondary-700 mb-1">
+                      Tipo de Vínculo:
                     </label>
-                    <select
-                      name="processId"
-                      value={formData.processId}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 border border-secondary-300 rounded-md"
-                      disabled={loading}
-                    >
-                      <option value="">Selecione um processo seletivo</option>
-                      {processes.map((process) => (
-                        <option key={process.id} value={process.id}>
-                          {process.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {linkType === 'test' && (
-                  <div className="bg-white p-3 rounded-md border border-secondary-200">
-                    <label className="block text-sm text-secondary-600 mb-1">
-                      Teste:
-                    </label>
-                    <select
-                      name="testId"
-                      value={formData.testId}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 border border-secondary-300 rounded-md"
-                      disabled={loading}
-                    >
-                      <option value="">Selecione um teste</option>
-                      {tests.map((test) => (
-                        <option key={test.id} value={test.id}>
-                          {test.title}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                
-                {linkType === 'process' && formData.processId && (
-                  <div className="bg-white p-3 rounded-md border border-secondary-200">
-                    <label className="block text-sm text-secondary-600 mb-1">
-                      Teste Associado:
-                    </label>
-                    <p className="text-md font-medium text-secondary-800">
-                      {tests.find(test => test.id === formData.testId)?.title || 'Nenhum teste associado'}
+                    <p className="px-3 py-2 bg-gray-50 rounded-md text-secondary-700">
+                      {formData.processId ? 'Processo Seletivo' : 'Teste Avulso'}
                     </p>
                   </div>
-                )}
-                
-                <div className="bg-white p-3 rounded-md border border-secondary-200">
-                  <span className="text-sm text-secondary-600">Código do Convite:</span>
-                  <div className="flex items-center justify-between mt-1">
-                    <p className="font-medium text-lg text-primary-600">{currentInviteCode || '----'}</p>
-                    {!currentInviteCode && (
-                      <button
-                        type="button"
-                        onClick={generateNewInvite}
-                        disabled={isGeneratingInvite || (linkType === 'process' ? !formData.processId : !formData.testId)}
-                        className={`px-3 py-1 text-sm ${
-                          isGeneratingInvite || (linkType === 'process' ? !formData.processId : !formData.testId)
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                            : 'bg-primary-50 text-primary-600 hover:bg-primary-100'
-                        } rounded`}
-                      >
-                        {isGeneratingInvite 
-                          ? 'Gerando...' 
-                          : linkType === 'process' && !formData.processId
-                            ? 'Selecione um processo'
-                            : linkType === 'test' && !formData.testId
-                              ? 'Selecione um teste'
-                              : 'Gerar Código'
-                        }
-                      </button>
-                    )}
-                    {currentInviteCode && (
-                      <button
-                        type="button"
-                        onClick={() => setIsShareModalOpen(true)}
-                        className="px-3 py-1 text-sm bg-primary-50 text-primary-600 hover:bg-primary-100 rounded"
-                      >
-                        Compartilhar
-                      </button>
-                    )}
+                  
+                  {formData.processId && (
+                    <div className="bg-white p-3 rounded-md border border-secondary-200">
+                      <label className="block text-sm font-medium text-secondary-700 mb-1">
+                        Processo Seletivo:
+                      </label>
+                      <p className="px-3 py-2 bg-gray-50 rounded-md text-secondary-700">
+                        {processes.find(p => p.id === formData.processId)?.name || 'Processo não encontrado'}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {formData.testId && (
+                    <div className="bg-white p-3 rounded-md border border-secondary-200">
+                      <label className="block text-sm font-medium text-secondary-700 mb-1">
+                        Teste:
+                      </label>
+                      <p className="px-3 py-2 bg-gray-50 rounded-md text-secondary-700">
+                        {tests.find(t => t.id === formData.testId)?.title || 'Teste não encontrado'}
+                      </p>
+                    </div>
+                  )}
+                  
+                  <div className="bg-white p-3 rounded-md border border-secondary-200">
+                    <label className="block text-sm font-medium text-secondary-700 mb-1">
+                      Código de Convite:
+                    </label>
+                    <div className="flex items-center">
+                      <span className="px-3 py-2 bg-gray-50 rounded-md text-secondary-700 font-mono flex-grow">
+                        {currentInviteCode}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white p-3 rounded-md border border-secondary-200">
+                    <label className="block text-sm font-medium text-secondary-700 mb-1">
+                      Link para o Teste:
+                    </label>
+                    <div className="flex items-center">
+                      <input
+                        type="text"
+                        readOnly
+                        value={`${window.location.origin}/test/${currentInviteCode}`}
+                        className="w-full px-3 py-2 bg-gray-50 rounded-md text-secondary-700 font-mono"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex space-x-2 mt-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/test/${currentInviteCode}`);
+                        toast.success('Link copiado para a área de transferência!', {
+                          position: 'bottom-center',
+                        });
+                      }}
+                      className="flex-1 px-4 py-2 bg-secondary-600 text-white rounded-md hover:bg-secondary-700 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:ring-offset-2"
+                    >
+                      Copiar Link
+                    </button>
+                    <button
+                      type="button"
+                      onClick={shareByWhatsApp}
+                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                    >
+                      Compartilhar via WhatsApp
+                    </button>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
