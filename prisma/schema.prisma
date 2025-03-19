@@ -245,20 +245,29 @@ model Option {
 }
 
 model Response {
-  id           String    @id @default(uuid())
-  candidateId  String
-  questionId   String
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  questionText String
-  optionText   String
-  timeSpent    Int       @default(0)
-  allOptions   Json?
-  companyId    String
-  isCorrect    Boolean
-  candidate    Candidate @relation(fields: [candidateId], references: [id])
-  company      Company   @relation(fields: [companyId], references: [id])
-  question     Question  @relation(fields: [questionId], references: [id])
+  id                  String    @id @default(uuid())
+  candidateId         String
+  questionId          String
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  questionText        String
+  optionText          String
+  timeSpent           Int       @default(0)
+  allOptions          Json?
+  companyId           String
+  isCorrect           Boolean
+  questionSnapshot    Json?     // Snapshot completo da questão
+  optionId            String?   // ID da opção selecionada
+  stageId             String?   // ID da etapa
+  stageName           String?   // Nome da etapa
+  categoryName        String?   // Nome da categoria
+  optionCharacteristic String?   // Característica/personalidade associada à opção selecionada
+  optionOriginalOrder Int?       // Posição original da opção antes do embaralhamento
+  optionsOrder        Json?      // Ordem em que as opções foram apresentadas ao candidato
+  questionType        String?    // Tipo da questão (múltipla escolha, opinativa, etc.)
+  candidate           Candidate @relation(fields: [candidateId], references: [id])
+  company             Company   @relation(fields: [companyId], references: [id])
+  question            Question  @relation(fields: [questionId], references: [id])
 
   @@unique([candidateId, questionId])
 }

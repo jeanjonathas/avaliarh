@@ -35,6 +35,7 @@ export default async function handler(
           completed: true,
           status: true,
           testId: true,
+          companyId: true, // Adicionar o campo companyId
         }
       });
 
@@ -68,7 +69,7 @@ export default async function handler(
       
       // Salvar as respostas com snapshot das perguntas e opções
       const savedResponses = await Promise.all(
-        responses.map(async (response: { questionId: string; optionId: string; timeSpent?: number }, index: number) => {
+        responses.map(async (response: { questionId: string; optionId: string; timeSpent?: number, optionsOrder?: string[] }, index: number) => {
           console.log(`Processando resposta ${index + 1}/${responses.length}: questionId=${response.questionId}, optionId=${response.optionId}`);
           
           try {
@@ -119,40 +120,79 @@ export default async function handler(
               }
             });
 
+            // Verificar se a questão é do tipo opinativo
+            const isOpinionQuestion = question.type?.includes('OPINION') || false;
+            
+            // Obter a característica/personalidade associada à opção selecionada (para questões opinativas)
+            const optionCharacteristic = (selectedOption as any).characteristic || 
+                                        (selectedOption as any).personality || 
+                                        null;
+            
+            // Determinar a posição original da opção antes do embaralhamento (se disponível)
+            const optionOriginalOrder = (selectedOption as any).originalPosition || 
+                                       selectedOption.position || 
+                                       null;
+            
+            // Capturar a ordem em que as opções foram apresentadas ao candidato
+            const optionsOrder = (response as any).optionsOrder || 
+                               question.options.map((o: any) => o.id) || 
+                               null;
+            
             // Criar ou atualizar a resposta
             const responseData = {
               candidateId,
               questionId: response.questionId,
               optionId: response.optionId,
+              questionText: question.text,
+              optionText: selectedOption.text,
+              timeSpent: response.timeSpent || 0,
+              companyId: candidate.companyId || question.companyId,
+              // Para questões opinativas, todas as respostas são consideradas corretas
+              isCorrect: isOpinionQuestion ? true : selectedOption.isCorrect,
+              // Campos de snapshot
+              questionSnapshot: question,
               stageId: stageId || testQuestion?.stageId || null,
               stageName: testQuestion?.stage?.title || null,
-              isCorrectOption: selectedOption.isCorrect,
-              optionText: selectedOption.text,
-              questionText: question.text,
               categoryName: question.categories?.[0]?.name || null,
-              questionSnapshot: JSON.stringify(question),
-              allOptionsSnapshot: JSON.stringify(question.options),
-              timeSpent: response.timeSpent || null, // Salvar o tempo gasto na resposta
+              // Campos específicos para questões opinativas
+              optionCharacteristic,
+              optionOriginalOrder,
+              optionsOrder: optionsOrder ? JSON.stringify(optionsOrder) : null,
+              questionType: question.type || 'MULTIPLE_CHOICE'
             };
 
             if (existingResponse) {
               console.log(`Atualizando resposta existente: ${existingResponse.id}`);
               try {
+                // Preparar os dados para o JSON que será armazenado em allOptions
+                const allOptionsData = {
+                  options: question.options,
+                  _questionSnapshot: JSON.stringify(question),
+                  _allOptionsSnapshot: JSON.stringify(question.options),
+                  _categoryName: question.categories?.[0]?.name || null,
+                  _stageName: testQuestion?.stage?.title || null,
+                  _stageId: stageId || testQuestion?.stageId || null
+                };
+
                 // Usar $executeRaw para atualizar a resposta existente
                 // Isso contorna problemas de tipagem do Prisma Client
                 const result = await prisma.$executeRaw`
                   UPDATE "Response"
                   SET 
-                    "optionId" = ${response.optionId},
                     "questionText" = ${question.text},
                     "optionText" = ${selectedOption.text},
-                    "isCorrectOption" = ${selectedOption.isCorrect},
-                    "allOptionsSnapshot" = ${JSON.stringify(question.options)}::jsonb,
+                    "optionId" = ${response.optionId},
+                    "timeSpent" = ${response.timeSpent || 0},
+                    "companyId" = ${candidate.companyId || question.companyId}, 
+                    "isCorrect" = ${isOpinionQuestion ? true : selectedOption.isCorrect},
                     "questionSnapshot" = ${JSON.stringify(question)}::jsonb,
-                    "categoryName" = ${question.categories?.[0]?.name || null},
-                    "stageName" = ${testQuestion?.stage?.title || null},
                     "stageId" = ${stageId || testQuestion?.stageId || null},
-                    "timeSpent" = ${response.timeSpent || null},
+                    "stageName" = ${testQuestion?.stage?.title || null},
+                    "categoryName" = ${question.categories?.[0]?.name || null},
+                    "optionCharacteristic" = ${optionCharacteristic},
+                    "optionOriginalOrder" = ${optionOriginalOrder},
+                    "optionsOrder" = ${optionsOrder ? JSON.stringify(optionsOrder) : null}::jsonb,
+                    "questionType" = ${question.type || 'MULTIPLE_CHOICE'},
                     "updatedAt" = NOW()
                   WHERE "id" = ${existingResponse.id}
                   RETURNING *;
@@ -164,16 +204,37 @@ export default async function handler(
                 throw error;
               }
             } else {
+              // Criar objeto com os campos que existem no modelo Response
+              const createData: any = {
+                id: uuidv4(),
+                candidateId: responseData.candidateId,
+                questionId: responseData.questionId,
+                optionId: responseData.optionId,
+                questionText: responseData.questionText,
+                optionText: responseData.optionText,
+                timeSpent: responseData.timeSpent,
+                companyId: responseData.companyId,
+                isCorrect: responseData.isCorrect,
+                questionSnapshot: responseData.questionSnapshot,
+                stageId: responseData.stageId,
+                stageName: responseData.stageName,
+                categoryName: responseData.categoryName,
+                optionCharacteristic: responseData.optionCharacteristic,
+                optionOriginalOrder: responseData.optionOriginalOrder,
+                optionsOrder: responseData.optionsOrder,
+                questionType: responseData.questionType,
+                createdAt: new Date(),
+                updatedAt: new Date()
+              };
+              
+              // Definir allOptions separadamente para evitar erros de tipagem
+              createData.allOptions = question.options;
+              
               // Criar nova resposta com snapshot
               try {
                 console.log(`Criando nova resposta para questão ${response.questionId}`);
                 const newResponse = await prisma.response.create({
-                  data: {
-                    id: uuidv4(),
-                    ...responseData,
-                    createdAt: new Date(),
-                    updatedAt: new Date()
-                  },
+                  data: createData
                 });
                 console.log(`Resposta criada com sucesso: ${newResponse.id}`);
                 return newResponse;
@@ -210,14 +271,21 @@ export default async function handler(
                         "id", 
                         "candidateId", 
                         "questionId", 
-                        "optionId", 
+                        "optionId",
                         "questionText", 
                         "optionText", 
-                        "isCorrectOption", 
-                        "stageName", 
-                        "categoryName", 
-                        "stageId",
                         "timeSpent",
+                        "allOptions",
+                        "companyId",
+                        "isCorrect",
+                        "questionSnapshot",
+                        "stageId",
+                        "stageName",
+                        "categoryName",
+                        "optionCharacteristic",
+                        "optionOriginalOrder",
+                        "optionsOrder",
+                        "questionType",
                         "createdAt", 
                         "updatedAt"
                       ) 
@@ -225,14 +293,28 @@ export default async function handler(
                         ${uuidv4()}, 
                         ${candidateId}, 
                         ${response.questionId}, 
-                        ${response.optionId}, 
+                        ${response.optionId},
                         ${question.text}, 
                         ${selectedOption.text}, 
-                        ${selectedOption.isCorrect}, 
-                        ${testQuestion?.stage?.title || null}, 
-                        ${question.categories?.[0]?.name || null}, 
+                        ${response.timeSpent || 0},
+                        ${JSON.stringify({
+                          options: question.options,
+                          _questionSnapshot: JSON.stringify(question),
+                          _allOptionsSnapshot: JSON.stringify(question.options),
+                          _categoryName: question.categories?.[0]?.name || null,
+                          _stageName: testQuestion?.stage?.title || null,
+                          _stageId: stageId || testQuestion?.stageId || null
+                        })}::jsonb,
+                        ${candidate.companyId || question.companyId}, 
+                        ${isOpinionQuestion ? true : selectedOption.isCorrect},
+                        ${JSON.stringify(question)}::jsonb,
                         ${stageId || testQuestion?.stageId || null},
-                        ${response.timeSpent || null},
+                        ${testQuestion?.stage?.title || null},
+                        ${question.categories?.[0]?.name || null},
+                        ${optionCharacteristic},
+                        ${optionOriginalOrder},
+                        ${optionsOrder ? JSON.stringify(optionsOrder) : null}::jsonb,
+                        ${question.type || 'MULTIPLE_CHOICE'},
                         NOW(), 
                         NOW()
                       )

@@ -175,44 +175,24 @@ export default async function handler(
         console.log(`Buscando questões específicas do teste ${testId} para a etapa ${stage.id}`);
         
         try {
-          // Usar SQL raw para ter mais controle sobre a consulta e buscar apenas as questões
-          // que estão associadas a esta etapa E a este teste
-          const rawQuestions = await prisma.$queryRaw`
-            SELECT q.*, ts."testId", ts."stageId"
-            FROM "Question" q
-            JOIN "StageQuestion" sq ON q."id" = sq."questionId"
-            JOIN "TestStage" ts ON sq."stageId" = ts."stageId"
-            WHERE ts."testId" = ${testId}
-            AND ts."stageId" = ${stage.id}
-            LIMIT 10
-          `;
+          // A tabela StageQuestion não existe, então vamos usar uma abordagem alternativa
+          console.log(`Erro ao buscar questões específicas via SQL raw: A tabela StageQuestion não existe`);
+          console.log(`Tentando abordagem alternativa para buscar questões...`);
           
-          // Verificar se rawQuestions é um array e tem a propriedade length
-          const questionsCount = Array.isArray(rawQuestions) ? rawQuestions.length : 0;
-          console.log(`Encontradas ${questionsCount} questões específicas para o teste ${testId} e etapa ${stage.id}`);
+          // Buscar questões diretamente pela etapa
+          const stageQuestions = await prisma.question.findMany({
+            where: {
+              stageId: stage.id
+            },
+            include: {
+              options: true,
+              categories: true
+            },
+            take: 10
+          });
           
-          // Se encontramos questões, buscar as opções para cada uma delas
-          if (Array.isArray(rawQuestions) && questionsCount > 0) {
-            // Extrair os IDs das questões
-            const questionIds = rawQuestions.map(q => q.id);
-            
-            // Buscar as questões completas com suas opções
-            questions = await prisma.question.findMany({
-              where: {
-                id: { in: questionIds }
-              },
-              include: {
-                options: {
-                  select: {
-                    id: true,
-                    text: true,
-                  },
-                },
-              },
-            });
-          } else {
-            console.log('Nenhuma questão específica encontrada via SQL raw');
-          }
+          console.log(`Encontradas ${stageQuestions.length} questões associadas à etapa ${stage.id}`);
+          questions = stageQuestions;
         } catch (error) {
           console.error('Erro ao buscar questões específicas via SQL raw:', error);
         }
