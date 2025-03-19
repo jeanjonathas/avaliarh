@@ -40,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       where: { candidateId },
       select: {
         id: true,
-        isCorrectOption: true
+        isCorrect: true
       }
     });
     
@@ -48,7 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     // Calcular a taxa de acerto
     const totalQuestions = responses.length;
-    const correctAnswers = responses.filter(r => r.isCorrectOption).length;
+    const correctAnswers = responses.filter(r => r.isCorrect).length;
     const accuracyRate = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
     
     console.log(`Desempenho do candidato: ${correctAnswers}/${totalQuestions} (${accuracyRate}%)`);

@@ -4,6 +4,7 @@ import { authOptions } from '../auth/[...nextauth]'
 import { prisma } from '../../../lib/prisma'
 import { Prisma } from '@prisma/client'
 import { v4 as uuidv4 } from 'uuid'
+import { registerCandidateProgress } from '../../../lib/utils/candidate-progress'
 
 export default async function handler(
   req: NextApiRequest,
@@ -372,52 +373,24 @@ export default async function handler(
           if (answeredQuestions >= stageQuestions) {
             console.log(`Todas as questões da etapa ${stageId} foram respondidas pelo candidato ${candidateId}`);
             
-            // Registrar o progresso do candidato para esta etapa
+            // Buscar informações sobre a etapa para obter o nome
+            let stageName = '';
             try {
-              // Buscar o candidato para obter o companyId
-              const candidateDetails = await prisma.candidate.findUnique({
-                where: { id: candidateId },
-                select: { companyId: true }
+              const stage = await prisma.stage.findUnique({
+                where: { id: stageId },
+                select: { title: true }
               });
               
-              if (!candidateDetails?.companyId) {
-                console.error(`Não foi possível encontrar o companyId para o candidato ${candidateId}`);
-                return;
+              if (stage) {
+                stageName = stage.title || '';
               }
               
-              // Verificar se já existe um registro de progresso para esta etapa
-              const existingProgress = await prisma.candidateProgress.findFirst({
-                where: {
-                  candidateId,
-                  stageId
-                }
-              });
+              // Usar a função utilitária para registrar o progresso do candidato
+              const progressResult = await registerCandidateProgress(candidateId, stageId, stageName);
               
-              if (!existingProgress) {
-                // Criar um novo registro de progresso
-                await prisma.candidateProgress.create({
-                  data: {
-                    candidateId,
-                    stageId,
-                    status: 'COMPLETED',
-                    completed: true,
-                    completedAt: new Date(),
-                    companyId: candidateDetails.companyId
-                  } as any
-                });
-                console.log(`Progresso registrado para o candidato ${candidateId} na etapa ${stageId}`);
-              } else {
-                // Atualizar o registro existente
-                await prisma.candidateProgress.update({
-                  where: { id: existingProgress.id },
-                  data: {
-                    status: 'COMPLETED',
-                    completed: true,
-                    completedAt: new Date(),
-                    updatedAt: new Date()
-                  } as any
-                });
-                console.log(`Progresso atualizado para o candidato ${candidateId} na etapa ${stageId}`);
+              if (!progressResult.success) {
+                console.warn('Aviso ao registrar progresso:', progressResult.message);
+                // Continuar mesmo com aviso para não bloquear o fluxo do candidato
               }
             } catch (progressError) {
               console.error('Erro ao registrar progresso:', progressError);

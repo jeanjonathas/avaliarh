@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../lib/prisma';
+import { registerCandidateProgress } from '../../../lib/utils/candidate-progress';
 
 export default async function handler(
   req: NextApiRequest,
@@ -32,6 +33,19 @@ export default async function handler(
     
     // Usar o UUID diretamente, pois não temos mais IDs personalizados
     const stageUUID = stageId;
+    
+    // Buscar informações sobre a etapa para obter o nome
+    let stageName = '';
+    const stage = await prisma.stage.findUnique({
+      where: { id: stageUUID },
+      select: { title: true }
+    });
+    
+    if (stage) {
+      stageName = stage.title || '';
+    }
+    
+    console.log(`Verificando conclusão da etapa ${stageUUID} (${stageName}) para o candidato ${candidateId}`);
     
     // Verificar se existe um registro de progresso para esta etapa
     const progress = await prisma.candidateProgress.findFirst({
@@ -81,25 +95,12 @@ export default async function handler(
     // Se a etapa estiver concluída mas não houver registro no CandidateProgress,
     // criar o registro agora
     if (isCompleted && !progress) {
-      // Buscar o candidato para obter o companyId
-      const candidateDetails = await prisma.candidate.findUnique({
-        where: { id: candidateId },
-        select: { companyId: true }
-      });
+      // Usar a função utilitária para registrar o progresso do candidato
+      const progressResult = await registerCandidateProgress(candidateId, stageUUID, stageName);
       
-      if (candidateDetails?.companyId) {
-        // Criar um novo registro de progresso
-        await prisma.candidateProgress.create({
-          data: {
-            candidateId,
-            stageId: stageUUID,
-            status: 'COMPLETED',
-            completed: true,
-            completedAt: new Date(),
-            companyId: candidateDetails.companyId
-          }
-        });
-        console.log(`Progresso registrado para o candidato ${candidateId} na etapa ${stageUUID}`);
+      if (!progressResult.success) {
+        console.warn('Aviso ao registrar progresso:', progressResult.message);
+        // Continuar mesmo com aviso para não bloquear o fluxo do candidato
       }
     }
     

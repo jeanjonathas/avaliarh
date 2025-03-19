@@ -54,7 +54,7 @@ const Home: NextPage = () => {
       }
 
       // Verificar se o teste já foi concluído
-      if (data.completed && data.responsesByStage) {
+      if (data.message && data.message.includes('já completou a avaliação')) {
         console.log('Teste já concluído, redirecionando para página de respostas anteriores');
         // Armazenar os dados das respostas na sessão
         sessionStorage.setItem('completedResponses', JSON.stringify(data));
@@ -65,6 +65,11 @@ const Home: NextPage = () => {
 
       // Armazenar os dados do candidato na sessão
       sessionStorage.setItem('candidateData', JSON.stringify(data.candidate))
+      
+      // Armazenar o token de segurança na sessão
+      if (data.securityToken) {
+        sessionStorage.setItem('securityToken', data.securityToken)
+      }
       
       // Armazenar os dados do teste na sessão, se disponíveis
       if (data.test) {

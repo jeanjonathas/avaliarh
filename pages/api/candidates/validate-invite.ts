@@ -90,7 +90,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         // Buscar snapshots separadamente para evitar problemas de tipo
         const responsesWithSnapshots = await prisma.$queryRaw`
-          SELECT id, "questionSnapshot", "allOptionsSnapshot", "stageName", "questionText", "optionText"
+          SELECT id, "questionSnapshot", "stageName", "questionType", "optionsOrder", "optionId"
           FROM "Response"
           WHERE "candidateId" = ${candidate.id}
         ` as any[];
@@ -103,10 +103,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return {
             ...response,
             questionSnapshot: snapshot?.questionSnapshot,
-            allOptionsSnapshot: snapshot?.allOptionsSnapshot,
-            stageName: snapshot?.stageName || (response as any).stageName || 'Sem Etapa',
-            questionText: snapshot?.questionText || response.questionText || '',
-            optionText: snapshot?.optionText || response.optionText || ''
+            stageName: snapshot?.stageName || 'Sem Etapa',
+            questionType: snapshot?.questionType || 'MULTIPLE_CHOICE',
+            optionsOrder: snapshot?.optionsOrder,
+            optionId: snapshot?.optionId
           };
         });
         
@@ -125,6 +125,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 : response.questionSnapshot;
               
               questionText = questionSnapshot.text || '';
+              
+              // Se temos informações sobre a opção selecionada, vamos tentar extrair o texto
+              if (response.optionId && questionSnapshot.options) {
+                const selectedOption = questionSnapshot.options.find((opt: any) => opt.id === response.optionId);
+                if (selectedOption) {
+                  optionText = selectedOption.text || '';
+                }
+              }
             } catch (error) {
               console.error('Erro ao processar questionSnapshot:', error);
             }

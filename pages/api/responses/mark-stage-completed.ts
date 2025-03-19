@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../lib/prisma';
 import { v4 as uuidv4 } from 'uuid';
+import { registerCandidateProgress } from '../../../lib/utils/candidate-progress';
 
 export default async function handler(
   req: NextApiRequest,
@@ -24,6 +25,7 @@ export default async function handler(
     // Verificar se o ID da etapa é um UUID válido
     const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(stageId);
     let stageUUID = stageId;
+    let stageName = '';
     
     // Se não for um UUID válido, buscar o UUID correspondente
     if (!isValidUUID) {
@@ -49,11 +51,19 @@ export default async function handler(
             testId: candidate.testId,
             order: parseInt(stageId)
           },
-          select: { stageId: true }
+          include: {
+            stage: {
+              select: {
+                id: true,
+                title: true
+              }
+            }
+          }
         });
         
         if (testStage) {
           stageUUID = testStage.stageId;
+          stageName = testStage.stage?.title || '';
         } else {
           return res.status(404).json({ 
             error: 'Etapa não encontrada'
@@ -64,6 +74,19 @@ export default async function handler(
         return res.status(400).json({ 
           error: 'Formato de ID de etapa não suportado'
         });
+      }
+    } else {
+      // Buscar a etapa pelo UUID
+      const stage = await prisma.stage.findUnique({
+        where: { id: stageUUID },
+        select: { 
+          id: true,
+          title: true 
+        }
+      });
+      
+      if (stage) {
+        stageName = stage.title || '';
       }
     }
     
@@ -141,57 +164,12 @@ export default async function handler(
       }
     }
     
-    // Registrar o progresso do candidato para esta etapa
-    try {
-      // Buscar o candidato para obter o companyId
-      const candidateDetails = await prisma.candidate.findUnique({
-        where: { id: candidateId },
-        select: { companyId: true }
-      });
-      
-      if (!candidateDetails?.companyId) {
-        console.error(`Não foi possível encontrar o companyId para o candidato ${candidateId}`);
-        return res.status(404).json({ 
-          error: 'Candidato não encontrado ou sem companyId'
-        });
-      }
-      
-      // Verificar se já existe um registro de progresso para esta etapa
-      const existingProgress = await prisma.candidateProgress.findFirst({
-        where: {
-          candidateId,
-          stageId: stageUUID
-        }
-      });
-      
-      if (!existingProgress) {
-        // Criar um novo registro de progresso
-        await prisma.candidateProgress.create({
-          data: {
-            candidateId,
-            stageId: stageUUID,
-            status: 'COMPLETED',
-            completed: true,
-            completedAt: new Date(),
-            companyId: candidateDetails.companyId
-          } as any
-        });
-        console.log(`Progresso registrado para o candidato ${candidateId} na etapa ${stageUUID}`);
-      } else {
-        // Atualizar o registro existente
-        await prisma.candidateProgress.update({
-          where: { id: existingProgress.id },
-          data: {
-            status: 'COMPLETED',
-            completed: true,
-            completedAt: new Date(),
-            updatedAt: new Date()
-          } as any
-        });
-        console.log(`Progresso atualizado para o candidato ${candidateId} na etapa ${stageUUID}`);
-      }
-    } catch (progressError) {
-      console.error('Erro ao registrar progresso:', progressError);
+    // Usar a função utilitária para registrar o progresso do candidato
+    const progressResult = await registerCandidateProgress(candidateId, stageUUID, stageName);
+    
+    if (!progressResult.success) {
+      console.warn('Aviso ao registrar progresso:', progressResult.message);
+      // Continuar mesmo com aviso para não bloquear o fluxo do candidato
     }
     
     return res.status(200).json({
