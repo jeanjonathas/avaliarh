@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
 import { PrismaClient, Candidate, Response, Test, Stage, Question, Status } from '@prisma/client'
+import { generateUniqueInviteCode } from '../../../../lib/invites'
 
 // Função auxiliar para converter BigInt para Number
 function convertBigIntToNumber(obj: any): any {
@@ -191,7 +192,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // POST - Gerar novo código de convite
     if (req.method === 'POST' && req.body.action === 'generateInvite') {
-      const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const inviteCode = await generateUniqueInviteCode();
       const inviteExpires = new Date();
       inviteExpires.setDate(inviteExpires.getDate() + 7); // Expira em 7 dias
 

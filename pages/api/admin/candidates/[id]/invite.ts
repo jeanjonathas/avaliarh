@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../../lib/auth'
 import { PrismaClient } from '@prisma/client'
+import { generateUniqueInviteCode, saveUsedInviteCode } from '../../../../../lib/invites'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
@@ -29,7 +30,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         select: { 
           inviteCode: true,
           testId: true,
-          processId: true
+          processId: true,
+          companyId: true
         }
       });
 
@@ -53,8 +55,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       }
 
-      // Gerar novo código de convite
-      const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      // Gerar novo código de convite usando a função centralizada
+      const inviteCode = await generateUniqueInviteCode();
       const inviteExpires = new Date();
       inviteExpires.setDate(inviteExpires.getDate() + 7); // Expira em 7 dias
 
@@ -69,6 +71,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           updatedAt: new Date(),
         },
       });
+
+      // Não precisamos salvar o código no histórico aqui, pois ele ainda está ativo
+      // O código só deve ser salvo no histórico quando for substituído por um novo
 
       return res.status(200).json({
         success: true,

@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { PrismaClient } from '@prisma/client';
 import { getServerSession } from 'next-auth/next';
 import * as emailService from '../../lib/email';
+import * as inviteService from '../../lib/invites';
 
 // Mock do módulo de email
 jest.mock('../../lib/email', () => ({
@@ -9,6 +10,12 @@ jest.mock('../../lib/email', () => ({
     success: true,
     previewUrl: 'https://ethereal.email/message/test',
   }),
+}));
+
+// Mock do módulo de convites
+jest.mock('../../lib/invites', () => ({
+  generateUniqueInviteCode: jest.fn().mockResolvedValue('ABCDEF'),
+  saveUsedInviteCode: jest.fn().mockResolvedValue(undefined),
 }));
 
 // Mock do Prisma
@@ -52,7 +59,8 @@ describe('Generate Invite API', () => {
       method: 'POST',
       body: { 
         candidateId: 'test-candidate-id',
-        expirationDays: 7
+        expirationDays: 7,
+        testId: 'test-id'
       },
     };
     
@@ -68,6 +76,11 @@ describe('Generate Invite API', () => {
     (getServerSession as jest.Mock).mockResolvedValue({
       user: { email: 'admin@example.com' }
     });
+
+    // Mock para o teste existir
+    mockPrisma.tests = {
+      findUnique: jest.fn().mockResolvedValue({ id: 'test-id', name: 'Test' })
+    };
   });
   
   it('should return 401 if user is not authenticated', async () => {
