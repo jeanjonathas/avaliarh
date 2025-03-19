@@ -923,7 +923,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
         ) : (
           <div className="flex flex-col items-center justify-center p-8 text-gray-500">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
             </svg>
             <p>Não há dados de desempenho por etapa disponíveis</p>
             <p className="text-sm mt-2">O candidato não respondeu perguntas de múltipla escolha ou os dados não foram processados corretamente</p>
@@ -1100,53 +1100,103 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
 
       {/* Recomendações baseadas no desempenho */}
       <div className="bg-white p-6 rounded-lg shadow-md">
-        <h3 className="text-lg font-semibold text-secondary-800 mb-4">Recomendações</h3>
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">Recomendações</h3>
         <div className="space-y-4">
           {(() => {
-            const totalCorrect = results?.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0;
-            const totalQuestions = results?.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0;
-            const percentage = totalQuestions > 0 ? parseFloat((totalCorrect / totalQuestions * 100).toFixed(1)) : 0;
+            // Usar os dados de performance em vez dos resultados antigos
+            const overallScore = performance?.summary?.overallScore || 0;
+            const multipleChoiceScore = performance?.summary?.multipleChoiceScore || 0;
+            const opinionScore = performance?.summary?.opinionScore || 0;
+            const accuracy = performance?.summary?.accuracy || 0;
+            const dominantPersonality = performance?.personalityAnalysis?.dominantPersonality?.trait;
+            const totalTime = performance?.totalTime || 0;
+            const avgTimePerQuestion = performance?.avgTimePerQuestion || 0;
             
-            if (percentage >= 80) {
-              return (
-                <div className="p-4 bg-green-50 border-l-4 border-green-500 rounded">
-                  <h4 className="font-medium text-green-800">Candidato Recomendado</h4>
-                  <p className="mt-2 text-green-700">
-                    Este candidato demonstrou excelente desempenho na avaliação. Recomendamos prosseguir com o processo de contratação.
-                  </p>
-                </div>
-              );
-            } else if (percentage >= 60) {
-              return (
-                <div className="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
-                  <h4 className="font-medium text-yellow-800">Candidato para Consideração</h4>
-                  <p className="mt-2 text-yellow-700">
-                    Este candidato demonstrou desempenho satisfatório. Recomendamos avaliar outros aspectos como experiência e entrevista antes de tomar uma decisão.
-                  </p>
-                </div>
-              );
+            let recommendationClass = '';
+            let recommendationTitle = '';
+            let recommendationText = '';
+            
+            if (accuracy >= 80) {
+              recommendationClass = 'bg-green-50 border-l-4 border-green-500';
+              recommendationTitle = 'Candidato Recomendado';
+              recommendationText = `Este candidato demonstrou excelente desempenho técnico com ${accuracy.toFixed(1)}% de acertos. `;
+              
+              if (dominantPersonality) {
+                recommendationText += `Seu perfil dominante é "${dominantPersonality}", `;
+                
+                if (dominantPersonality.includes('Analítico') || dominantPersonality.includes('Lógico')) {
+                  recommendationText += 'indicando boa capacidade de análise e resolução de problemas. ';
+                } else if (dominantPersonality.includes('Criativo') || dominantPersonality.includes('Inovador')) {
+                  recommendationText += 'indicando capacidade de inovação e pensamento criativo. ';
+                } else if (dominantPersonality.includes('Comunicativo') || dominantPersonality.includes('Extrovertido')) {
+                  recommendationText += 'indicando boas habilidades de comunicação e trabalho em equipe. ';
+                } else if (dominantPersonality.includes('Líder') || dominantPersonality.includes('Decisivo')) {
+                  recommendationText += 'indicando potencial para posições de liderança. ';
+                } else {
+                  recommendationText += 'o que complementa suas habilidades técnicas. ';
+                }
+              }
+              
+              recommendationText += 'Recomendamos prosseguir com o processo de contratação.';
+            } else if (accuracy >= 60) {
+              recommendationClass = 'bg-yellow-50 border-l-4 border-yellow-500';
+              recommendationTitle = 'Candidato para Consideração';
+              recommendationText = `Este candidato demonstrou desempenho satisfatório com ${accuracy.toFixed(1)}% de acertos. `;
+              
+              if (totalTime < 15) {
+                recommendationText += 'Completou o teste rapidamente, o que pode indicar eficiência ou pressa. ';
+              } else if (totalTime > 45) {
+                recommendationText += 'Dedicou tempo considerável ao teste, o que pode indicar cuidado ou dificuldade. ';
+              }
+              
+              if (dominantPersonality) {
+                recommendationText += `Seu perfil "${dominantPersonality}" pode ser adequado para a posição, dependendo dos requisitos específicos. `;
+              }
+              
+              recommendationText += 'Recomendamos avaliar outros aspectos como experiência e entrevista antes de tomar uma decisão.';
             } else {
-              return (
-                <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded">
-                  <h4 className="font-medium text-red-800">Candidato Não Recomendado</h4>
-                  <p className="mt-2 text-red-700">
-                    Este candidato não atingiu a pontuação mínima necessária. Recomendamos considerar outros candidatos.
-                  </p>
-                </div>
-              );
+              recommendationClass = 'bg-red-50 border-l-4 border-red-500';
+              recommendationTitle = 'Candidato Não Recomendado';
+              recommendationText = `Este candidato não atingiu a pontuação mínima necessária (${accuracy.toFixed(1)}% de acertos). `;
+              
+              if (performance?.stagePerformance?.some(stage => stage.accuracy >= 70)) {
+                recommendationText += 'No entanto, demonstrou bom desempenho em algumas áreas específicas. ';
+                
+                const bestStage = performance?.stagePerformance?.reduce(
+                  (best, current) => current.accuracy > best.accuracy ? current : best, 
+                  { accuracy: 0, stageName: '' }
+                );
+                
+                if (bestStage && bestStage.stageName) {
+                  recommendationText += `Destaque para "${bestStage.stageName}" com ${bestStage.accuracy.toFixed(1)}% de acertos. `;
+                }
+                
+                recommendationText += 'Pode ser considerado para outras posições que exijam essas habilidades específicas.';
+              } else {
+                recommendationText += 'Recomendamos considerar outros candidatos para esta posição.';
+              }
             }
+            
+            return (
+              <div className={`p-4 ${recommendationClass} rounded`}>
+                <h4 className="font-medium text-gray-800">{recommendationTitle}</h4>
+                <p className="mt-2 text-gray-700">
+                  {recommendationText}
+                </p>
+              </div>
+            );
           })()}
           
           {/* Áreas para desenvolvimento */}
           <div className="mt-4">
-            <h4 className="font-medium text-secondary-800">Áreas para Desenvolvimento:</h4>
-            <ul className="mt-2 space-y-1 list-disc list-inside text-secondary-600">
-              {results?.stageScores?.filter(stage => stage.percentage < 60).map(stage => (
-                <li key={stage.id}>
-                  {stage.name} ({stage.percentage !== null && stage.percentage !== undefined ? stage.percentage.toFixed(1) : '0'}%) - Necessita aprimoramento
+            <h4 className="font-medium text-gray-800">Áreas para Desenvolvimento:</h4>
+            <ul className="mt-2 space-y-1 list-disc list-inside text-gray-600">
+              {performance?.stagePerformance?.filter(stage => stage.accuracy < 60).map(stage => (
+                <li key={stage.stageId}>
+                  {stage.stageName} ({stage.accuracy.toFixed(1)}%) - Necessita aprimoramento
                 </li>
               ))}
-              {results?.stageScores?.filter(stage => stage.percentage < 60).length === 0 && (
+              {performance?.stagePerformance?.filter(stage => stage.accuracy < 60).length === 0 && (
                 <li>Não foram identificadas áreas críticas para desenvolvimento.</li>
               )}
             </ul>
@@ -1154,18 +1204,43 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
           
           {/* Pontos fortes */}
           <div className="mt-4">
-            <h4 className="font-medium text-secondary-800">Pontos Fortes:</h4>
-            <ul className="mt-2 space-y-1 list-disc list-inside text-secondary-600">
-              {results?.stageScores?.filter(stage => stage.percentage >= 80).map(stage => (
-                <li key={stage.id}>
-                  {stage.name} ({stage.percentage !== null && stage.percentage !== undefined ? stage.percentage.toFixed(1) : '0'}%) - Excelente desempenho
+            <h4 className="font-medium text-gray-800">Pontos Fortes:</h4>
+            <ul className="mt-2 space-y-1 list-disc list-inside text-gray-600">
+              {performance?.stagePerformance?.filter(stage => stage.accuracy >= 80).map(stage => (
+                <li key={stage.stageId}>
+                  {stage.stageName} ({stage.accuracy.toFixed(1)}%) - Excelente desempenho
                 </li>
               ))}
-              {results?.stageScores?.filter(stage => stage.percentage >= 80).length === 0 && (
+              {performance?.stagePerformance?.filter(stage => stage.accuracy >= 80).length === 0 && (
                 <li>Não foram identificados pontos de excelência.</li>
               )}
             </ul>
           </div>
+          
+          {/* Tempo de resposta */}
+          <div className="mt-4">
+            <h4 className="font-medium text-gray-800">Análise de Tempo:</h4>
+            <p className="mt-2 text-gray-600">
+              {performance?.totalTime < 15 && 'O candidato completou o teste rapidamente, o que pode indicar eficiência ou familiaridade com os temas abordados.'}
+              {performance?.totalTime >= 15 && performance?.totalTime <= 30 && 'O candidato completou o teste em um tempo médio, demonstrando equilíbrio entre reflexão e agilidade.'}
+              {performance?.totalTime > 30 && 'O candidato dedicou um tempo considerável ao teste, o que pode indicar cuidado na análise ou dificuldade com os temas abordados.'}
+            </p>
+          </div>
+          
+          {/* Personalidade */}
+          {performance?.personalityAnalysis?.dominantPersonality && (
+            <div className="mt-4">
+              <h4 className="font-medium text-gray-800">Perfil Comportamental:</h4>
+              <p className="mt-2 text-gray-600">
+                O perfil predominante do candidato é "{performance.personalityAnalysis.dominantPersonality.trait}" 
+                ({performance.personalityAnalysis.dominantPersonality.percentage.toFixed(1)}%). 
+                {performance.personalityAnalysis.dominantPersonality.trait.includes('Analítico') && ' Este perfil indica uma pessoa metódica, que valoriza precisão e dados concretos.'}
+                {performance.personalityAnalysis.dominantPersonality.trait.includes('Criativo') && ' Este perfil indica uma pessoa inovadora, que busca soluções originais e pensa "fora da caixa".'}
+                {performance.personalityAnalysis.dominantPersonality.trait.includes('Comunicativo') && ' Este perfil indica uma pessoa sociável, que se expressa bem e trabalha bem em equipe.'}
+                {performance.personalityAnalysis.dominantPersonality.trait.includes('Líder') && ' Este perfil indica uma pessoa decisiva, que assume responsabilidades e orienta equipes.'}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
