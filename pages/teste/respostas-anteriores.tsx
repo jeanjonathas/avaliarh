@@ -294,7 +294,7 @@ const RespostasAnteriores: NextPage = () => {
             </p>
             
             {/* Exibir a pontuação do candidato se showResults for true */}
-            {responseData.showResults && responseData.scoreData && (
+            {responseData.showResults === true && responseData.scoreData && (
               <div className="mb-8 bg-white p-6 rounded-lg shadow-md border border-primary-100">
                 <h2 className="text-xl font-semibold text-primary-700 mb-4 pb-2 border-b border-primary-100">
                   Seu Resultado
@@ -332,6 +332,23 @@ const RespostasAnteriores: NextPage = () => {
                     </p>
                   </div>
                 </div>
+              </div>
+            )}
+            
+            {/* Mensagem informativa quando os resultados não são exibidos */}
+            {responseData.showResults !== true && responseData.scoreData && (
+              <div className="mb-8 bg-blue-50 p-6 rounded-lg shadow-md border border-blue-100">
+                <div className="flex items-center mb-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <h2 className="text-xl font-semibold text-blue-700">
+                    Informação
+                  </h2>
+                </div>
+                <p className="text-blue-700">
+                  Suas respostas foram registradas com sucesso. Os resultados detalhados não estão disponíveis para visualização neste momento.
+                </p>
               </div>
             )}
             

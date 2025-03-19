@@ -197,7 +197,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           candidateName: candidate.name,
           candidateEmail: candidate.email,
           responsesByStage,
-          showResults: candidate.showResults,
+          showResults: candidate.showResults === true, // Garantir que seja um booleano
           scoreData
         });
       } catch (error) {
