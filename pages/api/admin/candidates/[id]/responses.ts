@@ -9,6 +9,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ message: 'Não autenticado' })
     }
 
+    console.log('NextAuth Session: Papel do usuário:', session.user?.role)
+
     const { id } = req.query
 
     if (req.method === 'GET') {
@@ -31,8 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   stage: true,
                   options: true
                 }
-              },
-              option: true
+              }
             },
             orderBy: {
               createdAt: 'asc'
@@ -45,13 +46,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(404).json({ message: 'Candidato não encontrado' })
       }
 
-      // Processar as respostas para incluir snapshots e informações adicionais
+      // Processar as respostas para incluir informações adicionais
       const processedResponses = candidate.responses.map(response => {
+        // Criar um snapshot da questão para cada resposta
         const questionSnapshot = {
           id: response.question?.id,
           text: response.question?.text,
-          categoryId: response.question?.categoryId,
-          categoryName: response.question?.categoryName,
           options: response.question?.options.map(opt => ({
             id: opt.id,
             text: opt.text,
@@ -59,21 +59,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }))
         }
 
+        // Retornar a resposta com informações adicionais
         return {
-          ...response,
-          questionSnapshot,
-          questionText: response.question?.text,
-          optionText: response.option?.text,
-          stageName: response.question?.stage?.title,
-          categoryName: response.question?.categoryName,
-          isCorrectOption: response.option?.isCorrect
+          id: response.id,
+          questionId: response.questionId,
+          questionText: response.questionText,
+          optionText: response.optionText,
+          isCorrect: response.isCorrect,
+          timeSpent: response.timeSpent,
+          createdAt: response.createdAt,
+          stageId: response.stageId || response.question?.stage?.id,
+          stageName: response.stageName || response.question?.stage?.title,
+          categoryName: response.categoryName,
+          question: questionSnapshot,
+          optionId: response.optionId
         }
       })
 
-      return res.status(200).json({
-        ...candidate,
-        responses: processedResponses
-      })
+      return res.status(200).json(processedResponses)
     }
 
     return res.status(405).json({ message: 'Método não permitido' })

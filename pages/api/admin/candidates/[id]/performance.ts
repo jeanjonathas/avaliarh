@@ -30,8 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 include: {
                   stage: true
                 }
-              },
-              option: true
+              }
             }
           }
         }
@@ -64,7 +63,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           correctAnswers: stageCorrect,
           incorrectAnswers: stageQuestions - stageCorrect,
           accuracy: stageAccuracy,
-          weight: testStage.weight || 1
+          weight: 1 // Valor padrão se não existir
         }
       }) || []
 
@@ -77,10 +76,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const totalTime = candidate.timeSpent || 0
 
       return res.status(200).json({
-        totalQuestions,
-        correctAnswers,
-        incorrectAnswers,
-        accuracy,
+        summary: {
+          totalQuestions,
+          correctAnswers,
+          incorrectAnswers,
+          accuracy
+        },
         stagePerformance,
         avgTimePerQuestion,
         totalTime,
