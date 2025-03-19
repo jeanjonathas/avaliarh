@@ -223,37 +223,28 @@ export default async function handler(
           
           try {
             // Buscar as questões associadas a esta etapa
-            const stageQuestions = await prisma.stageQuestion.findMany({
+            const questions = await prisma.question.findMany({
               where: {
                 stageId: stage.id
               },
-              select: {
-                questionId: true
+              take: 3, // Limitar a 3 questões
+              include: {
+                options: {
+                  select: {
+                    id: true,
+                    text: true,
+                    categoryName: true,
+                    categoryNameUuid: true,
+                    isCorrect: true,
+                    weight: true,
+                    position: true
+                  }
+                }
               }
             });
             
-            if (stageQuestions.length > 0) {
-              const questionIds = stageQuestions.map(sq => sq.questionId);
-              console.log(`Encontradas ${questionIds.length} questões associadas à etapa ${stage.id}`);
-              
-              // Limitar o número de questões para 3 (ou outro número desejado)
-              const limitedQuestionIds = questionIds.slice(0, 3);
-              
-              questions = await prisma.question.findMany({
-                where: {
-                  id: { in: limitedQuestionIds }
-                },
-                include: {
-                  options: {
-                    select: {
-                      id: true,
-                      text: true,
-                    },
-                  },
-                },
-              });
-              
-              console.log(`Usando ${questions.length} questões limitadas da etapa ${stage.id}`);
+            if (questions.length > 0) {
+              console.log(`Encontradas ${questions.length} questões associadas à etapa ${stage.id}`);
             }
           } catch (error) {
             console.error('Erro na abordagem alternativa:', error);
@@ -286,6 +277,39 @@ export default async function handler(
         action: 'questions_found',
         details: { stageId: stage.id, questionCount: questions.length }
       })
+
+      // Verificar se a etapa é do tipo opinativa para embaralhar as alternativas
+      if (stage.questionType === 'OPINION_MULTIPLE') {
+        console.log('Embaralhando alternativas para perguntas opinativas');
+        
+        // Função para embaralhar array (algoritmo Fisher-Yates)
+        const shuffleArray = (array: any[]) => {
+          const newArray = [...array]; // Criar uma cópia para não modificar o original
+          for (let i = newArray.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+          }
+          return newArray;
+        };
+        
+        // Embaralhar as alternativas de cada pergunta, mantendo o vínculo com a categoria
+        questions = questions.map(question => {
+          // Criar cópias das opções para não modificar os objetos originais
+          const shuffledOptions = shuffleArray(question.options);
+          
+          // Retornar a pergunta com as opções embaralhadas
+          return {
+            ...question,
+            options: shuffledOptions
+          };
+        });
+        
+        logs.push({
+          timestamp: new Date().toISOString(),
+          action: 'options_shuffled',
+          details: { stageType: stage.questionType }
+        });
+      }
 
       return res.status(200).json({
         stageTitle: stage.title,

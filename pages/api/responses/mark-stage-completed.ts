@@ -68,35 +68,30 @@ export default async function handler(
     }
     
     // Buscar todas as questões da etapa
-    const stageQuestions = await prisma.stageQuestion.findMany({
+    const questions = await prisma.question.findMany({
       where: {
         stageId: stageUUID
       },
       include: {
-        question: {
-          include: {
-            options: true,
-            Category: true,
-            Stage: true
-          }
-        }
+        options: true,
+        stage: true
       }
     });
     
     // Para cada questão que ainda não tem resposta, criar uma resposta "automática"
     // com a primeira opção (isso é apenas para marcar como concluído)
-    for (const sq of stageQuestions) {
+    for (const question of questions) {
       // Verificar se já existe uma resposta para esta questão
       const existingResponse = await prisma.response.findFirst({
         where: {
           candidateId,
-          questionId: sq.questionId
+          questionId: question.id
         }
       });
       
       // Se não existir resposta e a questão tiver opções, criar uma resposta automática
-      if (!existingResponse && sq.question.options.length > 0) {
-        const selectedOption = sq.question.options[0];
+      if (!existingResponse && question.options.length > 0) {
+        const selectedOption = question.options[0];
         
         try {
           // Usar o prisma.$queryRaw para contornar problemas de tipagem
@@ -108,59 +103,95 @@ export default async function handler(
               "optionId", 
               "questionText", 
               "optionText", 
-              "isCorrectOption", 
-              "allOptionsSnapshot", 
-              "questionSnapshot", 
-              "categoryName", 
-              "stageName", 
-              "stageId",
+              "isCorrect", 
+              "companyId",
               "createdAt", 
               "updatedAt"
             ) VALUES (
               ${uuidv4()}, 
               ${candidateId}, 
-              ${sq.questionId}, 
+              ${question.id}, 
               ${selectedOption.id}, 
-              ${sq.question.text}, 
+              ${question.text}, 
               ${selectedOption.text}, 
               ${selectedOption.isCorrect}, 
-              ${JSON.stringify(sq.question.options)}::jsonb, 
-              ${JSON.stringify({
-                id: sq.question.id,
-                text: sq.question.text,
-                categoryId: sq.question.categoryId,
-                categoryName: sq.question.Category?.name || null,
-                stageName: sq.question.Stage?.title || null,
-                stageId: sq.question.Stage?.id || null
-              })}::jsonb, 
-              ${sq.question.Category?.name || null}, 
-              ${sq.question.Stage?.title || null}, 
-              ${sq.question.Stage?.id || null},
+              ${question.companyId || null},
               NOW(), 
               NOW()
             )
           `;
           
-          console.log(`Resposta automática criada para a questão ${sq.questionId}`);
+          console.log(`Resposta automática criada para a questão ${question.id}`);
         } catch (error) {
           console.error('Erro ao criar resposta automática:', error);
           // Fallback: tentar criar apenas com os campos básicos
           await prisma.response.create({
             data: {
               candidateId,
-              questionId: sq.questionId,
+              questionId: question.id,
               optionId: selectedOption.id,
               //@ts-ignore - Ignorar erros de tipagem, pois sabemos que estes campos existem no banco
-              questionText: sq.question.text,
+              questionText: question.text,
               optionText: selectedOption.text,
-              isCorrectOption: selectedOption.isCorrect,
-              stageName: sq.question.Stage?.title || null,
-              stageId: sq.question.Stage?.id || null,
-              categoryName: sq.question.Category?.name || null
+              isCorrect: selectedOption.isCorrect,
+              companyId: question.companyId || null
             } as any
           });
         }
       }
+    }
+    
+    // Registrar o progresso do candidato para esta etapa
+    try {
+      // Buscar o candidato para obter o companyId
+      const candidateDetails = await prisma.candidate.findUnique({
+        where: { id: candidateId },
+        select: { companyId: true }
+      });
+      
+      if (!candidateDetails?.companyId) {
+        console.error(`Não foi possível encontrar o companyId para o candidato ${candidateId}`);
+        return res.status(404).json({ 
+          error: 'Candidato não encontrado ou sem companyId'
+        });
+      }
+      
+      // Verificar se já existe um registro de progresso para esta etapa
+      const existingProgress = await prisma.candidateProgress.findFirst({
+        where: {
+          candidateId,
+          stageId: stageUUID
+        }
+      });
+      
+      if (!existingProgress) {
+        // Criar um novo registro de progresso
+        await prisma.candidateProgress.create({
+          data: {
+            candidateId,
+            stageId: stageUUID,
+            status: 'COMPLETED',
+            completed: true,
+            completedAt: new Date(),
+            companyId: candidateDetails.companyId
+          } as any
+        });
+        console.log(`Progresso registrado para o candidato ${candidateId} na etapa ${stageUUID}`);
+      } else {
+        // Atualizar o registro existente
+        await prisma.candidateProgress.update({
+          where: { id: existingProgress.id },
+          data: {
+            status: 'COMPLETED',
+            completed: true,
+            completedAt: new Date(),
+            updatedAt: new Date()
+          } as any
+        });
+        console.log(`Progresso atualizado para o candidato ${candidateId} na etapa ${stageUUID}`);
+      }
+    } catch (progressError) {
+      console.error('Erro ao registrar progresso:', progressError);
     }
     
     return res.status(200).json({

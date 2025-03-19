@@ -72,12 +72,15 @@ export default async function handler(
           console.log(`Processando resposta ${index + 1}/${responses.length}: questionId=${response.questionId}, optionId=${response.optionId}`);
           
           try {
-            // Buscar a questão e a opção selecionada
+            // Buscar a questão para obter mais informações
             const question = await prisma.question.findUnique({
-              where: { id: response.questionId },
+              where: {
+                id: response.questionId
+              },
               include: {
                 options: true,
-                Category: true,
+                categories: true,
+                stage: true
               }
             });
 
@@ -86,29 +89,33 @@ export default async function handler(
               return null;
             }
 
-            // Verificar se a opção selecionada pertence à questão
-            const selectedOption = question.options.find(opt => opt.id === response.optionId);
+            // Buscar a opção selecionada
+            const selectedOption = await prisma.option.findUnique({
+              where: {
+                id: response.optionId
+              }
+            });
+
             if (!selectedOption) {
               console.error(`Opção não encontrada: ${response.optionId} para questão ${response.questionId}`);
               return null;
             }
+
+            // Buscar informações sobre o estágio
+            const testQuestion = await prisma.question.findUnique({
+              where: {
+                id: response.questionId
+              },
+              include: {
+                stage: true
+              }
+            });
 
             // Verificar se já existe uma resposta para esta questão e candidato
             const existingResponse = await prisma.response.findFirst({
               where: {
                 candidateId,
                 questionId: response.questionId
-              }
-            });
-
-            // Buscar a etapa associada à questão
-            const testQuestion = await prisma.testQuestion.findFirst({
-              where: {
-                questionId: response.questionId,
-                testId: candidate.testId
-              },
-              include: {
-                stage: true,
               }
             });
 
@@ -122,7 +129,7 @@ export default async function handler(
               isCorrectOption: selectedOption.isCorrect,
               optionText: selectedOption.text,
               questionText: question.text,
-              categoryName: question.Category?.name || null,
+              categoryName: question.categories?.[0]?.name || null,
               questionSnapshot: JSON.stringify(question),
               allOptionsSnapshot: JSON.stringify(question.options),
               timeSpent: response.timeSpent || null, // Salvar o tempo gasto na resposta
@@ -142,7 +149,7 @@ export default async function handler(
                     "isCorrectOption" = ${selectedOption.isCorrect},
                     "allOptionsSnapshot" = ${JSON.stringify(question.options)}::jsonb,
                     "questionSnapshot" = ${JSON.stringify(question)}::jsonb,
-                    "categoryName" = ${question.Category?.name || null},
+                    "categoryName" = ${question.categories?.[0]?.name || null},
                     "stageName" = ${testQuestion?.stage?.title || null},
                     "stageId" = ${stageId || testQuestion?.stageId || null},
                     "timeSpent" = ${response.timeSpent || null},
@@ -181,8 +188,8 @@ export default async function handler(
                     const question = await prisma.question.findUnique({
                       where: { id: response.questionId },
                       include: { 
-                        Category: true,
-                        Stage: true,
+                        categories: true,
+                        stage: true,
                         options: true
                       }
                     });
@@ -223,7 +230,7 @@ export default async function handler(
                         ${selectedOption.text}, 
                         ${selectedOption.isCorrect}, 
                         ${testQuestion?.stage?.title || null}, 
-                        ${question.Category?.name || null}, 
+                        ${question.categories?.[0]?.name || null}, 
                         ${stageId || testQuestion?.stageId || null},
                         ${response.timeSpent || null},
                         NOW(), 
@@ -258,7 +265,7 @@ export default async function handler(
       if (stageId && validResponses.length > 0) {
         try {
           // Contar quantas questões existem nesta etapa
-          const stageQuestions = await prisma.stageQuestion.count({
+          const stageQuestions = await prisma.question.count({
             where: {
               stageId: stageId
             }
@@ -269,10 +276,10 @@ export default async function handler(
             where: {
               candidateId: candidateId,
               questionId: {
-                in: await prisma.stageQuestion.findMany({
+                in: await prisma.question.findMany({
                   where: { stageId: stageId },
-                  select: { questionId: true }
-                }).then(sq => sq.map(q => q.questionId))
+                  select: { id: true }
+                }).then(questions => questions.map(q => q.id))
               }
             }
           });
@@ -282,6 +289,57 @@ export default async function handler(
           // Se todas as questões da etapa foram respondidas, atualizar o progresso
           if (answeredQuestions >= stageQuestions) {
             console.log(`Todas as questões da etapa ${stageId} foram respondidas pelo candidato ${candidateId}`);
+            
+            // Registrar o progresso do candidato para esta etapa
+            try {
+              // Buscar o candidato para obter o companyId
+              const candidateDetails = await prisma.candidate.findUnique({
+                where: { id: candidateId },
+                select: { companyId: true }
+              });
+              
+              if (!candidateDetails?.companyId) {
+                console.error(`Não foi possível encontrar o companyId para o candidato ${candidateId}`);
+                return;
+              }
+              
+              // Verificar se já existe um registro de progresso para esta etapa
+              const existingProgress = await prisma.candidateProgress.findFirst({
+                where: {
+                  candidateId,
+                  stageId
+                }
+              });
+              
+              if (!existingProgress) {
+                // Criar um novo registro de progresso
+                await prisma.candidateProgress.create({
+                  data: {
+                    candidateId,
+                    stageId,
+                    status: 'COMPLETED',
+                    completed: true,
+                    completedAt: new Date(),
+                    companyId: candidateDetails.companyId
+                  } as any
+                });
+                console.log(`Progresso registrado para o candidato ${candidateId} na etapa ${stageId}`);
+              } else {
+                // Atualizar o registro existente
+                await prisma.candidateProgress.update({
+                  where: { id: existingProgress.id },
+                  data: {
+                    status: 'COMPLETED',
+                    completed: true,
+                    completedAt: new Date(),
+                    updatedAt: new Date()
+                  } as any
+                });
+                console.log(`Progresso atualizado para o candidato ${candidateId} na etapa ${stageId}`);
+              }
+            } catch (progressError) {
+              console.error('Erro ao registrar progresso:', progressError);
+            }
           }
         } catch (error) {
           console.error('Erro ao verificar progresso da etapa:', error);

@@ -103,7 +103,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             ...response,
             questionSnapshot: snapshot?.questionSnapshot,
             allOptionsSnapshot: snapshot?.allOptionsSnapshot,
-            stageName: snapshot?.stageName || response.stageName || 'Sem Etapa',
+            stageName: snapshot?.stageName || (response as any).stageName || 'Sem Etapa',
             questionText: snapshot?.questionText || response.questionText || '',
             optionText: snapshot?.optionText || response.optionText || ''
           };
