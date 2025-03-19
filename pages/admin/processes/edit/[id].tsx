@@ -12,6 +12,8 @@ interface ProcessStage {
   order: number;
   type: string;
   testId?: string;
+  requestCandidatePhoto?: boolean;
+  showResultsToCandidate?: boolean;
 }
 
 interface FormData {
@@ -19,6 +21,7 @@ interface FormData {
   description?: string;
   cutoffScore?: number;
   evaluationType: string;
+  jobPosition: string;
   stages: ProcessStage[];
 }
 
@@ -69,6 +72,7 @@ const EditProcess: React.FC = () => {
       name: '',
       description: '',
       evaluationType: 'SCORE_BASED',
+      jobPosition: '',
       stages: []
     }
   });
@@ -95,13 +99,16 @@ const EditProcess: React.FC = () => {
             description: process.description,
             evaluationType: process.evaluationType,
             cutoffScore: process.cutoffScore,
+            jobPosition: process.jobPosition,
             stages: process.stages.map((stage: ProcessStage) => ({
               id: stage.id,
               name: stage.name,
               description: stage.description,
               order: stage.order,
               type: stage.type,
-              testId: stage.testId
+              testId: stage.testId,
+              requestCandidatePhoto: stage.requestCandidatePhoto === true,
+              showResultsToCandidate: stage.showResultsToCandidate === true
             }))
           });
         } else {
@@ -251,6 +258,21 @@ const EditProcess: React.FC = () => {
 
             <div>
               <label className="block text-sm font-medium text-secondary-700 mb-1">
+                Vaga *
+              </label>
+              <input
+                type="text"
+                placeholder="Ex: Desenvolvedor Full Stack"
+                {...register('jobPosition', { required: 'Vaga é obrigatória' })}
+                className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+              />
+              {errors.jobPosition && (
+                <p className="mt-1 text-sm text-red-600">Vaga é obrigatória</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-secondary-700 mb-1">
                 Descrição
               </label>
               <textarea
@@ -309,7 +331,9 @@ const EditProcess: React.FC = () => {
                     name: '',
                     description: '',
                     order: fields.length + 1,
-                    type: 'TEST'
+                    type: 'TEST',
+                    requestCandidatePhoto: true,
+                    showResultsToCandidate: true
                   })}
                   className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                 >
@@ -375,6 +399,38 @@ const EditProcess: React.FC = () => {
                       rows={2}
                       className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                     />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`requestCandidatePhoto-${index}`}
+                        {...register(`stages.${index}.requestCandidatePhoto` as const)}
+                        className="w-4 h-4 text-primary-600 bg-gray-100 rounded border-gray-300 focus:ring-primary-500"
+                      />
+                      <label 
+                        htmlFor={`requestCandidatePhoto-${index}`}
+                        className="text-sm font-medium text-secondary-700"
+                      >
+                        Solicitar foto do candidato
+                      </label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`showResultsToCandidate-${index}`}
+                        {...register(`stages.${index}.showResultsToCandidate` as const)}
+                        className="w-4 h-4 text-primary-600 bg-gray-100 rounded border-gray-300 focus:ring-primary-500"
+                      />
+                      <label 
+                        htmlFor={`showResultsToCandidate-${index}`}
+                        className="text-sm font-medium text-secondary-700"
+                      >
+                        Exibir resultados ao candidato
+                      </label>
+                    </div>
                   </div>
 
                   {watch(`stages.${index}.type`) === 'TEST' && (

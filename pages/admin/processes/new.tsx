@@ -85,8 +85,8 @@ const NewProcess: React.FC = () => {
           order: 1,
           type: 'TEST',
           testId: '',
-          requestCandidatePhoto: false,
-          showResultsToCandidate: false,
+          requestCandidatePhoto: true,
+          showResultsToCandidate: true,
         }
       ]
     }
@@ -142,8 +142,8 @@ const NewProcess: React.FC = () => {
       order: fields.length + 1,
       type: 'TEST',
       testId: '',
-      requestCandidatePhoto: false,
-      showResultsToCandidate: false,
+      requestCandidatePhoto: true,
+      showResultsToCandidate: true,
     });
   };
 
@@ -178,8 +178,8 @@ const NewProcess: React.FC = () => {
         order: 1,
         type: 'TEST',
         testId: '',
-        requestCandidatePhoto: false,
-        showResultsToCandidate: false,
+        requestCandidatePhoto: true,
+        showResultsToCandidate: true,
       }]
     });
   }, [reset]);
@@ -208,8 +208,8 @@ const NewProcess: React.FC = () => {
               order: 1,
               type: 'TEST',
               testId: '',
-              requestCandidatePhoto: false,
-              showResultsToCandidate: false,
+              requestCandidatePhoto: true,
+              showResultsToCandidate: true,
             }]
           });
         } catch (error) {

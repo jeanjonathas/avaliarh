@@ -47,16 +47,10 @@ export default async function handler(
           where: { id },
           include: {
             stages: {
-              orderBy: { order: 'asc' },
+              orderBy: { order: 'asc' }
             },
             candidates: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                status: true,
-                overallStatus: true,
-                createdAt: true,
+              include: {
                 progresses: {
                   include: {
                     stage: true,
@@ -83,7 +77,7 @@ export default async function handler(
           return res.status(403).json({ message: 'Acesso negado' });
         }
 
-        const { name, description, cutoffScore, evaluationType, stages } = req.body;
+        const { name, description, cutoffScore, evaluationType, jobPosition, stages } = req.body;
 
         if (!name) {
           return res.status(400).json({ message: 'Nome do processo seletivo é obrigatório' });
@@ -108,19 +102,31 @@ export default async function handler(
               description,
               cutoffScore,
               evaluationType,
+              jobPosition,
               stages: {
                 create: stages.map((stage: any) => ({
                   name: stage.name,
                   description: stage.description,
                   order: stage.order,
                   type: stage.type,
-                  testId: stage.testId || null // Garantir que testId seja null quando vazio
+                  testId: stage.testId || null,
+                  requestCandidatePhoto: typeof stage.requestCandidatePhoto === 'boolean' ? stage.requestCandidatePhoto : false,
+                  showResultsToCandidate: typeof stage.showResultsToCandidate === 'boolean' ? stage.showResultsToCandidate : false
                 })),
               },
             },
             include: {
               stages: {
                 orderBy: { order: 'asc' },
+              },
+              candidates: {
+                include: {
+                  progresses: {
+                    include: {
+                      stage: true,
+                    },
+                  },
+                },
               },
             },
           });
