@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import AdminLayout from '../../../../components/admin/AdminLayout';
 import { useNotification } from '../../../../contexts/NotificationContext';
+import CollapsibleTestTable from '../../../../components/admin/processes/CollapsibleTestTable';
 
 interface ProcessStage {
   id?: string;
@@ -21,9 +22,29 @@ interface FormData {
   stages: ProcessStage[];
 }
 
+interface Question {
+  id: string;
+  text: string;
+  type: string;
+}
+
+interface Stage {
+  id: string;
+  title: string;
+  description?: string;
+  order: number;
+  questions: Question[];
+}
+
 interface Test {
   id: string;
   title: string;
+  description?: string;
+  timeLimit?: number;
+  active: boolean;
+  stages?: Stage[];
+  sectionsCount?: number;
+  questionsCount?: number;
 }
 
 const stageTypes = [
@@ -40,6 +61,8 @@ const EditProcess: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tests, setTests] = useState<Test[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingTests, setIsLoadingTests] = useState(false);
+  const [detailedTests, setDetailedTests] = useState<{[key: string]: Test}>({});
 
   const { control, handleSubmit, register, formState: { errors }, watch, setValue, reset } = useForm<FormData>({
     defaultValues: {
@@ -101,38 +124,47 @@ const EditProcess: React.FC = () => {
   useEffect(() => {
     const fetchTests = async () => {
       try {
+        setIsLoadingTests(true);
         const response = await fetch('/api/admin/tests');
         if (response.ok) {
           const { tests: testsData } = await response.json();
-          setTests(testsData.map(test => ({
-            id: test.id,
-            title: test.title
-          })));
+          setTests(testsData);
         }
       } catch (error) {
         console.error('Erro ao carregar testes:', error);
         showToast('Erro ao carregar testes disponíveis', 'error');
+      } finally {
+        setIsLoadingTests(false);
       }
     };
 
     fetchTests();
   }, [showToast]);
 
+  // Carregar detalhes dos testes quando necessário
+  const loadTestDetails = async (testId: string) => {
+    if (detailedTests[testId]) return;
+    
+    try {
+      const response = await fetch(`/api/admin/tests/${testId}`);
+      if (response.ok) {
+        const testData = await response.json();
+        setDetailedTests(prev => ({
+          ...prev,
+          [testId]: testData
+        }));
+      }
+    } catch (error) {
+      console.error(`Erro ao carregar detalhes do teste ${testId}:`, error);
+    }
+  };
+
   const handleTestSelect = async (testId: string, stageIndex: number) => {
+    setValue(`stages.${stageIndex}.testId`, testId);
+    
+    // Carregar detalhes do teste selecionado
     if (testId) {
-      // Salvar o estado atual do formulário em localStorage
-      const currentFormData = {
-        id: id as string,
-        name: watch('name'),
-        description: watch('description'),
-        evaluationType: watch('evaluationType'),
-        cutoffScore: watch('cutoffScore'),
-        stages: watch('stages')
-      };
-      localStorage.setItem('processDraft', JSON.stringify(currentFormData));
-      
-      // Redirecionar para a página do teste
-      router.push(`/admin/test/${testId}`);
+      loadTestDetails(testId);
     }
   };
 
@@ -350,18 +382,34 @@ const EditProcess: React.FC = () => {
                       <label className="block text-sm font-medium text-secondary-700 mb-1">
                         Selecionar Teste
                       </label>
-                      <select
-                        {...register(`stages.${index}.testId` as const)}
-                        onChange={(e) => handleTestSelect(e.target.value, index)}
-                        className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                      >
-                        <option value="">Selecione um teste...</option>
-                        {tests.map(test => (
-                          <option key={test.id} value={test.id}>
-                            {test.title}
-                          </option>
-                        ))}
-                      </select>
+                      
+                      {/* Campo oculto para armazenar o ID do teste selecionado */}
+                      <input 
+                        type="hidden" 
+                        {...register(`stages.${index}.testId` as const)} 
+                      />
+                      
+                      {isLoadingTests ? (
+                        <div className="animate-pulse">
+                          <div className="h-10 bg-gray-200 rounded w-full mb-2"></div>
+                          <div className="h-10 bg-gray-200 rounded w-full mb-2"></div>
+                        </div>
+                      ) : (
+                        <CollapsibleTestTable 
+                          tests={tests}
+                          selectedTestId={watch(`stages.${index}.testId`) || ''}
+                          onTestSelect={(testId) => handleTestSelect(testId, index)}
+                        />
+                      )}
+                      
+                      {/* Exibir o teste selecionado */}
+                      {watch(`stages.${index}.testId`) && (
+                        <div className="mt-2 p-3 bg-blue-50 rounded-md">
+                          <p className="text-sm font-medium text-blue-800">
+                            Teste selecionado: {tests.find(t => t.id === watch(`stages.${index}.testId`))?.title || 'Carregando...'}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
