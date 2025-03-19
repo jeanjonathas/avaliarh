@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import AdminLayout from '../../../components/admin/AdminLayout';
-import { useNotification } from '../../../contexts/NotificationContext';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
+import { Switch, FormControlLabel, FormGroup } from '@mui/material';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 
 interface ProcessStage {
@@ -65,7 +66,6 @@ const stageTypes = [
 
 const NewProcess: React.FC = () => {
   const router = useRouter();
-  const { showToast } = useNotification();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tests, setTests] = useState<Test[]>([]);
   const [isLoadingTests, setIsLoadingTests] = useState(false);
@@ -125,14 +125,14 @@ const NewProcess: React.FC = () => {
         }
       } catch (error) {
         console.error('Erro ao carregar testes:', error);
-        showToast('Erro ao carregar testes', 'error');
+        toast.error('Erro ao carregar testes');
       } finally {
         setIsLoadingTests(false);
       }
     };
 
     fetchTests();
-  }, [showToast]);
+  }, []);
 
   // Função para adicionar uma nova etapa
   const addStage = () => {
@@ -233,16 +233,16 @@ const NewProcess: React.FC = () => {
       });
 
       if (response.ok) {
-        showToast('Processo seletivo criado com sucesso!', 'success');
+        toast.success('Processo seletivo criado com sucesso!');
         localStorage.removeItem('processDraft'); // Limpar rascunho após salvar
         router.push('/admin/processes');
       } else {
         const error = await response.json();
-        showToast(error.message || 'Erro ao criar processo seletivo', 'error');
+        toast.error(error.message || 'Erro ao criar processo seletivo');
       }
     } catch (error) {
       console.error('Erro ao criar processo seletivo:', error);
-      showToast('Erro ao criar processo seletivo', 'error');
+      toast.error('Erro ao criar processo seletivo');
     } finally {
       setIsSubmitting(false);
     }
@@ -568,25 +568,39 @@ const NewProcess: React.FC = () => {
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-secondary-700 mb-1">
-                      Solicitar Foto do Candidato
-                    </label>
-                    <input
-                      type="checkbox"
-                      {...register(`stages.${index}.requestCandidatePhoto`)}
-                      className="h-4 w-4 text-primary-600 border-secondary-300 focus:ring-primary-500 cursor-pointer"
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <Controller
+                      name={`stages.${index}.requestCandidatePhoto`}
+                      control={control}
+                      defaultValue={true}
+                      render={({ field }) => (
+                        <FormControlLabel 
+                          control={
+                            <Switch 
+                              checked={field.value} 
+                              onChange={field.onChange}
+                            />
+                          } 
+                          label="Solicitar foto do candidato" 
+                        />
+                      )}
                     />
-                  </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-secondary-700 mb-1">
-                      Mostrar Resultados ao Candidato
-                    </label>
-                    <input
-                      type="checkbox"
-                      {...register(`stages.${index}.showResultsToCandidate`)}
-                      className="h-4 w-4 text-primary-600 border-secondary-300 focus:ring-primary-500 cursor-pointer"
+                    <Controller
+                      name={`stages.${index}.showResultsToCandidate`}
+                      control={control}
+                      defaultValue={true}
+                      render={({ field }) => (
+                        <FormControlLabel 
+                          control={
+                            <Switch 
+                              checked={field.value} 
+                              onChange={field.onChange}
+                            />
+                          } 
+                          label="Exibir resultados ao candidato" 
+                        />
+                      )}
                     />
                   </div>
                 </div>

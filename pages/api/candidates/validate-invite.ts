@@ -40,6 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         "inviteExpires", 
         "inviteAttempts",
         "testId",
+        "processId",
         observations,
         instagram,
         score,
@@ -241,6 +242,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
     
+    // Buscar a configuração requestCandidatePhoto da primeira etapa do processo seletivo
+    let requestCandidatePhoto = true; // Valor padrão
+    let showResultsToCandidate = true; // Valor padrão
+    
+    if (candidate.processId) {
+      try {
+        const processStages = await prisma.processStage.findMany({
+          where: { processId: candidate.processId },
+          orderBy: { order: 'asc' },
+          select: { 
+            requestCandidatePhoto: true,
+            showResultsToCandidate: true
+          }
+        });
+        
+        if (processStages.length > 0) {
+          // Usar a configuração da primeira etapa
+          requestCandidatePhoto = processStages[0].requestCandidatePhoto === true;
+          showResultsToCandidate = processStages[0].showResultsToCandidate === true;
+          console.log(`Configuração requestCandidatePhoto da primeira etapa: ${requestCandidatePhoto}`);
+          console.log(`Configuração showResultsToCandidate da primeira etapa: ${showResultsToCandidate}`);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar configurações da etapa do processo:', error);
+      }
+    }
+    
     // Resetar o contador de tentativas após um login bem-sucedido
     await prisma.$executeRaw`
       UPDATE "Candidate"
@@ -268,8 +296,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         observations: candidate.observations,
         instagram: candidate.instagram,
         score: candidate.score,
-        showResults: candidate.showResults,
-        requestPhoto: candidate.requestPhoto,
+        showResults: showResultsToCandidate, // Usar a configuração da etapa do processo
+        requestPhoto: requestCandidatePhoto, // Usar a configuração da etapa do processo
         photoUrl: candidate.photoUrl
       },
       test: test,
