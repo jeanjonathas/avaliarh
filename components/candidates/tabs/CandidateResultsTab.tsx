@@ -79,7 +79,9 @@ interface CandidateResults {
 
 export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => {
   const [results, setResults] = useState<CandidateResults | null>(null)
+  const [performance, setPerformance] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [loadingPerformance, setLoadingPerformance] = useState(true)
 
   useEffect(() => {
     const fetchResults = async () => {
@@ -102,7 +104,29 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
       }
     }
 
-    fetchResults()
+    const fetchPerformance = async () => {
+      try {
+        const response = await fetch(`/api/admin/candidates/${candidate.id}/performance`, {
+          credentials: 'include'
+        })
+
+        if (!response.ok) {
+          throw new Error('Erro ao buscar dados de desempenho')
+        }
+
+        const data = await response.json()
+        setPerformance(data)
+      } catch (error) {
+        console.error('Erro ao buscar dados de desempenho:', error)
+      } finally {
+        setLoadingPerformance(false)
+      }
+    }
+
+    if (candidate.id) {
+      fetchResults()
+      fetchPerformance()
+    }
   }, [candidate.id])
 
   // Função para obter a cor do status
@@ -140,108 +164,125 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
     return `${hours}h ${remainingMinutes}min`
   }
 
-  if (loading) {
+  if (loading && loadingPerformance) {
     return (
       <div className="flex justify-center items-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
-        <Toaster position="top-right" />
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     )
-  }
-
-  if (!results?.completed) {
-    return (
-      <div className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
-        <h4 className="font-medium text-blue-800">Aguardando Respostas</h4>
-        <p className="mt-2 text-blue-700">
-          Este candidato ainda não realizou o teste. Os resultados serão exibidos após a conclusão da avaliação.
-        </p>
-        <Toaster position="top-right" />
-      </div>
-    )
-  }
-
-  // Preparar dados para o gráfico de barras de desempenho por etapa
-  const stageData = {
-    labels: results.stageScores.map(stage => stage.name),
-    datasets: [
-      {
-        label: 'Porcentagem de Acertos',
-        data: results.stageScores.map(stage => stage.percentage),
-        backgroundColor: 'rgba(59, 130, 246, 0.5)',
-        borderColor: 'rgb(59, 130, 246)',
-        borderWidth: 1,
-      }
-    ]
-  }
-
-  // Opções para o gráfico de barras
-  const stageOptions = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'top' as const,
-      },
-      title: {
-        display: true,
-        text: 'Desempenho por Etapa'
-      }
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        max: 100,
-        ticks: {
-          callback: (value: number) => `${value}%`
-        }
-      }
-    }
-  }
-
-  // Dados para o gráfico de radar
-  const radarData = {
-    labels: results.skillScores.map(score => score.skill),
-    datasets: [
-      {
-        label: 'Desempenho do Candidato',
-        data: results.skillScores.map(score => score.percentage),
-        backgroundColor: 'rgba(59, 130, 246, 0.2)',
-        borderColor: 'rgb(59, 130, 246)',
-        borderWidth: 2,
-        pointBackgroundColor: 'rgb(59, 130, 246)',
-        pointBorderColor: '#fff',
-        pointHoverBackgroundColor: '#fff',
-        pointHoverBorderColor: 'rgb(59, 130, 246)'
-      }
-    ]
-  }
-
-  // Opções para o gráfico de radar
-  const radarOptions = {
-    responsive: true,
-    scales: {
-      r: {
-        beginAtZero: true,
-        max: 100,
-        ticks: {
-          stepSize: 20
-        }
-      }
-    },
-    plugins: {
-      legend: {
-        position: 'top' as const,
-      },
-      title: {
-        display: true,
-        text: 'Desempenho por Habilidade'
-      }
-    }
   }
 
   return (
     <div className="space-y-8">
-      <Toaster position="top-right" />
+      {/* Seção de Desempenho */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="p-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Desempenho do Candidato</h3>
+          
+          {loadingPerformance ? (
+            <div className="flex justify-center items-center p-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+          ) : performance && performance.summary ? (
+            performance.showResults === true ? (
+              <div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                  <div className="bg-white p-5 rounded-lg shadow-md border-l-4 border-primary-500">
+                    <div className="flex items-center">
+                      <div className="p-3 rounded-full bg-primary-100 text-primary-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                      </div>
+                      <div className="ml-4">
+                        <p className="text-sm text-secondary-500">Total de Questões</p>
+                        <p className="text-xl font-semibold text-secondary-900">{performance.summary.totalQuestions}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-5 rounded-lg shadow-md border-l-4 border-green-500">
+                    <div className="flex items-center">
+                      <div className="p-3 rounded-full bg-green-100 text-green-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                      <div className="ml-4">
+                        <p className="text-sm text-secondary-500">Respostas Corretas</p>
+                        <p className="text-xl font-semibold text-secondary-900">{performance.summary.correctAnswers}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-5 rounded-lg shadow-md border-l-4 border-blue-500">
+                    <div className="flex items-center">
+                      <div className="p-3 rounded-full bg-blue-100 text-blue-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                        </svg>
+                      </div>
+                      <div className="ml-4">
+                        <p className="text-sm text-secondary-500">Taxa de Acerto</p>
+                        <p className="text-xl font-semibold text-secondary-900">{typeof performance.summary.accuracy === 'number' ? performance.summary.accuracy.toFixed(1) : '0'}%</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {performance.stagePerformance && performance.stagePerformance.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Desempenho por Etapa</h3>
+                    <div className="space-y-4">
+                      {performance.stagePerformance.map((stage: any) => (
+                        <div key={stage.stageId} className="bg-white p-4 rounded-lg shadow border">
+                          <h4 className="font-medium text-gray-900 mb-2">{stage.stageName}</h4>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div>
+                              <p className="text-sm text-gray-500">Total de Questões</p>
+                              <p className="font-semibold">{stage.totalQuestions}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-500">Corretas</p>
+                              <p className="font-semibold text-green-600">{stage.correctAnswers}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-500">Incorretas</p>
+                              <p className="font-semibold text-red-600">{stage.incorrectAnswers}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-500">Taxa de Acerto</p>
+                              <p className="font-semibold">{typeof stage.accuracy === 'number' ? stage.accuracy.toFixed(1) : '0'}%</p>
+                            </div>
+                          </div>
+                          <div className="mt-2 w-full bg-gray-200 rounded-full h-2.5">
+                            <div 
+                              className="bg-blue-600 h-2.5 rounded-full" 
+                              style={{ width: `${stage.accuracy}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
+                <p className="text-yellow-700">
+                  A exibição dos resultados de desempenho não está habilitada para este teste.
+                </p>
+              </div>
+            )
+          ) : (
+            <div className="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
+              <p className="text-yellow-700">
+                Não foram encontrados dados de desempenho para este candidato.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Cards de resumo de desempenho */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -257,12 +298,14 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
               <h4 className="text-sm font-medium text-secondary-500">Pontuação Geral</h4>
               <div className="flex items-baseline">
                 <span className="text-2xl font-semibold text-secondary-900">
-                  {typeof results.score === 'object' 
-                    ? results.score.percentage.toFixed(1) 
-                    : parseFloat((results.score || 0).toFixed(1))}%</span>
+                  {typeof results?.score === 'object' 
+                    ? (results.score.percentage !== null && results.score.percentage !== undefined ? results.score.percentage.toFixed(1) : '0') 
+                    : (results?.score !== null && results?.score !== undefined ? results?.score.toFixed(1) : '0')}%</span>
                 <span className="ml-2 text-sm text-secondary-500">
-                  ({typeof results.score === 'object' 
-                    ? `${results.score.correct}/${results.score.total}` 
+                  ({typeof results?.score === 'object' 
+                    ? (results.score.total != null && results.score.correct != null 
+                       ? `${results.score.correct}/${results.score.total}` 
+                       : '0/0')
                     : '0/0'})
                 </span>
               </div>
@@ -282,9 +325,9 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
               <h4 className="text-sm font-medium text-secondary-500">Status do Teste</h4>
               <div className="flex items-baseline">
                 <span className="text-2xl font-semibold text-secondary-900">
-                  {!results.completed ? 'Pendente' : (() => {
-                    const totalCorrect = results.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0;
-                    const totalQuestions = results.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0;
+                  {!results?.completed ? 'Pendente' : (() => {
+                    const totalCorrect = results?.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0;
+                    const totalQuestions = results?.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0;
                     const percentage = totalQuestions > 0 ? parseFloat((totalCorrect / totalQuestions * 100).toFixed(1)) : 0;
                     
                     if (percentage >= 80) return 'Aprovado';
@@ -309,7 +352,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
               <h4 className="text-sm font-medium text-secondary-500">Tempo Gasto</h4>
               <div className="flex items-baseline">
                 <span className="text-2xl font-semibold text-secondary-900">
-                  {formatTime(results.timeSpent)}
+                  {formatTime(results?.timeSpent)}
                 </span>
               </div>
             </div>
@@ -322,18 +365,18 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
         <div className="flex justify-between items-start">
           <div>
             <h2 className="text-xl font-semibold text-gray-900">
-              {results.processName || 'Processo Seletivo'}
+              {results?.processName || 'Processo Seletivo'}
             </h2>
             <p className="text-sm text-gray-600 mt-1">
-              {results.jobPosition || 'Cargo não especificado'}
+              {results?.jobPosition || 'Cargo não especificado'}
             </p>
           </div>
           <div className="text-right">
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(results.processStatus.overallStatus)}`}>
-              {translateStatus(results.processStatus.overallStatus)}
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(results?.processStatus?.overallStatus)}`}>
+              {translateStatus(results?.processStatus?.overallStatus)}
             </span>
             <p className="text-sm text-gray-600 mt-1">
-              Etapa Atual: {results.processStatus.currentStage}
+              Etapa Atual: {results?.processStatus?.currentStage}
             </p>
           </div>
         </div>
@@ -342,10 +385,76 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white p-6 rounded-lg shadow-md">
-          <Bar data={stageData} options={stageOptions} />
+          <Bar data={{
+            labels: results?.stageScores?.map(stage => stage.name),
+            datasets: [
+              {
+                label: 'Porcentagem de Acertos',
+                data: results?.stageScores?.map(stage => stage.percentage),
+                backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                borderColor: 'rgb(59, 130, 246)',
+                borderWidth: 1,
+              }
+            ]
+          }} options={{
+            responsive: true,
+            plugins: {
+              legend: {
+                position: 'top' as const,
+              },
+              title: {
+                display: true,
+                text: 'Desempenho por Etapa'
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                max: 100,
+                ticks: {
+                  callback: (value: number) => `${value}%`
+                }
+              }
+            }
+          }} />
         </div>
         <div className="bg-white p-6 rounded-lg shadow-md">
-          <Radar data={radarData} options={radarOptions} />
+          <Radar data={{
+            labels: results?.skillScores?.map(score => score.skill),
+            datasets: [
+              {
+                label: 'Desempenho do Candidato',
+                data: results?.skillScores?.map(score => score.percentage),
+                backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                borderColor: 'rgb(59, 130, 246)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgb(59, 130, 246)',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgb(59, 130, 246)'
+              }
+            ]
+          }} options={{
+            responsive: true,
+            scales: {
+              r: {
+                beginAtZero: true,
+                max: 100,
+                ticks: {
+                  stepSize: 20
+                }
+              }
+            },
+            plugins: {
+              legend: {
+                position: 'top' as const,
+              },
+              title: {
+                display: true,
+                text: 'Desempenho por Habilidade'
+              }
+            }
+          }} />
         </div>
       </div>
 
@@ -374,7 +483,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {results.stageScores.map((stage, index) => (
+              {results?.stageScores?.map((stage, index) => (
                 <tr key={stage.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {stage.name}
@@ -390,11 +499,11 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {stage.type === 'TEST' ? (
                       <div className="flex items-center">
-                        <span className="mr-2">{stage.percentage.toFixed(1)}%</span>
+                        <span className="mr-2">{stage.percentage !== null && stage.percentage !== undefined ? stage.percentage.toFixed(1) : '0'}%</span>
                         <div className="w-24 bg-gray-200 rounded-full h-2">
-                          <div
+                          <div 
                             className={`h-2 rounded-full ${
-                              stage.percentage >= 80 ? 'bg-green-500' :
+                              stage.percentage >= 80 ? 'bg-green-500' : 
                               stage.percentage >= 60 ? 'bg-yellow-500' : 'bg-red-500'
                             }`}
                             style={{ width: `${stage.percentage}%` }}
@@ -420,7 +529,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
       </div>
 
       {/* Observações */}
-      {results.observations && (
+      {results?.observations && (
         <div className="bg-white p-6 rounded-lg shadow-md">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Observações</h3>
           <p className="text-gray-700 whitespace-pre-line">
@@ -433,9 +542,9 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h3 className="text-lg font-semibold text-secondary-800 mb-4">Desempenho por Etapa</h3>
         <div className="space-y-4">
-          {results.stageScores.map((stage) => (
+          {results?.stageScores?.map((stage) => (
             <div key={stage.id} className="border border-secondary-200 rounded-lg p-4">
-              <h4 className="font-medium text-secondary-700 mb-2">{stage.name}</h4>
+              <h4 className="font-medium text-secondary-700">{stage.name}</h4>
               <div className="grid grid-cols-3 gap-4 text-sm">
                 <div>
                   <p className="text-secondary-500">Total de Questões</p>
@@ -447,7 +556,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                 </div>
                 <div>
                   <p className="text-secondary-500">Taxa de Acerto</p>
-                  <p className="font-medium text-secondary-900">{stage.percentage.toFixed(1)}%</p>
+                  <p className="font-medium text-secondary-900">{stage.percentage !== null && stage.percentage !== undefined ? stage.percentage.toFixed(1) : '0'}%</p>
                 </div>
               </div>
               {/* Barra de progresso */}
@@ -470,8 +579,8 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
         <h3 className="text-lg font-semibold text-secondary-800 mb-4">Recomendações</h3>
         <div className="space-y-4">
           {(() => {
-            const totalCorrect = results.stageScores.reduce((acc, stage) => acc + stage.correct, 0);
-            const totalQuestions = results.stageScores.reduce((acc, stage) => acc + stage.total, 0);
+            const totalCorrect = results?.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0;
+            const totalQuestions = results?.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0;
             const percentage = totalQuestions > 0 ? parseFloat((totalCorrect / totalQuestions * 100).toFixed(1)) : 0;
             
             if (percentage >= 80) {
@@ -508,12 +617,12 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
           <div className="mt-4">
             <h4 className="font-medium text-secondary-800">Áreas para Desenvolvimento:</h4>
             <ul className="mt-2 space-y-1 list-disc list-inside text-secondary-600">
-              {results.stageScores.filter(stage => stage.percentage < 60).map(stage => (
+              {results?.stageScores?.filter(stage => stage.percentage < 60).map(stage => (
                 <li key={stage.id}>
-                  {stage.name} ({stage.percentage.toFixed(1)}%) - Necessita aprimoramento
+                  {stage.name} ({stage.percentage !== null && stage.percentage !== undefined ? stage.percentage.toFixed(1) : '0'}%) - Necessita aprimoramento
                 </li>
               ))}
-              {results.stageScores.filter(stage => stage.percentage < 60).length === 0 && (
+              {results?.stageScores?.filter(stage => stage.percentage < 60).length === 0 && (
                 <li>Não foram identificadas áreas críticas para desenvolvimento.</li>
               )}
             </ul>
@@ -523,12 +632,12 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
           <div className="mt-4">
             <h4 className="font-medium text-secondary-800">Pontos Fortes:</h4>
             <ul className="mt-2 space-y-1 list-disc list-inside text-secondary-600">
-              {results.stageScores.filter(stage => stage.percentage >= 80).map(stage => (
+              {results?.stageScores?.filter(stage => stage.percentage >= 80).map(stage => (
                 <li key={stage.id}>
-                  {stage.name} ({stage.percentage.toFixed(1)}%) - Excelente desempenho
+                  {stage.name} ({stage.percentage !== null && stage.percentage !== undefined ? stage.percentage.toFixed(1) : '0'}%) - Excelente desempenho
                 </li>
               ))}
-              {results.stageScores.filter(stage => stage.percentage >= 80).length === 0 && (
+              {results?.stageScores?.filter(stage => stage.percentage >= 80).length === 0 && (
                 <li>Não foram identificados pontos de excelência.</li>
               )}
             </ul>
