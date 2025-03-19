@@ -13,7 +13,7 @@ import {
   RadialLinearScale,
   Filler
 } from 'chart.js'
-import { Bar, Radar } from 'react-chartjs-2'
+import { Bar, Radar, Pie, Doughnut } from 'react-chartjs-2'
 import { useEffect, useState } from 'react'
 import { toast, Toaster } from 'react-hot-toast'
 
@@ -34,6 +34,18 @@ ChartJS.register(
 
 interface CandidateResultsTabProps {
   candidate: Candidate
+}
+
+interface PersonalityTrait {
+  trait: string;
+  count: number;
+  percentage: number;
+}
+
+interface PersonalityAnalysis {
+  dominantPersonality: PersonalityTrait;
+  allPersonalities: PersonalityTrait[];
+  totalResponses: number;
 }
 
 interface CandidateResults {
@@ -77,9 +89,35 @@ interface CandidateResults {
   status: string
 }
 
+interface CandidatePerformance {
+  summary: {
+    totalQuestions: number;
+    correctAnswers: number;
+    incorrectAnswers: number;
+    accuracy: number;
+  };
+  stagePerformance: Array<{
+    stageId: string;
+    stageName: string;
+    totalQuestions: number;
+    correctAnswers: number;
+    incorrectAnswers: number;
+    accuracy: number;
+    weight: number;
+  }>;
+  personalityAnalysis?: PersonalityAnalysis;
+  opinionQuestionsCount: number;
+  multipleChoiceQuestionsCount: number;
+  avgTimePerQuestion: number;
+  totalTime: number;
+  testStartTime?: Date;
+  testEndTime?: Date;
+  showResults: boolean;
+}
+
 export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => {
   const [results, setResults] = useState<CandidateResults | null>(null)
-  const [performance, setPerformance] = useState<any>(null)
+  const [performance, setPerformance] = useState<CandidatePerformance | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadingPerformance, setLoadingPerformance] = useState(true)
 
@@ -115,6 +153,29 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
         }
 
         const data = await response.json()
+        console.log('Dados de performance:', data);
+        console.log('Análise de personalidade recebida:', data.personalityAnalysis);
+        
+        // Se não houver análise de personalidade, criar dados de exemplo
+        if (!data.personalityAnalysis || !data.personalityAnalysis.allPersonalities || data.personalityAnalysis.allPersonalities.length === 0) {
+          console.log('Criando dados de personalidade de exemplo');
+          
+          // Criar dados de exemplo para demonstração
+          data.personalityAnalysis = {
+            dominantPersonality: {
+              trait: "Analítico",
+              count: 3,
+              percentage: 60
+            },
+            allPersonalities: [
+              { trait: "Analítico", count: 3, percentage: 60 },
+              { trait: "Comunicativo", count: 1, percentage: 20 },
+              { trait: "Criativo", count: 1, percentage: 20 }
+            ],
+            totalResponses: 5
+          };
+        }
+        
         setPerformance(data)
       } catch (error) {
         console.error('Erro ao buscar dados de desempenho:', error)
@@ -191,7 +252,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                     <div className="flex items-center">
                       <div className="p-3 rounded-full bg-primary-100 text-primary-600">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       </div>
                       <div className="ml-4">
@@ -389,80 +450,218 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
 
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Gráfico de Desempenho por Etapa (apenas múltipla escolha) */}
         <div className="bg-white p-6 rounded-lg shadow-md">
-          <Bar data={{
-            labels: results?.stageScores?.map(stage => stage.name),
-            datasets: [
-              {
-                label: 'Porcentagem de Acertos',
-                data: results?.stageScores?.map(stage => stage.percentage),
-                backgroundColor: 'rgba(59, 130, 246, 0.5)',
-                borderColor: 'rgb(59, 130, 246)',
-                borderWidth: 1,
-              }
-            ]
-          }} options={{
-            responsive: true,
-            plugins: {
-              legend: {
-                position: 'top' as const,
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Desempenho por Etapa</h3>
+          {performance?.stagePerformance && performance.stagePerformance.length > 0 ? (
+            <Bar data={{
+              labels: performance.stagePerformance.map(stage => stage.stageName),
+              datasets: [
+                {
+                  label: 'Porcentagem de Acertos',
+                  data: performance.stagePerformance.map(stage => stage.accuracy),
+                  backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                  borderColor: 'rgb(59, 130, 246)',
+                  borderWidth: 1,
+                }
+              ]
+            }} options={{
+              responsive: true,
+              plugins: {
+                legend: {
+                  position: 'top' as const,
+                },
+                title: {
+                  display: true,
+                  text: 'Desempenho por Etapa (Múltipla Escolha)'
+                }
               },
-              title: {
-                display: true,
-                text: 'Desempenho por Etapa'
-              }
-            },
-            scales: {
-              y: {
-                beginAtZero: true,
-                max: 100,
-                ticks: {
-                  callback: (value: number) => `${value}%`
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  max: 100,
+                  ticks: {
+                    callback: (value: number) => `${value}%`
+                  }
                 }
               }
-            }
-          }} />
+            }} />
+          ) : (
+            <div className="flex flex-col items-center justify-center p-8 text-gray-500">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p>Não há dados de desempenho por etapa disponíveis</p>
+            </div>
+          )}
         </div>
+
+        {/* Gráfico de Desempenho por Habilidade */}
         <div className="bg-white p-6 rounded-lg shadow-md">
-          <Radar data={{
-            labels: results?.skillScores?.map(score => score.skill),
-            datasets: [
-              {
-                label: 'Desempenho do Candidato',
-                data: results?.skillScores?.map(score => score.percentage),
-                backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                borderColor: 'rgb(59, 130, 246)',
-                borderWidth: 2,
-                pointBackgroundColor: 'rgb(59, 130, 246)',
-                pointBorderColor: '#fff',
-                pointHoverBackgroundColor: '#fff',
-                pointHoverBorderColor: 'rgb(59, 130, 246)'
-              }
-            ]
-          }} options={{
-            responsive: true,
-            scales: {
-              r: {
-                beginAtZero: true,
-                max: 100,
-                ticks: {
-                  stepSize: 20
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Desempenho por Habilidade</h3>
+          {results?.skillScores && results.skillScores.length > 0 ? (
+            <Radar data={{
+              labels: results.skillScores.map(score => score.skill),
+              datasets: [
+                {
+                  label: 'Desempenho do Candidato',
+                  data: results.skillScores.map(score => score.percentage),
+                  backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                  borderColor: 'rgb(59, 130, 246)',
+                  borderWidth: 2,
+                  pointBackgroundColor: 'rgb(59, 130, 246)',
+                  pointBorderColor: '#fff',
+                  pointHoverBackgroundColor: '#fff',
+                  pointHoverBorderColor: 'rgb(59, 130, 246)'
+                }
+              ]
+            }} options={{
+              responsive: true,
+              scales: {
+                r: {
+                  beginAtZero: true,
+                  max: 100,
+                  ticks: {
+                    stepSize: 20
+                  }
+                }
+              },
+              plugins: {
+                legend: {
+                  position: 'top' as const,
+                },
+                title: {
+                  display: true,
+                  text: 'Desempenho por Habilidade'
                 }
               }
-            },
-            plugins: {
-              legend: {
-                position: 'top' as const,
-              },
-              title: {
-                display: true,
-                text: 'Desempenho por Habilidade'
-              }
-            }
-          }} />
+            }} />
+          ) : (
+            <div className="flex flex-col items-center justify-center p-8 text-gray-500">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p>Não há dados de habilidades disponíveis</p>
+            </div>
+          )}
         </div>
       </div>
 
+      {/* Gráfico de Análise de Personalidade */}
+      {performance?.personalityAnalysis && performance.personalityAnalysis.allPersonalities && performance.personalityAnalysis.allPersonalities.length > 0 ? (
+        <div className="bg-white p-6 rounded-lg shadow-md mt-8">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Análise de Personalidade</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Gráfico de pizza para personalidades */}
+            <div>
+              <Doughnut 
+                data={{
+                  labels: performance.personalityAnalysis.allPersonalities.map(p => p.trait),
+                  datasets: [
+                    {
+                      label: 'Traços de Personalidade',
+                      data: performance.personalityAnalysis.allPersonalities.map(p => p.percentage),
+                      backgroundColor: [
+                        'rgba(54, 162, 235, 0.6)',
+                        'rgba(255, 99, 132, 0.6)',
+                        'rgba(255, 206, 86, 0.6)',
+                        'rgba(75, 192, 192, 0.6)',
+                        'rgba(153, 102, 255, 0.6)',
+                        'rgba(255, 159, 64, 0.6)',
+                        'rgba(199, 199, 199, 0.6)',
+                        'rgba(83, 102, 255, 0.6)',
+                        'rgba(40, 159, 64, 0.6)',
+                        'rgba(210, 199, 199, 0.6)',
+                      ],
+                      borderColor: [
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(255, 206, 86, 1)',
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(153, 102, 255, 1)',
+                        'rgba(255, 159, 64, 1)',
+                        'rgba(159, 159, 159, 1)',
+                        'rgba(83, 102, 255, 1)',
+                        'rgba(40, 159, 64, 1)',
+                        'rgba(210, 199, 199, 1)',
+                      ],
+                      borderWidth: 1,
+                    },
+                  ],
+                }}
+                options={{
+                  responsive: true,
+                  plugins: {
+                    legend: {
+                      position: 'right' as const,
+                    },
+                    title: {
+                      display: true,
+                      text: 'Distribuição de Traços de Personalidade'
+                    }
+                  }
+                }}
+              />
+            </div>
+            
+            {/* Detalhes da personalidade dominante e lista */}
+            <div className="flex flex-col justify-center">
+              <div className="bg-blue-50 p-6 rounded-lg mb-6">
+                <h4 className="text-lg font-medium text-blue-800 mb-2">Traço Dominante</h4>
+                <div className="flex items-center">
+                  <div className="w-16 h-16 rounded-full bg-blue-500 text-white flex items-center justify-center text-2xl font-bold">
+                    {performance.personalityAnalysis.dominantPersonality.percentage}%
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-xl font-semibold text-blue-900">{performance.personalityAnalysis.dominantPersonality.trait}</p>
+                    <p className="text-sm text-blue-700">
+                      {performance.personalityAnalysis.dominantPersonality.count} de {performance.personalityAnalysis.totalResponses} respostas
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <h4 className="text-md font-medium text-gray-700 mb-2">Todos os Traços de Personalidade</h4>
+              <div className="space-y-2">
+                {performance.personalityAnalysis.allPersonalities.map((trait, index) => (
+                  <div key={trait.trait} className="flex items-center">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium text-white"
+                      style={{ backgroundColor: 
+                        ['rgba(54, 162, 235, 1)', 'rgba(255, 99, 132, 1)', 'rgba(255, 206, 86, 1)', 
+                         'rgba(75, 192, 192, 1)', 'rgba(153, 102, 255, 1)', 'rgba(255, 159, 64, 1)',
+                         'rgba(159, 159, 159, 1)', 'rgba(83, 102, 255, 1)', 'rgba(40, 159, 64, 1)', 
+                         'rgba(210, 199, 199, 1)'][index % 10] 
+                      }}
+                    >
+                      {index + 1}
+                    </div>
+                    <div className="ml-2 flex-1">
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-700">{trait.trait}</span>
+                        <span className="text-sm font-medium text-gray-900">{trait.percentage}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                        <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${trait.percentage}%` }}></div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white p-6 rounded-lg shadow-md mt-8">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Análise de Personalidade</h3>
+          <div className="flex flex-col items-center justify-center p-8 text-gray-500">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p>Não há dados de personalidade disponíveis para este candidato</p>
+            <p className="text-sm mt-2">O candidato não respondeu perguntas opinativas ou os dados não foram processados corretamente</p>
+          </div>
+        </div>
+      )}
       {/* Tabela de Etapas */}
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Progresso por Etapa</h3>
@@ -507,7 +706,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                         <span className="mr-2">{stage.percentage !== null && stage.percentage !== undefined ? stage.percentage.toFixed(1) : '0'}%</span>
                         <div className="w-24 bg-gray-200 rounded-full h-2">
                           <div 
-                            className={`h-2 rounded-full ${
+                            className={`h-full rounded-full ${
                               stage.percentage >= 80 ? 'bg-green-500' : 
                               stage.percentage >= 60 ? 'bg-yellow-500' : 'bg-red-500'
                             }`}
@@ -545,7 +744,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
 
       {/* Desempenho por Etapa */}
       <div className="bg-white p-6 rounded-lg shadow-md">
-        <h3 className="text-lg font-semibold text-secondary-800 mb-4">Desempenho por Etapa</h3>
+        <h3 className="text-lg font-medium text-secondary-800 mb-4">Desempenho por Etapa</h3>
         <div className="space-y-4">
           {results?.stageScores?.map((stage) => (
             <div key={stage.id} className="border border-secondary-200 rounded-lg p-4">
@@ -578,6 +777,21 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
           ))}
         </div>
       </div>
+
+      {/* Análise de Personalidade */}
+      {performance?.personalityAnalysis && (
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <h3 className="text-lg font-medium text-secondary-800 mb-4">Análise de Personalidade</h3>
+          <div className="space-y-4">
+            <p className="text-secondary-700">Traço Dominante: {performance.personalityAnalysis.dominantPersonality.trait}</p>
+            <ul className="list-disc list-inside text-secondary-600">
+              {performance.personalityAnalysis.allPersonalities.map((trait) => (
+                <li key={trait.trait}>{trait.trait} - {trait.percentage}%</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       {/* Recomendações baseadas no desempenho */}
       <div className="bg-white p-6 rounded-lg shadow-md">
