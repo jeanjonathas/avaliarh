@@ -121,6 +121,9 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
   const [loading, setLoading] = useState(true)
   const [loadingPerformance, setLoadingPerformance] = useState(true)
 
+  // Dados para o gráfico de radar de personalidade
+  const [personalityRadarData, setPersonalityRadarData] = useState<any>(null);
+
   useEffect(() => {
     const fetchResults = async () => {
       try {
@@ -189,6 +192,101 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
       fetchPerformance()
     }
   }, [candidate.id])
+
+  // Processar dados de personalidade para o gráfico de radar
+  useEffect(() => {
+    if (performance?.personalityAnalysis?.allPersonalities && candidate?.responses) {
+      // Extrair todos os traços de personalidade possíveis das perguntas opinativas do teste
+      const allPossibleTraits: string[] = [];
+      
+      // Verificar se temos acesso às respostas completas do candidato
+      if (candidate.responses) {
+        // Filtrar apenas as perguntas opinativas
+        const opinionResponses = candidate.responses.filter(response => {
+          // Verificar se é uma pergunta opinativa com base no snapshot
+          if (response.questionSnapshot && typeof response.questionSnapshot === 'object') {
+            const options = response.questionSnapshot.options || [];
+            // Verificar se a pergunta tem opções com personalidade
+            const hasPersonalityOptions = options.some((opt: any) => 
+              (opt.text && (opt.text.includes('(') && opt.text.includes(')'))) || opt.categoryName
+            );
+            
+            // Verificar se a pergunta não tem opções corretas/incorretas
+            const hasNoCorrectOptions = options.every((opt: any) => opt.isCorrect !== true);
+            
+            return hasPersonalityOptions || hasNoCorrectOptions;
+          }
+          return false;
+        });
+        
+        // Extrair todos os traços de personalidade possíveis das opções
+        opinionResponses.forEach(response => {
+          if (response.questionSnapshot && typeof response.questionSnapshot === 'object') {
+            const options = response.questionSnapshot.options || [];
+            options.forEach((option: any) => {
+              let trait = option.categoryName;
+              
+              // Se não houver categoryName, tentar extrair do texto (entre parênteses)
+              if (!trait && option.text) {
+                const match = option.text.match(/\(([^)]+)\)/);
+                if (match && match[1]) {
+                  trait = match[1].trim();
+                }
+              }
+              
+              // Adicionar o traço à lista se ainda não estiver presente
+              if (trait && !allPossibleTraits.includes(trait)) {
+                allPossibleTraits.push(trait);
+              }
+            });
+          }
+        });
+      }
+      
+      // Se não conseguimos extrair traços das perguntas, usar os traços que já temos na análise
+      if (allPossibleTraits.length === 0) {
+        performance.personalityAnalysis.allPersonalities.forEach(trait => {
+          if (!allPossibleTraits.includes(trait.trait)) {
+            allPossibleTraits.push(trait.trait);
+          }
+        });
+      }
+      
+      console.log('Traços de personalidade possíveis:', allPossibleTraits);
+      
+      // Criar um mapa com todos os traços possíveis inicializados com 0%
+      const traitMap: Record<string, number> = {};
+      allPossibleTraits.forEach(trait => {
+        traitMap[trait] = 0;
+      });
+      
+      // Preencher com os valores reais dos traços que o candidato possui
+      performance.personalityAnalysis.allPersonalities.forEach(trait => {
+        traitMap[trait.trait] = trait.percentage;
+      });
+      
+      // Converter o mapa em arrays para o gráfico
+      const labels = Object.keys(traitMap);
+      const data = Object.values(traitMap);
+      
+      setPersonalityRadarData({
+        labels,
+        datasets: [
+          {
+            label: 'Traços de Personalidade',
+            data,
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+            borderColor: 'rgb(255, 99, 132)',
+            borderWidth: 2,
+            pointBackgroundColor: 'rgb(255, 99, 132)',
+            pointBorderColor: '#fff',
+            pointHoverBackgroundColor: '#fff',
+            pointHoverBorderColor: 'rgb(255, 99, 132)'
+          }
+        ]
+      });
+    }
+  }, [performance, candidate]);
 
   // Função para obter a cor do status
   const getStatusColor = (status: string) => {
@@ -602,47 +700,39 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
             {/* Gráfico de radar para personalidades */}
             <div>
               <h4 className="text-md font-medium text-gray-700 mb-4 text-center">Radar de Traços de Personalidade</h4>
-              <Radar data={{
-                labels: performance.personalityAnalysis.allPersonalities.map(p => p.trait),
-                datasets: [
-                  {
-                    label: 'Traços de Personalidade',
-                    data: performance.personalityAnalysis.allPersonalities.map(p => p.percentage),
-                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                    borderColor: 'rgb(255, 99, 132)',
-                    borderWidth: 2,
-                    pointBackgroundColor: 'rgb(255, 99, 132)',
-                    pointBorderColor: '#fff',
-                    pointHoverBackgroundColor: '#fff',
-                    pointHoverBorderColor: 'rgb(255, 99, 132)'
-                  }
-                ]
-              }} options={{
-                responsive: true,
-                scales: {
-                  r: {
-                    beginAtZero: true,
-                    max: 100,
-                    ticks: {
-                      stepSize: 20
+              {personalityRadarData && (
+                <Radar data={personalityRadarData} options={{
+                  responsive: true,
+                  scales: {
+                    r: {
+                      beginAtZero: true,
+                      max: 100,
+                      ticks: {
+                        stepSize: 20
+                      },
+                      pointLabels: {
+                        font: {
+                          size: 11
+                        }
+                      }
                     }
-                  }
-                },
-                plugins: {
-                  legend: {
-                    position: 'top' as const,
                   },
-                  tooltip: {
-                    callbacks: {
-                      label: function(context) {
-                        const label = context.dataset.label || '';
-                        const value = context.raw as number;
-                        return `${label}: ${value}%`;
+                  plugins: {
+                    legend: {
+                      position: 'top' as const,
+                    },
+                    tooltip: {
+                      callbacks: {
+                        label: function(context) {
+                          const label = context.dataset.label || '';
+                          const value = context.raw as number;
+                          return `${label}: ${value}%`;
+                        }
                       }
                     }
                   }
-                }
-              }} />
+                }} />
+              )}
             </div>
           </div>
 
@@ -784,16 +874,6 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
         </div>
       </div>
 
-      {/* Observações */}
-      {results?.observations && (
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Observações</h3>
-          <p className="text-gray-700 whitespace-pre-line">
-            {results.observations}
-          </p>
-        </div>
-      )}
-
       {/* Desempenho por Etapa */}
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h3 className="text-lg font-medium text-secondary-800 mb-4">Desempenho por Etapa</h3>
@@ -829,21 +909,6 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
           ))}
         </div>
       </div>
-
-      {/* Análise de Personalidade */}
-      {performance?.personalityAnalysis && (
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h3 className="text-lg font-medium text-secondary-800 mb-4">Análise de Personalidade</h3>
-          <div className="space-y-4">
-            <p className="text-secondary-700">Traço Dominante: {performance.personalityAnalysis.dominantPersonality.trait}</p>
-            <ul className="list-disc list-inside text-secondary-600">
-              {performance.personalityAnalysis.allPersonalities.map((trait) => (
-                <li key={trait.trait}>{trait.trait} - {trait.percentage}%</li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
 
       {/* Recomendações baseadas no desempenho */}
       <div className="bg-white p-6 rounded-lg shadow-md">
