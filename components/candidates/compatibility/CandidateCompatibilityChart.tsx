@@ -13,6 +13,7 @@ interface CandidateCompatibilityChartProps {
   expectedProfile?: Record<string, number>;
   processId?: string;
   candidateId?: string;
+  onCompatibilityCalculated?: (compatibilityScore: number) => void;
 }
 
 interface TraitWithCompatibility extends PersonalityTrait {
@@ -21,6 +22,9 @@ interface TraitWithCompatibility extends PersonalityTrait {
   weight: number;
   expectedValue: number;
   position: number;
+  hierarchicalWeight?: number;
+  questionCount?: number;
+  normalizationFactor?: number;
 }
 
 interface ProcessPersonalityData {
@@ -37,7 +41,8 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
   personalityTraits,
   expectedProfile: propExpectedProfile,
   processId,
-  candidateId
+  candidateId,
+  onCompatibilityCalculated
 }) => {
   const [compatibilityScore, setCompatibilityScore] = useState<number>(0);
   const [traitsWithCompatibility, setTraitsWithCompatibility] = useState<TraitWithCompatibility[]>([]);
@@ -215,67 +220,79 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
   };
 
   useEffect(() => {
-    console.log('Traços de personalidade recebidos:', personalityTraits);
-    fetchProcessPersonalityData();
-  }, [processId, personalityTraits]);
-
-  useEffect(() => {
-    if (!mergedTraits || mergedTraits.length === 0) {
-      console.log('Sem traços mesclados para calcular compatibilidade');
-      return;
-    }
-
-    console.log('Calculando compatibilidade com traços mesclados:', mergedTraits);
-
-    // Usar o perfil esperado da API ou o fornecido como prop
-    const effectiveExpectedProfile = 
-      processPersonalityData?.expectedProfile || 
-      propExpectedProfile || 
-      {};
-    
-    console.log('Perfil esperado efetivo:', effectiveExpectedProfile);
-    
-    // Verificar se o perfil esperado tem pelo menos um traço
-    const hasExpectedProfile = Object.keys(effectiveExpectedProfile).length > 0;
-    
-    // Se não houver perfil esperado, criar um com valores padrão (50%)
-    if (!hasExpectedProfile) {
-      console.log('Criando perfil esperado padrão');
-      const defaultProfile = {};
-      mergedTraits.forEach(trait => {
-        defaultProfile[trait.trait] = 50; // Valor padrão de 50%
+    if (processId) {
+      fetchProcessPersonalityData();
+    } else if (personalityTraits.length > 0) {
+      // Se não temos ID do processo, usar apenas os traços fornecidos
+      setMergedTraits(personalityTraits);
+      
+      // Criar dados de processo padrão
+      const defaultTraits = personalityTraits.map((trait, index) => ({
+        name: trait.trait,
+        weight: trait.weight || (personalityTraits.length - index), // Peso baseado na ordem
+        categoryNameUuid: trait.categoryNameUuid
+      }));
+      
+      setProcessPersonalityData({
+        traits: defaultTraits,
+        expectedProfile: propExpectedProfile || null,
+        isDefaultData: true
       });
       
-      console.log('Perfil esperado padrão criado:', defaultProfile);
-      
-      // Calcular a compatibilidade usando o perfil padrão
-      calculateCompatibility(mergedTraits, defaultProfile);
       setUsingDefaultData(true);
-    } else {
-      // Calcular a compatibilidade usando o perfil esperado existente
-      console.log('Usando perfil esperado existente:', effectiveExpectedProfile);
-      calculateCompatibility(mergedTraits, effectiveExpectedProfile);
-      setUsingDefaultData(false);
     }
-  }, [mergedTraits, processPersonalityData, propExpectedProfile]);
+  }, [processId, personalityTraits, propExpectedProfile]);
+
+  useEffect(() => {
+    if (mergedTraits.length > 0 && processPersonalityData) {
+      try {
+        const result = calculateCompatibility(
+          mergedTraits, 
+          processPersonalityData.traits, 
+          processPersonalityData.expectedProfile || propExpectedProfile || {}
+        );
+        
+        if (result) {
+          setTraitsWithCompatibility(result.traitsWithCompatibility);
+          setCompatibilityScore(result.totalCompatibility);
+          
+          // Notificar o componente pai sobre o cálculo de compatibilidade
+          if (onCompatibilityCalculated) {
+            onCompatibilityCalculated(result.totalCompatibility);
+          }
+        }
+      } catch (error) {
+        console.error("Erro ao calcular compatibilidade:", error);
+        setError("Erro ao calcular compatibilidade");
+      } finally {
+        setLoading(false);
+      }
+    }
+  }, [mergedTraits, processPersonalityData, propExpectedProfile, onCompatibilityCalculated]);
 
   // Função para calcular a compatibilidade conforme a fórmula especificada
   const calculateCompatibility = (
     traits: PersonalityTrait[], 
+    processTraits: Array<{name: string, weight: number, categoryNameUuid?: string}>,
     expectedProfile: Record<string, number>
-  ) => {
+  ): {traitsWithCompatibility: TraitWithCompatibility[], totalCompatibility: number} => {
     console.log('Calculando compatibilidade - Traços:', traits, 'Perfil esperado:', expectedProfile);
     
     if (!traits || traits.length === 0) {
       console.log('Sem traços para calcular compatibilidade');
-      setCompatibilityScore(0);
-      setTraitsWithCompatibility([]);
-      return;
+      return {traitsWithCompatibility: [], totalCompatibility: 0};
     }
     
     // Ordenar os traços por peso (do maior para o menor)
     const sortedTraits = [...traits].sort((a, b) => (b.weight || 0) - (a.weight || 0));
     const totalTraits = sortedTraits.length;
+    
+    // Atribuir pesos hierárquicos baseados no número de traços (n, n-1, n-2, ..., 1)
+    // Isso garante uma distribuição consistente independente do número de traços
+    const hierarchicalWeights = new Map<string, number>();
+    sortedTraits.forEach((trait, index) => {
+      hierarchicalWeights.set(trait.trait, totalTraits - index); // Peso n para o primeiro, n-1 para o segundo, etc.
+    });
     
     // Criar um mapa de posição na hierarquia para cada traço
     const positionMap = new Map<string, number>();
@@ -283,27 +300,33 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
       positionMap.set(trait.trait, index + 1); // Posição começa em 1
     });
     
-    // Para debug
+    // Calcular o número médio de questões por traço para normalização
+    const questionsPerTrait = new Map<string, number>();
+    let totalQuestions = 0;
+    
+    // Assumimos que cada traço tem pelo menos uma questão
+    // Na prática, isso deveria ser obtido dos dados reais
+    traits.forEach(trait => {
+      // Aqui poderíamos obter o número real de questões para cada traço
+      // Por enquanto, assumimos um valor padrão de 4 questões por traço
+      const questionCount = 4; // Valor padrão, idealmente seria dinâmico
+      questionsPerTrait.set(trait.trait, questionCount);
+      totalQuestions += questionCount;
+    });
+    
+    const averageQuestionsPerTrait = totalQuestions / totalTraits;
+    
+    console.log('Pesos hierárquicos:', Object.fromEntries(hierarchicalWeights.entries()));
     console.log('Mapa de posições:', Object.fromEntries(positionMap.entries()));
-    console.log('Traços ordenados por peso:', sortedTraits.map(t => `${t.trait} (peso ${t.weight})`));
+    console.log('Questões por traço:', Object.fromEntries(questionsPerTrait.entries()));
+    console.log('Média de questões por traço:', averageQuestionsPerTrait);
     
-    // Calcular a compatibilidade total considerando apenas traços com valores reais
-    // Exemplo: Se apenas cccccccccc tem valor 100% e os outros são 0%, a compatibilidade
-    // total deve ser igual à compatibilidade hierárquica de cccccccccc
-    
-    // Filtrar traços com valores reais (não zero)
+    // Filtrar traços com valores reais (não zero) apenas para o cálculo especial
     const traitsWithValues = traits.filter(trait => (trait.percentage || 0) > 0);
-    
-    // Se não houver traços com valores, a compatibilidade é 0
-    if (traitsWithValues.length === 0) {
-      setCompatibilityScore(0);
-      setTraitsWithCompatibility([]);
-      return;
-    }
     
     // Caso especial: se apenas um traço tem valor, a compatibilidade total
     // deve ser igual à compatibilidade hierárquica desse traço
-    if (traitsWithValues.length === 1) {
+    if (traitsWithValues.length === 1 && traits.length > 1) {
       const onlyTrait = traitsWithValues[0];
       const position = positionMap.get(onlyTrait.trait) || totalTraits;
       const hierarchyCompatibility = ((totalTraits - position + 1) / totalTraits) * 100;
@@ -314,16 +337,45 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
       const actualValue = onlyTrait.percentage || 0;
       const finalCompatibility = (actualValue / 100) * hierarchyCompatibility;
       
-      setCompatibilityScore(Math.round(finalCompatibility));
+      // Calcular a compatibilidade para TODOS os traços, mesmo os sem valor
+      const allTraitsWithCompatibility = traits.map(trait => {
+        const traitPosition = positionMap.get(trait.trait) || totalTraits;
+        const traitHierarchyCompatibility = ((totalTraits - traitPosition + 1) / totalTraits) * 100;
+        const traitActualValue = trait.percentage || 0;
+        const traitRealCompatibility = (traitActualValue / 100) * traitHierarchyCompatibility;
+        const questionCount = questionsPerTrait.get(trait.trait) || 4;
+        const normalizationFactor = Math.sqrt(questionCount / averageQuestionsPerTrait);
+        const hierarchicalWeight = hierarchicalWeights.get(trait.trait) || 1;
+        
+        return {
+          ...trait,
+          compatibility: traitHierarchyCompatibility, // Mantemos a compatibilidade hierárquica para exibição
+          realCompatibility: traitRealCompatibility, // Usamos a compatibilidade normalizada
+          expectedValue: traitHierarchyCompatibility,
+          weight: trait.weight || 1,
+          hierarchicalWeight,
+          position: traitPosition,
+          questionCount,
+          normalizationFactor
+        } as TraitWithCompatibility;
+      });
+      
+      // Retornar todos os traços com a compatibilidade total calculada
+      return {
+        traitsWithCompatibility: allTraitsWithCompatibility,
+        totalCompatibility: Math.round(finalCompatibility)
+      };
     }
     
     let totalWeightedCompatibility = 0;
-    let totalWeight = 0;
+    let totalHierarchicalWeight = 0;
     
     const traitsCompatibility = traits.map(trait => {
       const actualValue = trait.percentage || 0;
-      const weight = trait.weight || 1;
+      const originalWeight = trait.weight || 1;
+      const hierarchicalWeight = hierarchicalWeights.get(trait.trait) || 1;
       const position = positionMap.get(trait.trait) || totalTraits;
+      const questionCount = questionsPerTrait.get(trait.trait) || 4;
       
       // Calcular a compatibilidade máxima possível para este traço com base na sua posição
       // Ci = ((n - posição(Pi) + 1) / n) × 100
@@ -332,40 +384,51 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
       // A compatibilidade hierárquica é baseada apenas na posição
       const hierarchyCompatibility = maxCompatibility;
       
+      // Normalizar o valor do traço considerando o número de questões
+      // Isso ajuda a compensar traços com diferentes números de questões
+      const normalizationFactor = Math.sqrt(questionCount / averageQuestionsPerTrait);
+      
       // A compatibilidade real do candidato é baseada no valor real do traço
       // Se o valor real é 100%, então a compatibilidade é máxima para este traço
       // Se o valor real é menor, a compatibilidade é proporcional
       const realCompatibility = (actualValue / 100) * hierarchyCompatibility;
       
-      // Acumular para o cálculo da compatibilidade total
-      totalWeightedCompatibility += weight * realCompatibility;
-      totalWeight += weight;
+      // Aplicar o fator de normalização para compensar diferenças no número de questões
+      const normalizedCompatibility = realCompatibility * normalizationFactor;
       
-      // Para debug
-      console.log(`Traço: ${trait.trait}, Peso: ${weight}, Posição: ${position}, Valor: ${actualValue}%, Compatibilidade Hierárquica: ${hierarchyCompatibility.toFixed(2)}%, Compatibilidade Real: ${realCompatibility.toFixed(2)}%`);
+      // Usar o peso hierárquico para o cálculo da compatibilidade total
+      // Isso garante uma distribuição consistente dos pesos independente do número de traços
+      totalWeightedCompatibility += hierarchicalWeight * normalizedCompatibility;
+      totalHierarchicalWeight += hierarchicalWeight;
+      
+      console.log(`Traço: ${trait.trait}, Peso Original: ${originalWeight}, Peso Hierárquico: ${hierarchicalWeight}, Posição: ${position}, Valor: ${actualValue}%, Questões: ${questionCount}, Fator Normalização: ${normalizationFactor.toFixed(2)}, Compatibilidade Hierárquica: ${hierarchyCompatibility.toFixed(2)}%, Compatibilidade Real: ${realCompatibility.toFixed(2)}%, Compatibilidade Normalizada: ${normalizedCompatibility.toFixed(2)}%`);
       
       return {
         ...trait,
         compatibility: hierarchyCompatibility, // Mantemos a compatibilidade hierárquica para exibição
-        realCompatibility: realCompatibility, // Adicionamos a compatibilidade real para o cálculo total
+        realCompatibility: normalizedCompatibility, // Usamos a compatibilidade normalizada
         expectedValue: maxCompatibility, // Valor esperado é a compatibilidade máxima
-        weight,
-        position
+        weight: originalWeight, // Mantemos o peso original para exibição
+        hierarchicalWeight, // Adicionamos o peso hierárquico para referência
+        position,
+        questionCount, // Adicionamos o número de questões para referência
+        normalizationFactor // Adicionamos o fator de normalização para referência
       };
     }) as TraitWithCompatibility[];
-
-    console.log('Traços com compatibilidade calculada:', traitsCompatibility);
-    console.log(`Total ponderado: ${totalWeightedCompatibility}, Peso total: ${totalWeight}`);
     
-    // Calcular a compatibilidade total como média ponderada das compatibilidades reais
-    // Compatibilidade Total = ∑(Pi × Ci_real) / ∑Pi
-    if (traitsWithValues.length > 1 && totalWeight > 0) {
-      const finalScore = totalWeightedCompatibility / totalWeight;
+    console.log('Traços com compatibilidade calculada:', traitsCompatibility);
+    console.log(`Total ponderado: ${totalWeightedCompatibility}, Peso hierárquico total: ${totalHierarchicalWeight}`);
+    
+    // Calcular a compatibilidade total como média ponderada das compatibilidades reais normalizadas
+    // Compatibilidade Total = ∑(Wi × Ci_norm) / ∑Wi
+    // Onde Wi é o peso hierárquico (n, n-1, ..., 1)
+    if (traitsWithValues.length > 1 && totalHierarchicalWeight > 0) {
+      const finalScore = totalWeightedCompatibility / totalHierarchicalWeight;
       console.log(`Compatibilidade calculada: ${finalScore.toFixed(2)}%`);
-      setCompatibilityScore(Math.round(finalScore));
+      return {traitsWithCompatibility, totalCompatibility: Math.round(finalScore)};
     }
 
-    setTraitsWithCompatibility(traitsCompatibility);
+    return {traitsWithCompatibility, totalCompatibility: 0};
   };
 
   // Dados para o gráfico de rosca
@@ -406,59 +469,63 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
   };
 
   return (
-    <div className="bg-white shadow-md rounded-lg p-6 mb-6">
-      <h3 className="text-xl font-semibold text-gray-800 mb-4">Compatibilidade com o Perfil Esperado</h3>
+    <div className="bg-white rounded-lg shadow p-6">
+      <h2 className="text-xl font-semibold text-gray-800 mb-4">Compatibilidade com o Perfil Esperado</h2>
       
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-400 text-red-800 rounded-md p-4 mb-4">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
           <p>{error}</p>
+          <button 
+            className="mt-2 text-sm text-red-600 hover:text-red-800"
+            onClick={() => {
+              setError(null);
+              setLoading(true);
+              fetchProcessPersonalityData();
+            }}
+          >
+            Tentar novamente
+          </button>
         </div>
       )}
       
       {loading ? (
-        <div className="flex flex-col items-center justify-center p-8 space-y-4">
-          <div className="w-10 h-10 border-t-2 border-b-2 border-primary-600 rounded-full animate-spin"></div>
-          <p className="text-sm text-gray-500">Carregando dados de compatibilidade...</p>
+        <div className="flex flex-col items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+          <p className="text-gray-600">Calculando compatibilidade...</p>
         </div>
       ) : (
         <>
-          {usingDefaultData && (
-            <div className="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 rounded-md p-4 mb-4">
-              <p className="text-sm">
-                <strong>Nota:</strong> Este gráfico está usando dados padrão porque o processo não tem um perfil esperado definido.
-                Para obter resultados mais precisos, defina os traços de personalidade esperados no processo seletivo.
-              </p>
+          {traitsWithCompatibility.length === 0 ? (
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded mb-4">
+              <p>Não foi possível calcular a compatibilidade. Verifique se os traços de personalidade foram configurados corretamente.</p>
             </div>
-          )}
-          
-          <div className="flex flex-col md:flex-row items-center">
-            <div className="w-full md:w-1/3 flex justify-center mb-4 md:mb-0">
-              <div className="relative w-48 h-48">
-                <Doughnut data={chartData} options={chartOptions} />
-                <div className="absolute inset-0 flex items-center justify-center flex-col">
-                  <span className="text-3xl font-bold text-gray-800">{compatibilityScore}%</span>
-                  <span className="text-sm text-gray-500">Compatibilidade</span>
+          ) : (
+            <>
+              <div className="flex flex-col md:flex-row items-center justify-between mb-6">
+                <div className="w-full md:w-1/3 flex flex-col items-center mb-4 md:mb-0">
+                  <div className="relative h-40 w-40">
+                    <Doughnut data={chartData} options={chartOptions} />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-3xl font-bold text-primary-600">{compatibilityScore}%</div>
+                        <div className="text-sm text-gray-500">Compatibilidade</div>
+                      </div>
+                    </div>
+                  </div>
+                  {usingDefaultData && (
+                    <div className="mt-2 text-xs text-amber-600 text-center">
+                      <p>Usando perfil padrão para demonstração</p>
+                    </div>
+                  )}
                 </div>
-              </div>
-            </div>
-            
-            <div className="w-full md:w-2/3">
-              <div className="flex justify-between items-center mb-3">
-                <h4 className="text-lg font-medium text-gray-700">Traços de Personalidade</h4>
-                <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                  Compatibilidade baseada na hierarquia dos traços
-                </div>
-              </div>
-              
-              {traitsWithCompatibility.length === 0 ? (
-                <div className="bg-gray-50 p-6 rounded-md text-center">
-                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <p className="mt-2 text-gray-500 italic">Nenhum traço de personalidade encontrado.</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
+                <div className="w-full md:w-2/3">
+                  <div className="flex justify-between items-center mb-3">
+                    <h4 className="text-lg font-medium text-gray-700">Traços de Personalidade</h4>
+                    <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                      Compatibilidade baseada na hierarquia dos traços
+                    </div>
+                  </div>
+                  
                   {traitsWithCompatibility.map((trait, index) => (
                     <div key={`${trait.trait}-${index}`} className="bg-gray-50 p-3 rounded-md mb-3">
                       <div className="flex justify-between mb-1">
@@ -499,7 +566,9 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
                           Compatibilidade real: {Math.round(trait.realCompatibility)}%
                         </span>
                         <span className="text-xs text-gray-500">
-                          ({Math.round(trait.percentage)}% do esperado)
+                          {trait.normalizationFactor !== 1 ? 
+                            `(Normalização: ${trait.normalizationFactor?.toFixed(2)})` : 
+                            ''}
                         </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
@@ -515,9 +584,9 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
                     </div>
                   ))}
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
+            </>
+          )}
         </>
       )}
     </div>

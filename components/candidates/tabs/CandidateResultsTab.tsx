@@ -500,8 +500,8 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                     <h3 className="text-lg font-medium text-gray-700 mb-2">Perfil de Personalidade</h3>
                     <div className="flex items-center">
                       <div className="text-3xl font-bold text-green-600">
-                        {performance.summary.opinionScore !== undefined && performance.opinionQuestionsCount > 0
-                          ? `${performance.summary.opinionScore.toFixed(1)}%` 
+                        {performance.personalityAnalysis?.weightedScore !== undefined && performance.opinionQuestionsCount > 0
+                          ? `${performance.personalityAnalysis?.weightedScore.toFixed(1)}%` 
                           : 'N/A'}
                       </div>
                       <div className="ml-4 text-sm text-gray-500">
@@ -674,6 +674,13 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                           return demoProfile;
                         })()
                       }
+                      onCompatibilityCalculated={(compatibilityScore) => {
+                        // Atualizar a pontuação de compatibilidade no card de Perfil de Personalidade
+                        const personalityCard = document.querySelector('.bg-gray-50.rounded-lg.p-4.border.border-gray-200 .text-3xl.font-bold.text-green-600');
+                        if (personalityCard && performance.opinionQuestionsCount > 0) {
+                          personalityCard.textContent = `${compatibilityScore.toFixed(1)}%`;
+                        }
+                      }}
                     />
                   </div>
                 )}
@@ -810,6 +817,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                   </div>
                 </div>
 
+                {/* Estatísticas de Desempenho por Etapa */}
                 {performance.stagePerformance && performance.stagePerformance.length > 0 && (
                   <div>
                     <h3 className="text-lg font-medium text-gray-900 mb-4">Desempenho por Etapa (Apenas Múltipla Escolha)</h3>
