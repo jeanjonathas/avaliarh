@@ -13,7 +13,11 @@ interface CandidateCompatibilityChartProps {
   expectedProfile?: Record<string, number>;
   processId?: string;
   candidateId?: string;
-  onCompatibilityCalculated?: (compatibilityScore: number) => void;
+  onCompatibilityCalculated?: (
+    compatibilityScore: number,
+    targetProfile?: string,
+    targetProfileMatchPercentage?: number
+  ) => void;
 }
 
 interface TraitWithCompatibility extends PersonalityTrait {
@@ -256,9 +260,28 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
           setTraitsWithCompatibility(result.traitsWithCompatibility);
           setCompatibilityScore(result.totalCompatibility);
           
+          // Encontrar o perfil alvo (traço com maior peso)
+          let targetProfile = '';
+          let targetProfileMatchPercentage = 0;
+          
+          if (result.traitsWithCompatibility.length > 0) {
+            // Ordenar por peso para encontrar o traço com maior peso
+            const sortedByWeight = [...result.traitsWithCompatibility].sort((a, b) => (b.weight || 1) - (a.weight || 1));
+            if (sortedByWeight.length > 0) {
+              targetProfile = sortedByWeight[0].trait;
+              // Encontrar a porcentagem de compatibilidade para o perfil alvo
+              const targetProfileData = result.traitsWithCompatibility.find(t => t.trait === targetProfile);
+              targetProfileMatchPercentage = targetProfileData ? targetProfileData.percentage : 0;
+            }
+          }
+          
           // Notificar o componente pai sobre o cálculo de compatibilidade
           if (onCompatibilityCalculated) {
-            onCompatibilityCalculated(result.totalCompatibility);
+            onCompatibilityCalculated(
+              result.totalCompatibility,
+              targetProfile,
+              targetProfileMatchPercentage
+            );
           }
         }
       } catch (error) {
