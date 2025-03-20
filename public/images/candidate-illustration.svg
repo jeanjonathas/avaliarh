@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400px" height="300px" viewBox="0 0 400 300" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>Área do Candidato</title>
+    <defs>
+        <linearGradient x1="0%" y1="0%" x2="100%" y2="100%" id="linearGradient-1">
+            <stop stop-color="#4F46E5" offset="0%"></stop>
+            <stop stop-color="#7C3AED" offset="100%"></stop>
+        </linearGradient>
+        <linearGradient x1="0%" y1="0%" x2="100%" y2="100%" id="linearGradient-2">
+            <stop stop-color="#F9FAFB" offset="0%"></stop>
+            <stop stop-color="#E5E7EB" offset="100%"></stop>
+        </linearGradient>
+    </defs>
+    <g id="Candidate" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <!-- Test Form Background -->
+        <rect id="Form-BG" fill="#FFFFFF" x="50" y="50" width="300" height="200" rx="12"></rect>
+        <rect id="Form-Header" fill="url(#linearGradient-1)" x="50" y="50" width="300" height="40" rx="12 12 0 0"></rect>
+        
+        <!-- Header Title -->
+        <rect id="Header-Title" fill="#FFFFFF" opacity="0.9" x="70" y="65" width="120" height="10" rx="5"></rect>
+        
+        <!-- Form Content -->
+        <rect id="Form-Label-1" fill="#111827" opacity="0.8" x="70" y="110" width="80" height="8" rx="4"></rect>
+        <rect id="Form-Input-1" fill="#F9FAFB" stroke="#E5E7EB" x="70" y="125" width="260" height="30" rx="6"></rect>
+        
+        <rect id="Form-Label-2" fill="#111827" opacity="0.8" x="70" y="170" width="60" height="8" rx="4"></rect>
+        <rect id="Form-Input-2" fill="#F9FAFB" stroke="#E5E7EB" x="70" y="185" width="260" height="30" rx="6"></rect>
+        
+        <!-- Submit Button -->
+        <rect id="Submit-Button" fill="url(#linearGradient-1)" x="230" y="230" width="100" height="30" rx="6"></rect>
+        <rect id="Button-Text" fill="#FFFFFF" opacity="0.9" x="250" y="240" width="60" height="10" rx="5"></rect>
+        
+        <!-- Decorative Elements -->
+        <circle id="Decoration-1" fill="#EEF2FF" cx="100" cy="230" r="15"></circle>
+        <circle id="Decoration-2" fill="#EEF2FF" cx="140" cy="230" r="10"></circle>
+        <circle id="Decoration-3" fill="#EEF2FF" cx="170" cy="230" r="5"></circle>
+        
+        <!-- Code Input Visualization -->
+        <rect id="Code-Box" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="2" x="120" y="125" width="160" height="30" rx="6"></rect>
+        <rect id="Code-Char-1" fill="#4F46E5" x="130" y="135" width="20" height="10" rx="2"></rect>
+        <rect id="Code-Char-2" fill="#4F46E5" x="160" y="135" width="20" height="10" rx="2"></rect>
+        <rect id="Code-Char-3" fill="#4F46E5" x="190" y="135" width="20" height="10" rx="2"></rect>
+        <rect id="Code-Char-4" fill="#4F46E5" x="220" y="135" width="20" height="10" rx="2"></rect>
+        <rect id="Code-Char-5" fill="#4F46E5" x="250" y="135" width="20" height="10" rx="2"></rect>
+    </g>
+</svg>

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800px" height="600px" viewBox="0 0 800 600" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>AvaliaRH Dashboard</title>
+    <defs>
+        <linearGradient x1="0%" y1="0%" x2="100%" y2="100%" id="linearGradient-1">
+            <stop stop-color="#4F46E5" offset="0%"></stop>
+            <stop stop-color="#7C3AED" offset="100%"></stop>
+        </linearGradient>
+        <linearGradient x1="0%" y1="0%" x2="100%" y2="100%" id="linearGradient-2">
+            <stop stop-color="#F9FAFB" offset="0%"></stop>
+            <stop stop-color="#E5E7EB" offset="100%"></stop>
+        </linearGradient>
+        <linearGradient x1="0%" y1="0%" x2="100%" y2="100%" id="linearGradient-3">
+            <stop stop-color="#4F46E5" offset="0%"></stop>
+            <stop stop-color="#7C3AED" offset="100%"></stop>
+        </linearGradient>
+        <linearGradient x1="0%" y1="0%" x2="100%" y2="100%" id="linearGradient-4">
+            <stop stop-color="#EEF2FF" offset="0%"></stop>
+            <stop stop-color="#C7D2FE" offset="100%"></stop>
+        </linearGradient>
+    </defs>
+    <g id="Dashboard" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <!-- Dashboard Background -->
+        <rect id="Dashboard-BG" fill="#FFFFFF" x="100" y="50" width="600" height="400" rx="12"></rect>
+        <rect id="Dashboard-Header" fill="url(#linearGradient-1)" x="100" y="50" width="600" height="60" rx="12 12 0 0"></rect>
+        
+        <!-- Header Elements -->
+        <circle id="Logo" fill="#FFFFFF" cx="130" cy="80" r="15"></circle>
+        <rect id="Menu-1" fill="#FFFFFF" opacity="0.6" x="160" y="75" width="40" height="10" rx="5"></rect>
+        <rect id="Menu-2" fill="#FFFFFF" opacity="0.6" x="210" y="75" width="60" height="10" rx="5"></rect>
+        <rect id="Menu-3" fill="#FFFFFF" opacity="0.6" x="280" y="75" width="50" height="10" rx="5"></rect>
+        <circle id="User-Avatar" fill="#FFFFFF" opacity="0.6" cx="660" cy="80" r="15"></circle>
+        
+        <!-- Sidebar -->
+        <rect id="Sidebar" fill="url(#linearGradient-2)" x="100" y="110" width="150" height="340" rx="0 0 0 12"></rect>
+        <rect id="Sidebar-Menu-1" fill="#E5E7EB" x="120" y="140" width="110" height="10" rx="5"></rect>
+        <rect id="Sidebar-Menu-2" fill="#4F46E5" x="120" y="170" width="110" height="10" rx="5"></rect>
+        <rect id="Sidebar-Menu-3" fill="#E5E7EB" x="120" y="200" width="110" height="10" rx="5"></rect>
+        <rect id="Sidebar-Menu-4" fill="#E5E7EB" x="120" y="230" width="110" height="10" rx="5"></rect>
+        <rect id="Sidebar-Menu-5" fill="#E5E7EB" x="120" y="260" width="110" height="10" rx="5"></rect>
+        
+        <!-- Main Content -->
+        <rect id="Content-Card-1" fill="#FFFFFF" x="270" y="130" width="410" height="120" rx="8"></rect>
+        <rect id="Card-1-Title" fill="#111827" opacity="0.8" x="290" y="150" width="150" height="15" rx="7.5"></rect>
+        <rect id="Card-1-Subtitle" fill="#6B7280" opacity="0.6" x="290" y="175" width="100" height="10" rx="5"></rect>
+        
+        <!-- Chart -->
+        <rect id="Chart-BG" fill="#F9FAFB" x="290" y="195" width="370" height="40" rx="4"></rect>
+        <rect id="Chart-Bar-1" fill="url(#linearGradient-3)" x="300" y="205" width="40" height="20" rx="4"></rect>
+        <rect id="Chart-Bar-2" fill="url(#linearGradient-3)" x="350" y="195" width="40" height="30" rx="4"></rect>
+        <rect id="Chart-Bar-3" fill="url(#linearGradient-3)" x="400" y="185" width="40" height="40" rx="4"></rect>
+        <rect id="Chart-Bar-4" fill="url(#linearGradient-3)" x="450" y="195" width="40" height="30" rx="4"></rect>
+        <rect id="Chart-Bar-5" fill="url(#linearGradient-3)" x="500" y="205" width="40" height="20" rx="4"></rect>
+        <rect id="Chart-Bar-6" fill="url(#linearGradient-3)" x="550" y="175" width="40" height="50" rx="4"></rect>
+        <rect id="Chart-Bar-7" fill="url(#linearGradient-3)" x="600" y="195" width="40" height="30" rx="4"></rect>
+        
+        <!-- Cards Grid -->
+        <rect id="Content-Card-2" fill="#FFFFFF" x="270" y="270" width="200" height="180" rx="8"></rect>
+        <rect id="Card-2-Title" fill="#111827" opacity="0.8" x="290" y="290" width="120" height="15" rx="7.5"></rect>
+        <rect id="Card-2-Subtitle" fill="#6B7280" opacity="0.6" x="290" y="315" width="80" height="10" rx="5"></rect>
+        
+        <!-- Pie Chart -->
+        <circle id="Pie-Chart-BG" fill="#F9FAFB" cx="370" cy="380" r="50"></circle>
+        <path d="M370,330 L370,380 L420,380 A50,50 0 0,0 370,330" id="Pie-Slice-1" fill="url(#linearGradient-3)"></path>
+        <path d="M370,380 L420,380 A50,50 0 0,0 395,345 L370,380" id="Pie-Slice-2" fill="#4338CA"></path>
+        <path d="M370,380 L395,345 A50,50 0 0,0 320,345 L370,380" id="Pie-Slice-3" fill="#818CF8"></path>
+        <path d="M370,380 L320,345 A50,50 0 0,0 370,330 L370,380" id="Pie-Slice-4" fill="#C7D2FE"></path>
+        
+        <!-- Card 3 -->
+        <rect id="Content-Card-3" fill="#FFFFFF" x="480" y="270" width="200" height="180" rx="8"></rect>
+        <rect id="Card-3-Title" fill="#111827" opacity="0.8" x="500" y="290" width="120" height="15" rx="7.5"></rect>
+        <rect id="Card-3-Subtitle" fill="#6B7280" opacity="0.6" x="500" y="315" width="80" height="10" rx="5"></rect>
+        
+        <!-- User Avatars -->
+        <circle id="User-1" fill="url(#linearGradient-4)" cx="520" cy="350" r="15"></circle>
+        <circle id="User-2" fill="url(#linearGradient-4)" cx="550" cy="350" r="15"></circle>
+        <circle id="User-3" fill="url(#linearGradient-4)" cx="580" cy="350" r="15"></circle>
+        <circle id="User-4" fill="url(#linearGradient-4)" cx="610" cy="350" r="15"></circle>
+        
+        <!-- Progress Bars -->
+        <rect id="Progress-BG-1" fill="#F9FAFB" x="500" y="380" width="160" height="10" rx="5"></rect>
+        <rect id="Progress-1" fill="url(#linearGradient-3)" x="500" y="380" width="120" height="10" rx="5"></rect>
+        
+        <rect id="Progress-BG-2" fill="#F9FAFB" x="500" y="400" width="160" height="10" rx="5"></rect>
+        <rect id="Progress-2" fill="url(#linearGradient-3)" x="500" y="400" width="80" height="10" rx="5"></rect>
+        
+        <rect id="Progress-BG-3" fill="#F9FAFB" x="500" y="420" width="160" height="10" rx="5"></rect>
+        <rect id="Progress-3" fill="url(#linearGradient-3)" x="500" y="420" width="140" height="10" rx="5"></rect>
+        
+        <!-- Shadow -->
+        <rect id="Shadow" fill="#000000" opacity="0.1" x="100" y="450" width="600" height="10" rx="5"></rect>
+    </g>
+</svg>
