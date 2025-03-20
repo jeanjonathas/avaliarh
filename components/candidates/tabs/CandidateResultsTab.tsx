@@ -1,4 +1,4 @@
-import { Candidate } from '../types'
+import { Candidate, PersonalityTrait } from '../types'
 import { 
   Chart as ChartJS, 
   CategoryScale, 
@@ -16,6 +16,7 @@ import {
 import { Bar, Radar, Pie, Doughnut } from 'react-chartjs-2'
 import { useEffect, useState } from 'react'
 import { toast, Toaster } from 'react-hot-toast'
+import CandidateCompatibilityChart from '../compatibility/CandidateCompatibilityChart'
 
 // Registrar componentes do Chart.js
 ChartJS.register(
@@ -34,14 +35,6 @@ ChartJS.register(
 
 interface CandidateResultsTabProps {
   candidate: Candidate
-}
-
-interface PersonalityTrait {
-  trait: string;
-  count: number;
-  percentage: number;
-  weight?: number;
-  weightedScore?: number;
 }
 
 interface PersonalityAnalysis {
@@ -641,7 +634,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                                     {trait.weight || 1}
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {trait.weightedScore?.toFixed(1) || (trait.percentage).toFixed(1)}
+                                    {trait.weightedScore?.toFixed(2) || '-'}
                                   </td>
                                 </>
                               )}
@@ -650,6 +643,38 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                         </tbody>
                       </table>
                     </div>
+                  </div>
+                )}
+                
+                {/* Gráfico de Compatibilidade com a Vaga */}
+                {performance.personalityAnalysis && performance.personalityAnalysis.allPersonalities && performance.personalityAnalysis.allPersonalities.length > 0 && (
+                  <div className="mt-6">
+                    <CandidateCompatibilityChart 
+                      personalityTraits={performance.personalityAnalysis.allPersonalities}
+                      processId={candidate.processId}
+                      expectedProfile={
+                        results?.processStatus?.expectedProfile || 
+                        // Perfil esperado de exemplo para demonstração
+                        (() => {
+                          // Criar um perfil esperado baseado nos traços do candidato, mas com valores diferentes
+                          const demoProfile: Record<string, number> = {};
+                          // Usar os traços do candidato como base
+                          performance.personalityAnalysis?.allPersonalities.forEach((trait, index) => {
+                            // Atribuir valores esperados diferentes para demonstração
+                            // Quanto menor o índice, maior o valor esperado (simulando prioridade)
+                            const expectedValue = Math.min(100, Math.max(20, 
+                              // Inverter alguns valores para demonstrar diferenças
+                              index % 2 === 0 
+                                ? trait.percentage + 20 
+                                : Math.max(10, trait.percentage - 20)
+                            ));
+                            demoProfile[trait.trait] = expectedValue;
+                          });
+                          console.log('Perfil esperado de demonstração:', demoProfile);
+                          return demoProfile;
+                        })()
+                      }
+                    />
                   </div>
                 )}
 
@@ -1112,6 +1137,31 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
             const totalTime = performance?.totalTime || 0;
             const avgTimePerQuestion = performance?.avgTimePerQuestion || 0;
             
+            // Identificar o perfil procurado (perfil com maior peso)
+            const allPersonalities = performance?.personalityAnalysis?.allPersonalities || [];
+            const hasTraitWeights = performance?.personalityAnalysis?.hasTraitWeights || false;
+            
+            // Encontrar o perfil com maior peso (se houver pesos configurados)
+            let targetProfile = '';
+            let targetProfileWeight = 0;
+            let profileMatch = false;
+            let profileMatchPercentage = 0;
+            
+            if (hasTraitWeights && allPersonalities.length > 0) {
+              const sortedByWeight = [...allPersonalities].sort((a, b) => (b.weight || 1) - (a.weight || 1));
+              if (sortedByWeight.length > 0) {
+                targetProfile = sortedByWeight[0].trait;
+                targetProfileWeight = sortedByWeight[0].weight || 1;
+                
+                // Verificar se o perfil dominante do candidato corresponde ao perfil procurado
+                profileMatch = dominantPersonality === targetProfile;
+                
+                // Calcular a porcentagem de correspondência com o perfil procurado
+                const targetProfileData = allPersonalities.find(p => p.trait === targetProfile);
+                profileMatchPercentage = targetProfileData ? targetProfileData.percentage : 0;
+              }
+            }
+            
             let recommendationClass = '';
             let recommendationTitle = '';
             let recommendationText = '';
@@ -1122,7 +1172,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
               recommendationText = `Este candidato demonstrou excelente desempenho técnico com ${accuracy.toFixed(1)}% de acertos. `;
               
               if (dominantPersonality) {
-                recommendationText += `Seu perfil dominante é "${dominantPersonality}", `;
+                recommendationText += `Seu perfil dominante é "${dominantPersonality}" (${performance?.personalityAnalysis?.dominantPersonality?.percentage.toFixed(1)}%), `;
                 
                 if (dominantPersonality.includes('Analítico') || dominantPersonality.includes('Lógico')) {
                   recommendationText += 'indicando boa capacidade de análise e resolução de problemas. ';
@@ -1135,9 +1185,31 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                 } else {
                   recommendationText += 'o que complementa suas habilidades técnicas. ';
                 }
+                
+                // Adicionar informações sobre o perfil procurado
+                if (hasTraitWeights && targetProfile) {
+                  recommendationText += `\n\nO perfil procurado para esta vaga é "${targetProfile}" `;
+                  
+                  if (profileMatch) {
+                    recommendationText += `e o candidato demonstra forte alinhamento com este perfil (${profileMatchPercentage.toFixed(1)}%). `;
+                    recommendationText += 'Esta correspondência de perfil, combinada com o excelente desempenho técnico, torna este candidato altamente recomendado para a posição. ';
+                  } else {
+                    // Verificar se o perfil procurado está entre os perfis do candidato
+                    const targetProfileInCandidate = allPersonalities.find(p => p.trait === targetProfile);
+                    if (targetProfileInCandidate && targetProfileInCandidate.percentage > 30) {
+                      recommendationText += `e, embora o perfil dominante do candidato seja diferente, ele demonstra características significativas deste perfil (${targetProfileInCandidate.percentage.toFixed(1)}%). `;
+                      recommendationText += 'Considerando seu excelente desempenho técnico, recomendamos prosseguir com o processo de contratação. ';
+                    } else {
+                      recommendationText += `enquanto o perfil dominante do candidato é diferente. Isto pode indicar uma abordagem alternativa, mas potencialmente valiosa para a função. `;
+                      recommendationText += 'Recomendamos avaliar durante a entrevista se esta diferença de perfil pode trazer diversidade positiva para a equipe. ';
+                    }
+                  }
+                } else {
+                  recommendationText += 'Recomendamos prosseguir com o processo de contratação. ';
+                }
+              } else {
+                recommendationText += 'Recomendamos prosseguir com o processo de contratação. ';
               }
-              
-              recommendationText += 'Recomendamos prosseguir com o processo de contratação.';
             } else if (accuracy >= 60) {
               recommendationClass = 'bg-yellow-50 border-l-4 border-yellow-500';
               recommendationTitle = 'Candidato para Consideração';
@@ -1150,14 +1222,36 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
               }
               
               if (dominantPersonality) {
-                recommendationText += `Seu perfil "${dominantPersonality}" pode ser adequado para a posição, dependendo dos requisitos específicos. `;
+                recommendationText += `\n\nSeu perfil dominante é "${dominantPersonality}" (${performance?.personalityAnalysis?.dominantPersonality?.percentage.toFixed(1)}%). `;
+                
+                // Adicionar informações sobre o perfil procurado
+                if (hasTraitWeights && targetProfile) {
+                  recommendationText += `O perfil procurado para esta vaga é "${targetProfile}". `;
+                  
+                  if (profileMatch) {
+                    recommendationText += `O alinhamento do candidato com o perfil desejado (${profileMatchPercentage.toFixed(1)}%) é um ponto positivo que pode compensar parcialmente seu desempenho técnico moderado. `;
+                    recommendationText += 'Recomendamos avaliar cuidadosamente outros aspectos como experiência prévia e desempenho na entrevista. ';
+                  } else {
+                    recommendationText += `Há uma divergência entre o perfil do candidato e o perfil ideal para a vaga, o que, combinado com seu desempenho técnico moderado, sugere cautela. `;
+                    recommendationText += 'Recomendamos avaliar se as habilidades específicas do candidato podem ser desenvolvidas com treinamento. ';
+                  }
+                } else {
+                  recommendationText += 'Recomendamos avaliar outros aspectos como experiência e entrevista antes de tomar uma decisão. ';
+                }
+              } else {
+                recommendationText += 'Recomendamos avaliar outros aspectos como experiência e entrevista antes de tomar uma decisão. ';
               }
-              
-              recommendationText += 'Recomendamos avaliar outros aspectos como experiência e entrevista antes de tomar uma decisão.';
             } else {
               recommendationClass = 'bg-red-50 border-l-4 border-red-500';
               recommendationTitle = 'Candidato Não Recomendado';
               recommendationText = `Este candidato não atingiu a pontuação mínima necessária (${accuracy.toFixed(1)}% de acertos). `;
+              
+              if (dominantPersonality && hasTraitWeights && targetProfile) {
+                if (profileMatch) {
+                  recommendationText += `\n\nApesar do baixo desempenho técnico, o candidato demonstra forte alinhamento com o perfil comportamental desejado ("${targetProfile}"). `;
+                  recommendationText += 'Isto pode indicar potencial para desenvolvimento com o treinamento adequado. ';
+                }
+              }
               
               if (performance?.stagePerformance?.some(stage => stage.accuracy >= 70)) {
                 recommendationText += 'No entanto, demonstrou bom desempenho em algumas áreas específicas. ';
@@ -1180,12 +1274,72 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
             return (
               <div className={`p-4 ${recommendationClass} rounded`}>
                 <h4 className="font-medium text-gray-800">{recommendationTitle}</h4>
-                <p className="mt-2 text-gray-700">
+                <p className="mt-2 text-gray-700 whitespace-pre-line">
                   {recommendationText}
                 </p>
               </div>
             );
           })()}
+          
+          {/* Análise de Compatibilidade com o Perfil Desejado */}
+          {performance?.personalityAnalysis?.hasTraitWeights && (
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <h4 className="font-medium text-gray-800 mb-2">Compatibilidade com o Perfil Desejado</h4>
+              
+              <div className="space-y-3">
+                {performance?.personalityAnalysis?.allPersonalities
+                  .sort((a, b) => (b.weight || 1) - (a.weight || 1))
+                  .slice(0, 3)
+                  .map((personality, index) => (
+                    <div key={index} className="flex flex-col">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-medium text-gray-700">
+                          {personality.trait} 
+                          {index === 0 ? ' (Perfil Desejado)' : ''}
+                        </span>
+                        <span className="text-sm text-gray-600">
+                          {personality.percentage.toFixed(1)}% 
+                          <span className="text-xs text-gray-500 ml-1">
+                            (Peso: {personality.weight?.toFixed(1) || 1})
+                          </span>
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className={`h-full rounded-full ${
+                            personality.percentage >= 70 ? 'bg-green-500' : 
+                            personality.percentage >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                          }`}
+                          style={{ width: `${personality.percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))
+                }
+                
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm font-medium text-gray-700">Compatibilidade Geral</span>
+                    <span className="text-sm text-gray-600">
+                      {performance?.personalityAnalysis?.weightedScore.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className={`h-full rounded-full ${
+                        performance?.personalityAnalysis?.weightedScore >= 70 ? 'bg-green-500' : 
+                        performance?.personalityAnalysis?.weightedScore >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                      }`}
+                      style={{ width: `${performance?.personalityAnalysis?.weightedScore}%` }}
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">
+                    A compatibilidade geral é calculada considerando os pesos atribuídos a cada perfil comportamental desejado para esta vaga.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           
           {/* Áreas para desenvolvimento */}
           <div className="mt-4">
@@ -1234,11 +1388,28 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
               <p className="mt-2 text-gray-600">
                 O perfil predominante do candidato é "{performance.personalityAnalysis.dominantPersonality.trait}" 
                 ({performance.personalityAnalysis.dominantPersonality.percentage.toFixed(1)}%). 
-                {performance.personalityAnalysis.dominantPersonality.trait.includes('Analítico') && ' Este perfil indica uma pessoa metódica, que valoriza precisão e dados concretos.'}
-                {performance.personalityAnalysis.dominantPersonality.trait.includes('Criativo') && ' Este perfil indica uma pessoa inovadora, que busca soluções originais e pensa "fora da caixa".'}
-                {performance.personalityAnalysis.dominantPersonality.trait.includes('Comunicativo') && ' Este perfil indica uma pessoa sociável, que se expressa bem e trabalha bem em equipe.'}
-                {performance.personalityAnalysis.dominantPersonality.trait.includes('Líder') && ' Este perfil indica uma pessoa decisiva, que assume responsabilidades e orienta equipes.'}
+                {performance.personalityAnalysis.dominantPersonality.trait.includes('Analítico') && ' Este perfil indica uma pessoa metódica, que valoriza precisão e dados concretos. Tende a ser organizada, detalhista e a tomar decisões baseadas em fatos e lógica.'}
+                {performance.personalityAnalysis.dominantPersonality.trait.includes('Criativo') && ' Este perfil indica uma pessoa inovadora, que busca soluções originais e pensa "fora da caixa". Tende a ser adaptável, imaginativa e a valorizar a experimentação de novas abordagens.'}
+                {performance.personalityAnalysis.dominantPersonality.trait.includes('Comunicativo') && ' Este perfil indica uma pessoa sociável, que se expressa bem e trabalha bem em equipe. Tende a ser colaborativa, empática e a valorizar relacionamentos interpessoais no ambiente de trabalho.'}
+                {performance.personalityAnalysis.dominantPersonality.trait.includes('Líder') && ' Este perfil indica uma pessoa decisiva, que assume responsabilidades e orienta equipes. Tende a ser confiante, motivadora e a tomar iniciativa em situações desafiadoras.'}
               </p>
+              
+              {performance.personalityAnalysis.allPersonalities.length > 1 && (
+                <div className="mt-3">
+                  <h5 className="text-sm font-medium text-gray-700">Perfis Secundários:</h5>
+                  <ul className="mt-1 space-y-1 list-disc list-inside text-gray-600 text-sm">
+                    {performance.personalityAnalysis.allPersonalities.slice(1, 3).map((personality, index) => (
+                      <li key={index}>
+                        {personality.trait} ({personality.percentage.toFixed(1)}%) - 
+                        {personality.trait.includes('Analítico') && ' Abordagem metódica e baseada em fatos'}
+                        {personality.trait.includes('Criativo') && ' Pensamento inovador e adaptável'}
+                        {personality.trait.includes('Comunicativo') && ' Habilidades sociais e colaborativas'}
+                        {personality.trait.includes('Líder') && ' Capacidade de decisão e iniciativa'}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
         </div>

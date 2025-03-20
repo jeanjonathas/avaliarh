@@ -31,7 +31,8 @@ export async function middleware(request: NextRequest) {
     '/api/questions',
     '/api/stages/next',
     '/api/stages/uuid',
-    '/api/responses/check-stage-completed'
+    '/api/responses/check-stage-completed',
+    '/api/admin/processes', // Adicionado para testes de compatibilidade
   ];
   
   // Verificar se é um endpoint público

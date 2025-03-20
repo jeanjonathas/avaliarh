@@ -164,3 +164,12 @@ export interface CandidateObservationsTabProps {
   candidate: Candidate
   onUpdate?: () => void
 }
+
+export interface PersonalityTrait {
+  trait: string;
+  count: number;
+  percentage: number;
+  weight?: number;
+  weightedScore?: number;
+  categoryNameUuid?: string; // UUID único para a categoria/personalidade
+}

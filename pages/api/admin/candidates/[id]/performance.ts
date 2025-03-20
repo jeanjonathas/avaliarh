@@ -222,6 +222,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?: any[]) {
   const personalityCount: Record<string, number> = {};
+  const personalityUuids: Record<string, string> = {}; // Para armazenar UUIDs dos traços
   let totalPersonalityResponses = 0;
 
   console.log('Analisando respostas opinativas com pesos:', opinionResponses.length);
@@ -233,6 +234,7 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
     
     if (selectedOption) {
       let personality = selectedOption.categoryName;
+      const categoryNameUuid = selectedOption.categoryNameUuid || selectedOption.id;
       
       if (!personality) {
         const match = selectedOption.text.match(/\(([^)]+)\)/);
@@ -245,6 +247,10 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
       
       if (personality) {
         personalityCount[personality] = (personalityCount[personality] || 0) + 1;
+        // Armazenar o UUID associado a este traço de personalidade
+        if (categoryNameUuid && !personalityUuids[personality]) {
+          personalityUuids[personality] = categoryNameUuid;
+        }
         totalPersonalityResponses++;
       }
     }
@@ -279,13 +285,21 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
       count,
       percentage,
       weight,
-      weightedScore
+      weightedScore,
+      categoryNameUuid: personalityUuids[trait] || null // Incluir o UUID do traço
     };
   }).sort((a, b) => b.percentage - a.percentage);
 
   const dominantPersonality = personalityPercentages.length > 0 
     ? personalityPercentages[0] 
-    : { trait: 'Não identificado', count: 0, percentage: 0, weight: 1, weightedScore: 0 };
+    : { 
+        trait: 'Não identificado', 
+        count: 0, 
+        percentage: 0, 
+        weight: 1, 
+        weightedScore: 0,
+        categoryNameUuid: null 
+      };
 
   const totalWeightedScore = personalityPercentages.reduce((sum, p) => sum + p.weightedScore, 0);
   const maxPossibleScore = personalityPercentages.reduce((sum, p) => sum + (p.percentage * 5), 0); 
