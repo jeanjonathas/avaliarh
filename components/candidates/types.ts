@@ -62,6 +62,7 @@ export interface Candidate {
   score?: CandidateScore
   rating?: number
   observations?: string
+  interviewNotes?: any
   inviteCode?: string
   inviteExpires?: string
   inviteSent?: boolean

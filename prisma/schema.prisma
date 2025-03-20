@@ -64,6 +64,7 @@ model Candidate {
   infoJobsLink   String?
   interviewDate  DateTime?
   observations   String?
+  interviewNotes Json?
   rating         Float?
   resumeFile     String?
   socialMediaUrl String?
