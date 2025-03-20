@@ -200,7 +200,10 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
         }
 
         const data = await response.json()
-        console.log('Dados de performance recebidos:', data);
+        console.log('Dados de desempenho completos:', JSON.stringify(data, null, 2));
+        console.log('Tempo total (API):', data.totalTime);
+        console.log('Tempo total em segundos (API):', data.totalTime);
+        console.log('Tempo médio por questão (API):', data.avgTimePerQuestion);
         
         // Verificar se os dados de desempenho por etapa estão corretos
         if (data.stagePerformance) {
@@ -391,37 +394,42 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
   }
 
   // Função para formatar o tempo
-  const formatTime = (minutes: number) => {
-    if (minutes < 1/60) {
+  const formatTime = (seconds: number) => {
+    // Verificar se o valor é válido (incluindo zero)
+    if (seconds === undefined || seconds === null || isNaN(seconds)) {
+      return 'N/A';
+    }
+    
+    // Para zero segundos, mostrar "0s"
+    if (seconds === 0) {
+      return '0s';
+    }
+    
+    if (seconds < 1) {
       // Menos de 1 segundo
-      return '< 1 segundo'
+      return '< 1 segundo';
     }
     
-    if (minutes < 1) {
-      // Menos de 1 minuto, mostrar em segundos
-      const seconds = Math.round(minutes * 60)
-      return `${seconds} ${seconds === 1 ? 'segundo' : 'segundos'}`
-    }
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
     
-    const hours = Math.floor(minutes / 60)
-    const remainingMinutes = Math.floor(minutes % 60)
-    const seconds = Math.round((minutes * 60) % 60)
-    
-    let timeString = ''
+    let timeString = '';
     
     if (hours > 0) {
-      timeString += `${hours}h `
+      timeString += `${hours}h `;
     }
     
-    if (remainingMinutes > 0 || (hours > 0 && seconds > 0)) {
-      timeString += `${remainingMinutes}min `
+    if (minutes > 0 || hours > 0) {
+      timeString += `${minutes}min `;
     }
     
-    if (seconds > 0 && hours === 0) {
-      timeString += `${seconds}s`
+    // Sempre mostrar segundos se não houver horas ou minutos, ou se houver segundos
+    if (remainingSeconds > 0 || (hours === 0 && minutes === 0)) {
+      timeString += `${remainingSeconds}s`;
     }
     
-    return timeString.trim()
+    return timeString.trim();
   }
 
   if (loading && loadingPerformance) {
@@ -754,7 +762,9 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                   <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                     <h3 className="text-lg font-medium text-gray-700 mb-2">Tempo Total</h3>
                     <div className="text-2xl font-bold text-gray-800">
-                      {formatTime(performance.totalTime)}
+                      {performance.totalTime !== undefined && performance.totalTime !== null 
+                        ? formatTime(performance.totalTime) 
+                        : 'N/A'}
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
                       Tempo calculado com base nas respostas
@@ -764,7 +774,9 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                   <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                     <h3 className="text-lg font-medium text-gray-700 mb-2">Tempo Médio por Questão</h3>
                     <div className="text-2xl font-bold text-gray-800">
-                      {formatTime(performance.avgTimePerQuestion)}
+                      {performance.avgTimePerQuestion !== undefined && performance.avgTimePerQuestion !== null
+                        ? formatTime(performance.avgTimePerQuestion)
+                        : 'N/A'}
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
                       Média de tempo gasto em cada questão
@@ -842,7 +854,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                     <div className="flex items-center">
                       <div className="p-3 rounded-full bg-primary-100 text-primary-600">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       </div>
                       <div className="ml-4">
@@ -1279,7 +1291,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
               if (totalTime < 15) {
                 recommendationText += 'Completou o teste rapidamente, o que pode indicar eficiência ou pressa. ';
               } else if (totalTime > 45) {
-                recommendationText += 'Dedicou tempo considerável ao teste, o que pode indicar cuidado ou dificuldade. ';
+                recommendationText += 'Dedicou tempo considerável ao teste, o que pode indicar cuidado na análise ou dificuldade com os temas abordados. ';
               }
               
               if (dominantPersonality) {

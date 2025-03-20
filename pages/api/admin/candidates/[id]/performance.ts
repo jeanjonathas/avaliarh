@@ -133,45 +133,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log('Número de perguntas opinativas:', opinionResponses.length);
       console.log('Número de perguntas de múltipla escolha:', multipleChoiceResponses.length);
 
-      const avgTimePerQuestion = candidate.responses?.length > 0 
-        ? candidate.responses.reduce((sum, r) => sum + (r.timeSpent || 0), 0) / candidate.responses.length 
-        : 0
-
-      // Calcular o tempo total com base nas respostas reais
-      // Em vez de usar candidate.timeSpent, vamos calcular com base nas respostas
-      console.log('Calculando tempo total com base nas respostas individuais:');
+      // Garantir que temos respostas antes de calcular o tempo total
+      const hasResponses = Array.isArray(candidate.responses) && candidate.responses.length > 0;
       
-      // Ordenar respostas por data para análise
-      const sortedResponses = [...(candidate.responses || [])].sort((a, b) => {
-        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return dateA - dateB;
-      });
+      // Calcular o tempo total em segundos
+      const responseTotalTimeSeconds = hasResponses 
+        ? candidate.responses.reduce((sum, r) => sum + (r.timeSpent || 0), 0) 
+        : 0;
       
-      // Registrar informações detalhadas sobre cada resposta
-      sortedResponses.forEach((r, index) => {
-        console.log(`Resposta ${index + 1}:`, {
-          pergunta: r.question?.text?.substring(0, 30) + '...',
-          tipo: r.question?.type,
-          tempoGasto: r.timeSpent || 0,
-          tempoGastoFormatado: `${Math.floor((r.timeSpent || 0) / 60)}min ${(r.timeSpent || 0) % 60}s`,
-          dataHora: r.createdAt ? new Date(r.createdAt).toISOString() : 'N/A'
-        });
-      });
+      console.log('Tempo total calculado em segundos:', responseTotalTimeSeconds);
       
-      const responseTotalTime = candidate.responses?.reduce((sum, r) => sum + (r.timeSpent || 0), 0) || 0;
+      // Calcular o tempo médio por questão em segundos
+      const avgTimePerQuestionSeconds = hasResponses && candidate.responses.length > 0
+        ? responseTotalTimeSeconds / candidate.responses.length
+        : 0;
+      
+      console.log('Tempo médio por questão em segundos:', avgTimePerQuestionSeconds);
       
       // Converter de segundos para minutos para manter a compatibilidade com a interface
-      const totalTime = Math.round(responseTotalTime / 60);
+      // Garantir que sempre temos um valor, mesmo que seja zero
+      const totalTimeMinutes = Math.max(0, responseTotalTimeSeconds / 60);
       
-      console.log('Tempo total calculado a partir das respostas (segundos):', responseTotalTime);
-      console.log('Tempo total calculado a partir das respostas (minutos):', totalTime);
-      console.log('Tempo total armazenado no candidato (minutos):', candidate.timeSpent || 0);
-      
-      // Verificar se há uma grande discrepância
-      if (Math.abs(totalTime - (candidate.timeSpent || 0)) > 5) {
-        console.log('ALERTA: Grande discrepância detectada entre o tempo calculado e o tempo armazenado!');
-      }
+      console.log('Tempo total em minutos:', totalTimeMinutes);
 
       const multipleChoiceScore = accuracy;
       const opinionScore = personalityAnalysis.weightedScore || 0;
@@ -186,9 +169,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Calcular a data de término com base na data de início e no tempo real gasto
-      // Usamos o tempo em segundos (responseTotalTime) para maior precisão
+      // Usamos o tempo em segundos (responseTotalTimeSeconds) para maior precisão
       const testEndTime = candidate.completed && candidate.testDate 
-        ? new Date(candidate.testDate.getTime() + (responseTotalTime * 1000))
+        ? new Date(candidate.testDate.getTime() + (responseTotalTimeSeconds * 1000))
         : null;
 
       return res.status(200).json({
@@ -205,8 +188,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         personalityAnalysis,
         opinionQuestionsCount: opinionResponses.length,
         multipleChoiceQuestionsCount: multipleChoiceResponses.length,
-        avgTimePerQuestion,
-        totalTime,
+        avgTimePerQuestion: avgTimePerQuestionSeconds, // Tempo médio em segundos
+        totalTime: responseTotalTimeSeconds, // Tempo total em segundos
         testStartTime: candidate.testDate,
         testEndTime,
         showResults: candidate.showResults
