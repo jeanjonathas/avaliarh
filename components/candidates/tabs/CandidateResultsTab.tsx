@@ -1348,15 +1348,41 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
               <h4 className="font-medium text-gray-800 mb-2">Compatibilidade com o Perfil Desejado</h4>
               
               <div className="space-y-3">
+                {targetProfile && (
+                  <div className="flex flex-col">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-medium text-gray-700">
+                        {targetProfile} 
+                        <span className="text-xs font-medium text-green-600 ml-1">(Perfil Desejado)</span>
+                      </span>
+                      <span className="text-sm text-gray-600">
+                        {profileMatchPercentage.toFixed(1)}% 
+                        <span className="text-xs text-gray-500 ml-1">
+                          (Peso: {performance?.personalityAnalysis?.allPersonalities.find(p => p.trait === targetProfile)?.weight?.toFixed(1) || '?'})
+                        </span>
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className={`h-full rounded-full ${
+                          profileMatchPercentage >= 70 ? 'bg-green-500' : 
+                          profileMatchPercentage >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                        }`}
+                        style={{ width: `${profileMatchPercentage}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+                
                 {performance?.personalityAnalysis?.allPersonalities
+                  .filter(p => p.trait !== targetProfile)
                   .sort((a, b) => (b.weight || 1) - (a.weight || 1))
-                  .slice(0, 3)
+                  .slice(0, 2)  // Mostrar apenas os 2 mais relevantes após o perfil alvo
                   .map((personality, index) => (
                     <div key={index} className="flex flex-col">
                       <div className="flex justify-between items-center mb-1">
                         <span className="text-sm font-medium text-gray-700">
-                          {personality.trait} 
-                          {index === 0 ? ' (Perfil Desejado)' : ''}
+                          {personality.trait}
                         </span>
                         <span className="text-sm text-gray-600">
                           {personality.percentage.toFixed(1)}% 
