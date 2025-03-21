@@ -20,12 +20,6 @@ export default function Home() {
   const [validationSuccess, setValidationSuccess] = useState(false);
   const router = useRouter();
 
-  useEffect(() => {
-    if (validationSuccess && candidate) {
-      router.push(`/candidate/register?code=${inviteCode}`)
-    }
-  }, [validationSuccess, candidate, router, inviteCode])
-
   const handleInviteSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -90,9 +84,12 @@ export default function Home() {
       
       // Definir o estado de sucesso e os dados do candidato
       setValidationStatus('success');
+      setCandidate(data.candidate);
+      setValidationSuccess(true);
+      
+      // Redirecionar para a página de introdução após um breve delay para mostrar o feedback visual
       setTimeout(() => {
-        setCandidate(data.candidate);
-        setValidationSuccess(true);
+        router.push(`/teste/introducao?code=${inviteCode}`);
       }, 800);
     } catch (error: any) {
       setError(error.message || 'Erro ao validar código de convite');
@@ -268,7 +265,7 @@ export default function Home() {
                   {validationStatus === 'success' && !error && (
                     <div className="mt-2 flex items-center text-green-600">
                       <svg className="w-4 h-4 mr-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
                       <span className="text-sm font-medium">Código válido! Redirecionando...</span>
                     </div>

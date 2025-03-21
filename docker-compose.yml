@@ -48,7 +48,7 @@ services:
       - DATABASE_URL=postgresql://postgres:02e821629ceff274c853f24327a36132@postgres:5432/avaliacao_candidatos?schema=public
       - NODE_ENV=production
       - NEXTAUTH_SECRET=02e821629ceff274c853f24327a36132
-      - NEXTAUTH_URL=https://selecao.doutoranimal.com.br
+      - NEXTAUTH_URL=https://admitto.com.br
     networks:
       - avaliarh_network
     depends_on:
@@ -64,7 +64,7 @@ services:
         window: 120s
       labels:
         - "traefik.enable=true"
-        - "traefik.http.routers.avaliarh.rule=Host(`selecao.doutoranimal.com.br`)"
+        - "traefik.http.routers.avaliarh.rule=Host(`admitto.com.br`) || Host(`admitto.app`)"
         - "traefik.http.routers.avaliarh.entrypoints=websecure"
         - "traefik.http.routers.avaliarh.tls=true"
         - "traefik.http.routers.avaliarh.tls.certresolver=letsencryptresolver"
@@ -113,7 +113,7 @@ services:
         condition: on-failure
       labels:
         - "traefik.enable=true"
-        - "traefik.http.routers.prisma-studio.rule=Host(`bd.selecao.doutoranimal.com.br`)"
+        - "traefik.http.routers.prisma-studio.rule=Host(`bd.admitto.com.br`)"
         - "traefik.http.routers.prisma-studio.entrypoints=websecure"
         - "traefik.http.routers.prisma-studio.tls=true"
         - "traefik.http.routers.prisma-studio.tls.certresolver=letsencryptresolver"

@@ -25,6 +25,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:02e821629ceff274c853f24327a36132@postgres:5432/avaliacao_candidatos
       - NODE_ENV=production
+      - NEXTAUTH_URL=https://admitto.com.br
     networks:
       - avaliarh_network
     depends_on:
