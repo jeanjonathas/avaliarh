@@ -8,17 +8,28 @@ const SuccessModal = ({ isOpen, onClose, message }: SuccessModalProps) => {
       onClose={onClose}
       title="Sucesso"
     >
-      <div className="mt-2">
-        <p className="text-sm text-gray-600">{message}</p>
-      </div>
-      <div className="mt-4">
-        <button
-          type="button"
-          onClick={onClose}
-          className="w-full px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded"
-        >
-          OK
-        </button>
+      <div className="space-y-4">
+        <div className="flex items-center justify-center py-4">
+          <div className="bg-green-100 rounded-full p-3">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+        </div>
+        
+        <div className="text-center">
+          <p className="text-secondary-700">{message}</p>
+        </div>
+        
+        <div className="pt-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors flex items-center justify-center"
+          >
+            OK
+          </button>
+        </div>
       </div>
     </Modal>
   )

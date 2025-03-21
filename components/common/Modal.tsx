@@ -12,7 +12,7 @@ interface ModalProps {
 const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
   return (
     <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-10" onClose={onClose}>
+      <Dialog as="div" className="relative z-50" onClose={onClose}>
         <Transition.Child
           as={Fragment}
           enter="ease-out duration-300"
@@ -22,7 +22,7 @@ const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black bg-opacity-25" />
+          <div className="fixed inset-0 bg-secondary-900 bg-opacity-50" />
         </Transition.Child>
 
         <div className="fixed inset-0 overflow-y-auto">
@@ -36,17 +36,17 @@ const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-lg bg-white p-6 text-left align-middle shadow-lg transition-all border border-secondary-200">
                 <Dialog.Title
                   as="h3"
-                  className="text-lg font-medium leading-6 text-gray-900 pr-8"
+                  className="text-lg font-medium leading-6 text-secondary-900 pr-8"
                 >
                   {title}
                 </Dialog.Title>
                 
                 <button
                   type="button"
-                  className="absolute top-4 right-4 text-gray-400 hover:text-gray-500"
+                  className="absolute top-4 right-4 text-secondary-400 hover:text-secondary-500 transition-colors"
                   onClick={onClose}
                 >
                   <span className="sr-only">Fechar</span>

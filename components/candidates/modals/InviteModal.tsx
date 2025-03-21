@@ -11,6 +11,7 @@ const InviteModal = ({ isOpen, onClose, candidate, onSuccess }: InviteModalProps
   const [linkType, setLinkType] = useState<'process' | 'test'>('test')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -82,6 +83,7 @@ const InviteModal = ({ isOpen, onClose, candidate, onSuccess }: InviteModalProps
         return;
       }
 
+      setIsSubmitting(true);
       const response = await fetch(`/api/admin/candidates/${candidate.id}/invite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -111,6 +113,8 @@ const InviteModal = ({ isOpen, onClose, candidate, onSuccess }: InviteModalProps
         }
       );
       setError('Erro ao gerar convite')
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -120,27 +124,38 @@ const InviteModal = ({ isOpen, onClose, candidate, onSuccess }: InviteModalProps
       onClose={onClose}
       title="Gerar Convite"
     >
-      <div className="space-y-4">
+      <div className="space-y-5">
         {loading ? (
-          <div className="text-center py-4">Carregando dados...</div>
+          <div className="flex items-center justify-center py-6">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mr-3"></div>
+            <p className="text-secondary-700">Carregando dados...</p>
+          </div>
         ) : error ? (
-          <div className="text-red-600 py-4">{error}</div>
+          <div className="p-4 bg-red-50 text-red-700 rounded-lg border border-red-200 flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p>{error}</p>
+          </div>
         ) : tests.length === 0 && processes.length === 0 ? (
-          <div className="text-amber-600 py-4">Nenhum teste ou processo seletivo disponível. Por favor, crie um primeiro.</div>
+          <div className="p-4 bg-yellow-50 text-yellow-700 rounded-lg border border-yellow-200 flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <p>Nenhum teste ou processo seletivo disponível. Por favor, crie um primeiro.</p>
+          </div>
         ) : (
           <>
-            <div className="bg-white p-3 rounded-md border border-gray-200">
-              <label className="block text-sm text-gray-700 mb-1">
-                Tipo de Vínculo:
-              </label>
-              <div className="flex space-x-4 mb-3">
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-secondary-200">
+              <h3 className="text-secondary-900 font-medium mb-3">Tipo de Vínculo</h3>
+              <div className="flex flex-wrap gap-3 mb-2">
                 <button
                   type="button"
                   onClick={() => handleLinkTypeChange('process')}
-                  className={`px-3 py-2 text-sm rounded-md ${
+                  className={`px-4 py-2 rounded-md transition-colors ${
                     linkType === 'process'
-                      ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                      : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                      ? 'bg-primary-100 text-primary-700 border border-primary-300 font-medium'
+                      : 'bg-white border border-secondary-300 text-secondary-700 hover:bg-secondary-50'
                   }`}
                 >
                   Processo Seletivo
@@ -148,10 +163,10 @@ const InviteModal = ({ isOpen, onClose, candidate, onSuccess }: InviteModalProps
                 <button
                   type="button"
                   onClick={() => handleLinkTypeChange('test')}
-                  className={`px-3 py-2 text-sm rounded-md ${
+                  className={`px-4 py-2 rounded-md transition-colors ${
                     linkType === 'test'
-                      ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                      : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                      ? 'bg-primary-100 text-primary-700 border border-primary-300 font-medium'
+                      : 'bg-white border border-secondary-300 text-secondary-700 hover:bg-secondary-50'
                   }`}
                 >
                   Teste Avulso
@@ -160,17 +175,19 @@ const InviteModal = ({ isOpen, onClose, candidate, onSuccess }: InviteModalProps
             </div>
 
             {linkType === 'process' && (
-              <div className="bg-white p-3 rounded-md border border-gray-200">
-                <label className="block text-sm text-gray-700 mb-1">
-                  Processo Seletivo:
+              <div className="bg-white p-4 rounded-lg shadow-sm border border-secondary-200">
+                <label className="block text-sm font-medium text-secondary-700 mb-2">
+                  Processo Seletivo
                 </label>
                 {processes.length === 0 ? (
-                  <div className="text-amber-600 py-2">Nenhum processo seletivo disponível.</div>
+                  <div className="p-3 bg-yellow-50 text-yellow-700 rounded-md text-sm">
+                    Nenhum processo seletivo disponível.
+                  </div>
                 ) : (
                   <select
                     value={selectedProcess}
                     onChange={(e) => setSelectedProcess(e.target.value)}
-                    className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white"
                   >
                     {processes.map((process) => (
                       <option key={process.id} value={process.id}>
@@ -183,17 +200,19 @@ const InviteModal = ({ isOpen, onClose, candidate, onSuccess }: InviteModalProps
             )}
 
             {linkType === 'test' && (
-              <div className="bg-white p-3 rounded-md border border-gray-200">
-                <label className="block text-sm text-gray-700 mb-1">
-                  Teste:
+              <div className="bg-white p-4 rounded-lg shadow-sm border border-secondary-200">
+                <label className="block text-sm font-medium text-secondary-700 mb-2">
+                  Teste
                 </label>
                 {tests.length === 0 ? (
-                  <div className="text-amber-600 py-2">Nenhum teste disponível.</div>
+                  <div className="p-3 bg-yellow-50 text-yellow-700 rounded-md text-sm">
+                    Nenhum teste disponível.
+                  </div>
                 ) : (
                   <select
                     value={selectedTest}
                     onChange={(e) => setSelectedTest(e.target.value)}
-                    className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white"
                   >
                     {tests.map((test) => (
                       <option key={test.id} value={test.id}>
@@ -205,27 +224,38 @@ const InviteModal = ({ isOpen, onClose, candidate, onSuccess }: InviteModalProps
               </div>
             )}
 
-            <div className="flex justify-end space-x-2 pt-2">
+            <div className="flex justify-end space-x-3 pt-3">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-gray-700 bg-gray-200 rounded hover:bg-gray-300"
+                className="px-4 py-2 bg-white border border-secondary-300 text-secondary-700 rounded-md hover:bg-secondary-50 transition-colors"
+                disabled={isSubmitting}
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={handleGenerateInvite}
-                disabled={(linkType === 'process' && (!selectedProcess || processes.length === 0)) || 
+                disabled={isSubmitting || (linkType === 'process' && (!selectedProcess || processes.length === 0)) || 
                          (linkType === 'test' && (!selectedTest || tests.length === 0))}
-                className={`px-4 py-2 text-white rounded ${
-                  (linkType === 'process' && (!selectedProcess || processes.length === 0)) || 
-                  (linkType === 'test' && (!selectedTest || tests.length === 0))
-                    ? 'bg-blue-400 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700'
-                }`}
+                className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
               >
-                Gerar Convite
+                {isSubmitting ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Gerando...
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    Gerar Convite
+                  </>
+                )}
               </button>
             </div>
           </>

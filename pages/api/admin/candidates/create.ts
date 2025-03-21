@@ -58,11 +58,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       resumeUrl: resumeUrl || null,
       requestPhoto: requestPhoto !== undefined ? requestPhoto : true,
       showResults: showResults !== undefined ? showResults : true,
-      // Armazenar as preferências como observações em formato JSON
-      observations: JSON.stringify({
-        requestPhoto: requestPhoto !== undefined ? requestPhoto : true,
-        showResults: showResults !== undefined ? showResults : true
-      }),
+      // Não armazenar as preferências como observações, pois já temos campos específicos
+      observations: null,
       // Adicionar o ID da empresa do usuário
       companyId: user.companyId,
       // Adicionar processId e testId se fornecidos
