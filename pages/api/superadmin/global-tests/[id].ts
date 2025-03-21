@@ -25,11 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         where: { id },
         include: {
           questions: true,
-          access: {
-            include: {
-              company: true,
-            },
-          },
+          companies: true,
         },
       });
 
@@ -44,8 +40,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         description: globalTest.description,
         isActive: globalTest.isActive,
         questions: globalTest.questions,
-        companies: globalTest.access.map(access => access.company),
-        companiesCount: globalTest.access.length,
+        companies: globalTest.companies,
+        companiesCount: globalTest.companies.length,
         createdAt: globalTest.createdAt,
         updatedAt: globalTest.updatedAt,
       };
@@ -84,7 +80,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
         include: {
           questions: true,
-          access: true,
+          companies: true,
         },
       });
 
@@ -95,7 +91,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         description: updatedGlobalTest.description,
         isActive: updatedGlobalTest.isActive,
         questions: updatedGlobalTest.questions,
-        companiesCount: updatedGlobalTest.access.length,
+        companiesCount: updatedGlobalTest.companies.length,
         createdAt: updatedGlobalTest.createdAt,
         updatedAt: updatedGlobalTest.updatedAt,
       };
@@ -109,7 +105,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const existingGlobalTest = await prisma.globalTest.findUnique({
         where: { id },
         include: {
-          access: true,
+          companies: true,
         },
       });
 
@@ -118,7 +114,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Remover todos os registros de acesso relacionados
-      if (existingGlobalTest.access.length > 0) {
+      if (existingGlobalTest.companies.length > 0) {
         await prisma.globalAccess.deleteMany({
           where: {
             globalTestId: id,

@@ -10,7 +10,7 @@ export default async function handler(
   if (req.method === 'POST') {
     // Criar um novo candidato
     try {
-      const { name, email, phone, position } = req.body
+      const { name, email, phone, position, companyId } = req.body
 
       if (!name || !email) {
         return res.status(400).json({ error: 'Nome e email são obrigatórios' })
@@ -22,6 +22,9 @@ export default async function handler(
           email,
           phone,
           position,
+          company: {
+            connect: { id: companyId || '1' } // Você precisa fornecer um ID de empresa válido
+          }
         },
       })
 

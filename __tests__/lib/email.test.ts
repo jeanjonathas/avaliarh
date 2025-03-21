@@ -35,8 +35,8 @@ describe('Email Service', () => {
   });
   
   afterAll(() => {
-    // Restaurar o valor original de NODE_ENV
-    process.env.NODE_ENV = originalNodeEnv;
+    // Restaurar o valor original de NODE_ENV usando Object.defineProperty
+    Object.defineProperty(process.env, 'NODE_ENV', { value: originalNodeEnv });
   });
   
   beforeEach(() => {

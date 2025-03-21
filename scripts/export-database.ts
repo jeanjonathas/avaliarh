@@ -37,14 +37,12 @@ async function exportDatabase(options: ExportOptions = { format: 'both', include
     console.log('📊 Coletando dados do banco...');
     const data = {
       users: await prisma.user.findMany(),
-      admins: await prisma.admin.findMany(),
-      tests: await prisma.tests.findMany(),
+      tests: await prisma.test.findMany(),
       stages: await prisma.stage.findMany(),
       testStages: await prisma.testStage.findMany(),
       categories: await prisma.category.findMany(),
       questions: await prisma.question.findMany(),
       options: await prisma.option.findMany(),
-      stageQuestions: await prisma.stageQuestion.findMany(),
       candidates: await prisma.candidate.findMany(),
       responses: await prisma.response.findMany(),
       usedInviteCodes: await prisma.usedInviteCode.findMany(),
@@ -96,14 +94,12 @@ async function exportToSQL(filepath: string, data: any) {
   
   // Exportar cada modelo
   await exportModelToSQL(writeStream, 'User', data.users);
-  await exportModelToSQL(writeStream, 'Admin', data.admins);
-  await exportModelToSQL(writeStream, 'tests', data.tests);
+  await exportModelToSQL(writeStream, 'Test', data.tests);
   await exportModelToSQL(writeStream, 'Stage', data.stages);
   await exportModelToSQL(writeStream, 'TestStage', data.testStages);
   await exportModelToSQL(writeStream, 'Category', data.categories);
   await exportModelToSQL(writeStream, 'Question', data.questions);
   await exportModelToSQL(writeStream, 'Option', data.options);
-  await exportModelToSQL(writeStream, 'StageQuestion', data.stageQuestions);
   await exportModelToSQL(writeStream, 'Candidate', data.candidates);
   await exportModelToSQL(writeStream, 'Response', data.responses);
   await exportModelToSQL(writeStream, 'UsedInviteCode', data.usedInviteCodes);
@@ -158,14 +154,12 @@ async function exportModelToSQL(writeStream: fs.WriteStream, modelName: string, 
 function generateStats(data: any) {
   return {
     Usuários: data.users.length,
-    Administradores: data.admins.length,
     Testes: data.tests.length,
     Etapas: data.stages.length,
     'Associações Teste-Etapa': data.testStages.length,
     Categorias: data.categories.length,
     Perguntas: data.questions.length,
     Opções: data.options.length,
-    'Associações Etapa-Pergunta': data.stageQuestions.length,
     Candidatos: data.candidates.length,
     Respostas: data.responses.length,
     'Códigos de Convite Usados': data.usedInviteCodes.length,
