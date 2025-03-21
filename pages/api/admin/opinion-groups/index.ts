@@ -98,10 +98,10 @@ export default async function handler(
       }
     } else if (req.method === 'POST') {
       try {
-        const { name, categories } = req.body;
+        const { name, categories, stageId } = req.body;
         
-        if (!name || !categories || !Array.isArray(categories) || categories.length === 0) {
-          return res.status(400).json({ message: 'Nome e categorias são obrigatórios' });
+        if (!name || !categories || !Array.isArray(categories) || categories.length === 0 || !stageId) {
+          return res.status(400).json({ message: 'Nome, categorias e stageId são obrigatórios' });
         }
 
         // Criar uma pergunta temporária para armazenar as categorias
@@ -111,7 +111,10 @@ export default async function handler(
             text: `Grupo de categorias: ${name}`,
             type: 'OPINION_MULTIPLE',
             difficulty: 'MEDIUM',
-            showResults: false
+            showResults: false,
+            stage: {
+              connect: { id: stageId }
+            }
           }
         });
         

@@ -42,8 +42,8 @@ export default async function handler(
         
         questions.forEach(question => {
           question.options.forEach(option => {
-            if (option.category) {
-              allOpinions.add(option.category);
+            if (option.categoryName) {
+              allOpinions.add(option.categoryName);
             }
           });
         });

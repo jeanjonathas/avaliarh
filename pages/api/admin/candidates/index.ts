@@ -115,7 +115,7 @@ export default async function handler(
       const processedCandidates = candidates.map(candidate => {
         // Calcular estatísticas
         const totalResponses = candidate.responses.length
-        const correctResponses = candidate.responses.filter(r => r.isCorrectOption).length
+        const correctResponses = candidate.responses.filter(r => r.isCorrect).length
         const score = totalResponses > 0 ? Math.round((correctResponses / totalResponses) * 100) : 0
 
         // Agrupar respostas por etapa para calcular pontuação por etapa
@@ -133,7 +133,7 @@ export default async function handler(
             }
             
             stageMap[response.stageId].total++
-            if (response.isCorrectOption) {
+            if (response.isCorrect) {
               stageMap[response.stageId].correct++
             }
           }
@@ -194,7 +194,12 @@ export default async function handler(
           phone: phone || null,
           position: position || null,
           instagram: instagram || null,
-          testId
+          company: {
+            connect: { id: session.user.companyId }
+          },
+          test: {
+            connect: { id: testId }
+          }
         }
       })
 
