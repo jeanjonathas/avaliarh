@@ -8,7 +8,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const session = await getSession({ req });
 
   // Verificar autenticação e permissão de superadmin
-  if (!session || (session.user.role as string) !== 'SUPER_ADMIN') {
+  if (!session || (session.user?.role as string) !== 'SUPER_ADMIN') {
     return res.status(401).json({ message: 'Não autorizado' });
   }
 
@@ -52,9 +52,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // POST - Criar uma nova pergunta global
     if (req.method === 'POST') {
-      const { text, type, difficulty, categoryIds, options, isGlobal } = req.body;
+      const { text, type, difficulty, categoryIds, options, isGlobal, stageId } = req.body;
 
-      if (!text || !type || !difficulty || !categoryIds || !options) {
+      if (!text || !type || !difficulty || !categoryIds || !options || !stageId) {
         return res.status(400).json({ message: 'Dados incompletos' });
       }
 
@@ -64,6 +64,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           text,
           type: type as QuestionType,
           difficulty: difficulty as DifficultyLevel,
+          categories: {
+            connect: categoryIds.map((id: string) => ({ id })),
+          },
         },
       });
 
@@ -75,6 +78,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             type: type as QuestionType,
             difficulty: difficulty as DifficultyLevel,
             globalQuestionId: globalQuestion.id,
+            stageId,
             categories: {
               connect: { id: categoryId },
             },

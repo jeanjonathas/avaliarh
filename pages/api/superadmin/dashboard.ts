@@ -8,7 +8,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const session = await getSession({ req });
 
   // Verifica se o usuário está autenticado e é um SUPER_ADMIN
-  if (!session || session.user.role !== 'SUPER_ADMIN') {
+  if (!session || session.user?.role !== 'SUPER_ADMIN') {
     return res.status(401).json({ message: 'Não autorizado' });
   }
 
@@ -29,15 +29,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Busca estatísticas de planos
     const companiesByPlan = await prisma.company.groupBy({
-      by: ['plan'],
+      by: ['planType'],
       _count: {
-        plan: true,
+        planType: true,
       },
     });
 
     const planStats: Record<string, number> = {};
     companiesByPlan.forEach(item => {
-      planStats[item.plan] = item._count.plan;
+      planStats[item.planType] = item._count.planType;
     });
 
     // Busca estatísticas de usuários

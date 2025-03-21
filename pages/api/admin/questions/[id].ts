@@ -41,7 +41,7 @@ export default async function handler(
 
   if (req.method === 'PUT') {
     // Validação das entradas
-    const { text, stageId, categoryId, options, type, difficulty, initialExplanation } = req.body
+    const { text, stageId, categoryId, options, type, difficulty } = req.body
     
     if (!text || text.trim() === '') {
       return res.status(400).json({ error: 'Texto da pergunta é obrigatório' })
@@ -125,8 +125,7 @@ export default async function handler(
           }),
           type: type as any,
           difficulty: difficulty as any,
-          initialExplanation: initialExplanation || undefined,
-          updatedAt: new Date()
+          updatedAt: new Date(),
         },
         include: {
           options: true,
@@ -156,13 +155,13 @@ export default async function handler(
           };
           
           // Adicionar campos específicos para perguntas de opinião, se existirem no schema
-          if (type === 'OPINION_MULTIPLE' || type === 'OPINION') {
+          if (type === 'OPINION_MULTIPLE') {
             try {
               // Usar os campos corretos conforme o schema do Prisma
-              if (option.category) optionData.categoryName = option.category;
-              if (option.categoryNameUuid) optionData.categoryNameUuid = option.categoryNameUuid;
-              if (option.weight) optionData.weight = option.weight;
-              if (option.explanation) optionData.explanation = option.explanation;
+              if (option && 'category' in option) optionData.categoryName = option.category;
+              if (option && 'categoryNameUuid' in option) optionData.categoryNameUuid = option.categoryNameUuid;
+              if (option && 'weight' in option) optionData.weight = option.weight;
+              if (option && 'explanation' in option) optionData.explanation = option.explanation;
               
               console.log('Adicionando campos específicos para pergunta de opinião:', {
                 categoryName: option.category,
@@ -215,10 +214,11 @@ export default async function handler(
           };
           
           // Adicionar campos específicos para perguntas de opinião, se existirem
-          if (question.type === 'OPINION_MULTIPLE' || question.type === 'OPINION') {
-            if ('opinionCategory' in option) formattedOption.opinionCategory = option.opinionCategory;
-            if ('opinionWeight' in option) formattedOption.opinionWeight = option.opinionWeight;
-            if ('explanation' in option) formattedOption.explanation = option.explanation;
+          if (question.type === 'OPINION_MULTIPLE') {
+            formattedOption.opinionCategory = option?.categoryName ?? '';
+            formattedOption.opinionCategoryUuid = option?.categoryNameUuid ?? '';
+            formattedOption.opinionWeight = option?.weight ?? 0;
+            formattedOption.explanation = option?.explanation ?? '';
           }
           
           return formattedOption;
@@ -323,8 +323,7 @@ export default async function handler(
         stageId: question.stageId,
         categoryId: question.categories && question.categories.length > 0 ? question.categories[0].id : null,
         categoryUuid: question.categories && question.categories.length > 0 ? question.categories[0].id : null,
-        initialExplanation: question.initialExplanation || '',
-        options: question.options.map(option => {
+        options: question.options?.map((option: any) => {
           // Dados base para qualquer tipo de opção
           const formattedOption: any = {
             id: option.id,
@@ -336,11 +335,11 @@ export default async function handler(
           };
           
           // Adicionar campos específicos para perguntas de opinião, se existirem
-          if (question.type === 'OPINION_MULTIPLE' || question.type === 'OPINION') {
-            formattedOption.category = option.categoryName || '';
-            formattedOption.categoryNameUuid = option.categoryNameUuid || '';
-            formattedOption.weight = option.weight || 1;
-            if ('explanation' in option) formattedOption.explanation = option.explanation;
+          if (question.type === 'OPINION_MULTIPLE') {
+            formattedOption.category = option?.categoryName ?? '';
+            formattedOption.categoryNameUuid = option?.categoryNameUuid ?? '';
+            formattedOption.weight = option?.weight ?? 1;
+            formattedOption.explanation = option?.explanation ?? '';
           }
           
           return formattedOption;

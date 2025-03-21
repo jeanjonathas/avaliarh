@@ -8,7 +8,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const session = await getSession({ req });
 
   // Verificar autenticação e permissão de superadmin
-  if (!session || (session.user.role as string) !== 'SUPER_ADMIN') {
+  if (!session || (session.user?.role as string) !== 'SUPER_ADMIN') {
     return res.status(401).json({ message: 'Não autorizado' });
   }
 
@@ -18,7 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const globalTests = await prisma.globalTest.findMany({
         include: {
           questions: true,
-          access: true,
+          companies: true,
         },
         orderBy: {
           createdAt: 'desc',
@@ -32,8 +32,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           title: test.title,
           description: test.description,
           isActive: test.isActive,
-          questions: test.questions,
-          companiesCount: test.access.length,
+          questions: (test as any).questions,
+          companiesCount: (test as any).companies?.length || 0,
           createdAt: test.createdAt,
           updatedAt: test.updatedAt,
         };
@@ -62,7 +62,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
         include: {
           questions: true,
-          access: true,
+          companies: true,
         },
       });
 
@@ -72,8 +72,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         title: newGlobalTest.title,
         description: newGlobalTest.description,
         isActive: newGlobalTest.isActive,
-        questions: newGlobalTest.questions,
-        companiesCount: newGlobalTest.access.length,
+        questions: (newGlobalTest as any).questions,
+        companiesCount: (newGlobalTest as any).companies?.length || 0,
         createdAt: newGlobalTest.createdAt,
         updatedAt: newGlobalTest.updatedAt,
       };

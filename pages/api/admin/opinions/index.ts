@@ -20,7 +20,7 @@ export default async function handler(
       select: { role: true },
     });
 
-    if (!user || user.role !== 'ADMIN') {
+    if (!user || user.role !== 'COMPANY_ADMIN') {
       return res.status(403).json({ message: 'Acesso negado' });
     }
 
