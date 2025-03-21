@@ -4,7 +4,7 @@ services:
     image: bitnami/git
     entrypoint: ["/bin/bash", "-c"]
     command: [
-      "rm -rf /app/* && git clone https://github.com/jeanjonathas/avaliarh.git /app && chmod -R 777 /app && touch /app/.update_complete"
+      "rm -rf /app/* && git clone https://github.com/jeanjonathas/admitto.git /app && chmod -R 777 /app && touch /app/.update_complete"
     ]
     volumes:
       - app_data:/app
