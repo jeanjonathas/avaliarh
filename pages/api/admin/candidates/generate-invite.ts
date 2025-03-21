@@ -84,7 +84,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     
     // Verificar se o teste existe
-    const testExists = await prisma.tests.findUnique({
+    const testExists = await prisma.test.findUnique({
       where: { id: testId }
     });
     

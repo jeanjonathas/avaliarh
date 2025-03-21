@@ -68,33 +68,35 @@ export default async function handler(
     }
 
     // Calcular pontuação geral
-    const totalQuestions = candidate.responses.length
+    const totalQuestions = candidate.responses.length;
     const correctAnswers = candidate.responses.filter(response => {
-      const correctOption = response.question.options.find(opt => opt.isCorrect)
-      return response.selectedOptionId === correctOption?.id
-    }).length
+      const correctOption = response.question.options.find(opt => opt.isCorrect);
+      // Use type assertion to access selectedOptionId property
+      return (response as any).selectedOptionId === correctOption?.id;
+    }).length;
 
     const score = {
       total: totalQuestions,
       correct: correctAnswers,
       percentage: totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0
-    }
+    };
 
     // Calcular pontuação por etapa
     const stageScores = candidate.process?.stages.map(stage => {
-      const progress = stage.progresses[0]
+      const progress = stage.progresses && stage.progresses.length > 0 ? stage.progresses[0] : null;
       const stageResponses = candidate.responses.filter(response => 
         response.question.stageId === stage.id
-      )
+      );
       
       const stageCorrect = stageResponses.filter(response => {
-        const correctOption = response.question.options.find(opt => opt.isCorrect)
-        return response.selectedOptionId === correctOption?.id
-      }).length
+        const correctOption = response.question.options.find(opt => opt.isCorrect);
+        // Use type assertion to access selectedOptionId property
+        return (response as any).selectedOptionId === correctOption?.id;
+      }).length;
 
       return {
         id: stage.id,
-        name: stage.name || stage.test?.title || 'Etapa sem nome',
+        name: stage.name || (stage.test ? stage.test.title : null) || 'Etapa sem nome',
         total: stageResponses.length,
         correct: stageCorrect,
         percentage: stageResponses.length > 0 
@@ -106,8 +108,8 @@ export default async function handler(
         interviewScore: progress?.interviewScore,
         interviewNotes: progress?.interviewNotes,
         finalDecision: progress?.finalDecision || 'PENDING_EVALUATION'
-      }
-    }) || []
+      };
+    }) || [];
 
     // Calcular pontuações por habilidade
     const skillScores = [
@@ -123,13 +125,15 @@ export default async function handler(
       'Carreira'
     ].map(skill => {
       const skillResponses = candidate.responses.filter(response =>
-        response.question.category === skill
-      )
+        // Use type assertion to access category property
+        (response.question as any).category === skill
+      );
 
       const skillCorrect = skillResponses.filter(response => {
-        const correctOption = response.question.options.find(opt => opt.isCorrect)
-        return response.selectedOptionId === correctOption?.id
-      }).length
+        const correctOption = response.question.options.find(opt => opt.isCorrect);
+        // Use type assertion to access selectedOptionId property
+        return (response as any).selectedOptionId === correctOption?.id;
+      }).length;
 
       return {
         skill,
@@ -138,8 +142,8 @@ export default async function handler(
         percentage: skillResponses.length > 0 
           ? (skillCorrect / skillResponses.length) * 100 
           : 0
-      }
-    })
+      };
+    });
 
     // Calcular status geral do processo
     const processStatus = {

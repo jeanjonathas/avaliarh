@@ -19,10 +19,10 @@ import {
 } from 'chart.js'
 import { Bar, Radar } from 'react-chartjs-2'
 import { Rating } from '@mui/material'
-import Navbar from '../../../components/admin/Navbar'
+import Navbar from '../admin/Navbar'
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useNotification } from '../../../contexts/NotificationContext';
+import { useNotification } from '../../contexts/NotificationContext';
 
 // Registrar componentes do Chart.js
 ChartJS.register(

@@ -697,7 +697,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
                     onChange={(e) => setValue('text', e.target.value)}
                   />
                   {errors.text && (
-                    <p className="text-red-500 text-xs mt-0.5">{errors.text.message}</p>
+                    <p className="text-red-500 text-xs mt-0.5">{String(errors.text?.message || "Campo obrigatório")}</p>
                   )}
                 </div>
               </div>
