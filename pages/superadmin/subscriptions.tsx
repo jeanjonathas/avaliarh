@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import SuperAdminLayout from '@/components/SuperAdminLayout';
-import { useToast } from '@/hooks/useToast';
+import { useNotification } from '@/contexts/NotificationContext';
 import { useRouter } from 'next/router';
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
@@ -40,7 +40,7 @@ export default function Subscriptions() {
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [subscriptionDetails, setSubscriptionDetails] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const toast = useToast();
+  const notification = useNotification();
   const router = useRouter();
 
   // Buscar empresas
@@ -52,11 +52,11 @@ export default function Subscriptions() {
           const data = await response.json();
           setCompanies(data);
         } else {
-          toast.showError('Erro ao carregar empresas');
+          notification.showToast('Erro ao carregar empresas', 'error');
         }
       } catch (error) {
         console.error('Erro ao buscar empresas:', error);
-        toast.showError('Erro ao carregar empresas');
+        notification.showToast('Erro ao carregar empresas', 'error');
       } finally {
         setLoading(false);
       }
@@ -82,11 +82,11 @@ export default function Subscriptions() {
         
         setIsModalOpen(true);
       } else {
-        toast.showError('Erro ao carregar detalhes da assinatura');
+        notification.showToast('Erro ao carregar detalhes da assinatura', 'error');
       }
     } catch (error) {
       console.error('Erro ao buscar detalhes da assinatura:', error);
-      toast.showError('Erro ao carregar detalhes da assinatura');
+      notification.showToast('Erro ao carregar detalhes da assinatura', 'error');
     } finally {
       setLoading(false);
     }
@@ -119,15 +119,15 @@ export default function Subscriptions() {
           } : company
         ));
         
-        toast.showSuccess('Assinatura atualizada com sucesso');
+        notification.showToast('Assinatura atualizada com sucesso', 'success');
         setIsModalOpen(false);
       } else {
         const error = await response.json();
-        toast.showError(error.message || 'Erro ao atualizar assinatura');
+        notification.showToast(error.message || 'Erro ao atualizar assinatura', 'error');
       }
     } catch (error) {
       console.error('Erro ao atualizar assinatura:', error);
-      toast.showError('Erro ao atualizar assinatura');
+      notification.showToast('Erro ao atualizar assinatura', 'error');
     } finally {
       setLoading(false);
     }
@@ -310,7 +310,7 @@ export default function Subscriptions() {
                         <option value="CANCELLED">Cancelada</option>
                       </Field>
                       {errors.status && touched.status && (
-                        <div className="text-red-500 text-sm mt-1">{errors.status}</div>
+                        <div className="text-red-500 text-sm mt-1">{String(errors.status)}</div>
                       )}
                     </div>
                     

@@ -132,10 +132,10 @@ const GlobalQuestions: NextPage = () => {
       const newQuestion = await response.json()
       setQuestions([...questions, newQuestion])
       resetForm()
-      notify.success('Pergunta adicionada com sucesso!')
+      notify.showSuccess('Pergunta adicionada com sucesso!')
     } catch (error) {
       console.error('Erro:', error)
-      notify.error('Falha ao adicionar pergunta')
+      notify.showError('Falha ao adicionar pergunta')
     }
   }
   
@@ -174,10 +174,10 @@ const GlobalQuestions: NextPage = () => {
       setIsEditing(false)
       setCurrentQuestion(null)
       resetForm()
-      notify.success('Pergunta atualizada com sucesso!')
+      notify.showSuccess('Pergunta atualizada com sucesso!')
     } catch (error) {
       console.error('Erro:', error)
-      notify.error('Falha ao atualizar pergunta')
+      notify.showError('Falha ao atualizar pergunta')
     }
   }
   
@@ -199,10 +199,10 @@ const GlobalQuestions: NextPage = () => {
       }
       
       setQuestions(questions.filter((q) => q.id !== deleteQuestionId))
-      notify.success('Pergunta excluída com sucesso!')
+      notify.showSuccess('Pergunta excluída com sucesso!')
     } catch (error) {
       console.error('Erro:', error)
-      notify.error('Falha ao excluir pergunta')
+      notify.showError('Falha ao excluir pergunta')
     } finally {
       setOpenDeleteDialog(false)
       setDeleteQuestionId(null)
