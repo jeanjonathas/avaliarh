@@ -138,10 +138,10 @@ const Plans: NextPage = () => {
       const newPlan = await response.json()
       setPlans([...plans, newPlan])
       resetForm()
-      notify.success('Plano adicionado com sucesso!')
+      notify.showSuccess('Plano adicionado com sucesso!')
     } catch (error) {
       console.error('Erro:', error)
-      notify.error('Falha ao adicionar plano')
+      notify.showError('Falha ao adicionar plano')
     }
   }
   
@@ -178,10 +178,10 @@ const Plans: NextPage = () => {
       setIsEditing(false)
       setCurrentPlan(null)
       resetForm()
-      notify.success('Plano atualizado com sucesso!')
+      notify.showSuccess('Plano atualizado com sucesso!')
     } catch (error) {
       console.error('Erro:', error)
-      notify.error('Falha ao atualizar plano')
+      notify.showError('Falha ao atualizar plano')
     }
   }
   
@@ -203,10 +203,10 @@ const Plans: NextPage = () => {
       }
       
       setPlans(plans.filter((p) => p.id !== deletePlanId))
-      notify.success('Plano excluído com sucesso!')
+      notify.showSuccess('Plano excluído com sucesso!')
     } catch (error) {
       console.error('Erro:', error)
-      notify.error('Falha ao excluir plano')
+      notify.showError('Falha ao excluir plano')
     } finally {
       setOpenDeleteDialog(false)
       setDeletePlanId(null)
@@ -237,7 +237,7 @@ const Plans: NextPage = () => {
       setOpenFeaturesDialog(true)
     } catch (error) {
       console.error('Erro:', error)
-      notify.error('Falha ao carregar recursos do plano')
+      notify.showError('Falha ao carregar recursos do plano')
     }
   }
   
@@ -271,10 +271,10 @@ const Plans: NextPage = () => {
         throw new Error('Erro ao atualizar recursos do plano')
       }
       
-      notify.success('Recursos do plano atualizados com sucesso!')
+      notify.showSuccess('Recursos do plano atualizados com sucesso!')
     } catch (error) {
       console.error('Erro:', error)
-      notify.error('Falha ao atualizar recursos do plano')
+      notify.showError('Falha ao atualizar recursos do plano')
     } finally {
       setOpenFeaturesDialog(false)
       setFeaturesPlanId(null)
@@ -295,7 +295,7 @@ const Plans: NextPage = () => {
       setOpenCompaniesDialog(true)
     } catch (error) {
       console.error('Erro:', error)
-      notify.error('Falha ao carregar empresas do plano')
+      notify.showError('Falha ao carregar empresas do plano')
     }
   }
   
@@ -322,10 +322,10 @@ const Plans: NextPage = () => {
         )
       )
       
-      notify.success('Assinatura atualizada com sucesso!')
+      notify.showSuccess('Assinatura atualizada com sucesso!')
     } catch (error) {
       console.error('Erro:', error)
-      notify.error('Falha ao atualizar assinatura')
+      notify.showError('Falha ao atualizar assinatura')
     }
   }
   

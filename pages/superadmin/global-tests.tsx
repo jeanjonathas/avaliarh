@@ -134,10 +134,10 @@ const GlobalTests: NextPage = () => {
       const newTest = await response.json()
       setTests([...tests, newTest])
       resetForm()
-      notify.success('Teste global adicionado com sucesso!')
+      notify.showSuccess('Teste global adicionado com sucesso!')
     } catch (error) {
       console.error('Erro:', error)
-      notify.error('Falha ao adicionar teste global')
+      notify.showError('Falha ao adicionar teste global')
     }
   }
   
@@ -174,10 +174,10 @@ const GlobalTests: NextPage = () => {
       setIsEditing(false)
       setCurrentTest(null)
       resetForm()
-      notify.success('Teste global atualizado com sucesso!')
+      notify.showSuccess('Teste global atualizado com sucesso!')
     } catch (error) {
       console.error('Erro:', error)
-      notify.error('Falha ao atualizar teste global')
+      notify.showError('Falha ao atualizar teste global')
     }
   }
   
@@ -199,10 +199,10 @@ const GlobalTests: NextPage = () => {
       }
       
       setTests(tests.filter((t) => t.id !== deleteTestId))
-      notify.success('Teste global excluído com sucesso!')
+      notify.showSuccess('Teste global excluído com sucesso!')
     } catch (error) {
       console.error('Erro:', error)
-      notify.error('Falha ao excluir teste global')
+      notify.showError('Falha ao excluir teste global')
     } finally {
       setOpenDeleteDialog(false)
       setDeleteTestId(null)
@@ -233,7 +233,7 @@ const GlobalTests: NextPage = () => {
       setOpenAccessDialog(true)
     } catch (error) {
       console.error('Erro:', error)
-      notify.error('Falha ao carregar dados de acesso')
+      notify.showError('Falha ao carregar dados de acesso')
     }
   }
   
@@ -261,7 +261,7 @@ const GlobalTests: NextPage = () => {
         throw new Error('Erro ao atualizar acesso')
       }
       
-      notify.success('Acesso ao teste atualizado com sucesso!')
+      notify.showSuccess('Acesso ao teste atualizado com sucesso!')
       
       // Atualizar a contagem de empresas no teste
       const updatedTests = tests.map(test => {
@@ -274,7 +274,7 @@ const GlobalTests: NextPage = () => {
       setTests(updatedTests)
     } catch (error) {
       console.error('Erro:', error)
-      notify.error('Falha ao atualizar acesso ao teste')
+      notify.showError('Falha ao atualizar acesso ao teste')
     } finally {
       setOpenAccessDialog(false)
       setAccessTestId(null)
