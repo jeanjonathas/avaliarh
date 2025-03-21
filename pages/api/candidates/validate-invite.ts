@@ -5,7 +5,7 @@ import crypto from 'crypto';
 // Função para gerar um token de segurança baseado no ID do candidato e uma chave secreta
 function generateSecurityToken(candidateId: string): string {
   // Em produção, use uma variável de ambiente para a chave secreta
-  const secretKey = process.env.SECURITY_TOKEN_SECRET || 'avaliarh-security-key';
+  const secretKey = process.env.SECURITY_TOKEN_SECRET || 'Admitto-security-key';
   return crypto
     .createHmac('sha256', secretKey)
     .update(candidateId)

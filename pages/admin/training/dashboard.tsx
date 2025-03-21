@@ -55,7 +55,7 @@ const TrainingDashboard: NextPage = () => {
           </h1>
           
           <p className="text-xl text-gray-600 mb-8">
-            Estamos trabalhando para trazer uma experiência completa de treinamento para a plataforma AvaliaRH.
+            Estamos trabalhando para trazer uma experiência completa de treinamento para a plataforma Admitto.
             Em breve você poderá gerenciar cursos, módulos e acompanhar o progresso dos alunos.
           </p>
           

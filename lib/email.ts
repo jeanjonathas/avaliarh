@@ -36,7 +36,7 @@ function getEmailConfig(): EmailConfig {
         user: process.env.EMAIL_USER || '',
         pass: process.env.EMAIL_PASSWORD || '',
       },
-      from: process.env.EMAIL_FROM || 'noreply@avaliarh.com',
+      from: process.env.EMAIL_FROM || 'noreply@Admitto.com',
     };
   } else {
     // Em desenvolvimento, usar Ethereal (serviço de teste do Nodemailer)
@@ -48,7 +48,7 @@ function getEmailConfig(): EmailConfig {
         user: 'ethereal.user@ethereal.email', // Será substituído pelo createTestAccount
         pass: 'ethereal.pass',
       },
-      from: 'desenvolvimento@avaliarh.com',
+      from: 'desenvolvimento@Admitto.com',
     };
   }
 }
@@ -101,7 +101,7 @@ export async function sendInviteEmail(
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
         <div style="text-align: center; margin-bottom: 20px;">
-          <h1 style="color: #2c3e50; margin-bottom: 10px;">AvaliaRH</h1>
+          <h1 style="color: #2c3e50; margin-bottom: 10px;">Admitto</h1>
           <p style="color: #7f8c8d; font-size: 16px;">Sistema de Avaliação de Candidatos</p>
         </div>
         
@@ -116,21 +116,21 @@ export async function sendInviteEmail(
             ${expirationDate ? `<p style="color: #e74c3c; margin-top: 10px;">${expirationText}</p>` : ''}
           </div>
           
-          <p>Para iniciar o teste, acesse <a href="https://avaliarh.com" style="color: #3498db; text-decoration: none;">avaliarh.com</a> e insira o código acima.</p>
+          <p>Para iniciar o teste, acesse <a href="https://Admitto.com" style="color: #3498db; text-decoration: none;">Admitto.com</a> e insira o código acima.</p>
           
           <p>Boa sorte!</p>
         </div>
         
         <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; color: #7f8c8d; font-size: 12px;">
           <p>Este é um email automático. Por favor, não responda a esta mensagem.</p>
-          <p>&copy; ${new Date().getFullYear()} AvaliaRH - Todos os direitos reservados.</p>
+          <p>&copy; ${new Date().getFullYear()} Admitto - Todos os direitos reservados.</p>
         </div>
       </div>
     `;
     
     // Versão em texto simples do email
     const textContent = `
-      AvaliaRH - Sistema de Avaliação de Candidatos
+      Admitto - Sistema de Avaliação de Candidatos
       
       Olá ${name},
       
@@ -140,17 +140,17 @@ export async function sendInviteEmail(
       
       ${expirationText}
       
-      Para iniciar o teste, acesse avaliarh.com e insira o código acima.
+      Para iniciar o teste, acesse Admitto.com e insira o código acima.
       
       Boa sorte!
       
       Este é um email automático. Por favor, não responda a esta mensagem.
-      &copy; ${new Date().getFullYear()} AvaliaRH - Todos os direitos reservados.
+      &copy; ${new Date().getFullYear()} Admitto - Todos os direitos reservados.
     `;
     
     // Enviar o email
     const info = await transporter.sendMail({
-      from: `"AvaliaRH" <${config.from}>`,
+      from: `"Admitto" <${config.from}>`,
       to,
       subject: 'Convite para Avaliação de Candidato',
       text: textContent,

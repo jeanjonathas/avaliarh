@@ -1,4 +1,4 @@
--- AvaliaRH Database Export
+-- Admitto Database Export
 -- Date: 2025-03-09T20:50:10.130Z
 
 -- Configuração inicial

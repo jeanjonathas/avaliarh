@@ -47,7 +47,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           <div className="flex justify-between items-center py-3">
             <div className="flex items-center space-x-4">
               <Link href="/admin/dashboard" className="text-xl font-bold">
-                AvaliaRH Admin
+                Admitto Admin
               </Link>
             </div>
             

@@ -349,7 +349,7 @@ const Conclusao: NextPage = () => {
           <Link href="/" className="text-2xl font-bold text-primary-700">
             <Image 
               src="/images/logo_horizontal.png"
-              alt="AvaliaRH Logo"
+              alt="Admitto Logo"
               width={180}
               height={54}
               priority
@@ -631,7 +631,7 @@ const Conclusao: NextPage = () => {
               </div>
               
               <p>
-                Se tiver alguma dúvida sobre o processo seletivo, entre em contato conosco pelo email <a href="mailto:contato@avaliarh.com.br" className="text-primary-600 hover:underline">contato@avaliarh.com.br</a>.
+                Se tiver alguma dúvida sobre o processo seletivo, entre em contato conosco pelo email <a href="mailto:contato@Admitto.com.br" className="text-primary-600 hover:underline">contato@Admitto.com.br</a>.
               </p>
               
               <div className="pt-6">

@@ -31,7 +31,7 @@ const Agradecimento: NextPage = () => {
         <header className="flex justify-center mb-8">
           <Image 
             src="/images/logo_horizontal.png"
-            alt="AvaliaRH Logo"
+            alt="Admitto Logo"
             width={220}
             height={66}
             priority

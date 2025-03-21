@@ -49,7 +49,7 @@ const SuperAdminLayout: React.FC<SuperAdminLayoutProps> = ({ children }) => {
           <div className="flex justify-between items-center py-3">
             <div className="flex items-center space-x-4">
               <Link href="/superadmin/dashboard" className="text-xl font-bold">
-                AvaliaRH Super Admin
+                Admitto Super Admin
               </Link>
             </div>
             

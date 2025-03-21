@@ -15,7 +15,7 @@ interface ExportOptions {
 }
 
 async function exportDatabase(options: ExportOptions = { format: 'both', includeTimestamp: true, prettyJson: true }) {
-  console.log('🚀 Iniciando exportação do banco de dados AvaliaRH...');
+  console.log('🚀 Iniciando exportação do banco de dados Admitto...');
   
   try {
     // Configurar diretório de saída
@@ -29,7 +29,7 @@ async function exportDatabase(options: ExportOptions = { format: 'both', include
       ? `_${format(new Date(), 'yyyy-MM-dd_HH-mm-ss', { locale: ptBR })}`
       : '';
     
-    const baseFilename = options.filename || `avaliarh_export${timestamp}`;
+    const baseFilename = options.filename || `Admitto_export${timestamp}`;
     const sqlFilepath = path.join(outputDir, `${baseFilename}.sql`);
     const jsonFilepath = path.join(outputDir, `${baseFilename}.json`);
     
@@ -88,7 +88,7 @@ async function exportToSQL(filepath: string, data: any) {
   const writeStream = fs.createWriteStream(filepath);
   
   // Escrever cabeçalho
-  writeStream.write(`-- AvaliaRH Database Export\n`);
+  writeStream.write(`-- Admitto Database Export\n`);
   writeStream.write(`-- Data: ${format(new Date(), 'dd/MM/yyyy HH:mm:ss', { locale: ptBR })}\n`);
   writeStream.write(`-- Versão: 1.0.0\n\n`);
   writeStream.write(`-- Configuração inicial\n`);
@@ -197,7 +197,7 @@ async function exportSingleModel(modelName: string, options: ExportOptions = { f
       ? `_${format(new Date(), 'yyyy-MM-dd_HH-mm-ss', { locale: ptBR })}`
       : '';
     
-    const baseFilename = options.filename || `avaliarh_${modelName.toLowerCase()}${timestamp}`;
+    const baseFilename = options.filename || `Admitto_${modelName.toLowerCase()}${timestamp}`;
     const filePath = path.join(outputDir, `${baseFilename}.${options.format}`);
     
     if (options.format === 'json') {
@@ -205,7 +205,7 @@ async function exportSingleModel(modelName: string, options: ExportOptions = { f
       fs.writeFileSync(filePath, JSON.stringify(records, null, jsonIndent));
     } else if (options.format === 'sql') {
       const writeStream = fs.createWriteStream(filePath);
-      writeStream.write(`-- AvaliaRH ${modelName} Export\n`);
+      writeStream.write(`-- Admitto ${modelName} Export\n`);
       writeStream.write(`-- Data: ${format(new Date(), 'dd/MM/yyyy HH:mm:ss', { locale: ptBR })}\n\n`);
       writeStream.write(`BEGIN;\n\n`);
       await exportModelToSQL(writeStream, modelName, records);

@@ -54,7 +54,7 @@ export default function SuperAdminLogin() {
   return (
     <>
       <Head>
-        <title>Super Admin Login | AvaliaRH</title>
+        <title>Super Admin Login | Admitto</title>
       </Head>
       <div className="min-h-screen bg-gray-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -62,7 +62,7 @@ export default function SuperAdminLogin() {
             <div className="w-32 h-32 relative">
               <Image 
                 src="/logo.png" 
-                alt="AvaliaRH Logo" 
+                alt="Admitto Logo" 
                 fill
                 style={{ objectFit: "contain" }}
                 priority

@@ -109,19 +109,19 @@ export default function Home() {
       <header className="bg-white shadow-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center">
-            <Link href="/" className="text-xl font-bold text-purple-700">
-              AvaliaRH
+            <Link href="/" className="text-xl font-bold text-sky-600">
+              Admitto
             </Link>
           </div>
           
           <nav className="hidden md:flex space-x-8">
-            <Link href="#recursos" className="text-gray-600 hover:text-purple-700 font-medium">
+            <Link href="#recursos" className="text-gray-600 hover:text-sky-600 font-medium">
               Recursos
             </Link>
-            <Link href="#clientes" className="text-gray-600 hover:text-purple-700 font-medium">
+            <Link href="#clientes" className="text-gray-600 hover:text-sky-600 font-medium">
               Clientes
             </Link>
-            <Link href="#planos" className="text-gray-600 hover:text-purple-700 font-medium">
+            <Link href="#planos" className="text-gray-600 hover:text-sky-600 font-medium">
               Planos
             </Link>
           </nav>
@@ -129,13 +129,13 @@ export default function Home() {
           <div className="flex items-center space-x-4">
             <Link 
               href="/admin" 
-              className="hidden md:inline-block text-gray-700 hover:text-purple-700 font-medium"
+              className="hidden md:inline-block text-gray-700 hover:text-sky-600 font-medium"
             >
               Login
             </Link>
             <Link 
               href="/register" 
-              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md font-medium transition-colors duration-300"
+              className="bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-md font-medium transition-colors duration-300"
             >
               Começar Grátis
             </Link>
@@ -145,51 +145,51 @@ export default function Home() {
       
       <main className="container mx-auto px-4">
         {/* Hero Section */}
-        <section className="bg-gradient-to-r from-purple-700 to-purple-900 rounded-xl mt-6 mb-12 overflow-hidden shadow-lg">
+        <section className="bg-gradient-to-r from-sky-500 to-sky-700 rounded-xl mt-6 mb-12 overflow-hidden shadow-lg">
           <div className="px-6 py-16 md:py-20 flex flex-col md:flex-row items-center">
             <div className="md:w-1/2 mb-10 md:mb-0 text-white">
               <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
-                AvaliaRH LMS
+                Admitto
               </h1>
-              <p className="text-xl md:text-2xl mb-8 text-purple-100">
+              <p className="text-xl md:text-2xl mb-8 text-sky-100">
                 A plataforma completa para avaliação e desenvolvimento de talentos
               </p>
               <ul className="mb-8 space-y-3">
                 <li className="flex items-center">
-                  <div className="bg-purple-500 rounded-full p-1 mr-3">
+                  <div className="bg-sky-400 rounded-full p-1 mr-3">
                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
                     </svg>
                   </div>
-                  <span className="text-purple-100">Testes de inteligência e personalidade</span>
+                  <span className="text-sky-100">Testes de inteligência e personalidade</span>
                 </li>
                 <li className="flex items-center">
-                  <div className="bg-purple-500 rounded-full p-1 mr-3">
+                  <div className="bg-sky-400 rounded-full p-1 mr-3">
                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
                     </svg>
                   </div>
-                  <span className="text-purple-100">Análise de compatibilidade com vagas</span>
+                  <span className="text-sky-100">Análise de compatibilidade com vagas</span>
                 </li>
                 <li className="flex items-center">
-                  <div className="bg-purple-500 rounded-full p-1 mr-3">
+                  <div className="bg-sky-400 rounded-full p-1 mr-3">
                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
                     </svg>
                   </div>
-                  <span className="text-purple-100">Relatórios detalhados e insights</span>
+                  <span className="text-sky-100">Relatórios detalhados e insights</span>
                 </li>
               </ul>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Link 
                   href="/register" 
-                  className="px-6 py-3 bg-yellow-400 hover:bg-yellow-500 text-purple-900 font-medium rounded-md shadow-md hover:shadow-lg transition-all duration-300 text-center"
+                  className="px-6 py-3 bg-yellow-400 hover:bg-yellow-500 text-sky-900 font-medium rounded-md shadow-md hover:shadow-lg transition-all duration-300 text-center"
                 >
                   Experimente Grátis
                 </Link>
                 <Link 
                   href="/demo" 
-                  className="px-6 py-3 bg-purple-600 text-white border border-purple-500 hover:bg-purple-700 font-medium rounded-md shadow-sm hover:shadow-md transition-all duration-300 text-center"
+                  className="px-6 py-3 bg-sky-600 text-white border border-sky-500 hover:bg-sky-700 font-medium rounded-md shadow-sm hover:shadow-md transition-all duration-300 text-center"
                 >
                   Agendar Demo
                 </Link>
@@ -198,15 +198,15 @@ export default function Home() {
             <div className="md:w-1/2 flex justify-center">
               <div className="relative w-full max-w-md">
                 <div className="absolute -top-6 -right-6 w-32 h-32 bg-yellow-400 rounded-full opacity-20"></div>
-                <div className="absolute -bottom-6 -left-6 w-32 h-32 bg-purple-400 rounded-full opacity-20"></div>
+                <div className="absolute -bottom-6 -left-6 w-32 h-32 bg-sky-400 rounded-full opacity-20"></div>
                 <div className="bg-white p-6 rounded-lg shadow-lg relative z-10">
                   <img 
                     src="/dashboard-preview.png" 
-                    alt="AvaliaRH Dashboard" 
+                    alt="Admitto Dashboard" 
                     className="w-full h-auto rounded-md shadow-sm"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
-                      target.src = "https://via.placeholder.com/500x300?text=AvaliaRH+Dashboard";
+                      target.src = "https://via.placeholder.com/500x300?text=Admitto+Dashboard";
                     }}
                   />
                 </div>
@@ -216,7 +216,7 @@ export default function Home() {
         </section>        
 
         {/* Área do Candidato */}
-        <section className="mb-12 bg-gradient-to-r from-purple-50 to-purple-100 rounded-xl p-8 shadow-sm">
+        <section className="mb-12 bg-gradient-to-r from-sky-50 to-sky-100 rounded-xl p-8 shadow-sm">
           <div className="flex flex-col md:flex-row items-center">
             <div className="md:w-1/2 mb-8 md:mb-0">
               <h2 className="text-2xl sm:text-3xl font-bold mb-4 text-gray-800">Área do Candidato</h2>
@@ -246,13 +246,13 @@ export default function Home() {
                         ? 'border-red-500 ring-1 ring-red-500 bg-red-50' 
                         : validationStatus === 'success'
                           ? 'border-green-500 ring-1 ring-green-500 bg-green-50'
-                          : 'border-purple-300'
+                          : 'border-sky-300'
                     } rounded-md focus:outline-none focus:ring-2 ${
                       validationStatus === 'error'
                         ? 'focus:ring-red-500' 
                         : validationStatus === 'success'
                           ? 'focus:ring-green-500'
-                          : 'focus:ring-purple-500'
+                          : 'focus:ring-sky-500'
                     } focus:border-transparent transition-colors`}
                     placeholder="CÓDIGO"
                     style={{ letterSpacing: '0.5em' }}
@@ -277,8 +277,8 @@ export default function Home() {
                 <button
                   type="submit"
                   className={`w-full py-3 px-4 ${
-                    isLoading ? 'bg-gray-400' : 'bg-purple-600 hover:bg-purple-700'
-                  } text-white font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors flex justify-center items-center`}
+                    isLoading ? 'bg-gray-400' : 'bg-sky-500 hover:bg-sky-600'
+                  } text-white font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 transition-colors flex justify-center items-center`}
                   disabled={isLoading}
                 >
                   {isLoading ? (
@@ -303,15 +303,15 @@ export default function Home() {
                 </p>
                 <ol className="space-y-3 text-gray-700">
                   <li className="flex">
-                    <span className="bg-purple-200 text-purple-800 rounded-full w-6 h-6 flex items-center justify-center mr-3 flex-shrink-0">1</span>
+                    <span className="bg-sky-200 text-sky-800 rounded-full w-6 h-6 flex items-center justify-center mr-3 flex-shrink-0">1</span>
                     <p>Insira o código de convite que você recebeu por e-mail</p>
                   </li>
                   <li className="flex">
-                    <span className="bg-purple-200 text-purple-800 rounded-full w-6 h-6 flex items-center justify-center mr-3 flex-shrink-0">2</span>
+                    <span className="bg-sky-200 text-sky-800 rounded-full w-6 h-6 flex items-center justify-center mr-3 flex-shrink-0">2</span>
                     <p>Complete os testes solicitados dentro do prazo</p>
                   </li>
                   <li className="flex">
-                    <span className="bg-purple-200 text-purple-800 rounded-full w-6 h-6 flex items-center justify-center mr-3 flex-shrink-0">3</span>
+                    <span className="bg-sky-200 text-sky-800 rounded-full w-6 h-6 flex items-center justify-center mr-3 flex-shrink-0">3</span>
                     <p>Receba feedback sobre seus resultados</p>
                   </li>
                 </ol>
@@ -335,9 +335,9 @@ export default function Home() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 border border-purple-100">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 border border-sky-100">
+              <div className="w-12 h-12 bg-sky-100 rounded-lg flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0012 18.75V19h-1v-1a3.4 3.4 0 00-1.889-3.009l-.533-.266" />
                 </svg>
               </div>
@@ -367,7 +367,7 @@ export default function Home() {
               </ul>
               <Link 
                 href="/recursos/testes-inteligencia" 
-                className="text-purple-600 hover:text-purple-800 font-medium inline-flex items-center"
+                className="text-sky-600 hover:text-sky-800 font-medium inline-flex items-center"
               >
                 Saiba mais
                 <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -376,9 +376,9 @@ export default function Home() {
               </Link>
             </div>
             
-            <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 border border-purple-100">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 border border-sky-100">
+              <div className="w-12 h-12 bg-sky-100 rounded-lg flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
@@ -408,7 +408,7 @@ export default function Home() {
               </ul>
               <Link 
                 href="/recursos/analise-personalidade" 
-                className="text-purple-600 hover:text-purple-800 font-medium inline-flex items-center"
+                className="text-sky-600 hover:text-sky-800 font-medium inline-flex items-center"
               >
                 Saiba mais
                 <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -417,9 +417,9 @@ export default function Home() {
               </Link>
             </div>
             
-            <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 border border-purple-100">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 border border-sky-100">
+              <div className="w-12 h-12 bg-sky-100 rounded-lg flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
@@ -449,7 +449,7 @@ export default function Home() {
               </ul>
               <Link 
                 href="/recursos/compatibilidade" 
-                className="text-purple-600 hover:text-purple-800 font-medium inline-flex items-center"
+                className="text-sky-600 hover:text-sky-800 font-medium inline-flex items-center"
               >
                 Saiba mais
                 <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -462,7 +462,7 @@ export default function Home() {
           <div className="mt-12 text-center">
             <Link 
               href="/recursos" 
-              className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-md shadow-md hover:shadow-lg transition-all duration-300 inline-flex items-center"
+              className="px-6 py-3 bg-sky-500 hover:bg-sky-600 text-white font-medium rounded-md shadow-md hover:shadow-lg transition-all duration-300 inline-flex items-center"
             >
               Ver todos os recursos
               <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -473,22 +473,22 @@ export default function Home() {
         </section>
 
         {/* Depoimentos */}
-        <section id="clientes" className="mb-12 bg-gradient-to-r from-purple-100 to-purple-200 p-8 rounded-xl shadow-sm relative overflow-hidden">
+        <section id="clientes" className="mb-12 bg-gradient-to-r from-sky-100 to-sky-200 p-8 rounded-xl shadow-sm relative overflow-hidden">
           <div className="absolute -top-10 -right-10 w-40 h-40 bg-yellow-300 rounded-full opacity-20"></div>
-          <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-purple-400 rounded-full opacity-20"></div>
+          <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-sky-400 rounded-full opacity-20"></div>
           
           <div className="text-center mb-10 relative z-10">
             <h2 className="text-2xl sm:text-3xl font-bold mb-4 text-gray-800">O que Nossos Clientes Dizem</h2>
             <p className="text-lg text-gray-700 max-w-3xl mx-auto">
-              Empresas de diversos segmentos já transformaram seus processos de RH com o AvaliaRH.
+              Empresas de diversos segmentos já transformaram seus processos de RH com o Admitto.
             </p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
             <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300">
               <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-purple-200 rounded-full mr-4 flex items-center justify-center">
-                  <span className="text-purple-700 font-bold">MS</span>
+                <div className="w-12 h-12 bg-sky-200 rounded-full mr-4 flex items-center justify-center">
+                  <span className="text-sky-700 font-bold">MS</span>
                 </div>
                 <div>
                   <h4 className="font-semibold text-gray-800">Maria Silva</h4>
@@ -496,7 +496,7 @@ export default function Home() {
                 </div>
               </div>
               <p className="text-gray-700">
-                "O AvaliaRH revolucionou nosso processo seletivo. Reduzimos o tempo de contratação em 40% e melhoramos significativamente a qualidade das nossas contratações."
+                "O Admitto revolucionou nosso processo seletivo. Reduzimos o tempo de contratação em 40% e melhoramos significativamente a qualidade das nossas contratações."
               </p>
               <div className="mt-4 flex">
                 <div className="flex text-yellow-400">
@@ -507,8 +507,8 @@ export default function Home() {
             
             <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300">
               <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-purple-200 rounded-full mr-4 flex items-center justify-center">
-                  <span className="text-purple-700 font-bold">JO</span>
+                <div className="w-12 h-12 bg-sky-200 rounded-full mr-4 flex items-center justify-center">
+                  <span className="text-sky-700 font-bold">JO</span>
                 </div>
                 <div>
                   <h4 className="font-semibold text-gray-800">João Oliveira</h4>
@@ -527,8 +527,8 @@ export default function Home() {
             
             <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300">
               <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-purple-200 rounded-full mr-4 flex items-center justify-center">
-                  <span className="text-purple-700 font-bold">AB</span>
+                <div className="w-12 h-12 bg-sky-200 rounded-full mr-4 flex items-center justify-center">
+                  <span className="text-sky-700 font-bold">AB</span>
                 </div>
                 <div>
                   <h4 className="font-semibold text-gray-800">Ana Beatriz</h4>
@@ -549,9 +549,9 @@ export default function Home() {
 
         {/* Chamada para Ação */}
         <section className="mb-12 sm:mb-20">
-          <div className="bg-gradient-to-r from-purple-600 to-purple-800 p-8 rounded-xl shadow-md text-white relative overflow-hidden">
+          <div className="bg-gradient-to-r from-sky-500 to-sky-700 p-8 rounded-xl shadow-md text-white relative overflow-hidden">
             <div className="absolute -top-10 -right-10 w-40 h-40 bg-yellow-300 rounded-full opacity-10"></div>
-            <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-purple-400 rounded-full opacity-10"></div>
+            <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-sky-400 rounded-full opacity-10"></div>
             
             <div className="relative z-10 flex flex-col md:flex-row items-center justify-between">
               <div className="mb-6 md:mb-0 md:mr-8">
@@ -559,19 +559,19 @@ export default function Home() {
                   Transforme seu Processo de RH Hoje
                 </h2>
                 <p className="text-lg opacity-90 max-w-xl">
-                  Junte-se a centenas de empresas que já estão contratando melhores talentos com o AvaliaRH.
+                  Junte-se a centenas de empresas que já estão contratando melhores talentos com o Admitto.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Link 
                   href="/planos" 
-                  className="px-6 py-3 bg-white text-purple-700 hover:bg-yellow-100 font-medium rounded-md shadow-md hover:shadow-lg transition-all duration-300 text-center"
+                  className="px-6 py-3 bg-white text-sky-700 hover:bg-yellow-100 font-medium rounded-md shadow-md hover:shadow-lg transition-all duration-300 text-center"
                 >
                   Ver planos
                 </Link>
                 <Link 
                   href="/contato" 
-                  className="px-6 py-3 bg-purple-500 hover:bg-purple-400 text-white font-medium rounded-md shadow-md hover:shadow-lg transition-all duration-300 border border-purple-400 text-center"
+                  className="px-6 py-3 bg-sky-400 hover:bg-sky-300 text-white font-medium rounded-md shadow-md hover:shadow-lg transition-all duration-300 border border-sky-300 text-center"
                 >
                   Falar com consultor
                 </Link>
@@ -582,10 +582,10 @@ export default function Home() {
 
         {/* Formulário de Contato */}
         <section id="planos" className="mb-12 sm:mb-20 flex flex-col md:flex-row gap-8 items-stretch">
-          <div className="w-full md:w-1/2 bg-gradient-to-br from-purple-100 to-purple-200 p-8 rounded-xl">
+          <div className="w-full md:w-1/2 bg-gradient-to-br from-sky-100 to-sky-200 p-8 rounded-xl">
             <h2 className="text-2xl font-bold mb-4 text-gray-800">Entre em Contato</h2>
             <p className="text-gray-700 mb-6">
-              Tem dúvidas sobre como o AvaliaRH pode ajudar sua empresa? Preencha o formulário e nossa equipe entrará em contato.
+              Tem dúvidas sobre como o Admitto pode ajudar sua empresa? Preencha o formulário e nossa equipe entrará em contato.
             </p>
             <form className="space-y-4">
               <div>
@@ -595,7 +595,7 @@ export default function Home() {
                 <input
                   type="text"
                   id="name"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                   placeholder="Seu nome"
                 />
               </div>
@@ -606,7 +606,7 @@ export default function Home() {
                 <input
                   type="email"
                   id="email"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                   placeholder="seu@email.com"
                 />
               </div>
@@ -617,7 +617,7 @@ export default function Home() {
                 <input
                   type="text"
                   id="company"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                   placeholder="Nome da sua empresa"
                 />
               </div>
@@ -628,13 +628,13 @@ export default function Home() {
                 <textarea
                   id="message"
                   rows={4}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                   placeholder="Como podemos ajudar?"
                 ></textarea>
               </div>
               <button
                 type="submit"
-                className="w-full px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-md shadow-md hover:shadow-lg transition-all duration-300"
+                className="w-full px-6 py-3 bg-sky-500 hover:bg-sky-600 text-white font-medium rounded-md shadow-md hover:shadow-lg transition-all duration-300"
               >
                 Enviar Mensagem
               </button>
@@ -643,13 +643,13 @@ export default function Home() {
           <div className="w-full md:w-1/2 bg-white p-8 rounded-xl shadow-md">
             <h2 className="text-2xl font-bold mb-6 text-gray-800">Planos e Preços</h2>
             <div className="space-y-6">
-              <div className="border border-gray-200 rounded-lg p-6 hover:border-purple-300 hover:shadow-md transition-all duration-300">
+              <div className="border border-gray-200 rounded-lg p-6 hover:border-sky-300 hover:shadow-md transition-all duration-300">
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <h3 className="text-xl font-semibold text-gray-800">Plano Starter</h3>
                     <p className="text-gray-600">Para pequenas empresas</p>
                   </div>
-                  <div className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm font-medium">
+                  <div className="bg-sky-100 text-sky-700 px-3 py-1 rounded-full text-sm font-medium">
                     Popular
                   </div>
                 </div>
@@ -671,13 +671,13 @@ export default function Home() {
                     <span className="text-green-500 mr-2">✓</span> Relatórios básicos
                   </li>
                 </ul>
-                <button className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-md shadow-sm hover:shadow-md transition-all duration-300">
+                <button className="w-full px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white font-medium rounded-md shadow-sm hover:shadow-md transition-all duration-300">
                   Começar Agora
                 </button>
               </div>
               
-              <div className="border border-purple-300 rounded-lg p-6 shadow-md relative">
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-purple-900 px-4 py-1 rounded-full text-sm font-bold">
+              <div className="border border-sky-300 rounded-lg p-6 shadow-md relative">
+                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-sky-900 px-4 py-1 rounded-full text-sm font-bold">
                   Mais Vendido
                 </div>
                 <div className="flex justify-between items-start mb-4">
@@ -707,7 +707,7 @@ export default function Home() {
                     <span className="text-green-500 mr-2">✓</span> Suporte prioritário
                   </li>
                 </ul>
-                <button className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-md shadow-sm hover:shadow-md transition-all duration-300">
+                <button className="w-full px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white font-medium rounded-md shadow-sm hover:shadow-md transition-all duration-300">
                   Escolher Plano
                 </button>
               </div>
@@ -719,27 +719,27 @@ export default function Home() {
         <footer className="pt-10 pb-6 border-t border-gray-200">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
             <div>
-              <h3 className="font-semibold text-gray-800 mb-4">AvaliaRH</h3>
-              <p className="text-gray-600 mb-4">
+              <h3 className="font-semibold text-gray-800 mb-4">Admitto </h3>
+              <p className="text-gray-600 text-sm mb-4">
                 Transformando a forma como as empresas avaliam e selecionam talentos.
               </p>
               <div className="flex space-x-4">
-                <a href="#" className="text-gray-500 hover:text-purple-600 transition-colors">
+                <a href="#" className="text-gray-500 hover:text-sky-600 transition-colors">
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path fillRule="evenodd" d="M12.315 2c2.43 0 2.784.013 3.808.06 1.064.049 1.791.218 2.427.465a4.902 4.902 0 011.772 1.153 4.902 4.902 0 011.153 1.772c.247.636.416 1.363.465 2.427.048 1.067.06 1.407.06 4.123v.08c0 2.643-.012 2.987-.06 4.043-.049 1.064-.218 1.791-.465 2.427a4.902 4.902 0 01-1.153 1.772 4.902 4.902 0 01-1.772 1.153c-.636.247-1.363.416-2.427.465-1.067.048-1.407.06-4.123.06h-.08c-2.643 0-2.987-.012-4.043-.06-1.064-.049-1.791-.218-2.427-.465a4.902 4.902 0 01-1.768 1.768c-1.56.419-7.814.419-7.814.419s-6.255 0-7.814-.419a2.505 2.505 0 0 1-1.768-1.768C2 15.255 2 12 2 12s0-3.255.417-4.814a2.507 2.507 0 0 1 1.768-1.768C5.744 5 11.998 5 11.998 5s6.255 0 7.814.418ZM15.194 12 10 15V9l5.194 3Z" clipRule="evenodd"></path>
                   </svg>
                 </a>
-                <a href="#" className="text-gray-500 hover:text-purple-600 transition-colors">
+                <a href="#" className="text-gray-500 hover:text-sky-600 transition-colors">
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path fillRule="evenodd" d="M12.315 2c2.43 0 2.784.013 3.808.06 1.064.049 1.791.218 2.427.465a4.902 4.902 0 011.772 1.153 4.902 4.902 0 011.153 1.772c.247.636.416 1.363.465 2.427.048 1.067.06 1.407.06 4.123v.08c0 2.643-.012 2.987-.06 4.043-.049 1.064-.218 1.791-.465 2.427a4.902 4.902 0 01-1.153 1.772 4.902 4.902 0 01-1.772 1.153c-.636.247-1.363.416-2.427.465-1.067.048-1.407.06-4.123.06h-.08c-2.643 0-2.987-.012-4.043-.06-1.064-.049-1.791-.218-2.427-.465a4.902 4.902 0 01-1.768 1.768c-1.56.419-7.814.419-7.814.419s-6.255 0-7.814-.419a2.505 2.505 0 0 1-1.768-1.768C2 15.255 2 12 2 12s0-3.255.417-4.814a2.507 2.507 0 0 1 1.768-1.768C5.744 5 11.998 5 11.998 5s6.255 0 7.814.418ZM15.194 12 10 15V9l5.194 3Z" clipRule="evenodd"></path>
                   </svg>
                 </a>
-                <a href="#" className="text-gray-500 hover:text-purple-600 transition-colors">
+                <a href="#" className="text-gray-500 hover:text-sky-600 transition-colors">
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path fillRule="evenodd" d="M12.315 2c2.43 0 2.784.013 3.808.06 1.064.049 1.791.218 2.427.465a4.902 4.902 0 011.772 1.153 4.902 4.902 0 011.153 1.772c.247.636.416 1.363.465 2.427.048 1.067.06 1.407.06 4.123v.08c0 2.643-.012 2.987-.06 4.043-.049 1.064-.218 1.791-.465 2.427a4.902 4.902 0 01-1.153 1.772 4.902 4.902 0 01-1.772 1.153c-.636.247-1.363.416-2.427.465-1.067.048-1.407.06-4.123.06h-.08c-2.643 0-2.987-.012-4.043-.06-1.064-.049-1.791-.218-2.427-.465a4.902 4.902 0 01-1.768 1.768c-1.56.419-7.814.419-7.814.419s-6.255 0-7.814-.419a2.505 2.505 0 0 1-1.768-1.768C2 15.255 2 12 2 12s0-3.255.417-4.814a2.507 2.507 0 0 1 1.768-1.768C5.744 5 11.998 5 11.998 5s6.255 0 7.814.418ZM15.194 12 10 15V9l5.194 3Z" clipRule="evenodd"></path>
                   </svg>
                 </a>
-                <a href="#" className="text-gray-500 hover:text-purple-600 transition-colors">
+                <a href="#" className="text-gray-500 hover:text-sky-600 transition-colors">
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path fillRule="evenodd" d="M12.315 2c2.43 0 2.784.013 3.808.06 1.064.049 1.791.218 2.427.465a4.902 4.902 0 011.772 1.153 4.902 4.902 0 011.153 1.772c.247.636.416 1.363.465 2.427.048 1.067.06 1.407.06 4.123v.08c0 2.643-.012 2.987-.06 4.043-.049 1.064-.218 1.791-.465 2.427a4.902 4.902 0 01-1.153 1.772 4.902 4.902 0 01-1.772 1.153c-.636.247-1.363.416-2.427.465-1.067.048-1.407.06-4.123.06h-.08c-2.643 0-2.987-.012-4.043-.06-1.064-.049-1.791-.218-2.427-.465a4.902 4.902 0 01-1.768 1.768c-1.56.419-7.814.419-7.814.419s-6.255 0-7.814-.419a2.505 2.505 0 0 1-1.768-1.768C2 15.255 2 12 2 12s0-3.255.417-4.814a2.507 2.507 0 0 1 1.768-1.768C5.744 5 11.998 5 11.998 5s6.255 0 7.814.418ZM15.194 12 10 15V9l5.194 3Z" clipRule="evenodd"></path>
                   </svg>
@@ -751,22 +751,22 @@ export default function Home() {
               <h3 className="font-semibold text-gray-800 mb-4">Recursos</h3>
               <ul className="space-y-2">
                 <li>
-                  <Link href="/recursos/testes-inteligencia" className="text-gray-600 hover:text-purple-600 transition-colors">
+                  <Link href="/recursos/testes-inteligencia" className="text-gray-600 hover:text-sky-600 transition-colors">
                     Testes de Inteligência
                   </Link>
                 </li>
                 <li>
-                  <Link href="/recursos/analise-personalidade" className="text-gray-600 hover:text-purple-600 transition-colors">
+                  <Link href="/recursos/analise-personalidade" className="text-gray-600 hover:text-sky-600 transition-colors">
                     Análise de Personalidade
                   </Link>
                 </li>
                 <li>
-                  <Link href="/recursos/compatibilidade" className="text-gray-600 hover:text-purple-600 transition-colors">
+                  <Link href="/recursos/compatibilidade" className="text-gray-600 hover:text-sky-600 transition-colors">
                     Compatibilidade
                   </Link>
                 </li>
                 <li>
-                  <Link href="/recursos/relatorios" className="text-gray-600 hover:text-purple-600 transition-colors">
+                  <Link href="/recursos/relatorios" className="text-gray-600 hover:text-sky-600 transition-colors">
                     Relatórios e Dashboards
                   </Link>
                 </li>
@@ -777,22 +777,22 @@ export default function Home() {
               <h3 className="font-semibold text-gray-800 mb-4">Empresa</h3>
               <ul className="space-y-2">
                 <li>
-                  <Link href="/sobre" className="text-gray-600 hover:text-purple-600 transition-colors">
+                  <Link href="/sobre" className="text-gray-600 hover:text-sky-600 transition-colors">
                     Sobre Nós
                   </Link>
                 </li>
                 <li>
-                  <Link href="/blog" className="text-gray-600 hover:text-purple-600 transition-colors">
+                  <Link href="/blog" className="text-gray-600 hover:text-sky-600 transition-colors">
                     Blog
                   </Link>
                 </li>
                 <li>
-                  <Link href="/clientes" className="text-gray-600 hover:text-purple-600 transition-colors">
+                  <Link href="/clientes" className="text-gray-600 hover:text-sky-600 transition-colors">
                     Casos de Sucesso
                   </Link>
                 </li>
                 <li>
-                  <Link href="/carreiras" className="text-gray-600 hover:text-purple-600 transition-colors">
+                  <Link href="/carreiras" className="text-gray-600 hover:text-sky-600 transition-colors">
                     Carreiras
                   </Link>
                 </li>
@@ -803,22 +803,22 @@ export default function Home() {
               <h3 className="font-semibold text-gray-800 mb-4">Suporte</h3>
               <ul className="space-y-2">
                 <li>
-                  <Link href="/contato" className="text-gray-600 hover:text-purple-600 transition-colors">
+                  <Link href="/contato" className="text-gray-600 hover:text-sky-600 transition-colors">
                     Contato
                   </Link>
                 </li>
                 <li>
-                  <Link href="/faq" className="text-gray-600 hover:text-purple-600 transition-colors">
+                  <Link href="/faq" className="text-gray-600 hover:text-sky-600 transition-colors">
                     Perguntas Frequentes
                   </Link>
                 </li>
                 <li>
-                  <Link href="/documentacao" className="text-gray-600 hover:text-purple-600 transition-colors">
+                  <Link href="/documentacao" className="text-gray-600 hover:text-sky-600 transition-colors">
                     Documentação
                   </Link>
                 </li>
                 <li>
-                  <Link href="/privacidade" className="text-gray-600 hover:text-purple-600 transition-colors">
+                  <Link href="/privacidade" className="text-gray-600 hover:text-sky-600 transition-colors">
                     Política de Privacidade
                   </Link>
                 </li>
@@ -828,16 +828,16 @@ export default function Home() {
           
           <div className="border-t border-gray-200 pt-6 flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-600 text-sm mb-4 md:mb-0">
-              &copy; {new Date().getFullYear()} AvaliaRH. Todos os direitos reservados.
+              &copy; {new Date().getFullYear()} Admitto. Todos os direitos reservados.
             </p>
             <div className="flex space-x-6">
-              <Link href="/termos" className="text-gray-600 hover:text-purple-600 transition-colors text-sm">
+              <Link href="/termos" className="text-gray-600 hover:text-sky-600 transition-colors text-sm">
                 Termos de Uso
               </Link>
-              <Link href="/privacidade" className="text-gray-600 hover:text-purple-600 transition-colors text-sm">
+              <Link href="/privacidade" className="text-gray-600 hover:text-sky-600 transition-colors text-sm">
                 Privacidade
               </Link>
-              <Link href="/cookies" className="text-gray-600 hover:text-purple-600 transition-colors text-sm">
+              <Link href="/cookies" className="text-gray-600 hover:text-sky-600 transition-colors text-sm">
                 Cookies
               </Link>
             </div>

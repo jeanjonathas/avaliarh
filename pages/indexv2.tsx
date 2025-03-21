@@ -120,7 +120,7 @@ const Home: NextPage = () => {
                 Revolucione seu Processo de Recrutamento e Desenvolvimento
               </h1>
               <p className="text-base sm:text-lg text-secondary-600 mb-6 sm:mb-8 text-center md:text-left">
-                O AvaliaRH é a plataforma completa para departamentos de RH que desejam otimizar processos de seleção e desenvolvimento de colaboradores com análises precisas e insights valiosos.
+                O Admitto é a plataforma completa para departamentos de RH que desejam otimizar processos de seleção e desenvolvimento de colaboradores com análises precisas e insights valiosos.
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
@@ -337,7 +337,7 @@ const Home: NextPage = () => {
                   </div>
                 </div>
                 <p className="text-secondary-600 italic">
-                  "O AvaliaRH transformou nosso processo de recrutamento. Conseguimos reduzir o tempo de contratação em 40% e melhorar significativamente a qualidade dos candidatos selecionados para entrevistas."
+                  "O Admitto transformou nosso processo de recrutamento. Conseguimos reduzir o tempo de contratação em 40% e melhorar significativamente a qualidade dos candidatos selecionados para entrevistas."
                 </p>
               </div>
               
@@ -362,7 +362,7 @@ const Home: NextPage = () => {
           <section className="bg-primary-600 text-white p-8 sm:p-12 rounded-lg text-center mb-16">
             <h2 className="text-2xl sm:text-3xl font-bold mb-4">Pronto para transformar seu RH?</h2>
             <p className="text-lg mb-8 max-w-2xl mx-auto">
-              Junte-se a centenas de empresas que já otimizaram seus processos de recrutamento e desenvolvimento com o AvaliaRH.
+              Junte-se a centenas de empresas que já otimizaram seus processos de recrutamento e desenvolvimento com o Admitto.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/admin/register" className="px-6 py-3 bg-white text-primary-600 font-medium rounded-md hover:bg-gray-100 transition-colors">
@@ -393,7 +393,7 @@ const Home: NextPage = () => {
               Privacidade
             </Link>
           </div>
-          <p>&copy; {new Date().getFullYear()} AvaliaRH - Todos os direitos reservados</p>
+          <p>&copy; {new Date().getFullYear()} Admitto - Todos os direitos reservados</p>
         </footer>
       </div>
     </div>

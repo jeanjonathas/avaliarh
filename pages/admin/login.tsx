@@ -53,7 +53,7 @@ const Login: NextPage = () => {
           <div className="text-center mb-8">
             <Image 
               src="/images/logo_horizontal.png"
-              alt="AvaliaRH Logo"
+              alt="Admitto Logo"
               width={200}
               height={60}
               priority

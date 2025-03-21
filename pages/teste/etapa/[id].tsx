@@ -808,7 +808,7 @@ const TestStage: NextPage = () => {
           <Link href="/" className="text-2xl font-bold text-primary-700">
             <Image 
               src="/images/logo_horizontal.png"
-              alt="AvaliaRH Logo"
+              alt="Admitto Logo"
               width={150}
               height={45}
               priority

@@ -504,7 +504,7 @@ const CandidateDetails = () => {
       console.log('Compartilhando convite via WhatsApp para candidato:', candidate.name);
       
       // Criar mensagem para o WhatsApp
-      const message = `Olá ${candidate.name}, aqui está seu código de convite para o processo seletivo: ${candidate.inviteCode}. Acesse o sistema AvaliaRH para realizar sua avaliação.`;
+      const message = `Olá ${candidate.name}, aqui está seu código de convite para o processo seletivo: ${candidate.inviteCode}. Acesse o sistema Admitto para realizar sua avaliação.`;
       
       // Codificar a mensagem para URL
       const encodedMessage = encodeURIComponent(message);
