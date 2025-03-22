@@ -7,7 +7,7 @@ import bcrypt from 'bcryptjs'
 interface CompanyData {
   id: string
   name: string
-  plan: string
+  planType: string
   isActive: boolean
 }
 
@@ -27,7 +27,7 @@ interface PrismaUser {
 interface PrismaCompany {
   id: string
   name: string
-  plan: string
+  planType: string
   isActive: boolean
   cnpj: string | null
   maxUsers: number
@@ -114,7 +114,7 @@ export const authOptions: NextAuthOptions = {
             try {
               // Usando prisma.$queryRaw para evitar problemas de tipagem
               const companyRecords = await prisma.$queryRaw`
-                SELECT id, name, plan, "isActive" 
+                SELECT id, name, "planType", "isActive" 
                 FROM "Company" 
                 WHERE id = ${user.companyId}
               ` as any[]
@@ -124,7 +124,7 @@ export const authOptions: NextAuthOptions = {
                 companyData = {
                   id: companyRecord.id,
                   name: companyRecord.name,
-                  plan: companyRecord.plan,
+                  planType: companyRecord.planType,
                   isActive: companyRecord.isActive
                 }
               }
