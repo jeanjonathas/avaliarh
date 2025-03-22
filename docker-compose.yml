@@ -50,6 +50,8 @@ services:
       - NODE_ENV=production
       - NEXTAUTH_SECRET=02e821629ceff274c853f24327a36132
       - NEXTAUTH_URL=https://admitto.com.br
+      - NEXTAUTH_URL_INTERNAL=http://localhost:3000
+      - NEXT_PUBLIC_DOMAIN=admitto.com.br
     networks:
       - avaliarh_network
     depends_on:

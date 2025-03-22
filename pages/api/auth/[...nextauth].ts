@@ -73,6 +73,17 @@ declare module "next-auth/jwt" {
 // Inicializando o cliente Prisma
 const prisma = new PrismaClient()
 
+// Verificar se estamos em ambiente de produção
+const isProduction = process.env.NODE_ENV === 'production'
+
+// Obter URLs de autenticação do ambiente
+const nextAuthUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+const nextAuthUrlInternal = process.env.NEXTAUTH_URL_INTERNAL || nextAuthUrl
+
+console.log('NextAuth URL:', nextAuthUrl)
+console.log('NextAuth URL Internal:', nextAuthUrlInternal)
+console.log('Ambiente:', isProduction ? 'Produção' : 'Desenvolvimento')
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -83,6 +94,7 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
+          console.log('Autorização: Credenciais incompletas');
           return null
         }
 
@@ -95,6 +107,7 @@ export const authOptions: NextAuthOptions = {
           }) as PrismaUser | null
 
           if (!user) {
+            console.log('Autorização: Usuário não encontrado');
             return null
           }
 
@@ -104,6 +117,7 @@ export const authOptions: NextAuthOptions = {
           )
 
           if (!isPasswordValid) {
+            console.log('Autorização: Senha inválida');
             return null
           }
 
@@ -143,6 +157,7 @@ export const authOptions: NextAuthOptions = {
             company: companyData
           }
 
+          console.log('Autorização: Login bem-sucedido para', user.email, 'com papel', user.role);
           return authUser
         } catch (error) {
           console.error('Erro na autenticação:', error)
@@ -156,6 +171,8 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.role = user.role;
+        token.companyId = user.companyId;
+        token.company = user.company;
         
         // Log para depuração do papel do usuário
         console.log('NextAuth JWT: Papel do usuário:', user.role);
@@ -166,6 +183,8 @@ export const authOptions: NextAuthOptions = {
       if (token) {
         session.user.id = token.id;
         session.user.role = token.role;
+        session.user.companyId = token.companyId;
+        session.user.company = token.company;
         
         // Log para depuração da sessão
         console.log('NextAuth Session: Papel do usuário:', token.role);
@@ -189,12 +208,43 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        secure: process.env.NODE_ENV === 'production',
+        secure: isProduction,
+      },
+    },
+    callbackUrl: {
+      name: `next-auth.callback-url`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: isProduction,
+      },
+    },
+    csrfToken: {
+      name: `next-auth.csrf-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: isProduction,
       },
     },
   },
-  debug: process.env.NODE_ENV !== 'production',
+  debug: !isProduction,
   secret: process.env.NEXTAUTH_SECRET,
+  logger: {
+    error(code, metadata) {
+      console.error(`NextAuth Error [${code}]:`, metadata);
+    },
+    warn(code) {
+      console.warn(`NextAuth Warning [${code}]`);
+    },
+    debug(code, metadata) {
+      console.log(`NextAuth Debug [${code}]:`, metadata);
+    },
+  },
+  // Configurações específicas para proxy reverso
+  // trustHost: true, // Removido para evitar erro de tipagem
 }
 
 export default NextAuth(authOptions)
