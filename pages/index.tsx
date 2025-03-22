@@ -24,26 +24,16 @@ export default function Home() {
 
   // Verificar se o usuário já está autenticado e redirecionar para o dashboard apropriado
   useEffect(() => {
+    // Remover o redirecionamento automático para permitir que usuários logados acessem a home
+    // Agora o usuário pode navegar livremente entre home e dashboard
     if (status === 'loading') return;
     
     if (session) {
-      console.log('Página inicial - Usuário já autenticado:', {
+      console.log('Página inicial - Usuário autenticado:', {
         role: session.user.role,
         name: session.user.name
       });
-      
-      // Redirecionar com base no papel do usuário
-      if (session.user.role === 'SUPER_ADMIN') {
-        console.log('Página inicial - Redirecionando para dashboard de superadmin');
-        if (typeof window !== 'undefined') {
-          window.location.href = '/superadmin/dashboard';
-        }
-      } else if (session.user.role === 'COMPANY_ADMIN') {
-        console.log('Página inicial - Redirecionando para dashboard de admin');
-        if (typeof window !== 'undefined') {
-          window.location.href = '/admin/dashboard';
-        }
-      }
+      // Não redirecionamos mais automaticamente
     }
   }, [session, status]);
 
@@ -151,18 +141,31 @@ export default function Home() {
           </nav>
           
           <div className="flex items-center space-x-4">
-            <Link 
-              href="/admin" 
-              className="hidden md:inline-block text-gray-700 hover:text-sky-600 font-medium"
-            >
-              Login
-            </Link>
-            <Link 
-              href="/register" 
-              className="bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-md font-medium transition-colors duration-300"
-            >
-              Começar Grátis
-            </Link>
+            {session ? (
+              <>
+                <Link 
+                  href={session.user.role === 'SUPER_ADMIN' ? '/superadmin/dashboard' : '/admin/dashboard'} 
+                  className="bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-md font-medium transition-colors duration-300"
+                >
+                  Acessar Dashboard
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link 
+                  href="/admin" 
+                  className="hidden md:inline-block text-gray-700 hover:text-sky-600 font-medium"
+                >
+                  Login
+                </Link>
+                <Link 
+                  href="/register" 
+                  className="bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-md font-medium transition-colors duration-300"
+                >
+                  Começar Grátis
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -452,19 +455,19 @@ export default function Home() {
                 Compare candidatos com perfis ideais para cada posição e equipe.
               </p>
               <ul className="space-y-2 mb-4">
-                <li className="flex items-center">
+                <li className="flex items-center text-gray-700">
                   <svg className="w-5 h-5 text-green-500 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
                   </svg>
                   <span className="text-gray-600">Match com perfil da vaga</span>
                 </li>
-                <li className="flex items-center">
+                <li className="flex items-center text-gray-700">
                   <svg className="w-5 h-5 text-green-500 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
                   </svg>
                   <span className="text-gray-600">Compatibilidade com equipe</span>
                 </li>
-                <li className="flex items-center">
+                <li className="flex items-center text-gray-700">
                   <svg className="w-5 h-5 text-green-500 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
                   </svg>
