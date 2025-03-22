@@ -55,7 +55,7 @@ export default async function handler(
           END as "successRate"
         FROM "Stage" s
         JOIN "TestStage" ts ON s.id = ts."stageId"
-        JOIN "tests" t ON ts."testId" = t.id AND t.active = true
+        JOIN "Test" t ON ts."testId" = t.id AND t.active = true
         LEFT JOIN "Question" q ON q."stageId" = s.id
         LEFT JOIN "Response" r ON r."questionId" = q.id AND r."candidateId" IN (
           SELECT c.id FROM "Candidate" c WHERE c."testId" = t.id
@@ -78,7 +78,7 @@ export default async function handler(
             CASE WHEN c.score > 1 THEN c.score ELSE c.score * 100 END
             ELSE NULL END), 1) as "averageScore"
         FROM "Candidate" c
-        JOIN "tests" t ON c."testId" = t.id
+        JOIN "Test" t ON c."testId" = t.id
         WHERE t.active = true
       `;
       
