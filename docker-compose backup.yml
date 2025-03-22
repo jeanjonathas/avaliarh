@@ -1,0 +1,80 @@
+version: "3.7"
+services:
+  app:
+    image: node:18
+    entrypoint: ["/bin/bash", "-c"]
+    command: [
+      "git clone https://github.com/jeanjonathas/avaliarh.git /tmp/app && cd /tmp/app && npm install --no-fund --no-audit --legacy-peer-deps && npx prisma generate && npx prisma migrate deploy && cp /opt/avaliarh/.env /tmp/app/.env && npm run build && NODE_ENV=production npm run start"
+    ]
+    environment:
+      - DATABASE_URL=postgresql://postgres:02e821629ceff274c853f24327a36132@postgres:5432/avaliacao_candidatos?schema=public
+      - NODE_ENV=production
+      - NEXTAUTH_SECRET=02e821629ceff274c853f24327a36132
+      - NEXTAUTH_URL=https://admitto.com.br
+      - NEXTAUTH_URL_INTERNAL=http://localhost:3000
+    volumes:
+      - /opt/avaliarh/.env:/opt/avaliarh/.env
+    networks:
+      - avaliarh_network
+    depends_on:
+      - postgres
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.avaliarh.rule=Host(`admitto.com.br`) || Host(`admitto.app`)
+        - traefik.http.routers.avaliarh.entrypoints=websecure
+        - traefik.http.routers.avaliarh.tls=true
+        - traefik.http.routers.avaliarh.tls.certresolver=letsencryptresolver
+        - traefik.http.services.avaliarh.loadbalancer.server.port=3000
+        - traefik.http.services.avaliarh.loadbalancer.passHostHeader=true
+        - traefik.http.routers.avaliarh.service=avaliarh
+
+  postgres:
+    image: postgres:14
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - avaliarh_network
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=02e821629ceff274c853f24327a36132
+      - POSTGRES_DB=avaliacao_candidatos
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 1024M
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    name: avaliarh_postgres_data
+
+networks:
+  avaliarh_network:
+    external: true
+    name: ralliugaNet
