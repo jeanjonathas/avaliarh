@@ -19,23 +19,48 @@ const Login: NextPage = () => {
   const router = useRouter()
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const { callbackUrl } = router.query
   
   // Verificar se o usuário já está autenticado
   useEffect(() => {
     const checkSession = async () => {
-      const session = await getSession()
-      if (session) {
-        console.log('Usuário já autenticado, redirecionando...')
-        if (session.user.role === 'SUPER_ADMIN') {
-          router.replace('/superadmin/dashboard')
+      try {
+        console.log('Verificando sessão existente...')
+        const session = await getSession()
+        
+        if (session) {
+          console.log('Sessão encontrada:', {
+            role: session.user.role,
+            name: session.user.name,
+            callbackUrl: callbackUrl || 'não especificado'
+          })
+          
+          // Se houver uma URL de callback, redirecionar para ela
+          if (callbackUrl && typeof callbackUrl === 'string') {
+            console.log('Redirecionando para URL de callback:', callbackUrl)
+            // Usar window.location para garantir um redirecionamento completo
+            window.location.replace(callbackUrl)
+            return
+          }
+          
+          // Caso contrário, redirecionar com base no papel do usuário
+          if (session.user.role === 'SUPER_ADMIN') {
+            console.log('Redirecionando para dashboard de superadmin')
+            window.location.replace('/superadmin/dashboard')
+          } else {
+            console.log('Redirecionando para dashboard de admin')
+            window.location.replace('/admin/dashboard')
+          }
         } else {
-          router.replace('/admin/dashboard')
+          console.log('Nenhuma sessão encontrada, mostrando formulário de login')
         }
+      } catch (error) {
+        console.error('Erro ao verificar sessão:', error)
       }
     }
     
     checkSession()
-  }, [router])
+  }, [router, callbackUrl])
   
   const handleSubmit = async (values: { email: string; password: string }) => {
     try {
@@ -68,13 +93,21 @@ const Login: NextPage = () => {
         
         console.log('Sessão obtida, papel:', session.user.role)
         
+        // Se houver uma URL de callback, redirecionar para ela
+        if (callbackUrl && typeof callbackUrl === 'string') {
+          console.log('Redirecionando para URL de callback após login:', callbackUrl)
+          // Usar window.location para garantir um redirecionamento completo
+          window.location.replace(callbackUrl)
+          return
+        }
+        
         // Redirecionar com base no papel do usuário
         if (session.user.role === 'SUPER_ADMIN') {
           console.log('Redirecionando para dashboard de superadmin')
-          router.push('/superadmin/dashboard')
+          window.location.replace('/superadmin/dashboard')
         } else {
           console.log('Redirecionando para dashboard de admin')
-          router.push('/admin/dashboard')
+          window.location.replace('/admin/dashboard')
         }
       }
     } catch (error) {

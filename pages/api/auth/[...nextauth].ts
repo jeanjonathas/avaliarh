@@ -73,15 +73,13 @@ declare module "next-auth/jwt" {
 // Inicializando o cliente Prisma
 const prisma = new PrismaClient()
 
-// Verificar se estamos em ambiente de produção
+// Verificar se estamos em produção
 const isProduction = process.env.NODE_ENV === 'production'
 
-// Obter URLs de autenticação do ambiente
-const nextAuthUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-const nextAuthUrlInternal = process.env.NEXTAUTH_URL_INTERNAL || nextAuthUrl
+// Obter a URL base do ambiente
+const baseUrl = process.env.NEXTAUTH_URL || (isProduction ? 'https://avaliarh.com.br' : 'http://localhost:3000')
 
-console.log('NextAuth URL:', nextAuthUrl)
-console.log('NextAuth URL Internal:', nextAuthUrlInternal)
+console.log('NextAuth URL:', baseUrl)
 console.log('Ambiente:', isProduction ? 'Produção' : 'Desenvolvimento')
 
 export const authOptions: NextAuthOptions = {
@@ -169,10 +167,10 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
-        token.role = user.role;
-        token.companyId = user.companyId;
-        token.company = user.company;
+        token.id = user.id
+        token.role = user.role
+        token.companyId = user.companyId
+        token.company = user.company
         
         // Log para depuração do papel do usuário
         console.log('NextAuth JWT: Papel do usuário:', user.role);
@@ -181,10 +179,10 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (token) {
-        session.user.id = token.id;
-        session.user.role = token.role;
-        session.user.companyId = token.companyId;
-        session.user.company = token.company;
+        session.user.id = token.id
+        session.user.role = token.role as Role
+        session.user.companyId = token.companyId
+        session.user.company = token.company
         
         // Log para depuração da sessão
         console.log('NextAuth Session: Papel do usuário:', token.role);
@@ -203,30 +201,33 @@ export const authOptions: NextAuthOptions = {
   },
   cookies: {
     sessionToken: {
-      name: `next-auth.session-token`,
+      name: isProduction ? `__Secure-next-auth.session-token` : `next-auth.session-token`,
       options: {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
         secure: isProduction,
+        domain: isProduction ? process.env.NEXT_PUBLIC_DOMAIN || undefined : undefined,
       },
     },
     callbackUrl: {
-      name: `next-auth.callback-url`,
+      name: isProduction ? `__Secure-next-auth.callback-url` : `next-auth.callback-url`,
       options: {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
         secure: isProduction,
+        domain: isProduction ? process.env.NEXT_PUBLIC_DOMAIN || undefined : undefined,
       },
     },
     csrfToken: {
-      name: `next-auth.csrf-token`,
+      name: isProduction ? `__Secure-next-auth.csrf-token` : `next-auth.csrf-token`,
       options: {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
         secure: isProduction,
+        domain: isProduction ? process.env.NEXT_PUBLIC_DOMAIN || undefined : undefined,
       },
     },
   },
@@ -244,7 +245,9 @@ export const authOptions: NextAuthOptions = {
     },
   },
   // Configurações específicas para proxy reverso
-  // trustHost: true, // Removido para evitar erro de tipagem
+  useSecureCookies: isProduction,
+  // @ts-ignore - A propriedade trustHost existe, mas pode não estar na tipagem atual
+  trustHost: true,
 }
 
 export default NextAuth(authOptions)

@@ -35,16 +35,45 @@ services:
         condition: on-failure
         max_attempts: 3
 
+  auth-diagnostic:
+    image: node:18
+    entrypoint: ["/bin/bash", "-c"]
+    command: [
+      "while [ ! -f /app/.setup_complete ]; do echo 'Waiting for setup to complete...' && sleep 5; done && cd /app && if [ -f /auth-fixes/scripts/check-production.js ]; then echo '=== Executando scripts de diagnóstico de autenticação ===' && mkdir -p /app/logs && node /auth-fixes/scripts/check-production.js > /app/logs/auth-diagnostic-$(date +%Y%m%d-%H%M%S).log 2>&1; fi && echo 'Diagnóstico concluído' && sleep infinity"
+    ]
+    volumes:
+      - app_data:/app
+      - ./auth-fixes:/auth-fixes:ro
+    environment:
+      - DATABASE_URL=postgresql://postgres:02e821629ceff274c853f24327a36132@postgres:5432/avaliacao_candidatos?schema=public
+      - NODE_ENV=production
+      - NEXTAUTH_SECRET=02e821629ceff274c853f24327a36132
+      - NEXTAUTH_URL=https://admitto.com.br
+      - NEXTAUTH_URL_INTERNAL=http://localhost:3000
+      - NEXT_PUBLIC_DOMAIN=admitto.com.br
+    networks:
+      - avaliarh_network
+    depends_on:
+      - postgres
+      - setup
+    deploy:
+      mode: replicated
+      replicas: 0
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+
   app:
     image: node:18
     entrypoint: ["/bin/bash", "-c"]
     command: [
-      "while [ ! -f /app/.setup_complete ]; do echo 'Waiting for setup to complete...' && sleep 5; done && cd /app && npm install --no-fund --no-audit --legacy-peer-deps && npx prisma generate && npm run build || (echo 'Build failed, applying hotfix...' && cp /hotfixes/opinion-wizard-hotfix.js /app/ && node /app/hotfix.js && node /app/enhanced-candidate-hotfix.js && node /app/opinion-wizard-hotfix.js && node /app/database-migration-hotfix.js && npx prisma migrate deploy && node /app/verify-migration.js && npm run build) && npm run start"
+      "while [ ! -f /app/.setup_complete ]; do echo 'Waiting for setup to complete...' && sleep 5; done && cd /app && npm install --no-fund --no-audit --legacy-peer-deps && npx prisma generate && npm run build || (echo 'Build failed, applying hotfix...' && cp /hotfixes/opinion-wizard-hotfix.js /app/ && node /app/hotfix.js && node /app/enhanced-candidate-hotfix.js && node /app/opinion-wizard-hotfix.js && node /app/database-migration-hotfix.js && npx prisma migrate deploy && node /app/verify-migration.js && npm run build) && if [ -d /auth-fixes ]; then echo 'Aplicando correções de autenticação...' && cp -r /auth-fixes/* /app/ && chmod +x /app/scripts/*.js && echo 'Correções aplicadas com sucesso!'; fi && npm run start"
     ]
     volumes:
       - app_data:/app
       - npm_cache:/root/.npm
       - ./opinion-wizard-hotfix.js:/hotfixes/opinion-wizard-hotfix.js
+      - ./auth-fixes:/auth-fixes:ro
     environment:
       - DATABASE_URL=postgresql://postgres:02e821629ceff274c853f24327a36132@postgres:5432/avaliacao_candidatos?schema=public
       - NODE_ENV=production

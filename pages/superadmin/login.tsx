@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GetServerSideProps } from 'next';
 import { getSession, signIn } from 'next-auth/react';
 import { useRouter } from 'next/router';
@@ -11,6 +11,48 @@ export default function SuperAdminLogin() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { callbackUrl } = router.query;
+
+  // Verificar se o usuário já está autenticado
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        console.log('SuperAdmin Login - Verificando sessão existente...');
+        const session = await getSession();
+        
+        if (session) {
+          console.log('SuperAdmin Login - Sessão encontrada:', {
+            role: session.user.role,
+            name: session.user.name,
+            callbackUrl: callbackUrl || 'não especificado'
+          });
+          
+          // Verificar se o usuário é um superadmin
+          if (session.user.role !== 'SUPER_ADMIN') {
+            console.log('SuperAdmin Login - Usuário não é SUPER_ADMIN, permanecendo na página de login');
+            return;
+          }
+          
+          // Se houver uma URL de callback, redirecionar para ela
+          if (callbackUrl && typeof callbackUrl === 'string') {
+            console.log('SuperAdmin Login - Redirecionando para URL de callback:', callbackUrl);
+            window.location.replace(callbackUrl);
+            return;
+          }
+          
+          // Caso contrário, redirecionar para o dashboard
+          console.log('SuperAdmin Login - Redirecionando para dashboard de superadmin');
+          window.location.replace('/superadmin/dashboard');
+        } else {
+          console.log('SuperAdmin Login - Nenhuma sessão encontrada, mostrando formulário de login');
+        }
+      } catch (error) {
+        console.error('SuperAdmin Login - Erro ao verificar sessão:', error);
+      }
+    };
+    
+    checkSession();
+  }, [router, callbackUrl]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,19 +60,31 @@ export default function SuperAdminLogin() {
     setError('');
 
     try {
+      console.log('SuperAdmin Login - Iniciando login para:', email);
+      
       const result = await signIn('credentials', {
         redirect: false,
         email,
         password,
-        callbackUrl: '/superadmin/dashboard',
       });
 
       if (result?.error) {
+        console.error('SuperAdmin Login - Erro no login:', result.error);
         setError('Credenciais inválidas. Por favor, tente novamente.');
-      } else if (result?.url) {
+      } else {
+        console.log('SuperAdmin Login - Login bem-sucedido, obtendo sessão...');
         // Verificar se o usuário é um superadmin após o login
         const session = await getSession();
-        if ((session?.user?.role as string) !== 'SUPER_ADMIN') {
+        
+        if (!session) {
+          console.error('SuperAdmin Login - Sessão não encontrada após login');
+          setError('Erro ao obter sessão. Tente novamente.');
+          setIsLoading(false);
+          return;
+        }
+        
+        if (session.user.role !== 'SUPER_ADMIN') {
+          console.error('SuperAdmin Login - Usuário não é SUPER_ADMIN, negando acesso');
           setError('Acesso restrito a Super Administradores.');
           // Fazer logout se não for um superadmin
           await signIn('credentials', {
@@ -39,13 +93,23 @@ export default function SuperAdminLogin() {
             password: '',
           });
         } else {
+          console.log('SuperAdmin Login - Usuário é SUPER_ADMIN, redirecionando...');
+          
+          // Se houver uma URL de callback, redirecionar para ela
+          if (callbackUrl && typeof callbackUrl === 'string') {
+            console.log('SuperAdmin Login - Redirecionando para URL de callback após login:', callbackUrl);
+            window.location.replace(callbackUrl);
+            return;
+          }
+          
           // Forçar redirecionamento para o dashboard de superadmin
-          router.push('/superadmin/dashboard');
+          console.log('SuperAdmin Login - Redirecionando para dashboard');
+          window.location.replace('/superadmin/dashboard');
         }
       }
     } catch (err) {
+      console.error('SuperAdmin Login - Erro inesperado:', err);
       setError('Ocorreu um erro durante o login. Por favor, tente novamente.');
-      console.error(err);
     } finally {
       setIsLoading(false);
     }
