@@ -30,6 +30,7 @@
     "@types/nodemailer": "^6.4.17",
     "@types/react-beautiful-dnd": "^13.1.8",
     "autoprefixer": "^10.4.17",
+    "axios": "^1.8.4",
     "bcryptjs": "^2.4.3",
     "chart.js": "^4.4.8",
     "formidable": "^3.5.2",
