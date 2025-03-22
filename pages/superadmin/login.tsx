@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { GetServerSideProps } from 'next';
-import { getSession, signIn } from 'next-auth/react';
+import { signIn, useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
-import Image from 'next/image';
+import Link from 'next/link';
 
 export default function SuperAdminLogin() {
   const [email, setEmail] = useState('');
@@ -11,205 +10,183 @@ export default function SuperAdminLogin() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { callbackUrl } = router.query;
-
+  const { data: session, status } = useSession();
+  
+  // Função para normalizar a URL de callback
+  const normalizeCallbackUrl = (url: string | null | undefined): string => {
+    if (!url) return '/superadmin/dashboard';
+    
+    try {
+      // Se a URL for relativa, retorne-a como está
+      if (url.startsWith('/')) return url;
+      
+      // Se for uma URL absoluta, extraia apenas o caminho
+      const urlObj = new URL(url);
+      
+      // Verificar se o domínio é diferente do atual
+      if (typeof window !== 'undefined') {
+        const currentHost = window.location.hostname;
+        if (urlObj.hostname !== currentHost) {
+          console.log(`SuperAdmin - Normalizando URL de callback: ${url} -> ${urlObj.pathname}`);
+          return urlObj.pathname;
+        }
+      }
+      
+      return url;
+    } catch (e) {
+      console.error('SuperAdmin - Erro ao normalizar URL de callback:', e);
+      return '/superadmin/dashboard';
+    }
+  };
+  
+  // Obter a URL de callback da query
+  const callbackUrl = normalizeCallbackUrl(
+    Array.isArray(router.query.callbackUrl) 
+      ? router.query.callbackUrl[0] 
+      : router.query.callbackUrl
+  );
+  
   // Verificar se o usuário já está autenticado
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        console.log('SuperAdmin Login - Verificando sessão existente...');
-        const session = await getSession();
-        
-        if (session) {
-          console.log('SuperAdmin Login - Sessão encontrada:', {
-            role: session.user.role,
-            name: session.user.name,
-            callbackUrl: callbackUrl || 'não especificado'
-          });
-          
-          // Verificar se o usuário é um superadmin
-          if (session.user.role !== 'SUPER_ADMIN') {
-            console.log('SuperAdmin Login - Usuário não é SUPER_ADMIN, permanecendo na página de login');
-            return;
-          }
-          
-          // Se houver uma URL de callback, redirecionar para ela
-          if (callbackUrl && typeof callbackUrl === 'string') {
-            console.log('SuperAdmin Login - Redirecionando para URL de callback:', callbackUrl);
-            window.location.replace(callbackUrl);
-            return;
-          }
-          
-          // Caso contrário, redirecionar para o dashboard
-          console.log('SuperAdmin Login - Redirecionando para dashboard de superadmin');
-          window.location.replace('/superadmin/dashboard');
-        } else {
-          console.log('SuperAdmin Login - Nenhuma sessão encontrada, mostrando formulário de login');
-        }
-      } catch (error) {
-        console.error('SuperAdmin Login - Erro ao verificar sessão:', error);
-      }
-    };
+    if (status === 'loading') return;
     
-    checkSession();
-  }, [router, callbackUrl]);
-
+    if (session) {
+      console.log('SuperAdmin - Usuário já autenticado:', {
+        role: session.user.role,
+        callbackUrl
+      });
+      
+      // Verificar se o usuário é um superadmin
+      if (session.user.role !== 'SUPER_ADMIN') {
+        console.log('SuperAdmin - Usuário não é SUPER_ADMIN, permanecendo na página de login');
+        setError('Acesso restrito a Super Administradores.');
+        return;
+      }
+      
+      // Redirecionar para a URL de callback ou dashboard
+      console.log('SuperAdmin - Redirecionando para:', callbackUrl);
+      
+      // Usar window.location para evitar problemas com o Next.js router
+      if (typeof window !== 'undefined') {
+        window.location.href = callbackUrl;
+      }
+    }
+  }, [session, status, callbackUrl]);
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError('');
-
+    setIsLoading(true);
+    
     try {
-      console.log('SuperAdmin Login - Iniciando login para:', email);
+      console.log('SuperAdmin - Iniciando login para:', email);
       
       const result = await signIn('credentials', {
         redirect: false,
         email,
         password,
       });
-
+      
       if (result?.error) {
-        console.error('SuperAdmin Login - Erro no login:', result.error);
+        console.error('SuperAdmin - Erro no login:', result.error);
         setError('Credenciais inválidas. Por favor, tente novamente.');
-      } else {
-        console.log('SuperAdmin Login - Login bem-sucedido, obtendo sessão...');
-        // Verificar se o usuário é um superadmin após o login
-        const session = await getSession();
+        setIsLoading(false);
+        return;
+      }
+      
+      if (result?.ok) {
+        console.log('SuperAdmin - Login bem-sucedido, verificando papel do usuário...');
         
-        if (!session) {
-          console.error('SuperAdmin Login - Sessão não encontrada após login');
-          setError('Erro ao obter sessão. Tente novamente.');
-          setIsLoading(false);
-          return;
-        }
-        
-        if (session.user.role !== 'SUPER_ADMIN') {
-          console.error('SuperAdmin Login - Usuário não é SUPER_ADMIN, negando acesso');
-          setError('Acesso restrito a Super Administradores.');
-          // Fazer logout se não for um superadmin
-          await signIn('credentials', {
-            redirect: false,
-            email: '',
-            password: '',
-          });
-        } else {
-          console.log('SuperAdmin Login - Usuário é SUPER_ADMIN, redirecionando...');
-          
-          // Se houver uma URL de callback, redirecionar para ela
-          if (callbackUrl && typeof callbackUrl === 'string') {
-            console.log('SuperAdmin Login - Redirecionando para URL de callback após login:', callbackUrl);
-            window.location.replace(callbackUrl);
-            return;
-          }
-          
-          // Forçar redirecionamento para o dashboard de superadmin
-          console.log('SuperAdmin Login - Redirecionando para dashboard');
-          window.location.replace('/superadmin/dashboard');
+        // Recarregar a página para que o useEffect acima verifique a sessão
+        // Isso garantirá que verificamos se o usuário é realmente um SUPER_ADMIN
+        if (typeof window !== 'undefined') {
+          window.location.reload();
         }
       }
-    } catch (err) {
-      console.error('SuperAdmin Login - Erro inesperado:', err);
-      setError('Ocorreu um erro durante o login. Por favor, tente novamente.');
+    } catch (error) {
+      console.error('SuperAdmin - Erro ao fazer login:', error);
+      setError('Ocorreu um erro ao processar o login. Tente novamente.');
     } finally {
       setIsLoading(false);
     }
   };
-
+  
+  // Se estiver carregando a sessão, mostre uma mensagem de carregamento
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="p-8 bg-white rounded-lg shadow-md w-full max-w-md">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Carregando...</h2>
+            <p className="text-gray-600">Verificando sua sessão</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <>
       <Head>
         <title>Super Admin Login | Admitto</title>
       </Head>
-      <div className="min-h-screen bg-gray-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-        <div className="sm:mx-auto sm:w-full sm:max-w-md">
-          <div className="flex justify-center">
-            <div className="w-32 h-32 relative">
-              <Image 
-                src="/logo.png" 
-                alt="Admitto Logo" 
-                fill
-                style={{ objectFit: "contain" }}
-                priority
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="p-8 bg-white rounded-lg shadow-md w-full max-w-md">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-gray-800">Login Super Administrador</h2>
+            <p className="text-gray-600">Acesso restrito a Super Administradores</p>
+          </div>
+          
+          {error && (
+            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+              {error}
+            </div>
+          )}
+          
+          <form onSubmit={handleSubmit}>
+            <div className="mb-4">
+              <label htmlFor="email" className="block text-gray-700 font-medium mb-2">
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
               />
             </div>
-          </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Acesso Super Admin
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Área restrita para administradores do sistema
-          </p>
-        </div>
-
-        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-          <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-            {error && (
-              <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-4">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm text-red-700">{error}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <form className="space-y-6" onSubmit={handleSubmit}>
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  E-mail
-                </label>
-                <div className="mt-1">
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                  Senha
-                </label>
-                <div className="mt-1">
-                  <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    autoComplete="current-password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
-                >
-                  {isLoading ? (
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  ) : 'Entrar'}
-                </button>
-              </div>
-            </form>
+            
+            <div className="mb-6">
+              <label htmlFor="password" className="block text-gray-700 font-medium mb-2">
+                Senha
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+            
+            <button
+              type="submit"
+              disabled={isLoading}
+              className={`w-full py-2 px-4 rounded-lg text-white font-medium ${
+                isLoading ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'
+              }`}
+            >
+              {isLoading ? 'Entrando...' : 'Entrar'}
+            </button>
+          </form>
+          
+          <div className="mt-6 text-center">
+            <Link href="/" className="text-blue-600 hover:text-blue-800">
+              Voltar para a página inicial
+            </Link>
           </div>
         </div>
       </div>

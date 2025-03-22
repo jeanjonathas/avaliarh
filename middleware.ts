@@ -54,6 +54,19 @@ function isPublicRoute(pathname: string, publicEndpoints: string[]): boolean {
   })
 }
 
+// Função para obter a URL base do ambiente atual
+function getBaseUrl(request: NextRequest): string {
+  const isProduction = process.env.NODE_ENV === 'production'
+  const host = request.headers.get('host') || ''
+  const protocol = request.headers.get('x-forwarded-proto') || 'http'
+  
+  if (isProduction) {
+    return process.env.NEXTAUTH_URL || `${protocol}://${host}`
+  }
+  
+  return process.env.NEXTAUTH_URL_INTERNAL || 'http://localhost:3000'
+}
+
 // Middleware principal para autenticação e autorização
 export async function middleware(request: NextRequest) {
   // Obter o caminho da URL
@@ -69,6 +82,7 @@ export async function middleware(request: NextRequest) {
   const hasNormalCookie = cookieHeader?.includes('next-auth.session-token')
   const protocol = request.headers.get('x-forwarded-proto') || 'http'
   const isProduction = process.env.NODE_ENV === 'production'
+  const baseUrl = getBaseUrl(request)
   
   console.log('Middleware - Headers:', JSON.stringify({
     host,
@@ -79,7 +93,8 @@ export async function middleware(request: NextRequest) {
     protocol,
     isProduction: isProduction ? 'Sim' : 'Não',
     nextauthUrl: process.env.NEXTAUTH_URL || 'não definido',
-    nextauthUrlInternal: process.env.NEXTAUTH_URL_INTERNAL || 'não definido'
+    nextauthUrlInternal: process.env.NEXTAUTH_URL_INTERNAL || 'não definido',
+    baseUrl
   }))
 
   // Verificar se é uma página de login
@@ -99,6 +114,7 @@ export async function middleware(request: NextRequest) {
     '/images/*',
     '/styles/*',
     '/scripts/*',
+    '/',
   ];
 
   // Verificar se é um endpoint público
@@ -140,8 +156,15 @@ export async function middleware(request: NextRequest) {
       // Criar URL de redirecionamento com callbackUrl
       const url = request.nextUrl.clone()
       url.pathname = loginUrl
-      url.search = `?callbackUrl=${encodeURIComponent(request.url)}`
       
+      // Usar a URL base atual para o callbackUrl, não a URL da requisição
+      // Isso evita misturar domínios como localhost e admitto.com.br
+      const currentPath = request.nextUrl.pathname
+      const callbackUrl = new URL(currentPath, baseUrl).toString()
+      
+      url.search = `?callbackUrl=${encodeURIComponent(callbackUrl)}`
+      
+      console.log('Middleware: Redirecionando para', url.toString())
       return NextResponse.redirect(url)
     }
     
@@ -150,7 +173,7 @@ export async function middleware(request: NextRequest) {
       if (token.role !== 'SUPER_ADMIN') {
         console.log('Middleware: Acesso negado a rota de superadmin para usuário com papel:', token.role)
         return new NextResponse(
-          JSON.stringify({ success: false, message: 'Acesso negado. Apenas Super Administradores podem acessar esta rota.' }),
+          JSON.stringify({ success: false, message: 'Acesso negado. Permissão insuficiente.' }),
           { status: 403, headers: { 'content-type': 'application/json' } }
         )
       }
@@ -161,7 +184,7 @@ export async function middleware(request: NextRequest) {
       if (token.role !== 'SUPER_ADMIN' && token.role !== 'COMPANY_ADMIN') {
         console.log('Middleware: Acesso negado a rota de admin para usuário com papel:', token.role)
         return new NextResponse(
-          JSON.stringify({ success: false, message: 'Acesso negado. Apenas Administradores podem acessar esta rota.' }),
+          JSON.stringify({ success: false, message: 'Acesso negado. Permissão insuficiente.' }),
           { status: 403, headers: { 'content-type': 'application/json' } }
         )
       }

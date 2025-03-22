@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Image from 'next/image'
+import { useSession } from 'next-auth/react'
 
 interface TestData {
   id: string;
@@ -19,6 +20,32 @@ export default function Home() {
   const [candidate, setCandidate] = useState<any>(null);
   const [validationSuccess, setValidationSuccess] = useState(false);
   const router = useRouter();
+  const { data: session, status } = useSession();
+
+  // Verificar se o usuário já está autenticado e redirecionar para o dashboard apropriado
+  useEffect(() => {
+    if (status === 'loading') return;
+    
+    if (session) {
+      console.log('Página inicial - Usuário já autenticado:', {
+        role: session.user.role,
+        name: session.user.name
+      });
+      
+      // Redirecionar com base no papel do usuário
+      if (session.user.role === 'SUPER_ADMIN') {
+        console.log('Página inicial - Redirecionando para dashboard de superadmin');
+        if (typeof window !== 'undefined') {
+          window.location.href = '/superadmin/dashboard';
+        }
+      } else if (session.user.role === 'COMPANY_ADMIN') {
+        console.log('Página inicial - Redirecionando para dashboard de admin');
+        if (typeof window !== 'undefined') {
+          window.location.href = '/admin/dashboard';
+        }
+      }
+    }
+  }, [session, status]);
 
   const handleInviteSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();

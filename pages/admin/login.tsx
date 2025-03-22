@@ -1,208 +1,178 @@
-import { NextPage } from 'next'
 import { useState, useEffect } from 'react'
+import { signIn, useSession } from 'next-auth/react'
 import { useRouter } from 'next/router'
-import { signIn, getSession } from 'next-auth/react'
+import Head from 'next/head'
 import Link from 'next/link'
-import Image from 'next/image'
-import { Formik, Form, Field, ErrorMessage } from 'formik'
-import * as Yup from 'yup'
 
-const validationSchema = Yup.object({
-  email: Yup.string()
-    .email('Email inválido')
-    .required('Email é obrigatório'),
-  password: Yup.string()
-    .required('Senha é obrigatória'),
-})
-
-const Login: NextPage = () => {
-  const router = useRouter()
+export default function AdminLogin() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const { callbackUrl } = router.query
+  const router = useRouter()
+  const { data: session, status } = useSession()
+  
+  // Função para normalizar a URL de callback
+  const normalizeCallbackUrl = (url: string | null | undefined): string => {
+    if (!url) return '/admin/dashboard'
+    
+    try {
+      // Se a URL for relativa, retorne-a como está
+      if (url.startsWith('/')) return url
+      
+      // Se for uma URL absoluta, extraia apenas o caminho
+      const urlObj = new URL(url)
+      
+      // Verificar se o domínio é diferente do atual
+      if (typeof window !== 'undefined') {
+        const currentHost = window.location.hostname
+        if (urlObj.hostname !== currentHost) {
+          console.log(`Normalizando URL de callback: ${url} -> ${urlObj.pathname}`)
+          return urlObj.pathname
+        }
+      }
+      
+      return url
+    } catch (e) {
+      console.error('Erro ao normalizar URL de callback:', e)
+      return '/admin/dashboard'
+    }
+  }
+  
+  // Obter a URL de callback da query
+  const callbackUrl = normalizeCallbackUrl(
+    Array.isArray(router.query.callbackUrl) 
+      ? router.query.callbackUrl[0] 
+      : router.query.callbackUrl
+  )
   
   // Verificar se o usuário já está autenticado
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        console.log('Verificando sessão existente...')
-        const session = await getSession()
-        
-        if (session) {
-          console.log('Sessão encontrada:', {
-            role: session.user.role,
-            name: session.user.name,
-            callbackUrl: callbackUrl || 'não especificado'
-          })
-          
-          // Se houver uma URL de callback, redirecionar para ela
-          if (callbackUrl && typeof callbackUrl === 'string') {
-            console.log('Redirecionando para URL de callback:', callbackUrl)
-            // Usar window.location para garantir um redirecionamento completo
-            window.location.replace(callbackUrl)
-            return
-          }
-          
-          // Caso contrário, redirecionar com base no papel do usuário
-          if (session.user.role === 'SUPER_ADMIN') {
-            console.log('Redirecionando para dashboard de superadmin')
-            window.location.replace('/superadmin/dashboard')
-          } else {
-            console.log('Redirecionando para dashboard de admin')
-            window.location.replace('/admin/dashboard')
-          }
-        } else {
-          console.log('Nenhuma sessão encontrada, mostrando formulário de login')
-        }
-      } catch (error) {
-        console.error('Erro ao verificar sessão:', error)
+    if (status === 'loading') return
+    
+    if (session) {
+      console.log('Usuário já autenticado, redirecionando para:', callbackUrl)
+      
+      // Usar window.location para evitar problemas com o Next.js router
+      if (typeof window !== 'undefined') {
+        window.location.href = callbackUrl
       }
     }
-    
-    checkSession()
-  }, [router, callbackUrl])
+  }, [session, status, callbackUrl])
   
-  const handleSubmit = async (values: { email: string; password: string }) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setIsLoading(true)
+    
     try {
-      setIsLoading(true)
-      setError('')
-      
-      console.log('Iniciando login para:', values.email)
-      
       const result = await signIn('credentials', {
         redirect: false,
-        email: values.email,
-        password: values.password,
+        email,
+        password,
       })
       
       if (result?.error) {
-        console.error('Erro no login:', result.error)
         setError('Email ou senha inválidos')
         setIsLoading(false)
-      } else {
-        console.log('Login bem-sucedido, obtendo sessão...')
-        // Obter a sessão para verificar o papel do usuário
-        const session = await getSession()
+        return
+      }
+      
+      if (result?.ok) {
+        console.log('Login bem-sucedido, redirecionando para:', callbackUrl)
         
-        if (!session) {
-          console.error('Sessão não encontrada após login')
-          setError('Erro ao obter sessão. Tente novamente.')
-          setIsLoading(false)
-          return
-        }
-        
-        console.log('Sessão obtida, papel:', session.user.role)
-        
-        // Se houver uma URL de callback, redirecionar para ela
-        if (callbackUrl && typeof callbackUrl === 'string') {
-          console.log('Redirecionando para URL de callback após login:', callbackUrl)
-          // Usar window.location para garantir um redirecionamento completo
-          window.location.replace(callbackUrl)
-          return
-        }
-        
-        // Redirecionar com base no papel do usuário
-        if (session.user.role === 'SUPER_ADMIN') {
-          console.log('Redirecionando para dashboard de superadmin')
-          window.location.replace('/superadmin/dashboard')
-        } else {
-          console.log('Redirecionando para dashboard de admin')
-          window.location.replace('/admin/dashboard')
+        // Usar window.location para evitar problemas com o Next.js router
+        if (typeof window !== 'undefined') {
+          window.location.href = callbackUrl
         }
       }
     } catch (error) {
-      console.error('Erro inesperado no login:', error)
-      setError('Ocorreu um erro ao fazer login. Tente novamente.')
+      console.error('Erro ao fazer login:', error)
+      setError('Ocorreu um erro ao processar o login')
+    } finally {
       setIsLoading(false)
     }
   }
   
+  // Se estiver carregando a sessão, mostre uma mensagem de carregamento
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="p-8 bg-white rounded-lg shadow-md w-full max-w-md">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Carregando...</h2>
+            <p className="text-gray-600">Verificando sua sessão</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+  
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white flex items-center justify-center">
-      <div className="container mx-auto px-4 py-12 max-w-md">
-        <div className="card">
+    <>
+      <Head>
+        <title>Login | Admitto</title>
+      </Head>
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="p-8 bg-white rounded-lg shadow-md w-full max-w-md">
           <div className="text-center mb-8">
-            <Image 
-              src="/images/logo_horizontal.png"
-              alt="Admitto Logo"
-              width={200}
-              height={60}
-              priority
-              className="mx-auto"
-            />
-            <h1 className="text-2xl font-bold text-secondary-900 mt-4">Área do Administrador</h1>
-            <p className="text-secondary-600 mt-2">Faça login para acessar o painel administrativo</p>
+            <h2 className="text-2xl font-bold text-gray-800">Login Administrativo</h2>
+            <p className="text-gray-600">Acesse o painel administrativo</p>
           </div>
           
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-6">
+            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
               {error}
             </div>
           )}
           
-          <Formik
-            initialValues={{ email: '', password: '' }}
-            validationSchema={validationSchema}
-            onSubmit={handleSubmit}
-          >
-            {({ isSubmitting }) => (
-              <Form className="space-y-6">
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-secondary-700 mb-1">
-                    Email
-                  </label>
-                  <Field
-                    type="email"
-                    name="email"
-                    id="email"
-                    className="input-field"
-                    placeholder="admin@empresa.com"
-                    disabled={isLoading}
-                  />
-                  <ErrorMessage name="email" component="div" className="text-red-500 text-sm mt-1" />
-                </div>
-                
-                <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-secondary-700 mb-1">
-                    Senha
-                  </label>
-                  <Field
-                    type="password"
-                    name="password"
-                    id="password"
-                    className="input-field"
-                    placeholder="••••••••"
-                    disabled={isLoading}
-                  />
-                  <ErrorMessage name="password" component="div" className="text-red-500 text-sm mt-1" />
-                </div>
-                
-                <div>
-                  <button
-                    type="submit"
-                    className="w-full bg-primary-600 text-white py-2 px-4 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors duration-200 flex items-center justify-center"
-                    disabled={isSubmitting || isLoading}
-                  >
-                    {isLoading ? (
-                      <>
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Entrando...
-                      </>
-                    ) : (
-                      'Entrar'
-                    )}
-                  </button>
-                </div>
-              </Form>
-            )}
-          </Formik>
+          <form onSubmit={handleSubmit}>
+            <div className="mb-4">
+              <label htmlFor="email" className="block text-gray-700 font-medium mb-2">
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+            
+            <div className="mb-6">
+              <label htmlFor="password" className="block text-gray-700 font-medium mb-2">
+                Senha
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+            
+            <button
+              type="submit"
+              disabled={isLoading}
+              className={`w-full py-2 px-4 rounded-lg text-white font-medium ${
+                isLoading ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'
+              }`}
+            >
+              {isLoading ? 'Entrando...' : 'Entrar'}
+            </button>
+          </form>
+          
+          <div className="mt-6 text-center">
+            <Link href="/" className="text-blue-600 hover:text-blue-800">
+              Voltar para a página inicial
+            </Link>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }
-
-export default Login

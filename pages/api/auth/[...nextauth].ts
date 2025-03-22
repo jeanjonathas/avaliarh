@@ -77,10 +77,37 @@ const prisma = new PrismaClient()
 const isProduction = process.env.NODE_ENV === 'production'
 
 // Obter a URL base do ambiente
-const baseUrl = process.env.NEXTAUTH_URL || (isProduction ? 'https://avaliarh.com.br' : 'http://localhost:3000')
+const baseUrl = process.env.NEXTAUTH_URL || (isProduction ? 'https://admitto.com.br' : 'http://localhost:3000')
+const internalUrl = process.env.NEXTAUTH_URL_INTERNAL || baseUrl
 
 console.log('NextAuth URL:', baseUrl)
+console.log('NextAuth URL Internal:', internalUrl)
 console.log('Ambiente:', isProduction ? 'Produção' : 'Desenvolvimento')
+console.log('Domain:', process.env.NEXT_PUBLIC_DOMAIN || 'não definido')
+
+// Função para garantir que as URLs de redirecionamento usem o domínio correto
+const ensureCorrectDomain = (url: string) => {
+  if (!url) return url
+  
+  try {
+    const parsedUrl = new URL(url)
+    const targetDomain = isProduction 
+      ? (process.env.NEXT_PUBLIC_DOMAIN || new URL(baseUrl).hostname)
+      : new URL(internalUrl).hostname
+    
+    // Se o domínio for diferente, corrija-o
+    if (parsedUrl.hostname !== targetDomain) {
+      console.log(`Corrigindo URL de redirecionamento: ${url} -> ${targetDomain}`)
+      parsedUrl.hostname = targetDomain
+      parsedUrl.protocol = isProduction ? 'https:' : 'http:'
+      return parsedUrl.toString()
+    }
+  } catch (error) {
+    console.error('Erro ao processar URL:', error)
+  }
+  
+  return url
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -102,64 +129,58 @@ export const authOptions: NextAuthOptions = {
             where: {
               email: credentials.email,
             },
-          }) as PrismaUser | null
+            include: {
+              company: true,
+            },
+          })
 
           if (!user) {
-            console.log('Autorização: Usuário não encontrado');
+            console.log(`Autorização: Usuário não encontrado para o email ${credentials.email}`);
             return null
           }
 
-          const isPasswordValid = await bcrypt.compare(
-            credentials.password,
-            user.password
-          )
+          // Verifica se a senha está correta
+          const isPasswordValid = await bcrypt.compare(credentials.password, user.password)
 
           if (!isPasswordValid) {
-            console.log('Autorização: Senha inválida');
+            console.log(`Autorização: Senha inválida para o usuário ${user.email}`);
             return null
           }
 
-          // Se o usuário tiver uma empresa associada, busca os dados da empresa
-          let companyData: CompanyData | null = null
-          
-          if (user.companyId) {
-            try {
-              // Usando prisma.$queryRaw para evitar problemas de tipagem
-              const companyRecords = await prisma.$queryRaw`
-                SELECT id, name, "planType", "isActive" 
-                FROM "Company" 
-                WHERE id = ${user.companyId}
-              ` as any[]
-              
-              if (companyRecords && companyRecords.length > 0) {
-                const companyRecord = companyRecords[0]
-                companyData = {
-                  id: companyRecord.id,
-                  name: companyRecord.name,
-                  planType: companyRecord.planType,
-                  isActive: companyRecord.isActive
-                }
-              }
-            } catch (error) {
-              console.error('Erro ao buscar empresa:', error)
+          // Verifica se a empresa está ativa (para usuários vinculados a empresas)
+          if (user.companyId && user.company) {
+            if (!user.company.isActive) {
+              console.log(`Autorização: Empresa ${user.company.name} está inativa`);
+              return null
             }
           }
 
-          // Construir o objeto de usuário para autenticação
-          const authUser = {
+          // Mapeia os dados da empresa para o formato simplificado
+          let companyData: CompanyData | null = null
+          if (user.company) {
+            companyData = {
+              id: user.company.id,
+              name: user.company.name,
+              planType: user.company.planType,
+              isActive: user.company.isActive,
+            }
+          }
+
+          // Retorna os dados do usuário autenticado
+          console.log(`Autorização: Usuário ${user.email} autenticado com sucesso`);
+          return {
             id: user.id,
             name: user.name,
             email: user.email,
             role: user.role,
             companyId: user.companyId,
-            company: companyData
+            company: companyData,
           }
-
-          console.log('Autorização: Login bem-sucedido para', user.email, 'com papel', user.role);
-          return authUser
         } catch (error) {
-          console.error('Erro na autenticação:', error)
+          console.error('Autorização: Erro ao autenticar usuário:', error);
           return null
+        } finally {
+          // Não é necessário desconectar o cliente Prisma aqui, pois ele é reutilizado
         }
       },
     }),
@@ -171,9 +192,6 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role
         token.companyId = user.companyId
         token.company = user.company
-        
-        // Log para depuração do papel do usuário
-        console.log('NextAuth JWT: Papel do usuário:', user.role);
       }
       return token
     },
@@ -189,11 +207,30 @@ export const authOptions: NextAuthOptions = {
       }
       return session
     },
+    async redirect({ url, baseUrl }) {
+      // Garantir que as URLs de redirecionamento usem o domínio correto
+      const correctedUrl = ensureCorrectDomain(url)
+      
+      // Log para depuração de redirecionamento
+      console.log('NextAuth Redirect:', { 
+        originalUrl: url, 
+        baseUrl, 
+        correctedUrl 
+      })
+      
+      // Se a URL começar com o baseUrl, retorne-a diretamente
+      if (correctedUrl.startsWith(baseUrl) || correctedUrl.startsWith('/')) {
+        return correctedUrl
+      }
+      
+      // Caso contrário, retorne o baseUrl
+      return baseUrl
+    }
   },
   pages: {
-    signIn: '/admin/login',
-    signOut: '/',
-    error: '/admin/login'
+    signIn: ensureCorrectDomain('/admin/login'),
+    signOut: ensureCorrectDomain('/'),
+    error: ensureCorrectDomain('/admin/login')
   },
   session: {
     strategy: 'jwt',

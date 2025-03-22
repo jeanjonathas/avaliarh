@@ -3,7 +3,7 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   images: {
-    domains: ['localhost', process.env.NEXT_PUBLIC_DOMAIN || 'avaliarh.com.br'],
+    domains: ['localhost', process.env.NEXT_PUBLIC_DOMAIN || 'admitto.com.br'],
   },
   // Configuração para lidar com proxy reverso HTTPS
   poweredByHeader: false,
@@ -41,11 +41,40 @@ const nextConfig = {
       ],
     }
   },
+  // Configuração para redirecionamentos
+  async redirects() {
+    return [
+      // Redirecionar para a página de dashboard após login
+      {
+        source: '/',
+        has: [
+          {
+            type: 'cookie',
+            key: 'next-auth.session-token',
+          },
+        ],
+        destination: '/admin/dashboard',
+        permanent: false,
+      },
+      {
+        source: '/',
+        has: [
+          {
+            type: 'cookie',
+            key: '__Secure-next-auth.session-token',
+          },
+        ],
+        destination: '/admin/dashboard',
+        permanent: false,
+      },
+    ]
+  },
   // Configuração para variáveis de ambiente
   env: {
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
     NEXTAUTH_URL_INTERNAL: process.env.NEXTAUTH_URL_INTERNAL || process.env.NEXTAUTH_URL,
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
+    NEXT_PUBLIC_DOMAIN: process.env.NEXT_PUBLIC_DOMAIN || 'admitto.com.br',
   },
   // Configuração para webpack
   webpack: (config, { isServer }) => {
