@@ -35,6 +35,11 @@ model Company {
   testInvitations   TestInvitation[]
   usedInviteCodes   UsedInviteCode[]
   users             User[]
+  
+  // Training system relations
+  trainingCourses   TrainingCourse[]
+  trainingSectors   TrainingSector[]
+  trainingTests     TrainingTest[]
 }
 
 model User {
@@ -341,6 +346,12 @@ model Student {
   company         Company    @relation(fields: [companyId], references: [id])
   convertedFrom   Candidate? @relation(fields: [convertedFromId], references: [id])
   user            User       @relation(fields: [userId], references: [id])
+  
+  // Training system relations
+  courseEnrollments CourseEnrollment[]
+  lessonProgress    LessonProgress[]
+  testAttempts      TestAttempt[]
+  accessLogs        TrainingAccessLog[]
 }
 
 model Category {
@@ -483,6 +494,216 @@ model EmotionGroup {
   processPersonalityConfigs ProcessPersonalityConfig[]
 }
 
+// Training Management System Models
+
+// Course model - represents a complete training course
+model TrainingCourse {
+  id                String              @id @default(uuid())
+  name              String
+  description       String?
+  sectorId          String?
+  companyId         String
+  showResults       Boolean             @default(true)
+  finalTestRequired Boolean             @default(false)
+  finalTestId       String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  
+  // Relations
+  company           Company             @relation(fields: [companyId], references: [id])
+  sector            TrainingSector?     @relation(fields: [sectorId], references: [id])
+  modules           TrainingModule[]
+  enrollments       CourseEnrollment[]
+  finalTest         TrainingTest?       @relation("CourseFinalTest", fields: [finalTestId], references: [id])
+  accessLogs        TrainingAccessLog[]
+}
+
+// Module model - represents a section of a course
+model TrainingModule {
+  id          String          @id @default(uuid())
+  name        String
+  description String?
+  order       Int
+  courseId    String
+  finalTestId String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  
+  // Relations
+  course      TrainingCourse  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons     TrainingLesson[]
+  finalTest   TrainingTest?   @relation("ModuleFinalTest", fields: [finalTestId], references: [id])
+}
+
+// Lesson model - represents individual learning content
+model TrainingLesson {
+  id          String               @id @default(uuid())
+  name        String
+  description String?
+  order       Int
+  moduleId    String
+  type        TrainingContentType
+  content     String               // URL for video/audio/slides, HTML content for text
+  duration    Int?                 // Duration in seconds (for video/audio)
+  finalTestId String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  
+  // Relations
+  module      TrainingModule       @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  finalTest   TrainingTest?        @relation("LessonFinalTest", fields: [finalTestId], references: [id])
+  progress    LessonProgress[]
+}
+
+// Sector model - represents company departments/sectors
+model TrainingSector {
+  id          String           @id @default(uuid())
+  name        String
+  description String?
+  companyId   String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  
+  // Relations
+  company     Company          @relation(fields: [companyId], references: [id])
+  courses     TrainingCourse[]
+}
+
+// CourseEnrollment model - tracks student enrollment in courses
+model CourseEnrollment {
+  id             String          @id @default(uuid())
+  studentId      String
+  courseId       String
+  enrollmentDate DateTime        @default(now())
+  completionDate DateTime?
+  progress       Float           @default(0) // 0-100%
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  
+  // Relations
+  student        Student         @relation(fields: [studentId], references: [id])
+  course         TrainingCourse  @relation(fields: [courseId], references: [id])
+}
+
+// LessonProgress model - tracks student progress in individual lessons
+model LessonProgress {
+  id          String         @id @default(uuid())
+  studentId   String
+  lessonId    String
+  timeSpent   Int            @default(0) // Time spent in seconds
+  completed   Boolean        @default(false)
+  completedAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  
+  // Relations
+  student     Student        @relation(fields: [studentId], references: [id])
+  lesson      TrainingLesson @relation(fields: [lessonId], references: [id])
+  
+  @@unique([studentId, lessonId])
+}
+
+// TrainingTest model - represents tests for courses, modules, or lessons
+model TrainingTest {
+  id           String                @id @default(uuid())
+  name         String
+  description  String?
+  timeLimit    Int?                  // Time limit in minutes
+  passingScore Int                   @default(70) // Percentage needed to pass
+  attempts     Int                   @default(1)  // Number of attempts allowed
+  companyId    String
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  
+  // Relations
+  company      Company               @relation(fields: [companyId], references: [id])
+  questions    TrainingQuestion[]
+  testAttempts TestAttempt[]
+  
+  // Relation to what this test belongs to (only one will be non-null)
+  courseFinalTests  TrainingCourse[] @relation("CourseFinalTest")
+  moduleFinalTests  TrainingModule[] @relation("ModuleFinalTest")
+  lessonFinalTests  TrainingLesson[] @relation("LessonFinalTest")
+}
+
+// TrainingQuestion model - represents questions in training tests
+model TrainingQuestion {
+  id          String                @id @default(uuid())
+  text        String
+  type        TrainingQuestionType  @default(MULTIPLE_CHOICE)
+  testId      String
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  
+  // Relations
+  test        TrainingTest          @relation(fields: [testId], references: [id], onDelete: Cascade)
+  options     TrainingOption[]
+  answers     QuestionAnswer[]
+}
+
+// TrainingOption model - represents answer options for questions
+model TrainingOption {
+  id          String           @id @default(uuid())
+  text        String
+  isCorrect   Boolean          @default(false)
+  questionId  String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  
+  // Relations
+  question    TrainingQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answers     QuestionAnswer[]
+}
+
+// TestAttempt model - tracks student attempts at tests
+model TestAttempt {
+  id        String           @id @default(uuid())
+  studentId String
+  testId    String
+  startTime DateTime         @default(now())
+  endTime   DateTime?
+  score     Float?
+  passed    Boolean?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  
+  // Relations
+  student   Student          @relation(fields: [studentId], references: [id])
+  test      TrainingTest     @relation(fields: [testId], references: [id])
+  answers   QuestionAnswer[]
+}
+
+// QuestionAnswer model - tracks student answers to questions
+model QuestionAnswer {
+  id          String           @id @default(uuid())
+  attemptId   String
+  questionId  String
+  optionId    String?
+  isCorrect   Boolean?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  
+  // Relations
+  attempt     TestAttempt      @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question    TrainingQuestion @relation(fields: [questionId], references: [id])
+  option      TrainingOption?  @relation(fields: [optionId], references: [id])
+}
+
+// TrainingAccessLog model - tracks student access to courses
+model TrainingAccessLog {
+  id        String         @id @default(uuid())
+  studentId String
+  courseId  String
+  accessDate DateTime       @default(now())
+  timeSpent Int            @default(0) // Time spent in seconds
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  
+  // Relations
+  student   Student        @relation(fields: [studentId], references: [id])
+  course    TrainingCourse @relation(fields: [courseId], references: [id])
+}
+
 enum Role {
   SUPER_ADMIN
   COMPANY_ADMIN
@@ -554,4 +775,19 @@ enum PaymentStatus {
   PAID
   FAILED
   REFUNDED
+}
+
+// Enums for the training system
+enum TrainingContentType {
+  VIDEO
+  AUDIO
+  SLIDES
+  TEXT
+}
+
+enum TrainingQuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  ESSAY
+  OPINION_MULTIPLE
 }
