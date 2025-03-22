@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { signIn, useSession } from 'next-auth/react';
+import { signIn, useSession, getSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
+import { GetServerSideProps } from 'next';
 
 export default function SuperAdminLogin() {
   const [email, setEmail] = useState('');
