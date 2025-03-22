@@ -72,13 +72,14 @@ const Navbar: React.FC<NavbarProps> = ({ onSectionChange }) => {
     }
   };
   
-  const handleLogout = async (e: React.MouseEvent) => {
+  const handleLogout = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     // Adicionar um estado de carregamento para feedback visual
     const logoutButton = e.currentTarget as HTMLButtonElement;
     logoutButton.disabled = true;
     logoutButton.innerText = 'Saindo...';
-    await signOut({ callbackUrl: '/' });
+    await signOut({ redirect: false });
+    router.push('/admin/login');
   };
   
   return (

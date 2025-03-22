@@ -89,6 +89,12 @@ console.log('Domain:', process.env.NEXT_PUBLIC_DOMAIN || 'não definido')
 const ensureCorrectDomain = (url: string) => {
   if (!url) return url
   
+  // Se for uma URL relativa, retorne-a diretamente
+  if (url.startsWith('/')) {
+    console.log(`URL relativa detectada: ${url}, retornando sem modificações`)
+    return url
+  }
+  
   try {
     const parsedUrl = new URL(url)
     const targetDomain = isProduction 
