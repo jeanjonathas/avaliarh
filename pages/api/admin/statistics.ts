@@ -1,6 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '../../../lib/auth'
+import { getToken } from 'next-auth/jwt'
 import { prisma } from '../../../lib/prisma'
 
 // Função auxiliar para converter BigInt para Number
@@ -32,14 +31,22 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Verificar autenticação
-  const session = await getServerSession(req, res, authOptions)
-  if (!session) {
+  // Verificar autenticação usando o middleware centralizado
+  const token = await getToken({ req })
+  if (!token) {
     return res.status(401).json({ error: 'Não autorizado' })
+  }
+
+  // Verificar se o usuário tem permissão (COMPANY_ADMIN ou SUPER_ADMIN)
+  if (!['COMPANY_ADMIN', 'SUPER_ADMIN'].includes(token.role as string)) {
+    return res.status(403).json({ error: 'Permissão negada' })
   }
 
   if (req.method === 'GET') {
     try {
+      // Obter o ID da empresa do token
+      const companyId = token.companyId as string
+
       // Buscar estatísticas de etapas
       const stageStats = await prisma.$queryRaw`
         SELECT 
@@ -47,26 +54,24 @@ export default async function handler(
           s.title as name,
           ts."order" as "order",
           COUNT(DISTINCT r.id) as "totalResponses",
-          SUM(CASE WHEN r."isCorrectOption" = true THEN 1 ELSE 0 END) as "correctResponses",
+          SUM(CASE WHEN r."isCorrect" = true THEN 1 ELSE 0 END) as "correctResponses",
           CASE 
             WHEN COUNT(DISTINCT r.id) > 0 
-            THEN ROUND(SUM(CASE WHEN r."isCorrectOption" = true THEN 1 ELSE 0 END) * 100.0 / COUNT(DISTINCT r.id), 1)
+            THEN ROUND(SUM(CASE WHEN r."isCorrect" = true THEN 1 ELSE 0 END) * 100.0 / COUNT(DISTINCT r.id), 1)
             ELSE 0 
           END as "successRate"
         FROM "Stage" s
         JOIN "TestStage" ts ON s.id = ts."stageId"
-        JOIN "Test" t ON ts."testId" = t.id AND t.active = true
+        JOIN "Test" t ON ts."testId" = t.id AND t."companyId" = ${companyId}
         LEFT JOIN "Question" q ON q."stageId" = s.id
         LEFT JOIN "Response" r ON r."questionId" = q.id AND r."candidateId" IN (
-          SELECT c.id FROM "Candidate" c WHERE c."testId" = t.id
+          SELECT c.id FROM "Candidate" c WHERE c."companyId" = ${companyId}
         )
         GROUP BY s.id, s.title, ts."order"
         ORDER BY ts."order", s.title
       `;
       
-      console.log('Estatísticas de etapas:', stageStats);
-
-      // Buscar estatísticas de candidatos
+      // Buscar estatísticas de candidatos (todos os candidatos da empresa)
       const candidateStats = await prisma.$queryRaw`
         SELECT 
           COUNT(*) as total,
@@ -78,13 +83,9 @@ export default async function handler(
             CASE WHEN c.score > 1 THEN c.score ELSE c.score * 100 END
             ELSE NULL END), 1) as "averageScore"
         FROM "Candidate" c
-        JOIN "Test" t ON c."testId" = t.id
-        WHERE t.active = true
+        WHERE c."companyId" = ${companyId}
       `;
       
-      // Log para debug
-      console.log('Estatísticas de candidatos:', candidateStats);
-
       // Calcular taxa de sucesso média esperada e real
       const expectedSuccessRate = 70; // Taxa de sucesso esperada (pode ser ajustada)
       
@@ -97,13 +98,6 @@ export default async function handler(
       
       const averageSuccessRate = totalResponses > 0 ? 
         parseFloat(((totalCorrect / totalResponses) * 100).toFixed(1)) : 0;
-      
-      console.log('Cálculo de taxa de sucesso:', { 
-        totalCorrect, 
-        totalResponses, 
-        averageSuccessRate,
-        expectedSuccessRate
-      });
       
       // Calcular pontuações médias por etapa
       const averageStageScores = Array.isArray(stageStats) ? 

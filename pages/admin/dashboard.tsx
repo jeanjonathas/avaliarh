@@ -17,17 +17,9 @@ import {
   Filler
 } from 'chart.js'
 import AdminLayout from '../../components/admin/AdminLayout'
-import {
-  SystemStats,
-  PerformanceCharts,
-  CandidatesList,
-  ActiveProcesses,
-  TrainingCourses,
-  InsightsPanel,
-  QuickActions,
-  LoadingState,
-  ErrorState
-} from '../../components/dashboard'
+import { StatsCard, ProcessCard, CourseCard, InsightCard } from '../../components/dashboard/cards'
+import axios from 'axios'
+import Link from 'next/link'
 
 // Registrar componentes do Chart.js
 ChartJS.register(
@@ -89,6 +81,7 @@ interface Statistics {
     approved: number
     rejected: number
     pending: number
+    averageScore?: number
   }
   averageStageScores: number[]
 }
@@ -135,199 +128,7 @@ const Dashboard: NextPage = () => {
   // Estados para gerenciamento de UI
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null)
   
-  // Estados para gráficos
-  const [categorySuccessData, setCategorySuccessData] = useState({
-    labels: [],
-    datasets: [
-      {
-        label: 'Taxa de Sucesso (%)',
-        data: [],
-        backgroundColor: [
-          'rgba(255, 99, 132, 0.7)',
-          'rgba(54, 162, 235, 0.7)',
-          'rgba(255, 206, 86, 0.7)',
-          'rgba(75, 192, 192, 0.7)',
-          'rgba(153, 102, 255, 0.7)',
-          'rgba(255, 159, 64, 0.7)'
-        ],
-        borderColor: [
-          'rgba(255, 99, 132, 1)',
-          'rgba(54, 162, 235, 1)',
-          'rgba(255, 206, 86, 1)',
-          'rgba(75, 192, 192, 1)',
-          'rgba(153, 102, 255, 1)',
-          'rgba(255, 159, 64, 1)'
-        ],
-        borderWidth: 1,
-        borderRadius: 4,
-      }
-    ]
-  })
-  
-  const [realVsExpectedData, setRealVsExpectedData] = useState({
-    labels: [],
-    datasets: [
-      {
-        label: 'Taxa Real',
-        data: [],
-        backgroundColor: 'rgba(54, 162, 235, 0.7)',
-        borderWidth: 0,
-        borderRadius: 4,
-      },
-      {
-        label: 'Taxa Esperada',
-        data: [],
-        backgroundColor: 'rgba(255, 99, 132, 0.7)',
-        borderWidth: 0,
-        borderRadius: 4,
-      }
-    ]
-  })
-  
-  const [overallPerformanceData, setOverallPerformanceData] = useState({
-    labels: [],
-    datasets: [
-      {
-        data: [],
-        backgroundColor: [
-          'rgba(75, 192, 192, 0.7)',
-          'rgba(255, 99, 132, 0.7)',
-          'rgba(255, 206, 86, 0.7)'
-        ],
-        borderColor: [
-          'rgba(75, 192, 192, 1)',
-          'rgba(255, 99, 132, 1)',
-          'rgba(255, 206, 86, 1)'
-        ],
-        borderWidth: 1,
-      }
-    ]
-  })
-  
-  const [trendData, setTrendData] = useState({
-    labels: [],
-    datasets: [
-      {
-        label: 'Aprovados',
-        data: [],
-        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-        borderColor: 'rgba(75, 192, 192, 1)',
-        borderWidth: 2,
-        tension: 0.4,
-        fill: true,
-      },
-      {
-        label: 'Reprovados',
-        data: [],
-        backgroundColor: 'rgba(255, 99, 132, 0.2)',
-        borderColor: 'rgba(255, 99, 132, 1)',
-        borderWidth: 2,
-        tension: 0.4,
-        fill: true,
-      }
-    ]
-  })
-
-  // Opções para os gráficos
-  const categorySuccessOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'top' as const,
-      },
-      title: {
-        display: true,
-        text: 'Taxa de Sucesso por Categoria',
-        font: {
-          size: 16
-        }
-      },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        max: 100,
-        title: {
-          display: true,
-          text: 'Porcentagem (%)'
-        }
-      }
-    }
-  }
-
-  const realVsExpectedOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'top' as const,
-      },
-      title: {
-        display: true,
-        text: 'Taxa Real vs Esperada',
-        font: {
-          size: 16
-        }
-      },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        max: 100,
-        title: {
-          display: true,
-          text: 'Porcentagem (%)'
-        }
-      }
-    }
-  }
-
-  const overallPerformanceOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'right' as const,
-      },
-      title: {
-        display: true,
-        text: 'Desempenho Geral',
-        font: {
-          size: 16
-        }
-      },
-    }
-  }
-
-  const trendOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'top' as const,
-      },
-      title: {
-        display: true,
-        text: 'Tendências de Aprovação',
-        font: {
-          size: 16
-        }
-      },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        title: {
-          display: true,
-          text: 'Número de Candidatos'
-        }
-      }
-    }
-  }
-
   // Verificar se o usuário está autenticado
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -343,123 +144,29 @@ const Dashboard: NextPage = () => {
         setError(null)
         
         // Carregar candidatos
-        const candidatesResponse = await fetch('/api/admin/candidates?activeOnly=true')
-        if (!candidatesResponse.ok) {
-          throw new Error(`Erro ao carregar os candidatos: ${candidatesResponse.status}`)
-        }
-        const candidatesData = await candidatesResponse.json()
-        setCandidates(Array.isArray(candidatesData) ? candidatesData : [])
+        const candidatesResponse = await axios.get('/api/admin/candidates?activeOnly=true')
+        setCandidates(candidatesResponse.data)
         
         // Carregar estatísticas
-        const statisticsResponse = await fetch('/api/admin/statistics')
-        if (!statisticsResponse.ok) {
-          throw new Error('Erro ao carregar estatísticas')
-        }
-        const statisticsData = await statisticsResponse.json()
-        setStatistics(statisticsData)
+        const statisticsResponse = await axios.get('/api/admin/statistics')
+        setStatistics(statisticsResponse.data)
         
-        // Carregar processos seletivos (mock para demonstração)
-        // Em produção, substituir por chamada à API real
-        setProcesses([
-          {
-            id: '1',
-            title: 'Processo Seletivo - Desenvolvedor Frontend',
-            position: 'Desenvolvedor Frontend',
-            status: 'ACTIVE',
-            candidateCount: 12,
-            startDate: '2023-06-01',
-            progress: 75
-          },
-          {
-            id: '2',
-            title: 'Processo Seletivo - Analista de Dados',
-            position: 'Analista de Dados',
-            status: 'ACTIVE',
-            candidateCount: 8,
-            startDate: '2023-06-15',
-            progress: 50
-          },
-          {
-            id: '3',
-            title: 'Processo Seletivo - UX/UI Designer',
-            position: 'Designer UX/UI',
-            status: 'ACTIVE',
-            candidateCount: 6,
-            startDate: '2023-07-01',
-            progress: 25
-          }
-        ])
+        // Carregar processos seletivos ativos
+        const processesResponse = await axios.get('/api/admin/processes/active')
+        setProcesses(processesResponse.data)
         
-        // Carregar cursos de treinamento (mock para demonstração)
-        // Em produção, substituir por chamada à API real
-        setCourses([
-          {
-            id: '1',
-            title: 'Introdução ao React',
-            category: 'Desenvolvimento Web',
-            studentCount: 24,
-            completionRate: 68,
-            instructor: 'João Silva',
-            duration: '20h'
-          },
-          {
-            id: '2',
-            title: 'Análise de Dados com Python',
-            category: 'Ciência de Dados',
-            studentCount: 18,
-            completionRate: 75,
-            instructor: 'Maria Oliveira',
-            duration: '15h'
-          },
-          {
-            id: '3',
-            title: 'Princípios de UX/UI',
-            category: 'Design',
-            studentCount: 15,
-            completionRate: 80,
-            instructor: 'Carlos Mendes',
-            duration: '12h'
-          }
-        ])
-        
-        // Carregar insights (mock para demonstração)
-        // Em produção, substituir por chamada à API real ou algoritmo de análise
-        setInsights([
-          {
-            id: '1',
-            type: 'info',
-            title: 'Aumento na taxa de aprovação',
-            description: 'A taxa de aprovação aumentou 12% no último mês, indicando uma melhoria na qualidade dos candidatos.'
-          },
-          {
-            id: '2',
-            type: 'warning',
-            title: 'Baixa conclusão em testes lógicos',
-            description: 'Apenas 65% dos candidatos estão concluindo os testes de raciocínio lógico. Considere revisar a dificuldade.'
-          },
-          {
-            id: '3',
-            type: 'success',
-            title: 'Novo recorde de candidatos',
-            description: 'Este mês registrou o maior número de candidatos inscritos desde o início da plataforma.'
-          },
-          {
-            id: '4',
-            type: 'tip',
-            title: 'Otimize o processo de seleção',
-            description: 'Adicionar uma etapa de entrevista técnica pode melhorar a qualidade final dos candidatos aprovados.'
-          }
-        ])
-        
-        // Atualizar dados dos gráficos com base nas estatísticas
-        if (statisticsData && statisticsData.stageStats) {
-          updateChartData(statisticsData)
+        // Carregar cursos de treinamento
+        try {
+          const coursesResponse = await axios.get('/api/admin/training/courses')
+          // A API agora retorna um objeto com courses e message
+          setCourses(coursesResponse.data.courses || [])
+        } catch (error) {
+          console.error('Erro ao carregar cursos:', error)
+          setCourses([])
         }
         
-        // Atualizar dados de tendências com base nos candidatos
-        if (candidatesData && Array.isArray(candidatesData) && candidatesData.length > 0) {
-          updateTrendData(candidatesData)
-        }
+        // Gerar insights com base nos dados carregados
+        generateInsights(statisticsResponse.data, candidatesResponse.data)
         
       } catch (error) {
         console.error('Erro ao carregar dados do dashboard:', error)
@@ -469,271 +176,252 @@ const Dashboard: NextPage = () => {
       }
     }
     
-    fetchDashboardData()
-  }, [])
+    if (status === 'authenticated') {
+      fetchDashboardData()
+    }
+  }, [status])
   
-  // Função para atualizar dados dos gráficos
-  const updateChartData = (stats: Statistics) => {
-    if (!stats || !stats.stageStats || !Array.isArray(stats.stageStats)) {
-      console.error('Dados de estatísticas inválidos:', stats)
-      return
+  // Gerar insights com base nos dados
+  const generateInsights = (stats: Statistics, candidates: Candidate[]) => {
+    const newInsights: Insight[] = []
+    
+    if (stats && stats.candidateStats) {
+      // Insight sobre taxa de aprovação
+      if (stats.candidateStats.approved > 0 && stats.candidateStats.total > 0) {
+        const approvalRate = Math.round((stats.candidateStats.approved / stats.candidateStats.total) * 100)
+        
+        if (approvalRate > 70) {
+          newInsights.push({
+            id: '1',
+            type: 'success',
+            title: 'Alta taxa de aprovação',
+            description: `A taxa de aprovação atual é de ${approvalRate}%, indicando um bom processo seletivo.`
+          })
+        } else if (approvalRate < 30) {
+          newInsights.push({
+            id: '2',
+            type: 'warning',
+            title: 'Baixa taxa de aprovação',
+            description: `A taxa de aprovação atual é de apenas ${approvalRate}%. Considere revisar os critérios de seleção.`
+          })
+        }
+      }
+      
+      // Insight sobre candidatos pendentes
+      if (stats.candidateStats.pending > 5) {
+        newInsights.push({
+          id: '3',
+          type: 'info',
+          title: 'Candidatos pendentes',
+          description: `Existem ${stats.candidateStats.pending} candidatos pendentes de avaliação.`
+        })
+      }
     }
     
-    // Ordenar etapas por ordem
-    const sortedStages = [...stats.stageStats].sort((a, b) => a.order - b.order)
+    // Insight sobre candidatos recentes
+    const lastWeek = new Date()
+    lastWeek.setDate(lastWeek.getDate() - 7)
     
-    // Atualizar dados de sucesso por categoria
-    setCategorySuccessData({
-      labels: sortedStages.map(stage => stage.name),
-      datasets: [
-        {
-          label: 'Taxa de Sucesso (%)',
-          data: sortedStages.map(stage => Math.round(stage.successRate * 100)),
-          backgroundColor: [
-            'rgba(255, 99, 132, 0.7)',
-            'rgba(54, 162, 235, 0.7)',
-            'rgba(255, 206, 86, 0.7)',
-            'rgba(75, 192, 192, 0.7)',
-            'rgba(153, 102, 255, 0.7)',
-            'rgba(255, 159, 64, 0.7)'
-          ],
-          borderColor: [
-            'rgba(255, 99, 132, 1)',
-            'rgba(54, 162, 235, 1)',
-            'rgba(255, 206, 86, 1)',
-            'rgba(75, 192, 192, 1)',
-            'rgba(153, 102, 255, 1)',
-            'rgba(255, 159, 64, 1)'
-          ],
-          borderWidth: 1,
-          borderRadius: 4,
-        }
-      ]
-    })
+    const recentCandidates = candidates.filter(c => 
+      new Date(c.createdAt) >= lastWeek
+    ).length
     
-    // Atualizar dados de taxa real vs esperada
-    setRealVsExpectedData({
-      labels: sortedStages.map(stage => stage.name),
-      datasets: [
-        {
-          label: 'Taxa Real',
-          data: sortedStages.map(stage => Math.round(stage.successRate * 100)),
-          backgroundColor: 'rgba(54, 162, 235, 0.7)',
-          borderWidth: 0,
-          borderRadius: 4,
-        },
-        {
-          label: 'Taxa Esperada',
-          data: sortedStages.map(() => Math.round(stats.expectedSuccessRate * 100)),
-          backgroundColor: 'rgba(255, 99, 132, 0.7)',
-          borderWidth: 0,
-          borderRadius: 4,
-        }
-      ]
-    })
-    
-    // Atualizar dados de desempenho geral
-    setOverallPerformanceData({
-      labels: ['Aprovados', 'Reprovados', 'Pendentes'],
-      datasets: [
-        {
-          data: [
-            stats.candidateStats.approved,
-            stats.candidateStats.rejected,
-            stats.candidateStats.pending
-          ],
-          backgroundColor: [
-            'rgba(75, 192, 192, 0.7)',
-            'rgba(255, 99, 132, 0.7)',
-            'rgba(255, 206, 86, 0.7)'
-          ],
-          borderColor: [
-            'rgba(75, 192, 192, 1)',
-            'rgba(255, 99, 132, 1)',
-            'rgba(255, 206, 86, 1)'
-          ],
-          borderWidth: 1,
-        }
-      ]
-    })
-  }
-  
-  // Função para atualizar dados de tendências
-  const updateTrendData = (candidatesData: Candidate[]) => {
-    // Obter os últimos 6 meses
-    const today = new Date()
-    const months = []
-    const approvedCounts = []
-    const rejectedCounts = []
-    
-    // Gerar os últimos 6 meses
-    for (let i = 5; i >= 0; i--) {
-      const month = new Date(today.getFullYear(), today.getMonth() - i, 1)
-      const monthName = month.toLocaleString('pt-BR', { month: 'short' }).charAt(0).toUpperCase() + 
-                       month.toLocaleString('pt-BR', { month: 'short' }).slice(1, 3)
-      months.push(monthName)
-      
-      // Filtrar candidatos para este mês
-      const monthCandidates = candidatesData.filter(candidate => {
-        const candidateDate = new Date(candidate.createdAt)
-        return candidateDate.getMonth() === month.getMonth() && 
-               candidateDate.getFullYear() === month.getFullYear()
+    if (recentCandidates > 0) {
+      newInsights.push({
+        id: '4',
+        type: 'info',
+        title: 'Novos candidatos na última semana',
+        description: `${recentCandidates} novo(s) candidato(s) se inscreveram na última semana.`
       })
-      
-      // Contar aprovados e rejeitados
-      const approved = monthCandidates.filter(c => c.status === 'APPROVED').length
-      const rejected = monthCandidates.filter(c => c.status === 'REJECTED').length
-      
-      approvedCounts.push(approved)
-      rejectedCounts.push(rejected)
     }
     
-    // Atualizar dados de tendências
-    setTrendData({
-      labels: months,
-      datasets: [
-        {
-          label: 'Aprovados',
-          data: approvedCounts,
-          backgroundColor: 'rgba(75, 192, 192, 0.2)',
-          borderColor: 'rgba(75, 192, 192, 1)',
-          borderWidth: 2,
-          tension: 0.4,
-          fill: true,
-        },
-        {
-          label: 'Reprovados',
-          data: rejectedCounts,
-          backgroundColor: 'rgba(255, 99, 132, 0.2)',
-          borderColor: 'rgba(255, 99, 132, 1)',
-          borderWidth: 2,
-          tension: 0.4,
-          fill: true,
-        }
-      ]
+    // Insight de dica
+    newInsights.push({
+      id: '5',
+      type: 'tip',
+      title: 'Otimize seu processo seletivo',
+      description: 'Considere adicionar testes específicos para cada posição para melhorar a qualidade dos candidatos aprovados.'
     })
-  }
-  
-  // Função para calcular compatibilidade do candidato
-  const calculateCompatibility = (candidate: Candidate) => {
-    if (!candidate.stageScores || candidate.stageScores.length === 0) {
-      return 0
-    }
     
-    // Cálculo simples de compatibilidade baseado na pontuação média
-    const totalCorrect = candidate.stageScores.reduce((acc, stage) => acc + stage.correct, 0)
-    const totalQuestions = candidate.stageScores.reduce((acc, stage) => acc + stage.total, 0)
-    
-    return totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0
-  }
-  
-  // Função para lidar com a visualização de detalhes do candidato
-  const handleViewCandidate = (candidate: Candidate) => {
-    setSelectedCandidate(candidate)
-    // Implementar lógica para mostrar detalhes do candidato
-    // Por exemplo, abrir um modal ou navegar para a página de detalhes
-    router.push(`/admin/candidates/${candidate.id}`)
-  }
-  
-  // Funções para ações rápidas
-  const handleAddCandidate = () => {
-    router.push('/admin/candidates/new')
-  }
-  
-  const handleCreateProcess = () => {
-    router.push('/admin/processes/new')
-  }
-  
-  const handleCreateCourse = () => {
-    router.push('/admin/training/courses/new')
-  }
-  
-  const handleExportData = () => {
-    // Implementar lógica para exportar dados
-    alert('Funcionalidade de exportação de dados será implementada em breve.')
-  }
-  
-  // Função para tentar novamente em caso de erro
-  const handleRetry = () => {
-    setError(null)
-    setLoading(true)
-    // Recarregar a página para tentar novamente
-    window.location.reload()
+    setInsights(newInsights)
   }
 
-  // Renderizar estado de carregamento
-  if (loading) {
-    return (
-      <AdminLayout>
-        <LoadingState message="Carregando dados do dashboard..." />
-      </AdminLayout>
-    )
-  }
-
-  // Renderizar estado de erro
-  if (error) {
-    return (
-      <AdminLayout>
-        <ErrorState message={error} onRetry={handleRetry} />
-      </AdminLayout>
-    )
-  }
-
-  // Renderizar dashboard
   return (
     <AdminLayout>
-      <div className="p-6 bg-secondary-50 min-h-screen">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-secondary-900">Dashboard Admitto</h1>
-          <p className="text-secondary-600">Visão geral do sistema e métricas de desempenho</p>
-        </div>
+      <div className="p-6">
+        <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
         
-        {/* Estatísticas do Sistema */}
-        <SystemStats statistics={statistics} />
-        
-        {/* Ações Rápidas e Insights */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          <div className="lg:col-span-1">
-            <QuickActions 
-              onAddCandidate={handleAddCandidate}
-              onCreateProcess={handleCreateProcess}
-              onCreateCourse={handleCreateCourse}
-              onExportData={handleExportData}
-            />
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {[...Array(4)].map((_, i) => (
+              <StatsCard 
+                key={i}
+                title=""
+                value={0}
+                type="total"
+                loading={true}
+              />
+            ))}
           </div>
-          <div className="lg:col-span-2">
-            <InsightsPanel insights={insights} />
+        ) : error ? (
+          <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-4 mb-6">
+            <p className="font-medium">{error}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="mt-2 text-sm text-red-600 hover:text-red-800 font-medium"
+            >
+              Tentar novamente
+            </button>
           </div>
-        </div>
-        
-        {/* Gráficos de Desempenho */}
-        <div className="mb-6">
-          <PerformanceCharts 
-            categorySuccessData={categorySuccessData}
-            categorySuccessOptions={categorySuccessOptions}
-            realVsExpectedData={realVsExpectedData}
-            realVsExpectedOptions={realVsExpectedOptions}
-            overallPerformanceData={overallPerformanceData}
-            overallPerformanceOptions={overallPerformanceOptions}
-            trendData={trendData}
-            trendOptions={trendOptions}
-          />
-        </div>
-        
-        {/* Lista de Candidatos */}
-        <div className="mb-6">
-          <CandidatesList 
-            candidates={candidates}
-            onViewCandidate={handleViewCandidate}
-            calculateCompatibility={calculateCompatibility}
-          />
-        </div>
-        
-        {/* Processos Seletivos e Cursos */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <ActiveProcesses processes={processes} />
-          <TrainingCourses courses={courses} />
-        </div>
+        ) : (
+          <>
+            {/* Estatísticas principais */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <StatsCard 
+                title="Total de Candidatos"
+                value={statistics?.candidateStats.total || 0}
+                type="total"
+              />
+              <StatsCard 
+                title="Aprovados"
+                value={statistics?.candidateStats.approved || 0}
+                type="approved"
+              />
+              <StatsCard 
+                title="Reprovados"
+                value={statistics?.candidateStats.rejected || 0}
+                type="rejected"
+              />
+              <StatsCard 
+                title="Pendentes"
+                value={statistics?.candidateStats.pending || 0}
+                type="pending"
+              />
+            </div>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+              {/* Processos Seletivos Ativos */}
+              <div className="col-span-1 lg:col-span-2">
+                <h2 className="text-lg font-semibold mb-4">Processos Seletivos Ativos</h2>
+                {processes.length === 0 ? (
+                  <div className="bg-white rounded-lg shadow p-6 text-center">
+                    <p className="text-gray-500">Nenhum processo seletivo ativo no momento.</p>
+                    <Link 
+                      href="/admin/processes/new" 
+                      className="inline-block mt-3 text-sm text-sky-600 hover:text-sky-800 font-medium"
+                    >
+                      Criar novo processo seletivo
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {processes.slice(0, 4).map(process => (
+                      <ProcessCard 
+                        key={process.id}
+                        id={process.id}
+                        title={process.title}
+                        position={process.position}
+                        candidateCount={process.candidateCount}
+                        startDate={process.startDate}
+                        progress={process.progress}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              {/* Insights */}
+              <div className="col-span-1">
+                <h2 className="text-lg font-semibold mb-4">Insights</h2>
+                <div className="space-y-3">
+                  {insights.map(insight => (
+                    <InsightCard 
+                      key={insight.id}
+                      type={insight.type}
+                      title={insight.title}
+                      description={insight.description}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            {/* Cursos de Treinamento */}
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold mb-4">
+                Cursos de Treinamento 
+                <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">Em breve</span>
+              </h2>
+              <div className="bg-white rounded-lg shadow p-6 text-center opacity-70">
+                <p className="text-gray-500">Funcionalidade de cursos de treinamento estará disponível em breve.</p>
+                <button 
+                  disabled
+                  className="inline-block mt-3 text-sm bg-gray-300 text-gray-600 px-4 py-2 rounded cursor-not-allowed opacity-70"
+                >
+                  Criar novo curso
+                </button>
+              </div>
+            </div>
+            
+            {/* Candidatos Recentes */}
+            {candidates.length > 0 && (
+              <div className="mb-6">
+                <h2 className="text-lg font-semibold mb-4">Candidatos Recentes</h2>
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Posição</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {candidates.slice(0, 5).map(candidate => (
+                        <tr key={candidate.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="font-medium text-gray-900">{candidate.name}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {candidate.email}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {candidate.position || 'Não especificado'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                              ${candidate.status === 'APPROVED' ? 'bg-green-100 text-green-800' : 
+                                candidate.status === 'REJECTED' ? 'bg-red-100 text-red-800' : 
+                                'bg-yellow-100 text-yellow-800'}`}
+                            >
+                              {candidate.status === 'APPROVED' ? 'Aprovado' : 
+                               candidate.status === 'REJECTED' ? 'Reprovado' : 'Pendente'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(candidate.createdAt).toLocaleDateString('pt-BR')}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {candidates.length > 5 && (
+                    <div className="bg-gray-50 px-6 py-3 border-t border-gray-200">
+                      <Link 
+                        href="/admin/candidates" 
+                        className="text-sm text-sky-600 hover:text-sky-800 font-medium"
+                      >
+                        Ver todos os candidatos
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </AdminLayout>
   )
