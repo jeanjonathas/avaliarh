@@ -13,7 +13,7 @@ interface Sector {
 
 interface Module {
   id: string;
-  title: string;
+  name: string;
   description: string;
   order: number;
   lessons: Lesson[];
@@ -21,12 +21,13 @@ interface Module {
 
 interface Lesson {
   id: string;
-  title: string;
+  name: string;
   description: string;
-  type: 'text' | 'slides' | 'video';
+  type: 'TEXT' | 'SLIDES' | 'VIDEO' | 'AUDIO';
   content: string;
   videoUrl?: string;
   slidesUrl?: string;
+  duration?: number;
   order: number;
 }
 
@@ -56,17 +57,18 @@ export default function NewCourse() {
   
   // New module/lesson form state
   const [moduleForm, setModuleForm] = useState({
-    title: '',
+    name: '',
     description: ''
   });
   
   const [lessonForm, setLessonForm] = useState({
-    title: '',
+    name: '',
     description: '',
-    type: 'text',
+    type: 'TEXT',
     content: '',
     videoUrl: '',
-    slidesUrl: ''
+    slidesUrl: '',
+    duration: undefined
   });
 
   useEffect(() => {
@@ -116,27 +118,27 @@ export default function NewCourse() {
   };
 
   const addModule = () => {
-    if (!moduleForm.title.trim()) {
+    if (!moduleForm.name.trim()) {
       setError('O título do módulo é obrigatório');
       return;
     }
 
     const newModule: Module = {
       id: `temp-${Date.now()}`,
-      title: moduleForm.title,
+      name: moduleForm.name,
       description: moduleForm.description,
       order: modules.length + 1,
       lessons: []
     };
 
     setModules([...modules, newModule]);
-    setModuleForm({ title: '', description: '' });
+    setModuleForm({ name: '', description: '' });
     setShowModuleForm(false);
     setError(null);
   };
 
   const addLesson = (moduleIndex: number) => {
-    if (!lessonForm.title.trim()) {
+    if (!lessonForm.name.trim()) {
       setError('O título da lição é obrigatório');
       return;
     }
@@ -144,30 +146,31 @@ export default function NewCourse() {
     const updatedModules = [...modules];
     const newLesson: Lesson = {
       id: `temp-${Date.now()}`,
-      title: lessonForm.title,
+      name: lessonForm.name,
       description: lessonForm.description,
-      type: lessonForm.type as 'text' | 'slides' | 'video',
+      type: lessonForm.type as 'TEXT' | 'SLIDES' | 'VIDEO' | 'AUDIO',
       content: lessonForm.content,
       order: updatedModules[moduleIndex].lessons.length + 1
     };
 
-    if (lessonForm.type === 'video' && lessonForm.videoUrl) {
+    if (lessonForm.type === 'VIDEO' && lessonForm.videoUrl) {
       newLesson.videoUrl = lessonForm.videoUrl;
     }
 
-    if (lessonForm.type === 'slides' && lessonForm.slidesUrl) {
+    if (lessonForm.type === 'SLIDES' && lessonForm.slidesUrl) {
       newLesson.slidesUrl = lessonForm.slidesUrl;
     }
 
     updatedModules[moduleIndex].lessons.push(newLesson);
     setModules(updatedModules);
     setLessonForm({
-      title: '',
+      name: '',
       description: '',
-      type: 'text',
+      type: 'TEXT',
       content: '',
       videoUrl: '',
-      slidesUrl: ''
+      slidesUrl: '',
+      duration: undefined
     });
     setShowLessonForm(false);
     setCurrentModuleIndex(null);
@@ -194,7 +197,7 @@ export default function NewCourse() {
     // Verificar se todos os módulos têm pelo menos uma lição
     const emptyModules = modules.filter(module => module.lessons.length === 0);
     if (emptyModules.length > 0) {
-      setError(`O(s) módulo(s) "${emptyModules.map(m => m.title).join(', ')}" não possui(em) lições`);
+      setError(`O(s) módulo(s) "${emptyModules.map(m => m.name).join(', ')}" não possui(em) lições`);
       setSubmitting(false);
       return;
     }
@@ -203,16 +206,17 @@ export default function NewCourse() {
       const courseData = {
         ...formData,
         modules: modules.map(module => ({
-          title: module.title,
+          name: module.name,
           description: module.description,
           order: module.order,
           lessons: module.lessons.map(lesson => ({
-            title: lesson.title,
+            name: lesson.name,
             description: lesson.description,
             type: lesson.type,
             content: lesson.content,
             videoUrl: lesson.videoUrl,
             slidesUrl: lesson.slidesUrl,
+            duration: lesson.duration,
             order: lesson.order
           }))
         }))
@@ -397,14 +401,14 @@ export default function NewCourse() {
                     {showModuleForm && (
                       <div className="mt-4 bg-white p-6 shadow-sm rounded-lg border border-gray-200">
                         <h4 className="text-md font-medium text-gray-900 mb-4">Novo Módulo</h4>
-                        <label htmlFor="moduleTitle" className="block text-sm font-medium text-gray-700">
-                          Título do Módulo *
+                        <label htmlFor="moduleName" className="block text-sm font-medium text-gray-700">
+                          Nome do Módulo *
                         </label>
                         <input
                           type="text"
-                          id="moduleTitle"
-                          name="title"
-                          value={moduleForm.title}
+                          id="moduleName"
+                          name="name"
+                          value={moduleForm.name}
                           onChange={handleModuleFormChange}
                           className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
                         />
@@ -424,7 +428,7 @@ export default function NewCourse() {
                             type="button"
                             onClick={() => {
                               setShowModuleForm(false);
-                              setModuleForm({ title: '', description: '' });
+                              setModuleForm({ name: '', description: '' });
                             }}
                             className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                           >
@@ -472,7 +476,7 @@ export default function NewCourse() {
                                     {index + 1}
                                   </div>
                                   <div className="ml-3">
-                                    <h4 className="text-lg font-medium text-gray-900">{module.title}</h4>
+                                    <h4 className="text-lg font-medium text-gray-900">{module.name}</h4>
                                     {module.description && (
                                       <p className="text-sm text-gray-500 mt-1">{module.description}</p>
                                     )}
@@ -499,14 +503,14 @@ export default function NewCourse() {
                                 <h4 className="text-md font-medium text-gray-900 mb-4">Nova Lição</h4>
                                 <div className="grid grid-cols-1 gap-4">
                                   <div>
-                                    <label htmlFor="lessonTitle" className="block text-sm font-medium text-gray-700">
-                                      Título da Lição *
+                                    <label htmlFor="lessonName" className="block text-sm font-medium text-gray-700">
+                                      Nome da Lição *
                                     </label>
                                     <input
                                       type="text"
-                                      id="lessonTitle"
-                                      name="title"
-                                      value={lessonForm.title}
+                                      id="lessonName"
+                                      name="name"
+                                      value={lessonForm.name}
                                       onChange={handleLessonFormChange}
                                       className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
                                     />
@@ -537,13 +541,14 @@ export default function NewCourse() {
                                       onChange={handleLessonFormChange}
                                       className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                                     >
-                                      <option value="text">Texto</option>
-                                      <option value="slides">Slides</option>
-                                      <option value="video">Vídeo</option>
+                                      <option value="TEXT">Texto</option>
+                                      <option value="SLIDES">Slides</option>
+                                      <option value="VIDEO">Vídeo</option>
+                                      <option value="AUDIO">Áudio</option>
                                     </select>
                                   </div>
                                   
-                                  {lessonForm.type === 'video' && (
+                                  {lessonForm.type === 'VIDEO' && (
                                     <div>
                                       <label htmlFor="videoUrl" className="block text-sm font-medium text-gray-700">
                                         URL do Vídeo *
@@ -560,7 +565,7 @@ export default function NewCourse() {
                                     </div>
                                   )}
                                   
-                                  {lessonForm.type === 'slides' && (
+                                  {lessonForm.type === 'SLIDES' && (
                                     <div>
                                       <label htmlFor="slidesUrl" className="block text-sm font-medium text-gray-700">
                                         URL das Slides *
@@ -598,12 +603,13 @@ export default function NewCourse() {
                                     onClick={() => {
                                       setShowLessonForm(false);
                                       setLessonForm({
-                                        title: '',
+                                        name: '',
                                         description: '',
-                                        type: 'text',
+                                        type: 'TEXT',
                                         content: '',
                                         videoUrl: '',
-                                        slidesUrl: ''
+                                        slidesUrl: '',
+                                        duration: undefined
                                       });
                                     }}
                                     className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
@@ -642,26 +648,26 @@ export default function NewCourse() {
                                     <div key={lesson.id} className="bg-gray-50 rounded-md border border-gray-200 p-4">
                                       <div className="flex items-center">
                                         <div className="flex-shrink-0">
-                                          {lesson.type === 'text' && (
+                                          {lesson.type === 'TEXT' && (
                                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                             </svg>
                                           )}
-                                          {lesson.type === 'video' && (
+                                          {lesson.type === 'VIDEO' && (
                                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                             </svg>
                                           )}
-                                          {lesson.type === 'slides' && (
+                                          {lesson.type === 'SLIDES' && (
                                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
                                             </svg>
                                           )}
                                         </div>
                                         <div className="ml-3">
-                                          <h5 className="text-md font-medium text-gray-900">Lição {lessonIndex + 1}: {lesson.title}</h5>
+                                          <h5 className="text-md font-medium text-gray-900">Lição {lessonIndex + 1}: {lesson.name}</h5>
                                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800 mt-1">
-                                            {lesson.type === 'text' ? 'Texto' : lesson.type === 'video' ? 'Vídeo' : 'Slides'}
+                                            {lesson.type === 'TEXT' ? 'Texto' : lesson.type === 'VIDEO' ? 'Vídeo' : lesson.type === 'SLIDES' ? 'Slides' : 'Áudio'}
                                           </span>
                                         </div>
                                       </div>

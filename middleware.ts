@@ -56,15 +56,16 @@ function isPublicRoute(pathname: string, publicEndpoints: string[]): boolean {
 
 // Função para obter a URL base do ambiente atual
 function getBaseUrl(request: NextRequest): string {
-  const isProduction = process.env.NODE_ENV === 'production'
-  const host = request.headers.get('host') || ''
+  const host = request.headers.get('host') || 'localhost:3000'
   const protocol = request.headers.get('x-forwarded-proto') || 'http'
   
-  if (isProduction) {
-    return process.env.NEXTAUTH_URL || `${protocol}://${host}`
+  // Usar NEXTAUTH_URL se estiver definido
+  if (process.env.NEXTAUTH_URL) {
+    return process.env.NEXTAUTH_URL
   }
   
-  return process.env.NEXTAUTH_URL_INTERNAL || 'http://localhost:3000'
+  // Caso contrário, construir a URL base a partir dos headers
+  return `${protocol}://${host}`
 }
 
 // Middleware principal para autenticação e autorização
@@ -72,34 +73,8 @@ export async function middleware(request: NextRequest) {
   // Obter o caminho da URL
   const { pathname } = request.nextUrl
   
-  console.log('Middleware - Rota acessada:', pathname)
-  
-  // Log dos headers para diagnóstico
-  const host = request.headers.get('host') || 'desconhecido'
-  const referer = request.headers.get('referer')
-  const cookieHeader = request.headers.get('cookie')
-  const hasSecureCookie = cookieHeader?.includes('__Secure-next-auth.session-token')
-  const hasNormalCookie = cookieHeader?.includes('next-auth.session-token')
-  const protocol = request.headers.get('x-forwarded-proto') || 'http'
-  const isProduction = process.env.NODE_ENV === 'production'
-  const baseUrl = getBaseUrl(request)
-  
-  console.log('Middleware - Headers:', JSON.stringify({
-    host,
-    referer,
-    cookie: cookieHeader ? 'Presente' : 'Ausente',
-    hasSecureCookie: hasSecureCookie ? 'Sim' : 'Não',
-    hasNormalCookie: hasNormalCookie ? 'Sim' : 'Não',
-    protocol,
-    isProduction: isProduction ? 'Sim' : 'Não',
-    nextauthUrl: process.env.NEXTAUTH_URL || 'não definido',
-    nextauthUrlInternal: process.env.NEXTAUTH_URL_INTERNAL || 'não definido',
-    baseUrl
-  }))
-
   // Verificar se é uma página de login
   if (isLoginRoute(pathname)) {
-    console.log('Middleware: Página de login detectada, permitindo acesso')
     return NextResponse.next()
   }
 
@@ -119,12 +94,18 @@ export async function middleware(request: NextRequest) {
 
   // Verificar se é um endpoint público
   if (isPublicRoute(pathname, publicEndpoints)) {
-    console.log('Middleware: Endpoint público detectado, permitindo acesso')
     return NextResponse.next()
   }
 
   try {
-    console.log('Middleware: Verificando token JWT...')
+    // Obter informações do ambiente
+    const host = request.headers.get('host') || 'desconhecido'
+    const cookieHeader = request.headers.get('cookie')
+    const hasSecureCookie = cookieHeader?.includes('__Secure-next-auth.session-token')
+    const hasNormalCookie = cookieHeader?.includes('next-auth.session-token')
+    const protocol = request.headers.get('x-forwarded-proto') || 'http'
+    const isProduction = process.env.NODE_ENV === 'production'
+    const baseUrl = getBaseUrl(request)
     
     // Obter o token JWT da requisição
     const token = await getToken({
@@ -134,20 +115,8 @@ export async function middleware(request: NextRequest) {
       cookieName: isProduction ? `__Secure-next-auth.session-token` : `next-auth.session-token`,
     })
     
-    // Log do token para diagnóstico (sem expor dados sensíveis)
-    console.log('Middleware - Token:', token ? {
-      name: token.name,
-      email: token.email,
-      role: token.role,
-      iat: token.iat,
-      exp: token.exp,
-      jti: token.jti
-    } : 'Token não encontrado')
-    
     // Se o token não existir, redirecionar para a página de login
     if (!token) {
-      console.log('Middleware: Token não encontrado, redirecionando para login')
-      
       // Determinar a página de login apropriada com base na rota
       const loginUrl = pathname.startsWith('/superadmin') 
         ? '/superadmin/login' 
@@ -164,14 +133,12 @@ export async function middleware(request: NextRequest) {
       
       url.search = `?callbackUrl=${encodeURIComponent(callbackUrl)}`
       
-      console.log('Middleware: Redirecionando para', url.toString())
       return NextResponse.redirect(url)
     }
     
     // Verificar permissões para rotas de superadmin
     if (pathname.startsWith('/api/superadmin') || pathname.startsWith('/superadmin')) {
       if (token.role !== 'SUPER_ADMIN') {
-        console.log('Middleware: Acesso negado a rota de superadmin para usuário com papel:', token.role)
         return new NextResponse(
           JSON.stringify({ success: false, message: 'Acesso negado. Permissão insuficiente.' }),
           { status: 403, headers: { 'content-type': 'application/json' } }
@@ -182,7 +149,6 @@ export async function middleware(request: NextRequest) {
     // Verificar permissões para rotas de admin
     if (pathname.startsWith('/api/admin') || pathname.startsWith('/admin')) {
       if (token.role !== 'SUPER_ADMIN' && token.role !== 'COMPANY_ADMIN') {
-        console.log('Middleware: Acesso negado a rota de admin para usuário com papel:', token.role)
         return new NextResponse(
           JSON.stringify({ success: false, message: 'Acesso negado. Permissão insuficiente.' }),
           { status: 403, headers: { 'content-type': 'application/json' } }
@@ -201,8 +167,6 @@ export async function middleware(request: NextRequest) {
       
       // Verificar se o papel do usuário está na lista de papéis permitidos
       if (!allowedRoles.includes(token.role as RoleType)) {
-        console.log(`Middleware: Acesso negado. Papel ${token.role} não tem permissão para ${routePrefix}`);
-        
         // Se for uma rota de API, retorna 403
         if (pathname.startsWith('/api/')) {
           return new NextResponse(
@@ -225,11 +189,8 @@ export async function middleware(request: NextRequest) {
       }
     }
     
-    console.log('Middleware: Acesso permitido para usuário com papel:', token.role)
     return NextResponse.next()
   } catch (error) {
-    console.error('Middleware: Erro ao verificar token:', error)
-    
     // Em caso de erro, redirecionar para a página de login
     const loginUrl = pathname.startsWith('/superadmin') 
       ? '/superadmin/login' 

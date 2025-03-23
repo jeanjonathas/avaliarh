@@ -271,7 +271,7 @@ async function createCourse(req: NextApiRequest, res: NextApiResponse, companyId
           await prisma.$executeRaw`
             INSERT INTO "TrainingModule" (
               id,
-              title,
+              name,
               description,
               "order",
               "courseId",
@@ -280,7 +280,7 @@ async function createCourse(req: NextApiRequest, res: NextApiResponse, companyId
             )
             VALUES (
               ${moduleId},
-              ${moduleItem.title},
+              ${moduleItem.name},
               ${moduleItem.description || ''},
               ${moduleItem.order || i + 1},
               ${courseId},
@@ -299,12 +299,13 @@ async function createCourse(req: NextApiRequest, res: NextApiResponse, companyId
               await prisma.$executeRaw`
                 INSERT INTO "TrainingLesson" (
                   id,
-                  title,
+                  name,
                   description,
                   type,
                   content,
                   "videoUrl",
                   "slidesUrl",
+                  "duration",
                   "order",
                   "moduleId",
                   "createdAt",
@@ -312,12 +313,13 @@ async function createCourse(req: NextApiRequest, res: NextApiResponse, companyId
                 )
                 VALUES (
                   ${lessonId},
-                  ${lesson.title},
+                  ${lesson.name},
                   ${lesson.description || ''},
-                  ${lesson.type || 'text'},
+                  ${lesson.type || 'TEXT'},
                   ${lesson.content || ''},
                   ${lesson.videoUrl || null},
                   ${lesson.slidesUrl || null},
+                  ${lesson.duration || null},
                   ${lesson.order || j + 1},
                   ${moduleId},
                   ${Prisma.raw('NOW()')},
@@ -341,7 +343,7 @@ async function createCourse(req: NextApiRequest, res: NextApiResponse, companyId
 
     // Fetch modules for this course
     const courseModules: any[] = await prisma.$queryRaw`
-      SELECT id, title, description, "order"
+      SELECT id, name, description, "order"
       FROM "TrainingModule"
       WHERE "courseId" = ${courseId}
       ORDER BY "order" ASC
@@ -349,20 +351,20 @@ async function createCourse(req: NextApiRequest, res: NextApiResponse, companyId
 
     // Fetch lessons for each module
     for (const moduleItem of courseModules) {
-      const moduleLessons: any[] = await prisma.$queryRaw`
-        SELECT id, title, description, type, content, "videoUrl", "slidesUrl", "order"
+      moduleItem.lessons = await prisma.$queryRaw`
+        SELECT id, name, description, type, content, "videoUrl", "slidesUrl", "duration", "order"
         FROM "TrainingLesson"
         WHERE "moduleId" = ${moduleItem.id}
         ORDER BY "order" ASC
       `;
-      moduleItem.lessons = moduleLessons;
     }
 
+    // Add modules to course
     course.modules = courseModules;
 
     return res.status(201).json(course);
   } catch (error) {
-    console.error('Erro ao criar curso:', error);
+    console.error('Error creating course:', error);
     return res.status(500).json({ error: 'Erro ao criar curso' });
   }
 }
