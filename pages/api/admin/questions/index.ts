@@ -28,6 +28,21 @@ export default async function handler(
         // Base where condition
         let whereCondition: any = {};
         
+        // Determinar o tipo de questão com base no referer ou query parameter
+        const referer = req.headers.referer || '';
+        const questionTypeFromQuery = req.query.questionType as string;
+        let questionType = 'selection'; // Valor padrão
+        
+        if (questionTypeFromQuery) {
+          // Se fornecido explicitamente na query, use esse valor
+          questionType = questionTypeFromQuery;
+        } else if (referer.includes('/admin/training/')) {
+          // Se o referer contém '/admin/training/', é uma questão de treinamento
+          questionType = 'training';
+        }
+        
+        console.log(`Tipo de questão determinado: ${questionType}`);
+        
         // Add type filter if provided
         if (type) {
           whereCondition.type = type;
@@ -226,17 +241,27 @@ export default async function handler(
     }
   } else if (req.method === 'POST') {
     try {
-      const { text, stageId, categoryId, categoryUuid, options, type, difficulty, showResults } = req.body;
+      console.log('Criando nova pergunta');
       
-      console.log('Recebendo requisição POST para criar pergunta:', {
-        text,
-        stageId,
-        categoryId,
-        categoryUuid,
-        options
-      });
-
-      // Validar dados obrigatórios
+      // Extrair dados do corpo da requisição
+      const { text, stageId, categoryId, options, type, difficulty, showResults } = req.body;
+      
+      // Determinar o tipo de questão com base no referer ou body parameter
+      const referer = req.headers.referer || '';
+      const questionTypeFromBody = req.body.questionType;
+      let questionType = 'selection'; // Valor padrão
+      
+      if (questionTypeFromBody) {
+        // Se fornecido explicitamente no body, use esse valor
+        questionType = questionTypeFromBody;
+      } else if (referer.includes('/admin/training/')) {
+        // Se o referer contém '/admin/training/', é uma questão de treinamento
+        questionType = 'training';
+      }
+      
+      console.log(`Tipo de questão determinado: ${questionType}`);
+      
+      // Validação básica
       if (!text) {
         return res.status(400).json({ error: 'Texto da pergunta é obrigatório' });
       }
@@ -369,6 +394,8 @@ export default async function handler(
                 connect: [{ id: finalCategoryId }]
               }
             } : {})
+            // Temporariamente removendo o campo questionType até que o Prisma Client seja atualizado
+            // questionType: questionType
           },
           include: {
             categories: true,

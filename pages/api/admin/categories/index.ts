@@ -45,7 +45,23 @@ export default async function handler(
       try {
         console.log('API Categories: Buscando categorias');
         
+        // Determinar o tipo de categoria com base no referer ou query parameter
+        const referer = req.headers.referer || '';
+        const categoryTypeFromQuery = req.query.categoryType as string;
+        let categoryType = 'selection'; // Valor padrão
+        
+        if (categoryTypeFromQuery) {
+          // Se fornecido explicitamente na query, use esse valor
+          categoryType = categoryTypeFromQuery;
+        } else if (referer.includes('/admin/training/')) {
+          // Se o referer contém '/admin/training/', é uma categoria de treinamento
+          categoryType = 'training';
+        }
+        
+        console.log(`API Categories: Tipo de categoria determinado: ${categoryType}`);
+        
         // Buscar todas as categorias usando o Prisma Client em vez de SQL raw
+        // Temporariamente removendo o filtro por categoryType até que o Prisma Client seja atualizado
         const categories = await prisma.category.findMany({
           include: {
             _count: {
@@ -85,7 +101,23 @@ export default async function handler(
           return res.status(400).json({ message: 'Nome da categoria é obrigatório' });
         }
         
+        // Determinar o tipo de categoria com base no referer ou body parameter
+        const referer = req.headers.referer || '';
+        const categoryTypeFromBody = req.body.categoryType;
+        let categoryType = 'selection'; // Valor padrão
+        
+        if (categoryTypeFromBody) {
+          // Se fornecido explicitamente no body, use esse valor
+          categoryType = categoryTypeFromBody;
+        } else if (referer.includes('/admin/training/')) {
+          // Se o referer contém '/admin/training/', é uma categoria de treinamento
+          categoryType = 'training';
+        }
+        
+        console.log(`API Categories: Tipo de categoria determinado: ${categoryType}`);
+        
         // Verificar se já existe uma categoria com o mesmo nome
+        // Temporariamente removendo o filtro por categoryType até que o Prisma Client seja atualizado
         const existingCategory = await prisma.category.findFirst({
           where: {
             name: {
@@ -101,6 +133,7 @@ export default async function handler(
         }
         
         // Criar nova categoria
+        // Temporariamente removendo o campo categoryType até que o Prisma Client seja atualizado
         const newCategory = await prisma.category.create({
           data: {
             name,

@@ -1,0 +1,342 @@
+[
+  {
+    "bloco": 1,
+    "frases": [
+      {
+        "texto": "Consigo tomar decisões com confiança.",
+        "dimensao": "Decisão"
+      },
+      {
+        "texto": "Me esforço para alcançar objetivos concretos.",
+        "dimensao": "Orientação para Resultados"
+      },
+      {
+        "texto": "Mantenho o foco nas minhas responsabilidades.",
+        "dimensao": "Autodisciplina"
+      }
+    ]
+  },
+  {
+    "bloco": 2,
+    "frases": [
+      {
+        "texto": "Costumo questionar antes de aceitar uma ideia.",
+        "dimensao": "Ceticismo"
+      },
+      {
+        "texto": "Me sinto motivado ao competir com os outros.",
+        "dimensao": "Competitividade"
+      },
+      {
+        "texto": "Gosto de agir de forma autônoma.",
+        "dimensao": "Independência"
+      }
+    ]
+  },
+  {
+    "bloco": 3,
+    "frases": [
+      {
+        "texto": "Me esforço para alcançar objetivos concretos.",
+        "dimensao": "Orientação para Resultados"
+      },
+      {
+        "texto": "Lido bem com situações incertas ou indefinidas.",
+        "dimensao": "Tolerância à Ambiguidade"
+      },
+      {
+        "texto": "Penso bem antes de tomar decisões importantes.",
+        "dimensao": "Prudência"
+      }
+    ]
+  },
+  {
+    "bloco": 4,
+    "frases": [
+      {
+        "texto": "Lido bem com situações incertas ou indefinidas.",
+        "dimensao": "Tolerância à Ambiguidade"
+      },
+      {
+        "texto": "Gosto de ser reconhecido pelo meu desempenho.",
+        "dimensao": "Necessidade de Reconhecimento"
+      },
+      {
+        "texto": "Me sinto energizado ao conversar com diferentes pessoas.",
+        "dimensao": "Contato Social"
+      }
+    ]
+  },
+  {
+    "bloco": 5,
+    "frases": [
+      {
+        "texto": "Penso bem antes de tomar decisões importantes.",
+        "dimensao": "Prudência"
+      },
+      {
+        "texto": "Prefiro pensar por conta própria do que seguir o grupo.",
+        "dimensao": "Autonomia no Pensamento"
+      },
+      {
+        "texto": "Gosto de estar sempre em movimento.",
+        "dimensao": "Energia"
+      }
+    ]
+  },
+  {
+    "bloco": 6,
+    "frases": [
+      {
+        "texto": "Sou cuidadoso com pequenos detalhes no trabalho.",
+        "dimensao": "Atenção a Detalhes"
+      },
+      {
+        "texto": "Tenho prazer em ajudar, mesmo sem receber algo em troca.",
+        "dimensao": "Altruísmo"
+      },
+      {
+        "texto": "Gosto de convencer os outros sobre minhas ideias.",
+        "dimensao": "Influência Social"
+      }
+    ]
+  },
+  {
+    "bloco": 7,
+    "frases": [
+      {
+        "texto": "Me sinto confortável ao compartilhar minha opinião.",
+        "dimensao": "Abertura à Comunicação"
+      },
+      {
+        "texto": "Prefiro pensar por conta própria do que seguir o grupo.",
+        "dimensao": "Autonomia no Pensamento"
+      },
+      {
+        "texto": "Tenho prazer em ajudar, mesmo sem receber algo em troca.",
+        "dimensao": "Altruísmo"
+      }
+    ]
+  },
+  {
+    "bloco": 8,
+    "frases": [
+      {
+        "texto": "Acredito que as coisas geralmente darão certo.",
+        "dimensao": "Otimismo"
+      },
+      {
+        "texto": "Me sinto confortável ao compartilhar minha opinião.",
+        "dimensao": "Abertura à Comunicação"
+      },
+      {
+        "texto": "Sou cuidadoso com pequenos detalhes no trabalho.",
+        "dimensao": "Atenção a Detalhes"
+      }
+    ]
+  },
+  {
+    "bloco": 9,
+    "frases": [
+      {
+        "texto": "Me sinto energizado ao conversar com diferentes pessoas.",
+        "dimensao": "Contato Social"
+      },
+      {
+        "texto": "Prefiro pensar por conta própria do que seguir o grupo.",
+        "dimensao": "Autonomia no Pensamento"
+      },
+      {
+        "texto": "Sou cuidadoso com pequenos detalhes no trabalho.",
+        "dimensao": "Atenção a Detalhes"
+      }
+    ]
+  },
+  {
+    "bloco": 10,
+    "frases": [
+      {
+        "texto": "Prefiro pensar por conta própria do que seguir o grupo.",
+        "dimensao": "Autonomia no Pensamento"
+      },
+      {
+        "texto": "Prefiro seguir procedimentos claros.",
+        "dimensao": "Dependência de Regras"
+      },
+      {
+        "texto": "Mantenho a calma mesmo sob pressão.",
+        "dimensao": "Controle Emocional"
+      }
+    ]
+  },
+  {
+    "bloco": 11,
+    "frases": [
+      {
+        "texto": "Tenho grandes planos para minha carreira.",
+        "dimensao": "Ambição"
+      },
+      {
+        "texto": "Acredito que as coisas geralmente darão certo.",
+        "dimensao": "Otimismo"
+      },
+      {
+        "texto": "Me coloco facilmente no lugar dos outros.",
+        "dimensao": "Empatia"
+      }
+    ]
+  },
+  {
+    "bloco": 12,
+    "frases": [
+      {
+        "texto": "Consigo tomar decisões com confiança.",
+        "dimensao": "Decisão"
+      },
+      {
+        "texto": "Me sinto confortável ao compartilhar minha opinião.",
+        "dimensao": "Abertura à Comunicação"
+      },
+      {
+        "texto": "Prefiro pensar por conta própria do que seguir o grupo.",
+        "dimensao": "Autonomia no Pensamento"
+      }
+    ]
+  },
+  {
+    "bloco": 13,
+    "frases": [
+      {
+        "texto": "Acredito nas minhas capacidades para lidar com desafios.",
+        "dimensao": "Autoconfiança"
+      },
+      {
+        "texto": "Mantenho o foco nas minhas responsabilidades.",
+        "dimensao": "Autodisciplina"
+      },
+      {
+        "texto": "Tenho prazer em ajudar, mesmo sem receber algo em troca.",
+        "dimensao": "Altruísmo"
+      }
+    ]
+  },
+  {
+    "bloco": 14,
+    "frases": [
+      {
+        "texto": "Gosto de planejar antes de agir.",
+        "dimensao": "Planejamento e Organização"
+      },
+      {
+        "texto": "Me sinto confortável ao compartilhar minha opinião.",
+        "dimensao": "Abertura à Comunicação"
+      },
+      {
+        "texto": "Gosto de convencer os outros sobre minhas ideias.",
+        "dimensao": "Influência Social"
+      }
+    ]
+  },
+  {
+    "bloco": 15,
+    "frases": [
+      {
+        "texto": "Mantenho a calma mesmo sob pressão.",
+        "dimensao": "Controle Emocional"
+      },
+      {
+        "texto": "Tenho grandes planos para minha carreira.",
+        "dimensao": "Ambição"
+      },
+      {
+        "texto": "Me sinto energizado ao conversar com diferentes pessoas.",
+        "dimensao": "Contato Social"
+      }
+    ]
+  },
+  {
+    "bloco": 16,
+    "frases": [
+      {
+        "texto": "Prefiro seguir procedimentos claros.",
+        "dimensao": "Dependência de Regras"
+      },
+      {
+        "texto": "Prefiro colaborar em grupo do que trabalhar sozinho.",
+        "dimensao": "Trabalho em Equipe"
+      },
+      {
+        "texto": "Tomo iniciativa e assumo a liderança quando necessário.",
+        "dimensao": "Assertividade"
+      }
+    ]
+  },
+  {
+    "bloco": 17,
+    "frases": [
+      {
+        "texto": "Tenho interesse constante em aprender coisas novas.",
+        "dimensao": "Curiosidade Intelectual"
+      },
+      {
+        "texto": "Acredito que as coisas geralmente darão certo.",
+        "dimensao": "Otimismo"
+      },
+      {
+        "texto": "Prefiro colaborar em grupo do que trabalhar sozinho.",
+        "dimensao": "Trabalho em Equipe"
+      }
+    ]
+  },
+  {
+    "bloco": 18,
+    "frases": [
+      {
+        "texto": "Sou cuidadoso com pequenos detalhes no trabalho.",
+        "dimensao": "Atenção a Detalhes"
+      },
+      {
+        "texto": "Gosto de propor ideias novas para resolver problemas.",
+        "dimensao": "Criatividade"
+      },
+      {
+        "texto": "Consigo me recuperar rapidamente após contratempos.",
+        "dimensao": "Resiliência"
+      }
+    ]
+  },
+  {
+    "bloco": 19,
+    "frases": [
+      {
+        "texto": "Prefiro colaborar em grupo do que trabalhar sozinho.",
+        "dimensao": "Trabalho em Equipe"
+      },
+      {
+        "texto": "Prefiro seguir procedimentos claros.",
+        "dimensao": "Dependência de Regras"
+      },
+      {
+        "texto": "Costumo questionar antes de aceitar uma ideia.",
+        "dimensao": "Ceticismo"
+      }
+    ]
+  },
+  {
+    "bloco": 20,
+    "frases": [
+      {
+        "texto": "Tenho prazer em ajudar, mesmo sem receber algo em troca.",
+        "dimensao": "Altruísmo"
+      },
+      {
+        "texto": "Me esforço para alcançar objetivos concretos.",
+        "dimensao": "Orientação para Resultados"
+      },
+      {
+        "texto": "Prefiro ambientes dinâmicos à rotina.",
+        "dimensao": "Apreciação por Variedade"
+      }
+    ]
+  }
+]

@@ -120,7 +120,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           "passingScore", 
           level, 
           "levelId", 
-          "companyId"
+          "companyId",
+          "testType"
         ) VALUES (
           ${name},
           ${description || ''},
@@ -128,7 +129,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           ${passingScore || 70},
           ${level},
           ${levelId},
-          ${companyId}
+          ${companyId},
+          'training'
         )
       `;
 

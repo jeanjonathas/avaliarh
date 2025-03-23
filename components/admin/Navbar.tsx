@@ -64,12 +64,8 @@ const Navbar: React.FC<NavbarProps> = ({ onSectionChange }) => {
   const handleSectionChange = (section: 'selecao' | 'treinamento') => {
     setActiveSection(section);
     
-    // Redirecionar para a página inicial da seção
-    if (section === 'selecao') {
-      router.push('/admin/dashboard');
-    } else {
-      router.push('/admin/training/dashboard');
-    }
+    // Não usamos mais router.push aqui para evitar loops de renderização
+    // A navegação será feita pelos componentes Link
   };
   
   const handleLogout = async (e: React.MouseEvent<HTMLButtonElement>) => {

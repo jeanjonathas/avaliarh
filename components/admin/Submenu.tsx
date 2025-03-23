@@ -16,13 +16,41 @@ const Submenu: React.FC<SubmenuProps> = ({
   children 
 }) => {
   const router = useRouter();
-  const isMainActive = router.pathname === mainLink || router.pathname.startsWith(mainLink + '/');
-  const [isExpanded, setIsExpanded] = useState(isMainActive);
+  const isMainActive = router.pathname.startsWith(mainLink) || 
+                      router.pathname.includes(mainLink.replace('-menu', ''));
+  
+  // Criar um ID único para este submenu baseado no mainLink
+  const submenuId = `submenu-${mainLink.replace(/\//g, '-')}`;
+  
+  // Inicializar o estado com base no localStorage ou na rota ativa
+  const [isExpanded, setIsExpanded] = useState(() => {
+    // Verificar se estamos no lado do cliente
+    if (typeof window !== 'undefined') {
+      const savedState = localStorage.getItem(submenuId);
+      // Se houver um estado salvo, usá-lo; caso contrário, usar isMainActive
+      return savedState !== null ? savedState === 'true' : isMainActive;
+    }
+    return isMainActive;
+  });
   
   // Atualiza o estado de expansão quando a rota muda
   useEffect(() => {
-    setIsExpanded(isMainActive);
-  }, [isMainActive]);
+    // Se a rota atual corresponde a este submenu, expandi-lo
+    if (isMainActive && !isExpanded) {
+      setIsExpanded(true);
+    }
+  }, [isMainActive, isExpanded]);
+  
+  // Salvar o estado no localStorage quando mudar
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(submenuId, isExpanded.toString());
+    }
+  }, [isExpanded, submenuId]);
+
+  const toggleExpanded = () => {
+    setIsExpanded(!isExpanded);
+  };
 
   return (
     <div className="mb-1">
@@ -30,18 +58,16 @@ const Submenu: React.FC<SubmenuProps> = ({
         className={`flex items-center justify-between px-3 py-2 rounded-md cursor-pointer ${
           isMainActive ? "bg-primary-50" : "hover:bg-primary-50"
         }`}
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={toggleExpanded}
       >
-        <Link 
-          href={mainLink}
+        <div
           className={`flex-1 flex items-center text-sm font-medium ${
             isMainActive ? "text-primary-700" : "text-secondary-700 hover:text-primary-700"
           }`}
-          onClick={(e) => e.stopPropagation()}
         >
           {icon}
           <span className="ml-2">{title}</span>
-        </Link>
+        </div>
         <svg 
           className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? 'transform rotate-180' : ''} ${
             isMainActive ? "text-primary-700" : "text-secondary-500"

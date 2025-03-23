@@ -109,24 +109,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Create the question
-      await prisma.$executeRaw`
-        INSERT INTO "Question" (
-          text, 
-          points, 
-          "testId"
-        ) VALUES (
-          ${text},
-          ${points || 1},
-          ${testId}
+      // Nota: Adicionando questionType = 'training' para identificar que é uma questão de treinamento
+      // Temporariamente comentado até que o Prisma Client seja atualizado
+      const newQuestion = await prisma.$queryRaw`
+        INSERT INTO "Question" (id, text, points, "testId", "questionType", "createdAt", "updatedAt")
+        VALUES (
+          gen_random_uuid(), 
+          ${text}, 
+          ${points || 1}, 
+          ${testId}, 
+          'training',
+          CURRENT_TIMESTAMP, 
+          CURRENT_TIMESTAMP
         )
-      `;
-
-      // Get the created question ID
-      const questionResult = await prisma.$queryRaw`
-        SELECT id FROM "Question" WHERE id = (SELECT lastval())
+        RETURNING id, text, points
       `;
       
-      const questionId = questionResult[0].id;
+      const questionId = newQuestion[0].id;
 
       // Create options for the question
       for (const option of options) {
@@ -144,15 +143,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Get the created question with options
-      const createdQuestion = await prisma.$queryRaw`
-        SELECT 
-          id, 
-          text, 
-          points
-        FROM "Question"
-        WHERE id = ${questionId}
-      `;
-
       const createdOptions = await prisma.$queryRaw`
         SELECT 
           id, 
@@ -164,7 +154,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       `;
 
       return res.status(201).json({
-        ...createdQuestion[0],
+        ...newQuestion[0],
         options: createdOptions
       });
     } catch (error) {

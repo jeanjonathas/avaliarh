@@ -9,7 +9,13 @@ interface SubMenuItemProps {
 
 const SubMenuItem: React.FC<SubMenuItemProps> = ({ title, href }) => {
   const router = useRouter();
-  const isActive = router.pathname === href || router.pathname.startsWith(href + '/');
+  
+  // Verificação mais precisa para determinar se o item está ativo
+  // Agora verifica se o caminho é exatamente igual ao href ou se é um subitem direto
+  // com verificação adicional para evitar correspondências parciais de URLs
+  const isActive = router.pathname === href || 
+                  (router.pathname.startsWith(href + '/') && 
+                   !router.pathname.replace(href + '/', '').includes('/'));
 
   return (
     <Link
