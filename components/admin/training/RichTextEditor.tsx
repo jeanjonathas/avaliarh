@@ -99,6 +99,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               formats={formats}
               className="h-[calc(100vh-180px)]"
               placeholder="Digite o conteúdo da aula aqui..."
+              style={{ fontSize: '16px', lineHeight: '1.6' }}
             />
           )}
         </div>

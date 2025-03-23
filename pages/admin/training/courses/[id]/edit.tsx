@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
-import AdminLayout from '../../../../components/admin/AdminLayout';
-import LoadingSpinner from '../../../../components/common/LoadingSpinner';
-import { TestSelectorTarget } from '../../../../components/admin/training/TestSelectorModal';
-import TestAssociationManager from '../../../../components/admin/training/TestAssociationManager';
-import RichTextEditor from '../../../../components/admin/training/RichTextEditor';
+import AdminLayout from '../../../../../components/admin/AdminLayout';
+import LoadingSpinner from '../../../../../components/common/LoadingSpinner';
+import { TestSelectorTarget } from '../../../../../components/admin/training/TestSelectorModal';
+import TestAssociationManager from '../../../../../components/admin/training/TestAssociationManager';
+import RichTextEditor from '../../../../../components/admin/training/RichTextEditor';
 import axios from 'axios';
 
 interface Sector {
@@ -787,43 +787,25 @@ export default function NewCourse() {
                       <div className="flex flex-col">
                         {lessonForm.type === 'TEXT' ? (
                           <>
-                            <textarea
-                              id="lessonContent"
-                              name="content"
-                              rows={6}
-                              value={lessonForm.content}
-                              onChange={handleLessonFormChange}
-                              className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                              placeholder="Digite o conteúdo da lição aqui..."
-                            />
-                            <div className="flex justify-between mt-2">
-                              <div className="text-xs text-gray-500">
-                                {lessonForm.content ? (
-                                  <span>Edição básica. Para formatação avançada, use o editor completo.</span>
-                                ) : (
-                                  <span>Você pode inserir texto simples aqui ou usar o editor completo para formatação avançada.</span>
-                                )}
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => setShowTextEditor(true)}
-                                className="self-end inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                </svg>
-                                Abrir Editor Completo
-                              </button>
+                            <div className="border border-secondary-300 rounded-md p-3 bg-white min-h-[200px]">
+                              <div 
+                                className="prose max-w-none"
+                                dangerouslySetInnerHTML={{ __html: lessonForm.content }}
+                              />
+                              {!lessonForm.content && (
+                                <p className="text-gray-400">Digite o conteúdo da lição usando o editor completo...</p>
+                              )}
                             </div>
-                            {lessonForm.content && (
-                              <div className="mt-3 border border-gray-200 rounded-md p-3 bg-gray-50">
-                                <h6 className="text-xs font-medium text-gray-500 mb-2">Pré-visualização:</h6>
-                                <div 
-                                  className="prose max-w-none"
-                                  dangerouslySetInnerHTML={{ __html: lessonForm.content }}
-                                />
-                              </div>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => setShowTextEditor(true)}
+                              className="mt-2 self-end inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                              Abrir Editor Completo
+                            </button>
                           </>
                         ) : (
                           <textarea
