@@ -407,6 +407,7 @@ export default function NewCourse() {
                           </label>
                           <input
                             type="text"
+                            name="name"
                             value={moduleForm.name}
                             onChange={handleModuleFormChange}
                             className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
@@ -420,6 +421,7 @@ export default function NewCourse() {
                             Descrição do Módulo
                           </label>
                           <textarea
+                            name="description"
                             value={moduleForm.description}
                             onChange={handleModuleFormChange}
                             rows={3}

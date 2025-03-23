@@ -199,14 +199,14 @@ async function getCourse(req: NextApiRequest, res: NextApiResponse, id: string, 
       id: string;
       studentId: string;
       progress: number;
-      startDate: Date;
+      enrollmentDate: Date;
       completionDate: Date | null;
     }[] = await prisma.$queryRaw`
       SELECT 
         id,
         "studentId",
         progress,
-        "startDate",
+        "enrollmentDate",
         "completionDate"
       FROM "CourseEnrollment"
       WHERE "courseId" = ${id}
@@ -267,7 +267,7 @@ async function getCourse(req: NextApiRequest, res: NextApiResponse, id: string, 
         id: enrollment.id,
         studentId: enrollment.studentId,
         progress: enrollment.progress,
-        startDate: enrollment.startDate,
+        enrollmentDate: enrollment.enrollmentDate,
         completionDate: enrollment.completionDate,
         student: studentMap.get(enrollment.studentId) || null
       })),

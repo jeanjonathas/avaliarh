@@ -315,7 +315,7 @@ async function createCourse(req: NextApiRequest, res: NextApiResponse, companyId
                   ${lessonId},
                   ${lesson.name},
                   ${lesson.description || ''},
-                  ${lesson.type || 'TEXT'},
+                  ${Prisma.raw(`'${lesson.type || 'TEXT'}'::\"TrainingContentType\"`)},
                   ${lesson.content || ''},
                   ${lesson.videoUrl || null},
                   ${lesson.slidesUrl || null},

@@ -544,6 +544,8 @@ model TrainingLesson {
   moduleId    String
   type        TrainingContentType
   content     String               // URL for video/audio/slides, HTML content for text
+  videoUrl    String?              // URL específica para vídeos (YouTube, Vimeo, etc.)
+  slidesUrl   String?              // URL específica para apresentações de slides
   duration    Int?                 // Duration in seconds (for video/audio)
   finalTestId String?
   createdAt   DateTime             @default(now())
