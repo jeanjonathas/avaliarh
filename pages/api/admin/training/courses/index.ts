@@ -100,14 +100,16 @@ async function getCourses(req: NextApiRequest, res: NextApiResponse, companyId: 
     const moduleCounts: {
       courseId: string;
       count: number;
-    }[] = await prisma.$queryRaw`
-      SELECT 
-        "courseId",
-        COUNT(*) as count
-      FROM "TrainingModule"
-      WHERE "courseId" IN (${Prisma.join(courses.map(c => c.id))})
-      GROUP BY "courseId"
-    `;
+    }[] = courses.length > 0 
+      ? await prisma.$queryRaw`
+          SELECT 
+            "courseId",
+            COUNT(*) as count
+          FROM "TrainingModule"
+          WHERE "courseId" IN (${Prisma.join(courses.map(c => c.id))})
+          GROUP BY "courseId"
+        `
+      : [];
 
     // Create a map for quick module count lookup
     const moduleCountMap = new Map();
@@ -119,16 +121,17 @@ async function getCourses(req: NextApiRequest, res: NextApiResponse, companyId: 
     const lessonCounts: {
       courseId: string;
       count: number;
-    }[] = await prisma.$queryRaw`
-      SELECT 
-        tc.id as "courseId",
-        COUNT(tl.id) as count
-      FROM "TrainingCourse" tc
-      JOIN "TrainingModule" tm ON tc.id = tm."courseId"
-      JOIN "TrainingLesson" tl ON tm.id = tl."moduleId"
-      WHERE tc."companyId" = ${companyId}
-      GROUP BY tc.id
-    `;
+    }[] = courses.length > 0
+      ? await prisma.$queryRaw`
+          SELECT 
+            m."courseId",
+            COUNT(l.id) as count
+          FROM "TrainingModule" m
+          JOIN "TrainingLesson" l ON l."moduleId" = m.id
+          WHERE m."courseId" IN (${Prisma.join(courses.map(c => c.id))})
+          GROUP BY m."courseId"
+        `
+      : [];
 
     // Create a map for quick lesson count lookup
     const lessonCountMap = new Map();
@@ -137,19 +140,22 @@ async function getCourses(req: NextApiRequest, res: NextApiResponse, companyId: 
     });
 
     // Get enrollment data for each course
+    const courseIds = courses.map(c => c.id);
     const enrollmentData: {
       courseId: string;
       count: number;
       avgProgress: number;
-    }[] = await prisma.$queryRaw`
-      SELECT 
-        "courseId",
-        COUNT(*) as count,
-        COALESCE(AVG(progress), 0) as "avgProgress"
-      FROM "CourseEnrollment"
-      WHERE "courseId" IN (${Prisma.join(courses.map(c => c.id))})
-      GROUP BY "courseId"
-    `;
+    }[] = courseIds.length > 0
+      ? await prisma.$queryRaw`
+          SELECT 
+            "courseId",
+            COUNT(*) as count,
+            COALESCE(AVG(progress), 0) as "avgProgress"
+          FROM "CourseEnrollment"
+          WHERE "courseId" IN (${Prisma.join(courseIds)})
+          GROUP BY "courseId"
+        `
+      : [];
 
     // Create a map for quick enrollment data lookup
     const enrollmentDataMap = new Map();
