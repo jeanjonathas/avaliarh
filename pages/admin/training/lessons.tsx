@@ -33,6 +33,11 @@ interface Module {
   courseId: string;
 }
 
+interface Course {
+  id: string;
+  name: string;
+}
+
 const LessonsPage: NextPage = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -45,42 +50,61 @@ const LessonsPage: NextPage = () => {
   const [modules, setModules] = useState<Module[]>([]);
   const [selectedModuleId, setSelectedModuleId] = useState<string>('');
   const [courseId, setCourseId] = useState<string>('');
+  const [courses, setCourses] = useState<Course[]>([]);
 
-  // Buscar módulos e aulas
+  // Buscar cursos disponíveis
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/admin/login');
     }
     
     if (status === 'authenticated') {
-      // Buscar todos os módulos
-      axios.get('/api/admin/training/modules')
+      // Buscar todos os cursos primeiro
+      axios.get('/api/admin/training/courses')
         .then(response => {
-          const modulesData = Array.isArray(response.data) ? response.data : [];
-          setModules(modulesData);
+          const coursesData = Array.isArray(response.data) ? response.data : [];
+          setCourses(coursesData);
           
-          // Se houver um módulo na URL, selecione-o
-          const moduleId = router.query.moduleId as string;
-          if (moduleId) {
-            setSelectedModuleId(moduleId);
-            fetchLessonsByModule(moduleId);
-            
-            // Obter o ID do curso do módulo selecionado
-            const selectedModule = modulesData.find(m => m.id === moduleId);
-            if (selectedModule) {
-              setCourseId(selectedModule.courseId);
-            }
+          // Se houver um curso na URL, selecione-o
+          const urlCourseId = router.query.courseId as string;
+          if (urlCourseId) {
+            setCourseId(urlCourseId);
+            fetchModulesByCourse(urlCourseId);
           } else {
             setLoading(false);
           }
         })
         .catch(err => {
-          console.error('Erro ao buscar módulos:', err);
-          setError(err.response?.data?.error || 'Ocorreu um erro ao buscar os módulos.');
+          console.error('Erro ao buscar cursos:', err);
+          setError(err.response?.data?.error || 'Ocorreu um erro ao buscar os cursos.');
           setLoading(false);
         });
     }
   }, [status, router]);
+
+  // Buscar módulos quando um curso for selecionado
+  useEffect(() => {
+    if (courseId) {
+      fetchModulesByCourse(courseId);
+    }
+  }, [courseId]);
+
+  const fetchModulesByCourse = (courseId: string) => {
+    setLoading(true);
+    axios.get(`/api/admin/training/modules?courseId=${courseId}`)
+      .then(response => {
+        const modulesData = Array.isArray(response.data) ? response.data : [];
+        setModules(modulesData);
+        setSelectedModuleId('');
+        setLessons([]);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Erro ao buscar módulos:', err);
+        setError(err.response?.data?.error || 'Ocorreu um erro ao buscar os módulos.');
+        setLoading(false);
+      });
+  };
 
   const fetchLessonsByModule = (moduleId: string) => {
     setLoading(true);
@@ -109,15 +133,8 @@ const LessonsPage: NextPage = () => {
         pathname: '/admin/training/lessons',
         query: { moduleId }
       }, undefined, { shallow: true });
-      
-      // Atualizar o ID do curso
-      const selectedModule = modules.find(m => m.id === moduleId);
-      if (selectedModule) {
-        setCourseId(selectedModule.courseId);
-      }
     } else {
       setLessons([]);
-      setCourseId('');
     }
   };
 
@@ -221,23 +238,41 @@ const LessonsPage: NextPage = () => {
         )}
 
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="mb-4">
-            <label htmlFor="moduleSelect" className="block text-sm font-medium text-secondary-700 mb-2">
-              Selecione um módulo para ver suas aulas:
-            </label>
-            <select
-              id="moduleSelect"
-              value={selectedModuleId}
-              onChange={handleModuleChange}
-              className="block w-full px-3 py-2 border border-secondary-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-            >
-              <option value="">Selecione um módulo</option>
-              {modules.map(module => (
-                <option key={module.id} value={module.id}>
-                  {module.name}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <label htmlFor="courseSelect" className="block text-sm font-medium text-secondary-700 mb-2">
+                Selecione um curso
+              </label>
+              <select
+                id="courseSelect"
+                className="block w-full px-3 py-2 border border-secondary-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                value={courseId}
+                onChange={(e) => setCourseId(e.target.value)}
+              >
+                <option value="">Selecione um curso</option>
+                {courses.map(course => (
+                  <option key={course.id} value={course.id}>{course.name}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label htmlFor="moduleSelect" className="block text-sm font-medium text-secondary-700 mb-2">
+                Selecione um módulo
+              </label>
+              <select
+                id="moduleSelect"
+                className="block w-full px-3 py-2 border border-secondary-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                value={selectedModuleId}
+                onChange={handleModuleChange}
+                disabled={!courseId || modules.length === 0}
+              >
+                <option value="">Selecione um módulo</option>
+                {modules.map(module => (
+                  <option key={module.id} value={module.id}>{module.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
