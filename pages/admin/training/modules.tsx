@@ -3,8 +3,11 @@ import { useRouter } from 'next/router'
 import { useSession } from 'next-auth/react'
 import { useEffect, useState } from 'react'
 import AdminLayout from '../../../components/admin/AdminLayout'
+import Breadcrumbs, { useBreadcrumbs } from '../../../components/admin/Breadcrumbs'
+import ContextualNavigation, { useContextualNavigation } from '../../../components/admin/ContextualNavigation'
 import axios from 'axios'
 import Link from 'next/link'
+import { PlusIcon, ArrowLeftIcon, BookOpenIcon } from '@heroicons/react/24/outline'
 
 interface Module {
   id: string;
@@ -28,6 +31,8 @@ interface Course {
 const TrainingModules: NextPage = () => {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const breadcrumbItems = useBreadcrumbs();
+  const contextualNav = useContextualNavigation();
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [modules, setModules] = useState<Module[]>([])
@@ -97,12 +102,14 @@ const TrainingModules: NextPage = () => {
   
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Carregando...</p>
+      <AdminLayout activeSection="treinamento">
+        <div className="min-h-screen bg-secondary-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+            <p className="mt-4 text-secondary-600">Carregando...</p>
+          </div>
         </div>
-      </div>
+      </AdminLayout>
     )
   }
   
@@ -111,22 +118,39 @@ const TrainingModules: NextPage = () => {
   }
   
   return (
-    <AdminLayout>
-      <div className="container mx-auto px-4 py-8">
+    <AdminLayout activeSection="treinamento">
+      <div className="container mx-auto px-4 py-6">
+        <Breadcrumbs items={breadcrumbItems} />
+        <ContextualNavigation 
+          prevLink={contextualNav.prev} 
+          nextLink={contextualNav.next} 
+          relatedLinks={contextualNav.related} 
+        />
+        
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Gerenciamento de Módulos</h1>
+          <h1 className="text-2xl font-bold text-secondary-900">Gerenciamento de Módulos</h1>
           {selectedCourseId && (
-            <button
-              onClick={() => {
-                router.push(`/admin/training/courses/${selectedCourseId}`);
-              }}
-              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors duration-200 font-medium flex items-center"
-            >
-              <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              Voltar para o Curso
-            </button>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  router.push(`/admin/training/courses/${selectedCourseId}`);
+                }}
+                className="px-4 py-2 bg-secondary-100 text-secondary-700 rounded-md hover:bg-secondary-200 transition-colors duration-200 font-medium flex items-center"
+              >
+                <ArrowLeftIcon className="h-5 w-5 mr-2" />
+                Voltar para o Curso
+              </button>
+              
+              <button
+                onClick={() => {
+                  router.push(`/admin/training/courses/${selectedCourseId}/modules/new`);
+                }}
+                className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors duration-200 font-medium flex items-center"
+              >
+                <PlusIcon className="h-5 w-5 mr-2" />
+                Novo Módulo
+              </button>
+            </div>
           )}
         </div>
 
@@ -136,16 +160,16 @@ const TrainingModules: NextPage = () => {
           </div>
         )}
 
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="mb-4">
-            <label htmlFor="courseSelect" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="courseSelect" className="block text-sm font-medium text-secondary-700 mb-2">
               Selecione um curso para ver seus módulos:
             </label>
             <select
               id="courseSelect"
               value={selectedCourseId}
               onChange={handleCourseChange}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+              className="block w-full px-3 py-2 border border-secondary-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
             >
               <option value="">Selecione um curso</option>
               {courses.map(course => (
@@ -159,28 +183,15 @@ const TrainingModules: NextPage = () => {
 
         {selectedCourseId ? (
           modules.length === 0 && !loading ? (
-            <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                className="h-16 w-16 mx-auto text-gray-400 mb-4" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-              >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth={1.5} 
-                  d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" 
-                />
-              </svg>
-              <h2 className="text-xl font-semibold text-gray-700 mb-2">Nenhum módulo encontrado</h2>
-              <p className="text-gray-500 mb-4">Este curso ainda não possui módulos.</p>
+            <div className="bg-white rounded-lg shadow-md p-6 text-center">
+              <BookOpenIcon className="h-16 w-16 mx-auto text-secondary-400 mb-4" />
+              <h2 className="text-xl font-semibold text-secondary-700 mb-2">Nenhum módulo encontrado</h2>
+              <p className="text-secondary-500 mb-4">Este curso ainda não possui módulos.</p>
               <button
-                onClick={() => router.push(`/admin/training/courses/${selectedCourseId}`)}
+                onClick={() => router.push(`/admin/training/courses/${selectedCourseId}/modules/new`)}
                 className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors duration-200 font-medium"
               >
-                Gerenciar Módulos no Curso
+                Criar Primeiro Módulo
               </button>
             </div>
           ) : (
@@ -188,38 +199,44 @@ const TrainingModules: NextPage = () => {
               {modules.map(module => (
                 <div 
                   key={module.id}
-                  className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200"
+                  className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200"
                 >
                   <div className="p-6">
                     <div className="flex justify-between items-start mb-3">
-                      <h2 className="text-xl font-semibold text-gray-800 line-clamp-1">{module.name}</h2>
-                      <span className="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">
+                      <h2 className="text-xl font-semibold text-secondary-800 line-clamp-1">{module.name}</h2>
+                      <span className="bg-secondary-100 text-secondary-600 text-xs font-medium px-2 py-1 rounded-full">
                         Ordem: {module.order}
                       </span>
                     </div>
                     
-                    <p className="text-gray-600 mb-4 line-clamp-2">{module.description}</p>
+                    <p className="text-secondary-600 mb-4 line-clamp-2">{module.description}</p>
                     
                     <div className="grid grid-cols-2 gap-2 mt-4 text-sm">
-                      <div className="bg-gray-50 p-2 rounded text-center">
+                      <div className="bg-secondary-50 p-2 rounded text-center">
                         <div className="font-semibold text-primary-700">{module.totalLessons || 0}</div>
-                        <div className="text-gray-500">Lições</div>
+                        <div className="text-secondary-500">Lições</div>
                       </div>
-                      <div className="bg-gray-50 p-2 rounded text-center">
+                      <div className="bg-secondary-50 p-2 rounded text-center">
                         <div className="font-semibold text-primary-700">
                           {module.hasFinalTest ? 'Sim' : 'Não'}
                         </div>
-                        <div className="text-gray-500">Teste Final</div>
+                        <div className="text-secondary-500">Teste Final</div>
                       </div>
                     </div>
                     
-                    <div className="mt-4 flex justify-end">
-                      <button
-                        onClick={() => router.push(`/admin/training/courses/${selectedCourseId}`)}
+                    <div className="mt-4 flex justify-between">
+                      <Link
+                        href={`/admin/training/modules/${module.id}/lessons`}
+                        className="px-3 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors duration-200 text-sm"
+                      >
+                        Ver Aulas
+                      </Link>
+                      <Link
+                        href={`/admin/training/modules/${module.id}`}
                         className="px-3 py-1 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors duration-200 text-sm"
                       >
                         Gerenciar Módulo
-                      </button>
+                      </Link>
                     </div>
                   </div>
                 </div>
@@ -227,28 +244,15 @@ const TrainingModules: NextPage = () => {
             </div>
           )
         ) : (
-          <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              className="h-16 w-16 mx-auto text-gray-400 mb-4" 
-              fill="none" 
-              viewBox="0 0 24 24" 
-              stroke="currentColor"
-            >
-              <path 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                strokeWidth={1.5} 
-                d="M8 16l2.879-2.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242zM21 12a9 9 0 11-18 0 9 9 0 0118 0z" 
-              />
-            </svg>
-            <h2 className="text-xl font-semibold text-gray-700 mb-2">Selecione um curso</h2>
-            <p className="text-gray-500 mb-4">Por favor, selecione um curso para visualizar seus módulos.</p>
+          <div className="bg-white rounded-lg shadow-md p-6 text-center">
+            <BookOpenIcon className="h-16 w-16 mx-auto text-secondary-400 mb-4" />
+            <h2 className="text-xl font-semibold text-secondary-700 mb-2">Selecione um curso</h2>
+            <p className="text-secondary-500">Selecione um curso para visualizar seus módulos.</p>
           </div>
         )}
       </div>
     </AdminLayout>
-  )
-}
+  );
+};
 
-export default TrainingModules
+export default TrainingModules;

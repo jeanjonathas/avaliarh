@@ -144,19 +144,44 @@ This checklist outlines the implementation plan for the training management syst
 - [x] Create student progress tracking dashboard
 - [x] Create reporting functionality for course completion
 
+### 6. Navigation and Menu Structure
+- [x] Implementar estrutura de menu lateral para a seção de treinamento
+- [x] Criar componentes de submenu para melhor organização
+- [x] Implementar indicadores visuais para itens ativos no menu
+- [x] Organizar menu em categorias lógicas (Cursos, Conteúdo, Avaliações, Alunos, etc.)
+- [x] Adicionar breadcrumbs nas páginas para facilitar a navegação
+- [x] Implementar navegação contextual entre páginas relacionadas
+- [x] Adicionar atalhos para ações frequentes no dashboard
+
+### 7. Páginas do Sistema de Treinamento
+- [x] Criar página `/admin/training/dashboard` (Dashboard principal)
+- [x] Criar página `/admin/training/courses` (Listagem de cursos)
+- [x] Criar página `/admin/training/courses/new` (Formulário de novo curso)
+- [x] Criar página `/admin/training/courses/[id]` (Detalhes do curso)
+- [x] Criar página `/admin/training/courses/[id]/edit` (Edição de curso)
+- [x] Criar página `/admin/training/sectors` (Gerenciamento de setores)
+- [x] Criar página `/admin/training/modules` (Listagem de módulos)
+- [x] Criar página `/admin/training/lessons` (Listagem de aulas)
+- [x] Criar página `/admin/training/tests` (Listagem de testes)
+- [x] Criar página `/admin/training/questions` (Banco de questões)
+- [x] Criar página `/admin/training/students` (Listagem de alunos)
+- [x] Criar página `/admin/training/enrollments` (Matrículas)
+- [x] Criar página `/admin/training/certificates` (Certificados)
+- [x] Criar página `/admin/training/reports` (Relatórios)
+
 ## Student UI Implementation
 
 ### 1. Course Listing
-- [ ] Create `/training` page with available courses
+- [ ] Create `/treinamento` page with available courses
 - [ ] Implement course filtering and search functionality
 
 ### 2. Course Details
-- [ ] Create `/training/courses/[id]` page with course overview
+- [ ] Create `/treinamento/cursos/[id]` page with course overview
 - [ ] Display modules and progress information
 - [ ] Show completion status and certificates (if applicable)
 
 ### 3. Lesson Viewing
-- [ ] Create `/training/lessons/[id]` page for consuming lesson content
+- [ ] Create `/treinamento/aulas/[id]` page for consuming lesson content
 - [ ] Implement video player for video content
 - [ ] Implement audio player for audio content
 - [ ] Implement PDF viewer for slide content
@@ -173,9 +198,9 @@ This checklist outlines the implementation plan for the training management syst
 ## Additional Features
 
 ### 1. Reporting
-- [ ] Create reports for course completion rates
-- [ ] Create reports for test performance
-- [ ] Create reports for time spent on training
+- [x] Create reports for course completion rates
+- [x] Create reports for test performance
+- [x] Create reports for time spent on training
 
 ### 2. Notifications
 - [ ] Implement email notifications for course enrollment
@@ -183,8 +208,8 @@ This checklist outlines the implementation plan for the training management syst
 - [ ] Implement reminders for incomplete courses
 
 ### 3. Certificates
-- [ ] Create certificate generation for completed courses
-- [ ] Implement certificate download functionality
+- [x] Create certificate generation for completed courses
+- [x] Implement certificate download functionality
 
 ## Testing
 

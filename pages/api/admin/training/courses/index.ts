@@ -192,7 +192,7 @@ async function getCourses(req: NextApiRequest, res: NextApiResponse, companyId: 
 // Create a new course
 async function createCourse(req: NextApiRequest, res: NextApiResponse, companyId: string) {
   try {
-    const { name, description, sectorId, showResults, finalTestRequired } = req.body;
+    const { name, description, sectorId, showResults, finalTestRequired, modules } = req.body;
 
     // Validate required fields
     if (!name) {
@@ -227,39 +227,138 @@ async function createCourse(req: NextApiRequest, res: NextApiResponse, companyId
       }
     }
 
-    // Create the course
-    const courseId = crypto.randomUUID();
-    await prisma.$executeRaw`
-      INSERT INTO "TrainingCourse" (
-        id, 
-        name, 
-        description, 
-        "sectorId", 
-        "showResults", 
-        "finalTestRequired", 
-        "companyId", 
-        "createdAt", 
-        "updatedAt"
-      ) 
-      VALUES (
-        ${courseId}, 
-        ${name}, 
-        ${description || ''}, 
-        ${sectorId || null}, 
-        ${showResults || false}, 
-        ${finalTestRequired || false}, 
-        ${companyId}, 
-        ${Prisma.raw('NOW()')}, 
-        ${Prisma.raw('NOW()')}
-      )
-    `;
+    // Validate modules if provided
+    if (modules && (!Array.isArray(modules) || modules.length === 0)) {
+      return res.status(400).json({ error: 'O curso deve ter pelo menos um módulo' });
+    }
 
-    // Fetch the created course
-    const course = await prisma.$queryRaw`
+    // Start a transaction to create the course, modules, and lessons
+    const courseId = crypto.randomUUID();
+    await prisma.$transaction(async (prisma) => {
+      // Create the course
+      await prisma.$executeRaw`
+        INSERT INTO "TrainingCourse" (
+          id, 
+          name, 
+          description, 
+          "sectorId", 
+          "showResults", 
+          "finalTestRequired", 
+          "companyId", 
+          "createdAt", 
+          "updatedAt"
+        ) 
+        VALUES (
+          ${courseId}, 
+          ${name}, 
+          ${description || ''}, 
+          ${sectorId || null}, 
+          ${showResults || false}, 
+          ${finalTestRequired || false}, 
+          ${companyId}, 
+          ${Prisma.raw('NOW()')}, 
+          ${Prisma.raw('NOW()')}
+        )
+      `;
+
+      // Create modules and lessons if provided
+      if (modules && modules.length > 0) {
+        for (let i = 0; i < modules.length; i++) {
+          const moduleItem = modules[i];
+          const moduleId = crypto.randomUUID();
+          
+          // Create module
+          await prisma.$executeRaw`
+            INSERT INTO "TrainingModule" (
+              id,
+              title,
+              description,
+              "order",
+              "courseId",
+              "createdAt",
+              "updatedAt"
+            )
+            VALUES (
+              ${moduleId},
+              ${moduleItem.title},
+              ${moduleItem.description || ''},
+              ${moduleItem.order || i + 1},
+              ${courseId},
+              ${Prisma.raw('NOW()')},
+              ${Prisma.raw('NOW()')}
+            )
+          `;
+
+          // Create lessons for this module if provided
+          if (moduleItem.lessons && moduleItem.lessons.length > 0) {
+            for (let j = 0; j < moduleItem.lessons.length; j++) {
+              const lesson = moduleItem.lessons[j];
+              const lessonId = crypto.randomUUID();
+              
+              // Create lesson
+              await prisma.$executeRaw`
+                INSERT INTO "TrainingLesson" (
+                  id,
+                  title,
+                  description,
+                  type,
+                  content,
+                  "videoUrl",
+                  "slidesUrl",
+                  "order",
+                  "moduleId",
+                  "createdAt",
+                  "updatedAt"
+                )
+                VALUES (
+                  ${lessonId},
+                  ${lesson.title},
+                  ${lesson.description || ''},
+                  ${lesson.type || 'text'},
+                  ${lesson.content || ''},
+                  ${lesson.videoUrl || null},
+                  ${lesson.slidesUrl || null},
+                  ${lesson.order || j + 1},
+                  ${moduleId},
+                  ${Prisma.raw('NOW()')},
+                  ${Prisma.raw('NOW()')}
+                )
+              `;
+            }
+          }
+        }
+      }
+
+      return courseId;
+    });
+
+    // Fetch the created course with modules and lessons
+    const course: any = await prisma.$queryRaw`
       SELECT * 
       FROM "TrainingCourse" 
       WHERE id = ${courseId}
     `.then((results: any[]) => results[0]);
+
+    // Fetch modules for this course
+    const courseModules: any[] = await prisma.$queryRaw`
+      SELECT id, title, description, "order"
+      FROM "TrainingModule"
+      WHERE "courseId" = ${courseId}
+      ORDER BY "order" ASC
+    `;
+
+    // Fetch lessons for each module
+    for (const moduleItem of courseModules) {
+      const moduleLessons: any[] = await prisma.$queryRaw`
+        SELECT id, title, description, type, content, "videoUrl", "slidesUrl", "order"
+        FROM "TrainingLesson"
+        WHERE "moduleId" = ${moduleItem.id}
+        ORDER BY "order" ASC
+      `;
+      moduleItem.lessons = moduleLessons;
+    }
+
+    course.modules = courseModules;
 
     return res.status(201).json(course);
   } catch (error) {

@@ -4,6 +4,31 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import AdminLayout from '../../../../components/admin/AdminLayout';
 import LoadingSpinner from '../../../../components/common/LoadingSpinner';
+import axios from 'axios';
+
+interface Sector {
+  id: string;
+  name: string;
+}
+
+interface Module {
+  id: string;
+  title: string;
+  description: string;
+  order: number;
+  lessons: Lesson[];
+}
+
+interface Lesson {
+  id: string;
+  title: string;
+  description: string;
+  type: 'text' | 'slides' | 'video';
+  content: string;
+  videoUrl?: string;
+  slidesUrl?: string;
+  order: number;
+}
 
 export default function NewCourse() {
   const { data: session, status } = useSession();
@@ -11,7 +36,7 @@ export default function NewCourse() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sectors, setSectors] = useState([]);
+  const [sectors, setSectors] = useState<Sector[]>([]);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -22,6 +47,28 @@ export default function NewCourse() {
     finalTestRequired: false
   });
 
+  // Modules and lessons state
+  const [modules, setModules] = useState<Module[]>([]);
+  const [currentModuleIndex, setCurrentModuleIndex] = useState<number | null>(null);
+  const [currentLessonIndex, setCurrentLessonIndex] = useState<number | null>(null);
+  const [showModuleForm, setShowModuleForm] = useState(false);
+  const [showLessonForm, setShowLessonForm] = useState(false);
+  
+  // New module/lesson form state
+  const [moduleForm, setModuleForm] = useState({
+    title: '',
+    description: ''
+  });
+  
+  const [lessonForm, setLessonForm] = useState({
+    title: '',
+    description: '',
+    type: 'text',
+    content: '',
+    videoUrl: '',
+    slidesUrl: ''
+  });
+
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
@@ -30,11 +77,16 @@ export default function NewCourse() {
     if (status === 'authenticated') {
       // Fetch sectors
       setLoading(true);
-      // This will be replaced with actual API call
-      setTimeout(() => {
-        setSectors([]);
-        setLoading(false);
-      }, 1000);
+      axios.get('/api/admin/sectors')
+        .then(response => {
+          setSectors(response.data || []);
+          setLoading(false);
+        })
+        .catch(err => {
+          console.error('Erro ao buscar setores:', err);
+          setError('Não foi possível carregar os setores. Por favor, tente novamente.');
+          setLoading(false);
+        });
     }
   }, [status, router]);
 
@@ -47,19 +99,131 @@ export default function NewCourse() {
     }));
   };
 
+  const handleModuleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setModuleForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleLessonFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setLessonForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const addModule = () => {
+    if (!moduleForm.title.trim()) {
+      setError('O título do módulo é obrigatório');
+      return;
+    }
+
+    const newModule: Module = {
+      id: `temp-${Date.now()}`,
+      title: moduleForm.title,
+      description: moduleForm.description,
+      order: modules.length + 1,
+      lessons: []
+    };
+
+    setModules([...modules, newModule]);
+    setModuleForm({ title: '', description: '' });
+    setShowModuleForm(false);
+    setError(null);
+  };
+
+  const addLesson = (moduleIndex: number) => {
+    if (!lessonForm.title.trim()) {
+      setError('O título da lição é obrigatório');
+      return;
+    }
+
+    const updatedModules = [...modules];
+    const newLesson: Lesson = {
+      id: `temp-${Date.now()}`,
+      title: lessonForm.title,
+      description: lessonForm.description,
+      type: lessonForm.type as 'text' | 'slides' | 'video',
+      content: lessonForm.content,
+      order: updatedModules[moduleIndex].lessons.length + 1
+    };
+
+    if (lessonForm.type === 'video' && lessonForm.videoUrl) {
+      newLesson.videoUrl = lessonForm.videoUrl;
+    }
+
+    if (lessonForm.type === 'slides' && lessonForm.slidesUrl) {
+      newLesson.slidesUrl = lessonForm.slidesUrl;
+    }
+
+    updatedModules[moduleIndex].lessons.push(newLesson);
+    setModules(updatedModules);
+    setLessonForm({
+      title: '',
+      description: '',
+      type: 'text',
+      content: '',
+      videoUrl: '',
+      slidesUrl: ''
+    });
+    setShowLessonForm(false);
+    setCurrentModuleIndex(null);
+    setError(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
 
+    if (!formData.name.trim()) {
+      setError('O nome do curso é obrigatório');
+      setSubmitting(false);
+      return;
+    }
+
+    if (modules.length === 0) {
+      setError('O curso deve ter pelo menos um módulo');
+      setSubmitting(false);
+      return;
+    }
+
+    // Verificar se todos os módulos têm pelo menos uma lição
+    const emptyModules = modules.filter(module => module.lessons.length === 0);
+    if (emptyModules.length > 0) {
+      setError(`O(s) módulo(s) "${emptyModules.map(m => m.title).join(', ')}" não possui(em) lições`);
+      setSubmitting(false);
+      return;
+    }
+
     try {
-      // This will be replaced with actual API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const courseData = {
+        ...formData,
+        modules: modules.map(module => ({
+          title: module.title,
+          description: module.description,
+          order: module.order,
+          lessons: module.lessons.map(lesson => ({
+            title: lesson.title,
+            description: lesson.description,
+            type: lesson.type,
+            content: lesson.content,
+            videoUrl: lesson.videoUrl,
+            slidesUrl: lesson.slidesUrl,
+            order: lesson.order
+          }))
+        }))
+      };
+
+      await axios.post('/api/admin/training/courses', courseData);
       
       // Redirect to courses page after successful creation
-      router.push('/admin/training');
+      router.push('/admin/training/courses');
     } catch (err: any) {
-      setError(err.message || 'Ocorreu um erro ao criar o curso. Por favor, tente novamente.');
+      setError(err.response?.data?.message || 'Ocorreu um erro ao criar o curso. Por favor, tente novamente.');
     } finally {
       setSubmitting(false);
     }
@@ -212,6 +376,307 @@ export default function NewCourse() {
                         <p className="text-gray-500">Os alunos precisarão completar um teste final para concluir o curso.</p>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Modules */}
+                  <div className="mt-8">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg font-medium text-gray-900">Módulos do Curso</h3>
+                      <button
+                        type="button"
+                        onClick={() => setShowModuleForm(true)}
+                        className="inline-flex items-center justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        Adicionar Módulo
+                      </button>
+                    </div>
+                    
+                    {showModuleForm && (
+                      <div className="mt-4 bg-white p-6 shadow-sm rounded-lg border border-gray-200">
+                        <h4 className="text-md font-medium text-gray-900 mb-4">Novo Módulo</h4>
+                        <label htmlFor="moduleTitle" className="block text-sm font-medium text-gray-700">
+                          Título do Módulo *
+                        </label>
+                        <input
+                          type="text"
+                          id="moduleTitle"
+                          name="title"
+                          value={moduleForm.title}
+                          onChange={handleModuleFormChange}
+                          className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                        />
+                        <label htmlFor="moduleDescription" className="block text-sm font-medium text-gray-700 mt-4">
+                          Descrição do Módulo
+                        </label>
+                        <textarea
+                          id="moduleDescription"
+                          name="description"
+                          rows={3}
+                          value={moduleForm.description}
+                          onChange={handleModuleFormChange}
+                          className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                        />
+                        <div className="mt-4 flex justify-end space-x-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowModuleForm(false);
+                              setModuleForm({ title: '', description: '' });
+                            }}
+                            className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={addModule}
+                            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                          >
+                            Adicionar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {modules.length === 0 ? (
+                      <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                        </svg>
+                        <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhum módulo adicionado</h3>
+                        <p className="mt-1 text-sm text-gray-500">Comece adicionando o primeiro módulo ao seu curso.</p>
+                        <div className="mt-6">
+                          <button
+                            type="button"
+                            onClick={() => setShowModuleForm(true)}
+                            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                            </svg>
+                            Adicionar Módulo
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {modules.map((module, index) => (
+                          <div key={module.id} className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
+                            <div className="bg-primary-50 px-4 py-4 border-b border-gray-200">
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center">
+                                  <div className="flex-shrink-0 bg-primary-600 rounded-full h-8 w-8 flex items-center justify-center text-white font-medium">
+                                    {index + 1}
+                                  </div>
+                                  <div className="ml-3">
+                                    <h4 className="text-lg font-medium text-gray-900">{module.title}</h4>
+                                    {module.description && (
+                                      <p className="text-sm text-gray-500 mt-1">{module.description}</p>
+                                    )}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCurrentModuleIndex(index);
+                                    setShowLessonForm(true);
+                                  }}
+                                  className="inline-flex items-center justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                  </svg>
+                                  Adicionar Lição
+                                </button>
+                              </div>
+                            </div>
+                            
+                            {showLessonForm && currentModuleIndex === index && (
+                              <div className="p-6 border-b border-gray-200 bg-gray-50">
+                                <h4 className="text-md font-medium text-gray-900 mb-4">Nova Lição</h4>
+                                <div className="grid grid-cols-1 gap-4">
+                                  <div>
+                                    <label htmlFor="lessonTitle" className="block text-sm font-medium text-gray-700">
+                                      Título da Lição *
+                                    </label>
+                                    <input
+                                      type="text"
+                                      id="lessonTitle"
+                                      name="title"
+                                      value={lessonForm.title}
+                                      onChange={handleLessonFormChange}
+                                      className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                                    />
+                                  </div>
+                                  
+                                  <div>
+                                    <label htmlFor="lessonDescription" className="block text-sm font-medium text-gray-700">
+                                      Descrição da Lição
+                                    </label>
+                                    <textarea
+                                      id="lessonDescription"
+                                      name="description"
+                                      rows={2}
+                                      value={lessonForm.description}
+                                      onChange={handleLessonFormChange}
+                                      className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                                    />
+                                  </div>
+                                  
+                                  <div>
+                                    <label htmlFor="lessonType" className="block text-sm font-medium text-gray-700">
+                                      Tipo de Conteúdo *
+                                    </label>
+                                    <select
+                                      id="lessonType"
+                                      name="type"
+                                      value={lessonForm.type}
+                                      onChange={handleLessonFormChange}
+                                      className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                    >
+                                      <option value="text">Texto</option>
+                                      <option value="slides">Slides</option>
+                                      <option value="video">Vídeo</option>
+                                    </select>
+                                  </div>
+                                  
+                                  {lessonForm.type === 'video' && (
+                                    <div>
+                                      <label htmlFor="videoUrl" className="block text-sm font-medium text-gray-700">
+                                        URL do Vídeo *
+                                      </label>
+                                      <input
+                                        type="text"
+                                        id="videoUrl"
+                                        name="videoUrl"
+                                        value={lessonForm.videoUrl}
+                                        onChange={handleLessonFormChange}
+                                        placeholder="https://www.youtube.com/watch?v=..."
+                                        className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                                      />
+                                    </div>
+                                  )}
+                                  
+                                  {lessonForm.type === 'slides' && (
+                                    <div>
+                                      <label htmlFor="slidesUrl" className="block text-sm font-medium text-gray-700">
+                                        URL das Slides *
+                                      </label>
+                                      <input
+                                        type="text"
+                                        id="slidesUrl"
+                                        name="slidesUrl"
+                                        value={lessonForm.slidesUrl}
+                                        onChange={handleLessonFormChange}
+                                        placeholder="https://docs.google.com/presentation/..."
+                                        className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                                      />
+                                    </div>
+                                  )}
+                                  
+                                  <div>
+                                    <label htmlFor="lessonContent" className="block text-sm font-medium text-gray-700">
+                                      Conteúdo da Lição *
+                                    </label>
+                                    <textarea
+                                      id="lessonContent"
+                                      name="content"
+                                      rows={4}
+                                      value={lessonForm.content}
+                                      onChange={handleLessonFormChange}
+                                      className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                                    />
+                                  </div>
+                                </div>
+                                
+                                <div className="mt-4 flex justify-end space-x-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowLessonForm(false);
+                                      setLessonForm({
+                                        title: '',
+                                        description: '',
+                                        type: 'text',
+                                        content: '',
+                                        videoUrl: '',
+                                        slidesUrl: ''
+                                      });
+                                    }}
+                                    className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                                  >
+                                    Cancelar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => addLesson(index)}
+                                    className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                                  >
+                                    Adicionar
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                            
+                            <div className="p-4">
+                              {module.lessons.length === 0 ? (
+                                <div className="text-center py-6 bg-gray-50 rounded-md">
+                                  <p className="text-sm text-gray-500">Nenhuma lição adicionada a este módulo.</p>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCurrentModuleIndex(index);
+                                      setShowLessonForm(true);
+                                    }}
+                                    className="mt-2 inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-primary-700 bg-primary-100 hover:bg-primary-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                                  >
+                                    Adicionar Lição
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="space-y-3">
+                                  {module.lessons.map((lesson, lessonIndex) => (
+                                    <div key={lesson.id} className="bg-gray-50 rounded-md border border-gray-200 p-4">
+                                      <div className="flex items-center">
+                                        <div className="flex-shrink-0">
+                                          {lesson.type === 'text' && (
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                          )}
+                                          {lesson.type === 'video' && (
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                          )}
+                                          {lesson.type === 'slides' && (
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                                            </svg>
+                                          )}
+                                        </div>
+                                        <div className="ml-3">
+                                          <h5 className="text-md font-medium text-gray-900">Lição {lessonIndex + 1}: {lesson.title}</h5>
+                                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800 mt-1">
+                                            {lesson.type === 'text' ? 'Texto' : lesson.type === 'video' ? 'Vídeo' : 'Slides'}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      {lesson.description && (
+                                        <p className="text-sm text-gray-500 mt-2 ml-8">{lesson.description}</p>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
