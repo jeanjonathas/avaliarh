@@ -87,8 +87,7 @@ async function getStudents(
         u.id as "user_id", 
         u.name as "user_name", 
         u.email as "user_email", 
-        u.role as "user_role", 
-        u.avatar as "user_avatar"
+        u.role as "user_role"
       FROM "Student" s
       JOIN "User" u ON s."userId" = u.id
       WHERE u."companyId" = $1
@@ -175,8 +174,7 @@ async function getStudents(
         id: student.user_id,
         name: student.user_name,
         email: student.user_email,
-        role: student.user_role,
-        avatar: student.user_avatar
+        role: student.user_role
       },
       courseEnrollments: enrollmentsByStudent.get(student.id) || []
     }));
