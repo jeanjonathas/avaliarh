@@ -1,167 +1,160 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '../../../../../lib/auth';
 import { prisma } from '../../../../../lib/prisma';
+import { Prisma } from '@prisma/client';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Check authentication
-  const session = await getSession({ req });
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  // Verificar autenticação
+  const session = await getServerSession(req, res, authOptions);
   if (!session || !session.user) {
-    return res.status(401).json({ error: 'Não autorizado' });
+    return res.status(401).json({ 
+      success: false,
+      error: 'Não autorizado' 
+    });
   }
 
   // Get user and check if they are an admin
   const user = await prisma.$queryRaw`
-    SELECT u.id, u."companyId", r.name as role
+    SELECT u.id, u."companyId", u.role
     FROM "User" u
-    JOIN "Role" r ON u."roleId" = r.id
     WHERE u.id = ${session.user.id}
   `;
 
-  if (!Array.isArray(user) || user.length === 0 || user[0].role !== 'admin') {
-    return res.status(403).json({ error: 'Acesso negado' });
+  if (!Array.isArray(user) || user.length === 0 || (user[0].role !== 'COMPANY_ADMIN' && user[0].role !== 'SUPER_ADMIN')) {
+    return res.status(403).json({ 
+      success: false,
+      error: 'Acesso negado' 
+    });
   }
 
   const companyId = user[0].companyId;
 
-  // Handle GET request - List tests
   if (req.method === 'GET') {
-    const { level, levelId } = req.query;
-
     try {
-      let tests = [];
-
-      if (level && levelId) {
-        // Get tests for a specific level (course, module, or lesson)
-        tests = await prisma.$queryRaw`
-          SELECT 
-            t.id, 
-            t.name, 
-            t.description, 
-            t."timeLimit", 
-            t."passingScore",
-            (SELECT COUNT(*) FROM "Question" q WHERE q."testId" = t.id) as "questionCount"
-          FROM "Test" t
-          WHERE t.level = ${level} AND t."levelId" = ${levelId} AND t."companyId" = ${companyId}
-          ORDER BY t.name
-        `;
-      } else {
-        // Get all tests for the company
-        tests = await prisma.$queryRaw`
-          SELECT 
-            t.id, 
-            t.name, 
-            t.description, 
-            t."timeLimit", 
-            t."passingScore",
-            t.level,
-            t."levelId",
-            (SELECT COUNT(*) FROM "Question" q WHERE q."testId" = t.id) as "questionCount"
-          FROM "Test" t
-          WHERE t."companyId" = ${companyId}
-          ORDER BY t.name
-        `;
-      }
-
-      return res.status(200).json(tests);
+      console.log('[API] Buscando testes de treinamento...');
+      
+      // Sempre usar 'training' como tipo de teste para este endpoint
+      const testType = 'training';
+      
+      // Buscar todos os testes de treinamento para a empresa
+      const testsRaw = await prisma.$queryRaw`
+        SELECT 
+          t.id, 
+          t.title, 
+          t.description, 
+          t."timeLimit", 
+          t."cutoffScore",
+          t.active,
+          t."createdAt", 
+          t."updatedAt",
+          t."testType",
+          (SELECT COUNT(*) FROM "Stage" s WHERE s."testId" = t.id) as "sectionsCount",
+          (
+            SELECT COUNT(*) 
+            FROM "Question" q 
+            JOIN "Stage" s ON q."stageId" = s.id 
+            WHERE s."testId" = t.id AND q."questionType" = 'training'
+          ) as "questionsCount"
+        FROM "Test" t
+        WHERE t."companyId" = ${companyId} AND t."testType" = ${testType}
+        ORDER BY t."createdAt" DESC
+      `;
+      
+      // Converter BigInt para Number para evitar erro de serialização
+      const tests = Array.isArray(testsRaw) ? testsRaw.map(test => ({
+        ...test,
+        sectionsCount: Number(test.sectionsCount),
+        questionsCount: Number(test.questionsCount),
+        timeLimit: test.timeLimit ? Number(test.timeLimit) : null,
+        cutoffScore: test.cutoffScore ? Number(test.cutoffScore) : null
+      })) : [];
+      
+      console.log(`[API] Encontrados ${tests.length} testes de treinamento`);
+      
+      return res.status(200).json({ 
+        success: true,
+        tests 
+      });
     } catch (error) {
-      console.error('Error fetching tests:', error);
-      return res.status(500).json({ error: 'Erro ao buscar testes' });
-    }
-  }
-
-  // Handle POST request - Create test
-  if (req.method === 'POST') {
-    const { name, description, timeLimit, passingScore, level, levelId } = req.body;
-
-    if (!name || !level || !levelId) {
-      return res.status(400).json({ 
-        error: 'Nome, nível (course, module, lesson) e ID do nível são obrigatórios' 
+      console.error('Erro ao buscar testes de treinamento:', error);
+      return res.status(500).json({ 
+        success: false,
+        error: 'Erro ao buscar testes de treinamento',
+        tests: [] 
       });
     }
-
+  } else if (req.method === 'POST') {
     try {
-      // Validate that the level and levelId exist and belong to the company
-      let levelExists = false;
-      
-      if (level === 'course') {
-        const course = await prisma.$queryRaw`
-          SELECT id FROM "Course" WHERE id = ${levelId} AND "companyId" = ${companyId}
-        `;
-        levelExists = Array.isArray(course) && course.length > 0;
-      } else if (level === 'module') {
-        const moduleData = await prisma.$queryRaw`
-          SELECT m.id 
-          FROM "Module" m
-          JOIN "Course" c ON m."courseId" = c.id
-          WHERE m.id = ${levelId} AND c."companyId" = ${companyId}
-        `;
-        levelExists = Array.isArray(moduleData) && moduleData.length > 0;
-      } else if (level === 'lesson') {
-        const lesson = await prisma.$queryRaw`
-          SELECT l.id 
-          FROM "Lesson" l
-          JOIN "Module" m ON l."moduleId" = m.id
-          JOIN "Course" c ON m."courseId" = c.id
-          WHERE l.id = ${levelId} AND c."companyId" = ${companyId}
-        `;
-        levelExists = Array.isArray(lesson) && lesson.length > 0;
+      const { title, description, timeLimit, cutoffScore, active } = req.body;
+      console.log('[API] Criando novo teste de treinamento:', { title, description, timeLimit, cutoffScore, active });
+
+      if (!title) {
+        return res.status(400).json({ 
+          success: false,
+          error: 'Título do teste é obrigatório' 
+        });
       }
 
-      if (!levelExists) {
-        return res.status(404).json({ error: 'Nível não encontrado ou não pertence à empresa' });
-      }
-
-      // Create the test
-      await prisma.$executeRaw`
+      // Criar o teste
+      const newTestResult = await prisma.$queryRaw`
         INSERT INTO "Test" (
-          name, 
+          id,
+          title, 
           description, 
           "timeLimit", 
-          "passingScore", 
-          level, 
-          "levelId", 
+          "cutoffScore",
+          active,
+          "testType",
           "companyId",
-          "testType"
+          "createdAt",
+          "updatedAt"
         ) VALUES (
-          ${name},
+          gen_random_uuid(),
+          ${title},
           ${description || ''},
-          ${timeLimit || 30},
-          ${passingScore || 70},
-          ${level},
-          ${levelId},
+          ${timeLimit ? parseInt(timeLimit) : null},
+          ${cutoffScore ? parseInt(cutoffScore) : 70},
+          ${active === undefined ? true : active},
+          'training',
           ${companyId},
-          'training'
+          CURRENT_TIMESTAMP,
+          CURRENT_TIMESTAMP
         )
+        RETURNING id, title, description, "timeLimit", "cutoffScore", active, "testType", "companyId", "createdAt", "updatedAt"
       `;
 
-      // Get the created test ID
-      const testResult = await prisma.$queryRaw`
-        SELECT id FROM "Test" WHERE id = (SELECT lastval())
-      `;
-      
-      const testId = testResult[0].id;
+      // Garantir que o resultado seja tratado corretamente
+      const newTest = Array.isArray(newTestResult) && newTestResult.length > 0 
+        ? {
+            ...newTestResult[0],
+            timeLimit: newTestResult[0].timeLimit ? Number(newTestResult[0].timeLimit) : null,
+            cutoffScore: newTestResult[0].cutoffScore ? Number(newTestResult[0].cutoffScore) : null
+          }
+        : { id: 'unknown', title, description };
 
-      // Get the created test
-      const createdTest = await prisma.$queryRaw`
-        SELECT 
-          id, 
-          name, 
-          description, 
-          "timeLimit", 
-          "passingScore",
-          level,
-          "levelId"
-        FROM "Test"
-        WHERE id = ${testId}
-      `;
+      console.log(`[API] Teste de treinamento criado com sucesso. ID: ${newTest.id}`);
 
-      return res.status(201).json(createdTest[0]);
+      return res.status(201).json({ 
+        success: true, 
+        message: 'Teste de treinamento criado com sucesso',
+        test: newTest
+      });
     } catch (error) {
-      console.error('Error creating test:', error);
-      return res.status(500).json({ error: 'Erro ao criar teste' });
+      console.error('Erro ao criar teste de treinamento:', error);
+      return res.status(500).json({ 
+        success: false,
+        error: 'Erro ao criar teste de treinamento' 
+      });
     }
+  } else {
+    res.setHeader('Allow', ['GET', 'POST']);
+    return res.status(405).json({ 
+      success: false,
+      error: `Método ${req.method} não permitido` 
+    });
   }
-
-  // If the request method is not supported
-  return res.status(405).json({ error: 'Método não permitido' });
 }

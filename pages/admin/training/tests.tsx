@@ -1,339 +1,444 @@
-import { NextPage } from 'next';
-import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/router';
-import axios from 'axios';
-import AdminLayout from '../../../components/admin/AdminLayout';
-import Breadcrumbs, { useBreadcrumbs } from '../../../components/admin/Breadcrumbs';
-import ContextualNavigation, { useContextualNavigation } from '../../../components/admin/ContextualNavigation';
-import { PlusIcon, DocumentTextIcon, ClipboardIcon, AcademicCapIcon } from '@heroicons/react/24/outline';
-import Link from 'next/link';
+import { NextPage } from 'next'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/router'
+import { useSession } from 'next-auth/react'
+import Link from 'next/link'
+import { Formik, Form, Field, ErrorMessage } from 'formik'
+import * as Yup from 'yup'
+import AdminLayout from '../../../components/admin/AdminLayout'
+import { useNotificationSystem } from '../../../hooks/useNotificationSystem';
 
 interface Test {
-  id: string;
-  title: string;
-  description: string;
-  moduleId: string | null;
-  courseId: string;
-  duration: number; // em minutos
-  passingScore: number; // pontuação mínima para aprovação (%)
-  questionCount: number;
-  attemptsAllowed: number;
-  isActive: boolean;
-  module?: {
-    name: string;
-  };
-  course?: {
-    name: string;
-  };
-  createdAt: string;
+  id: string
+  title: string
+  description: string | null
+  timeLimit: number | null
+  active: boolean
+  sectionsCount?: number
+  questionsCount?: number
+  createdAt: string
+  testType: string
 }
 
-interface Course {
-  id: string;
-  name: string;
-}
+const validationSchema = Yup.object({
+  title: Yup.string().required('O título do teste é obrigatório'),
+  description: Yup.string(),
+  timeLimit: Yup.number().min(1, 'O tempo deve ser pelo menos 1 minuto').nullable(),
+  active: Yup.boolean()
+})
 
-const TestsPage: NextPage = () => {
-  const { data: session, status } = useSession();
-  const router = useRouter();
-  const breadcrumbItems = useBreadcrumbs();
-  const contextualNav = useContextualNavigation();
+const Tests: NextPage = () => {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+  const notify = useNotificationSystem();
+  const [tests, setTests] = useState<Test[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [isEditing, setIsEditing] = useState(false)
+  const [currentTest, setCurrentTest] = useState<Test | null>(null)
   
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [tests, setTests] = useState<Test[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [selectedCourseId, setSelectedCourseId] = useState<string>('');
-  const [filterType, setFilterType] = useState<'all' | 'module' | 'course'>('all');
-
-  // Buscar cursos e testes
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/admin/login');
+      router.push('/admin/login')
+    }
+  }, [status, router])
+  
+  useEffect(() => {
+    const fetchTests = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch('/api/admin/training/tests')
+        if (!response.ok) {
+          throw new Error('Erro ao carregar os testes')
+        }
+        const data = await response.json()
+        setTests(data.tests || [])
+      } catch (error) {
+        console.error('Erro:', error)
+        setError('Não foi possível carregar os testes. Por favor, tente novamente.')
+        notify.showError('Não foi possível carregar os testes. Por favor, tente novamente.')
+      } finally {
+        setLoading(false)
+      }
     }
     
     if (status === 'authenticated') {
-      // Buscar todos os cursos
-      axios.get('/api/admin/training/courses')
-        .then(response => {
-          const coursesData = Array.isArray(response.data) ? response.data : [];
-          setCourses(coursesData);
+      fetchTests()
+    }
+  }, [status])
+  
+  const handleSubmit = async (values: any, { resetForm }: any) => {
+    try {
+      const method = isEditing ? 'PUT' : 'POST'
+      const url = isEditing ? `/api/admin/training/tests/${currentTest?.id}` : '/api/admin/training/tests'
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(values),
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || `Erro ao ${isEditing ? 'atualizar' : 'criar'} o teste`)
+      }
+      
+      // Atualizar a lista de testes
+      const testsResponse = await fetch('/api/admin/training/tests')
+      const testsData = await testsResponse.json()
+      setTests(testsData.tests || [])
+      
+      // Limpar o formulário e o estado de edição
+      resetForm()
+      setIsEditing(false)
+      setCurrentTest(null)
+      
+      // Mostrar mensagem de sucesso
+      notify.showSuccess(isEditing ? 'Teste atualizado com sucesso!' : 'Teste criado com sucesso!')
+    } catch (error) {
+      console.error('Erro:', error)
+      notify.showError(`Ocorreu um erro ao ${isEditing ? 'atualizar' : 'criar'} o teste. Por favor, tente novamente.`)
+    }
+  }
+  
+  const handleCancel = () => {
+    setIsEditing(false)
+    setCurrentTest(null)
+  }
+  
+  const handleDelete = async (id: string) => {
+    // Encontrar o teste para mostrar o título na confirmação
+    const testToDelete = tests.find(test => test.id === id);
+    
+    if (!testToDelete) {
+      notify.showError('Teste não encontrado');
+      return;
+    }
+    
+    // Usar o sistema de notificações para confirmar a exclusão
+    notify.confirm(
+      'Confirmar exclusão',
+      `Tem certeza que deseja excluir o teste "${testToDelete.title}"? Esta operação não poderá ser desfeita.`,
+      async () => {
+        try {
+          const response = await fetch(`/api/admin/training/tests/${id}`, {
+            method: 'DELETE',
+          })
           
-          // Se houver um curso na URL, selecione-o
-          const courseId = router.query.courseId as string;
-          if (courseId) {
-            setSelectedCourseId(courseId);
-            setFilterType('course');
-            fetchTestsByCourse(courseId);
-          } else {
-            // Buscar todos os testes
-            fetchAllTests();
+          if (!response.ok) {
+            const errorData = await response.json()
+            throw new Error(errorData.error || 'Erro ao excluir o teste')
           }
-        })
-        .catch(err => {
-          console.error('Erro ao buscar cursos:', err);
-          setError(err.response?.data?.error || 'Ocorreu um erro ao buscar os cursos.');
-          setLoading(false);
-        });
-    }
-  }, [status, router]);
-
-  const fetchAllTests = () => {
-    setLoading(true);
-    axios.get('/api/admin/training/tests')
-      .then(response => {
-        const testsData = Array.isArray(response.data) ? response.data : [];
-        setTests(testsData);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Erro ao buscar testes:', err);
-        setError(err.response?.data?.error || 'Ocorreu um erro ao buscar os testes.');
-        setLoading(false);
-      });
-  };
-
-  const fetchTestsByCourse = (courseId: string) => {
-    setLoading(true);
-    axios.get(`/api/admin/training/tests?courseId=${courseId}`)
-      .then(response => {
-        const testsData = Array.isArray(response.data) ? response.data : [];
-        setTests(testsData);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Erro ao buscar testes do curso:', err);
-        setError(err.response?.data?.error || 'Ocorreu um erro ao buscar os testes do curso.');
-        setLoading(false);
-      });
-  };
-
-  const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    setFilterType(value as 'all' | 'module' | 'course');
-    
-    if (value === 'all') {
-      setSelectedCourseId('');
-      fetchAllTests();
-      
-      // Atualizar a URL removendo o parâmetro courseId
-      router.push('/admin/training/tests', undefined, { shallow: true });
-    }
-  };
-
-  const handleCourseChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const courseId = e.target.value;
-    setSelectedCourseId(courseId);
-    
-    if (courseId) {
-      fetchTestsByCourse(courseId);
-      
-      // Atualizar a URL com o ID do curso selecionado
-      router.push({
-        pathname: '/admin/training/tests',
-        query: { courseId }
-      }, undefined, { shallow: true });
-    } else {
-      fetchAllTests();
-      
-      // Atualizar a URL removendo o parâmetro courseId
-      router.push('/admin/training/tests', undefined, { shallow: true });
-    }
-  };
-
-  // Função para formatar a duração
-  const formatDuration = (minutes: number) => {
-    if (minutes < 60) {
-      return `${minutes} min`;
-    } else {
-      const hours = Math.floor(minutes / 60);
-      const mins = minutes % 60;
-      return `${hours}h${mins > 0 ? ` ${mins}min` : ''}`;
-    }
-  };
-
-  if (status === 'loading' || loading) {
-    return (
-      <AdminLayout activeSection="treinamento">
-        <div className="min-h-screen bg-secondary-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-            <p className="mt-4 text-secondary-600">Carregando...</p>
-          </div>
-        </div>
-      </AdminLayout>
+          
+          // Atualizar a lista de testes
+          setTests(tests.filter(test => test.id !== id))
+          
+          // Mostrar mensagem de sucesso
+          notify.showSuccess('Teste excluído com sucesso!')
+        } catch (error) {
+          console.error('Erro:', error)
+          notify.showError('Ocorreu um erro ao excluir o teste. Por favor, tente novamente.')
+        }
+      },
+      {
+        type: 'warning',
+        confirmText: 'Excluir',
+        cancelText: 'Cancelar'
+      }
     );
   }
-
-  if (status === 'unauthenticated') {
-    return null; // Será redirecionado pelo useEffect
+  
+  const handleEdit = (test: Test) => {
+    setCurrentTest(test)
+    setIsEditing(true)
   }
-
+  
+  const handleToggleActive = async (id: string, currentActive: boolean) => {
+    try {
+      const response = await fetch(`/api/admin/training/tests/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ active: !currentActive }),
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Erro ao atualizar o status do teste')
+      }
+      
+      // Atualizar o teste na lista
+      setTests(tests.map(test => 
+        test.id === id ? { ...test, active: !currentActive } : test
+      ))
+      
+      // Mostrar mensagem de sucesso
+      notify.showSuccess(`Teste ${!currentActive ? 'ativado' : 'desativado'} com sucesso!`)
+    } catch (error) {
+      console.error('Erro:', error)
+      notify.showError('Ocorreu um erro ao atualizar o status do teste. Por favor, tente novamente.')
+    }
+  }
+  
+  if (status === 'loading' || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-primary-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-secondary-700">Carregando...</p>
+        </div>
+      </div>
+    )
+  }
+  
+  if (status === 'unauthenticated') {
+    return null // Será redirecionado pelo useEffect
+  }
+  
   return (
-    <AdminLayout activeSection="treinamento">
-      <div className="container mx-auto px-4 py-6">
-        <Breadcrumbs items={breadcrumbItems} />
-        <ContextualNavigation 
-          prevLink={contextualNav.prev} 
-          nextLink={contextualNav.next} 
-          relatedLinks={contextualNav.related} 
-        />
-        
+    <AdminLayout>
+      <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-secondary-900">Gerenciamento de Testes</h1>
-          <Link
-            href="/admin/training/tests/new"
-            className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors duration-200 font-medium flex items-center"
-          >
-            <PlusIcon className="h-5 w-5 mr-2" />
-            Novo Teste
-          </Link>
+          <h1 className="text-2xl font-bold text-secondary-800">Gerenciar Testes</h1>
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
+          <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-md">
             {error}
           </div>
         )}
 
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="filterType" className="block text-sm font-medium text-secondary-700 mb-2">
-                Filtrar por:
-              </label>
-              <select
-                id="filterType"
-                value={filterType}
-                onChange={handleFilterChange}
-                className="block w-full px-3 py-2 border border-secondary-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="md:col-span-1">
+            <div className="bg-white shadow-md rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-secondary-800 mb-4">
+                {isEditing ? 'Editar Teste' : 'Novo Teste'}
+              </h2>
+              
+              <Formik
+                initialValues={{
+                  title: currentTest?.title || '',
+                  description: currentTest?.description || '',
+                  timeLimit: currentTest?.timeLimit || '',
+                  active: currentTest?.active ?? true
+                }}
+                validationSchema={validationSchema}
+                onSubmit={handleSubmit}
+                enableReinitialize
               >
-                <option value="all">Todos os testes</option>
-                <option value="course">Testes por curso</option>
-              </select>
+                {({ isSubmitting, setFieldValue, values }) => (
+                  <Form>
+                    <div className="mb-4">
+                      <label htmlFor="title" className="block text-sm font-medium text-secondary-700 mb-1">
+                        Título
+                      </label>
+                      <Field
+                        type="text"
+                        name="title"
+                        id="title"
+                        className="w-full p-2 border border-secondary-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Digite o título do teste"
+                      />
+                      <ErrorMessage name="title" component="div" className="mt-1 text-sm text-red-600" />
+                    </div>
+
+                    <div className="mb-4">
+                      <label htmlFor="description" className="block text-sm font-medium text-secondary-700 mb-1">
+                        Descrição
+                      </label>
+                      <Field
+                        as="textarea"
+                        name="description"
+                        id="description"
+                        rows={3}
+                        className="w-full p-2 border border-secondary-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Digite a descrição do teste"
+                      />
+                      <ErrorMessage name="description" component="div" className="mt-1 text-sm text-red-600" />
+                    </div>
+
+                    <div className="mb-4">
+                      <label htmlFor="timeLimit" className="block text-sm font-medium text-secondary-700 mb-1">
+                        Tempo Limite (minutos)
+                      </label>
+                      <Field
+                        type="number"
+                        name="timeLimit"
+                        id="timeLimit"
+                        className="w-full p-2 border border-secondary-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Digite o tempo limite em minutos"
+                      />
+                      <ErrorMessage name="timeLimit" component="div" className="mt-1 text-sm text-red-600" />
+                      <p className="mt-1 text-xs text-secondary-500">
+                        Deixe em branco para sem limite de tempo
+                      </p>
+                    </div>
+
+                    <div className="mb-4 flex items-center">
+                      <Field
+                        type="checkbox"
+                        name="active"
+                        id="active"
+                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-secondary-300 rounded"
+                      />
+                      <label htmlFor="active" className="ml-2 block text-sm text-secondary-700">
+                        Ativo
+                      </label>
+                    </div>
+
+                    <div className="flex justify-end space-x-2">
+                      {isEditing && (
+                        <button
+                          type="button"
+                          onClick={handleCancel}
+                          className="px-4 py-2 border border-secondary-300 text-secondary-700 rounded-md hover:bg-secondary-50"
+                        >
+                          Cancelar
+                        </button>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                      >
+                        {isSubmitting ? 'Salvando...' : isEditing ? 'Atualizar' : 'Salvar'}
+                      </button>
+                    </div>
+                  </Form>
+                )}
+              </Formik>
             </div>
-            
-            {filterType === 'course' && (
-              <div>
-                <label htmlFor="courseSelect" className="block text-sm font-medium text-secondary-700 mb-2">
-                  Selecione um curso:
-                </label>
-                <select
-                  id="courseSelect"
-                  value={selectedCourseId}
-                  onChange={handleCourseChange}
-                  className="block w-full px-3 py-2 border border-secondary-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                >
-                  <option value="">Selecione um curso</option>
-                  {courses.map(course => (
-                    <option key={course.id} value={course.id}>
-                      {course.name}
-                    </option>
-                  ))}
-                </select>
+          </div>
+
+          <div className="md:col-span-2">
+            <div className="bg-white shadow-md rounded-lg overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-secondary-200">
+                  <thead className="bg-secondary-50">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
+                        Título
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
+                        Seções/Perguntas
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-secondary-500 uppercase tracking-wider">
+                        Ações
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-secondary-200">
+                    {tests.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-6 py-4 text-center text-sm text-secondary-500">
+                          Nenhum teste encontrado
+                        </td>
+                      </tr>
+                    ) : (
+                      tests.map((test) => (
+                        <tr key={test.id}>
+                          <td className="px-6 py-4">
+                            <div className="text-sm font-medium text-secondary-900">{test.title}</div>
+                            <div className="text-sm text-secondary-500 mt-1 max-w-md break-words">
+                              {test.description && test.description.split('\n').map((line, i) => (
+                                <span key={i}>
+                                  {line}
+                                  {i < test.description.split('\n').length - 1 && <br />}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-secondary-900">
+                              {test.sectionsCount || 0} etapas
+                            </div>
+                            <div className="text-sm text-secondary-500">
+                              {test.questionsCount || 0} perguntas
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              test.active
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {test.active ? 'Ativo' : 'Inativo'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <div className="flex flex-col space-y-1.5 items-end">
+                              <Link 
+                                href={`/admin/training/test/${test.id}`} 
+                                className="px-2 py-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors duration-200 text-xs font-medium flex items-center w-24 justify-center"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                  <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                                  <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                                </svg>
+                                Detalhes
+                              </Link>
+                              <button
+                                onClick={() => handleEdit(test)}
+                                className="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 transition-colors duration-200 text-xs font-medium flex items-center w-24 justify-center"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                </svg>
+                                Editar
+                              </button>
+                              <button
+                                onClick={() => handleToggleActive(test.id, test.active)}
+                                className={`px-2 py-1 rounded-md transition-colors duration-200 text-xs font-medium flex items-center w-24 justify-center ${
+                                  test.active 
+                                    ? 'bg-amber-50 text-amber-600 hover:bg-amber-100' 
+                                    : 'bg-green-50 text-green-600 hover:bg-green-100'
+                                }`}
+                              >
+                                {test.active ? (
+                                  <>
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                      <path fillRule="evenodd" d="M13.477 14.89A6 6 0 015.11 6.524l8.367 8.368zm1.414-1.414L6.524 5.11a6 6 0 018.367 8.367zM18 10a8 8 0 11-16 0 8 8 0 0116 0z" clipRule="evenodd" />
+                                    </svg>
+                                    Desativar
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                    </svg>
+                                    Ativar
+                                  </>
+                                )}
+                              </button>
+                              <button
+                                onClick={() => handleDelete(test.id)}
+                                className="px-2 py-1 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors duration-200 text-xs font-medium flex items-center w-24 justify-center"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                                Excluir
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
-            )}
+            </div>
           </div>
         </div>
-
-        {tests.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-6 text-center">
-            <DocumentTextIcon className="h-16 w-16 mx-auto text-secondary-400 mb-4" />
-            <h2 className="text-xl font-semibold text-secondary-700 mb-2">Nenhum teste encontrado</h2>
-            <p className="text-secondary-500 mb-4">
-              {filterType === 'course' && selectedCourseId 
-                ? 'Este curso ainda não possui testes.' 
-                : 'Não há testes cadastrados no sistema.'}
-            </p>
-            <Link
-              href="/admin/training/tests/new"
-              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors duration-200 font-medium"
-            >
-              Criar Novo Teste
-            </Link>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {tests.map(test => (
-              <div 
-                key={test.id}
-                className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200"
-              >
-                <div className="p-6">
-                  <div className="flex justify-between items-start mb-3">
-                    <h2 className="text-xl font-semibold text-secondary-800 line-clamp-1">{test.title}</h2>
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                      test.isActive 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-secondary-100 text-secondary-800'
-                    }`}>
-                      {test.isActive ? 'Ativo' : 'Inativo'}
-                    </span>
-                  </div>
-                  
-                  <p className="text-secondary-600 mb-4 line-clamp-2">{test.description}</p>
-                  
-                  <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
-                    <div className="flex items-center">
-                      <ClipboardIcon className="h-5 w-5 text-secondary-500 mr-2" />
-                      <span className="text-secondary-600">{test.questionCount} questões</span>
-                    </div>
-                    <div className="flex items-center">
-                      <AcademicCapIcon className="h-5 w-5 text-secondary-500 mr-2" />
-                      <span className="text-secondary-600">Nota mínima: {test.passingScore}%</span>
-                    </div>
-                    <div className="flex items-center">
-                      <svg className="h-5 w-5 text-secondary-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <span className="text-secondary-600">Duração: {formatDuration(test.duration)}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <svg className="h-5 w-5 text-secondary-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      <span className="text-secondary-600">Tentativas: {test.attemptsAllowed}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-4 pt-4 border-t border-secondary-200">
-                    <div className="text-sm text-secondary-600 mb-2">
-                      {test.course?.name && (
-                        <div className="mb-1">
-                          <span className="font-medium">Curso:</span> {test.course.name}
-                        </div>
-                      )}
-                      {test.module?.name && (
-                        <div>
-                          <span className="font-medium">Módulo:</span> {test.module.name}
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="flex justify-between mt-2">
-                      <Link
-                        href={`/admin/training/tests/${test.id}/questions`}
-                        className="px-3 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors duration-200 text-sm"
-                      >
-                        Questões
-                      </Link>
-                      <Link
-                        href={`/admin/training/tests/${test.id}`}
-                        className="px-3 py-1 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors duration-200 text-sm"
-                      >
-                        Gerenciar
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </AdminLayout>
-  );
-};
+  )
+}
 
-export default TestsPage;
+export default Tests

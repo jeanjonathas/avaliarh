@@ -35,7 +35,7 @@ export default async function handler(
       
       // Buscar todos os testes usando Prisma Client em vez de SQL raw
       // Usando uma abordagem alternativa para contornar os erros de lint
-      const tests = await prisma.$queryRaw`
+      const testsRaw = await prisma.$queryRaw`
         SELECT 
           t.id, 
           t.title, 
@@ -57,8 +57,14 @@ export default async function handler(
         ORDER BY t."createdAt" DESC
       `;
       
-      // Corrigir o erro de TypeScript adicionando uma verificação de tipo
-      const testsArray = Array.isArray(tests) ? tests : [];
+      // Converter BigInt para Number para evitar erro de serialização
+      const testsArray = Array.isArray(testsRaw) ? testsRaw.map(test => ({
+        ...test,
+        sectionsCount: Number(test.sectionsCount),
+        questionsCount: Number(test.questionsCount),
+        timeLimit: test.timeLimit ? Number(test.timeLimit) : null
+      })) : [];
+      
       console.log(`[API] Encontrados ${testsArray.length} testes`);
       
       // Corrigir o formato da resposta para incluir a propriedade 'tests'
