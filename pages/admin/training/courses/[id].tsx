@@ -10,6 +10,7 @@ import ModuleFormModal from '../../../../components/admin/training/ModuleFormMod
 import DeleteModuleModal from '../../../../components/admin/training/DeleteModuleModal';
 import ModuleReorderModal from '../../../../components/admin/training/ModuleReorderModal';
 import axios from 'axios';
+import { toast } from 'react-hot-toast';
 
 export default function CourseDetail() {
   const { data: session, status } = useSession();
@@ -53,19 +54,27 @@ export default function CourseDetail() {
   }, [status, router, id]);
 
   const handleDeleteCourse = async () => {
-    if (!id) return;
-    
-    setDeleting(true);
     try {
-      await axios.delete(`/api/admin/training/courses/${id}`);
-      
-      // Redirect to courses page after successful deletion
+      setDeleting(true);
+      const response = await axios.delete(`/api/admin/training/courses/${id}`);
+
+      if (response.status !== 200) {
+        const data = response.data;
+        if (data.error === 'Course has enrolled students') {
+          toast.error('Não é possível excluir um curso com alunos matriculados');
+        } else {
+          toast.error('Ocorreu um erro ao excluir o curso');
+        }
+        return;
+      }
+
+      toast.success('Curso excluído com sucesso');
       router.push('/admin/training');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Ocorreu um erro ao excluir o curso. Por favor, tente novamente.');
-      setDeleteModalOpen(false);
+    } catch (error) {
+      toast.error('Ocorreu um erro ao excluir o curso');
     } finally {
       setDeleting(false);
+      setDeleteModalOpen(false);
     }
   };
 

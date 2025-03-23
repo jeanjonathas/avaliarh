@@ -71,181 +71,32 @@ const StudentProgressPage: NextPage = () => {
     if (status === 'unauthenticated') {
       router.push('/admin/login');
     }
-    
+
     if (status === 'authenticated') {
       const fetchData = async () => {
         try {
-          // Em produção, substituir por chamadas reais à API
-          // Simular busca de dados
-          
-          // Dados de exemplo para desenvolvimento
-          const mockStudents: Student[] = [
-            { id: '1', name: 'Ana Silva', email: 'ana.silva@empresa.com' },
-            { id: '2', name: 'Carlos Oliveira', email: 'carlos.oliveira@empresa.com' },
-            { id: '3', name: 'Mariana Costa', email: 'mariana.costa@empresa.com' },
-            { id: '4', name: 'Roberto Santos', email: 'roberto.santos@empresa.com' }
-          ];
-          
-          const mockCourses: Course[] = [
-            { id: '1', name: 'Introdução à Gestão de RH' },
-            { id: '2', name: 'Recrutamento e Seleção Avançado' },
-            { id: '3', name: 'Liderança e Gestão de Equipes' },
-            { id: '4', name: 'Desenvolvimento Organizacional' }
-          ];
-          
-          const mockModules: Module[] = [
-            { id: '1', name: 'Fundamentos de RH', courseId: '1' },
-            { id: '2', name: 'Legislação Trabalhista', courseId: '1' },
-            { id: '3', name: 'Técnicas de Entrevista', courseId: '2' },
-            { id: '4', name: 'Avaliação de Competências', courseId: '2' },
-            { id: '5', name: 'Comunicação Efetiva', courseId: '3' },
-            { id: '6', name: 'Gestão de Conflitos', courseId: '3' },
-            { id: '7', name: 'Cultura Organizacional', courseId: '4' },
-            { id: '8', name: 'Gestão de Mudanças', courseId: '4' }
-          ];
-          
-          const mockProgressData: StudentProgress[] = [
-            {
-              id: '1',
-              studentId: '1',
-              studentName: 'Ana Silva',
-              studentEmail: 'ana.silva@empresa.com',
-              courseId: '1',
-              courseName: 'Introdução à Gestão de RH',
-              moduleId: '1',
-              moduleName: 'Fundamentos de RH',
-              progress: 100,
-              lastActivity: '2025-03-20T14:30:00Z',
-              status: 'completed',
-              completedLessons: 5,
-              totalLessons: 5,
-              completedTests: 2,
-              totalTests: 2,
-              averageScore: 92
-            },
-            {
-              id: '2',
-              studentId: '1',
-              studentName: 'Ana Silva',
-              studentEmail: 'ana.silva@empresa.com',
-              courseId: '1',
-              courseName: 'Introdução à Gestão de RH',
-              moduleId: '2',
-              moduleName: 'Legislação Trabalhista',
-              progress: 60,
-              lastActivity: '2025-03-21T10:15:00Z',
-              status: 'in_progress',
-              completedLessons: 3,
-              totalLessons: 5,
-              completedTests: 1,
-              totalTests: 2,
-              averageScore: 85
-            },
-            {
-              id: '3',
-              studentId: '2',
-              studentName: 'Carlos Oliveira',
-              studentEmail: 'carlos.oliveira@empresa.com',
-              courseId: '2',
-              courseName: 'Recrutamento e Seleção Avançado',
-              moduleId: '3',
-              moduleName: 'Técnicas de Entrevista',
-              progress: 80,
-              lastActivity: '2025-03-19T16:45:00Z',
-              status: 'in_progress',
-              completedLessons: 4,
-              totalLessons: 5,
-              completedTests: 1,
-              totalTests: 2,
-              averageScore: 78
-            },
-            {
-              id: '4',
-              studentId: '3',
-              studentName: 'Mariana Costa',
-              studentEmail: 'mariana.costa@empresa.com',
-              courseId: '3',
-              courseName: 'Liderança e Gestão de Equipes',
-              moduleId: '5',
-              moduleName: 'Comunicação Efetiva',
-              progress: 100,
-              lastActivity: '2025-03-18T09:20:00Z',
-              status: 'completed',
-              completedLessons: 4,
-              totalLessons: 4,
-              completedTests: 2,
-              totalTests: 2,
-              averageScore: 95
-            },
-            {
-              id: '5',
-              studentId: '3',
-              studentName: 'Mariana Costa',
-              studentEmail: 'mariana.costa@empresa.com',
-              courseId: '3',
-              courseName: 'Liderança e Gestão de Equipes',
-              moduleId: '6',
-              moduleName: 'Gestão de Conflitos',
-              progress: 0,
-              lastActivity: '',
-              status: 'not_started',
-              completedLessons: 0,
-              totalLessons: 5,
-              completedTests: 0,
-              totalTests: 2,
-              averageScore: 0
-            },
-            {
-              id: '6',
-              studentId: '4',
-              studentName: 'Roberto Santos',
-              studentEmail: 'roberto.santos@empresa.com',
-              courseId: '4',
-              courseName: 'Desenvolvimento Organizacional',
-              moduleId: '7',
-              moduleName: 'Cultura Organizacional',
-              progress: 40,
-              lastActivity: '2025-03-22T08:45:00Z',
-              status: 'in_progress',
-              completedLessons: 2,
-              totalLessons: 5,
-              completedTests: 0,
-              totalTests: 2,
-              averageScore: 0
-            },
-            {
-              id: '7',
-              studentId: '2',
-              studentName: 'Carlos Oliveira',
-              studentEmail: 'carlos.oliveira@empresa.com',
-              courseId: '2',
-              courseName: 'Recrutamento e Seleção Avançado',
-              moduleId: '4',
-              moduleName: 'Avaliação de Competências',
-              progress: 20,
-              lastActivity: '2025-03-21T13:10:00Z',
-              status: 'in_progress',
-              completedLessons: 1,
-              totalLessons: 5,
-              completedTests: 0,
-              totalTests: 2,
-              averageScore: 0
-            }
-          ];
-          
-          setStudents(mockStudents);
-          setCourses(mockCourses);
-          setModules(mockModules);
-          setProgressData(mockProgressData);
-          setFilteredProgressData(mockProgressData);
-          setLoading(false);
+          setLoading(true);
+          setError(null);
+
+          const [studentsRes, coursesRes, modulesRes, progressRes] = await Promise.all([
+            axios.get('/api/admin/training/students'),
+            axios.get('/api/admin/training/courses'),
+            axios.get('/api/admin/training/modules'),
+            axios.get('/api/admin/training/student-progress')
+          ]);
+
+          setStudents(studentsRes.data);
+          setCourses(coursesRes.data);
+          setModules(modulesRes.data);
+          setProgressData(progressRes.data);
+          setFilteredProgressData(progressRes.data);
         } catch (err) {
-          console.error('Erro ao buscar dados de progresso:', err);
-          setError('Ocorreu um erro ao buscar os dados de progresso dos alunos.');
+          setError('Erro ao carregar dados. Tente novamente mais tarde.');
+        } finally {
           setLoading(false);
         }
       };
-      
+
       fetchData();
     }
   }, [status, router]);
