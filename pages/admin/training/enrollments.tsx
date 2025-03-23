@@ -8,6 +8,7 @@ import Breadcrumbs, { useBreadcrumbs } from '../../../components/admin/Breadcrum
 import ContextualNavigation, { useContextualNavigation } from '../../../components/admin/ContextualNavigation';
 import { PlusIcon, UserGroupIcon, AcademicCapIcon, CheckCircleIcon, XCircleIcon, ClockIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
 
 interface Enrollment {
   id: string;
@@ -18,7 +19,7 @@ interface Enrollment {
   progress: number;
   lastAccessDate: string;
   completionDate: string | null;
-  student: {
+  student?: {
     name: string;
     email: string;
     department: string;
@@ -36,8 +37,11 @@ interface Course {
 
 interface Student {
   id: string;
+  userId: string;
   name: string;
   email: string;
+  department?: string;
+  role?: string;
 }
 
 const EnrollmentsPage: NextPage = () => {
@@ -57,8 +61,9 @@ const EnrollmentsPage: NextPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [newEnrollment, setNewEnrollment] = useState({
-    studentId: '',
+    userId: '',
     courseId: '',
+    action: 'enroll'
   });
 
   // Buscar matrículas, cursos e alunos
@@ -76,18 +81,26 @@ const EnrollmentsPage: NextPage = () => {
         })
         .catch(err => {
           console.error('Erro ao buscar cursos:', err);
-          setError('Ocorreu um erro ao buscar os cursos.');
+          toast.error('Ocorreu um erro ao buscar os cursos.');
         });
       
       // Buscar todos os alunos
       axios.get('/api/admin/training/students')
         .then(response => {
-          const studentsData = Array.isArray(response.data) ? response.data : [];
-          setStudents(studentsData);
+          const studentsData = Array.isArray(response.data?.data) ? response.data.data : [];
+          const formattedStudents = studentsData.map((student: any) => ({
+            id: student.id,
+            userId: student.userId,
+            name: student.user?.name || '',
+            email: student.user?.email || '',
+            department: student.user?.department || '',
+            role: student.user?.role || ''
+          }));
+          setStudents(formattedStudents);
         })
         .catch(err => {
           console.error('Erro ao buscar alunos:', err);
-          setError('Ocorreu um erro ao buscar os alunos.');
+          toast.error('Ocorreu um erro ao buscar os alunos.');
         });
       
       // Buscar todas as matrículas
@@ -99,7 +112,7 @@ const EnrollmentsPage: NextPage = () => {
         })
         .catch(err => {
           console.error('Erro ao buscar matrículas:', err);
-          setError('Ocorreu um erro ao buscar as matrículas.');
+          toast.error('Ocorreu um erro ao buscar as matrículas.');
           setLoading(false);
         });
     }
@@ -111,7 +124,7 @@ const EnrollmentsPage: NextPage = () => {
     const matchesStudent = selectedStudentId ? enrollment.studentId === selectedStudentId : true;
     const matchesStatus = selectedStatus ? enrollment.status === selectedStatus : true;
     const matchesSearch = searchTerm 
-      ? enrollment.student.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      ? enrollment.student?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
         enrollment.course.name.toLowerCase().includes(searchTerm.toLowerCase())
       : true;
     
@@ -120,23 +133,28 @@ const EnrollmentsPage: NextPage = () => {
 
   // Função para adicionar nova matrícula
   const handleAddEnrollment = () => {
-    if (!newEnrollment.studentId || !newEnrollment.courseId) {
-      setError('Por favor, selecione um aluno e um curso.');
+    if (!newEnrollment.userId || !newEnrollment.courseId) {
+      toast.error('Por favor, selecione um aluno e um curso.');
       return;
     }
     
     setLoading(true);
-    axios.post('/api/admin/training/enrollments', newEnrollment)
+    axios.post('/api/admin/training/enrollments', {
+      userId: newEnrollment.userId,
+      courseId: newEnrollment.courseId,
+      action: 'enroll'
+    })
       .then(response => {
         // Adicionar a nova matrícula à lista
         setEnrollments([...enrollments, response.data]);
         setShowAddModal(false);
-        setNewEnrollment({ studentId: '', courseId: '' });
+        setNewEnrollment({ userId: '', courseId: '', action: 'enroll' });
         setLoading(false);
+        toast.success('Matrícula adicionada com sucesso!');
       })
       .catch(err => {
         console.error('Erro ao adicionar matrícula:', err);
-        setError(err.response?.data?.error || 'Ocorreu um erro ao adicionar a matrícula.');
+        toast.error(err.response?.data?.error || 'Ocorreu um erro ao adicionar a matrícula.');
         setLoading(false);
       });
   };
@@ -154,10 +172,11 @@ const EnrollmentsPage: NextPage = () => {
               : enrollment
           ));
           setLoading(false);
+          toast.success('Matrícula cancelada com sucesso!');
         })
         .catch(err => {
           console.error('Erro ao cancelar matrícula:', err);
-          setError(err.response?.data?.error || 'Ocorreu um erro ao cancelar a matrícula.');
+          toast.error(err.response?.data?.error || 'Ocorreu um erro ao cancelar a matrícula.');
           setLoading(false);
         });
     }
@@ -379,14 +398,18 @@ const EnrollmentsPage: NextPage = () => {
                           <UserGroupIcon className="h-6 w-6 text-primary-600" />
                         </div>
                         <div className="ml-4">
-                          <div className="text-sm font-medium text-secondary-900">{enrollment.student.name}</div>
-                          <div className="text-sm text-secondary-500">{enrollment.student.email}</div>
+                          <div className="text-sm font-medium text-secondary-900">
+                            {enrollment.student?.name || 'Nome não disponível'}
+                          </div>
+                          <div className="text-sm text-secondary-500">
+                            {enrollment.student?.email || 'Email não disponível'}
+                          </div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-secondary-900">{enrollment.course.name}</div>
-                      <div className="text-sm text-secondary-500">{enrollment.student.department}</div>
+                      <div className="text-sm text-secondary-500">{enrollment.student?.department || 'Departamento não disponível'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-secondary-600">{formatDate(enrollment.enrollmentDate)}</div>
@@ -466,15 +489,14 @@ const EnrollmentsPage: NextPage = () => {
                 Aluno:
               </label>
               <select
-                id="studentId"
-                value={newEnrollment.studentId}
-                onChange={(e) => setNewEnrollment({ ...newEnrollment, studentId: e.target.value })}
-                className="block w-full px-3 py-2 border border-secondary-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                value={newEnrollment.userId}
+                onChange={(e) => setNewEnrollment({...newEnrollment, userId: e.target.value})}
+                className="w-full p-2 border rounded-md"
               >
                 <option value="">Selecione um aluno</option>
                 {students.map(student => (
-                  <option key={student.id} value={student.id}>
-                    {student.name}
+                  <option key={student.userId} value={student.userId}>
+                    {student.name} ({student.email})
                   </option>
                 ))}
               </select>

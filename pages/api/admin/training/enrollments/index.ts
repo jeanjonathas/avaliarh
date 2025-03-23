@@ -197,7 +197,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               id: student.studentId,
               name: student.studentName,
               email: student.studentEmail
-            }))
+            })),
+            enrolledStudent: {
+              id: studentId,
+              userId: userId
+            }
           });
         } else {
           // Unenroll the user - Delete enrollment if exists
