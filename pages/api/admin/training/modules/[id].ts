@@ -296,53 +296,65 @@ async function updateModule(req: NextApiRequest, res: NextApiResponse, id: strin
       }
     }
 
-    // Build the update query dynamically
-    const updateFields = [];
-    const updateValues = [];
-
+    // Create an update data object with only the fields that are provided
+    const updateData: any = {};
+    
     if (name !== undefined) {
-      updateFields.push(`name = ${Prisma.raw('$' + (updateValues.length + 1))}`);
-      updateValues.push(name);
+      updateData.name = name;
     }
-
+    
     if (description !== undefined) {
-      updateFields.push(`description = ${Prisma.raw('$' + (updateValues.length + 1))}`);
-      updateValues.push(description);
+      updateData.description = description;
     }
-
+    
     if (order !== undefined) {
-      updateFields.push(`"order" = ${Prisma.raw('$' + (updateValues.length + 1))}`);
-      updateValues.push(order);
+      updateData.order = order;
     }
-
+    
     if (finalTestId !== undefined) {
-      updateFields.push(`"finalTestId" = ${Prisma.raw('$' + (updateValues.length + 1))}`);
-      updateValues.push(finalTestId);
+      updateData.finalTestId = finalTestId || null; // Handle null case
     }
-
+    
     // Add updated timestamp
-    updateFields.push(`"updatedAt" = ${Prisma.raw('NOW()')}`);
-
-    if (updateFields.length === 0) {
+    updateData.updatedAt = new Date();
+    
+    if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ error: 'Nenhum campo para atualizar fornecido' });
     }
-
-    // Execute the update
-    const updateQuery = `
-      UPDATE "TrainingModule"
-      SET ${updateFields.join(', ')}
-      WHERE id = $${updateValues.length + 1}
-      RETURNING *
-    `;
-
-    updateValues.push(id);
-
-    const updatedModule = await prisma.$queryRawUnsafe(updateQuery, ...updateValues)
-      .then((results: any[]) => results[0] || null);
-
-    if (!updatedModule) {
-      return res.status(500).json({ error: 'Erro ao atualizar módulo' });
+    
+    // Build the SET clause for the SQL query
+    const setClauses = [];
+    
+    if (updateData.name !== undefined) {
+      setClauses.push(`name = ${Prisma.sql`${updateData.name}`}`);
     }
+    
+    if (updateData.description !== undefined) {
+      setClauses.push(`description = ${Prisma.sql`${updateData.description}`}`);
+    }
+    
+    if (updateData.order !== undefined) {
+      setClauses.push(`"order" = ${updateData.order}`);
+    }
+    
+    if (updateData.finalTestId !== undefined) {
+      setClauses.push(`"finalTestId" = ${updateData.finalTestId === null ? Prisma.sql`NULL` : Prisma.sql`${updateData.finalTestId}`}`);
+    }
+    
+    // Add updated timestamp
+    setClauses.push(`"updatedAt" = ${Prisma.raw('NOW()')}`);
+    
+    // Execute the update
+    await prisma.$executeRaw`
+      UPDATE "TrainingModule"
+      SET ${Prisma.raw(setClauses.join(', '))}
+      WHERE id = ${id}
+    `;
+    
+    // Fetch the updated module
+    const updatedModule = await prisma.$queryRaw`
+      SELECT * FROM "TrainingModule" WHERE id = ${id}
+    `.then((results: any[]) => results[0] || null);
 
     return res.status(200).json(updatedModule);
   } catch (error) {

@@ -44,10 +44,12 @@ interface Lesson {
   finalTest?: Test;
 }
 
-export default function NewCourse() {
+export default function EditCourse() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const { id } = router.query;
+  
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sectors, setSectors] = useState<Sector[]>([]);
@@ -92,7 +94,6 @@ export default function NewCourse() {
     }
 
     if (status === 'authenticated') {
-      // Fetch sectors
       setLoading(true);
       
       // Fetch sectors
@@ -109,15 +110,64 @@ export default function NewCourse() {
       axios.get('/api/admin/training/tests')
         .then(response => {
           setTests(response.data.tests || []);
-          setLoading(false);
         })
         .catch(err => {
           console.error('Erro ao buscar testes:', err);
           setError('Não foi possível carregar os testes. Por favor, tente novamente.');
-          setLoading(false);
         });
+
+      // Fetch course data if ID is available
+      if (id) {
+        axios.get(`/api/admin/training/courses/${id}`)
+          .then(response => {
+            const courseData = response.data;
+            
+            // Set form data
+            setFormData({
+              name: courseData.name || '',
+              description: courseData.description || '',
+              sectorId: courseData.sectorId || '',
+              showResults: courseData.showResults !== undefined ? courseData.showResults : true,
+              finalTestId: courseData.finalTestId || ''
+            });
+            
+            // Set modules and lessons
+            if (courseData.modules && Array.isArray(courseData.modules)) {
+              setModules(courseData.modules.map((module: any) => ({
+                id: module.id,
+                name: module.name,
+                description: module.description || '',
+                order: module.order,
+                finalTestId: module.finalTestId || '',
+                finalTest: module.finalTest || null,
+                lessons: Array.isArray(module.lessons) ? module.lessons.map((lesson: any) => ({
+                  id: lesson.id,
+                  name: lesson.name,
+                  description: lesson.description || '',
+                  type: lesson.type || 'TEXT',
+                  content: lesson.content || '',
+                  videoUrl: lesson.videoUrl || '',
+                  slidesUrl: lesson.slidesUrl || '',
+                  duration: lesson.duration,
+                  order: lesson.order,
+                  finalTestId: lesson.finalTestId || '',
+                  finalTest: lesson.finalTest || null
+                })) : []
+              })));
+            }
+          })
+          .catch(err => {
+            console.error('Erro ao carregar dados do curso:', err);
+            setError('Não foi possível carregar os dados do curso. Por favor, tente novamente.');
+          })
+          .finally(() => {
+            setLoading(false);
+          });
+      } else {
+        setLoading(false);
+      }
     }
-  }, [status, router]);
+  }, [status, router, id]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target as HTMLInputElement;
@@ -230,34 +280,91 @@ export default function NewCourse() {
     }
 
     try {
+      // First, update the basic course information
       const courseData = {
-        ...formData,
-        finalTestRequired: !!formData.finalTestId, // Define como true se houver um teste final
-        modules: modules.map(module => ({
-          name: module.name,
-          description: module.description,
-          order: module.order,
-          finalTestId: module.finalTestId,
-          lessons: module.lessons.map(lesson => ({
-            name: lesson.name,
-            description: lesson.description,
-            type: lesson.type,
-            content: lesson.content,
-            videoUrl: lesson.videoUrl,
-            slidesUrl: lesson.slidesUrl,
-            duration: lesson.duration,
-            order: lesson.order,
-            finalTestId: lesson.finalTestId
-          }))
-        }))
+        name: formData.name,
+        description: formData.description,
+        sectorId: formData.sectorId || null,
+        showResults: formData.showResults,
+        finalTestRequired: !!formData.finalTestId,
+        finalTestId: formData.finalTestId || null
       };
 
-      await axios.post('/api/admin/training/courses', courseData);
+      // Update the course basic info
+      await axios.put(`/api/admin/training/courses/${id}`, courseData);
       
-      // Redirect to courses page after successful creation
-      router.push('/admin/training/courses');
+      // Now handle modules and lessons
+      // We'll use a separate API endpoint for modules and lessons
+      for (const moduleItem of modules) {
+        let moduleId = moduleItem.id;
+        
+        // If it's a new module (has a temp ID), create it
+        if (moduleItem.id.startsWith('temp-')) {
+          const moduleData = {
+            courseId: id,
+            name: moduleItem.name,
+            description: moduleItem.description,
+            order: moduleItem.order,
+            finalTestId: moduleItem.finalTestId || null
+          };
+          
+          // Create the module
+          const moduleResponse = await axios.post('/api/admin/training/modules', moduleData);
+          moduleId = moduleResponse.data.id;
+        } else {
+          // Update existing module
+          const moduleData = {
+            name: moduleItem.name,
+            description: moduleItem.description,
+            order: moduleItem.order,
+            finalTestId: moduleItem.finalTestId || null
+          };
+          
+          await axios.put(`/api/admin/training/modules/${moduleItem.id}`, moduleData);
+        }
+        
+        // Now handle lessons for this module
+        for (const lesson of moduleItem.lessons) {
+          if (lesson.id.startsWith('temp-')) {
+            // It's a new lesson, create it
+            const lessonData = {
+              moduleId: moduleId,
+              name: lesson.name,
+              description: lesson.description,
+              type: lesson.type,
+              content: lesson.content,
+              videoUrl: lesson.videoUrl || null,
+              slidesUrl: lesson.slidesUrl || null,
+              duration: lesson.duration || null,
+              order: lesson.order,
+              finalTestId: lesson.finalTestId || null
+            };
+            
+            await axios.post('/api/admin/training/lessons', lessonData);
+          } else {
+            // Update existing lesson
+            const lessonData = {
+              name: lesson.name,
+              description: lesson.description,
+              type: lesson.type,
+              content: lesson.content,
+              videoUrl: lesson.videoUrl || null,
+              slidesUrl: lesson.slidesUrl || null,
+              duration: lesson.duration || null,
+              order: lesson.order,
+              finalTestId: lesson.finalTestId || null
+            };
+            
+            await axios.put(`/api/admin/training/lessons/${lesson.id}`, lessonData);
+          }
+        }
+      }
+      
+      // Redirect to course detail page after successful update
+      router.push(`/admin/training/courses/${id}`);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Ocorreu um erro ao criar o curso. Por favor, tente novamente.');
+      console.error('Erro ao atualizar curso:', err);
+      setError(err.response?.data?.error || err.response?.data?.message || 'Ocorreu um erro ao atualizar o curso. Por favor, tente novamente.');
     } finally {
       setSubmitting(false);
     }
@@ -276,7 +383,7 @@ export default function NewCourse() {
   return (
     <AdminLayout>
       <Head>
-        <title>Novo Curso | AvaliaRH</title>
+        <title>Editar Curso | AvaliaRH</title>
       </Head>
 
       <div className="py-6">
@@ -291,7 +398,7 @@ export default function NewCourse() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
             </button>
-            <h1 className="text-2xl font-semibold text-gray-900">Novo Curso</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Editar Curso</h1>
           </div>
         </div>
 
@@ -880,7 +987,7 @@ export default function NewCourse() {
                       <span className="ml-2">Salvando...</span>
                     </>
                   ) : (
-                    'Criar Curso'
+                    'Atualizar Curso'
                   )}
                 </button>
               </div>
