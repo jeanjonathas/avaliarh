@@ -8,6 +8,7 @@ import Breadcrumbs, { useBreadcrumbs } from '../../../components/admin/Breadcrum
 import ContextualNavigation, { useContextualNavigation } from '../../../components/admin/ContextualNavigation';
 import { PlusIcon, UserGroupIcon, AcademicCapIcon, UserCircleIcon, PencilIcon, TrashIcon, XCircleIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
 
 interface Student {
   id: string;
@@ -60,18 +61,44 @@ const TrainingStudents: NextPage = () => {
     setError(null);
     
     try {
-      // Tentar buscar alunos da API
+      // Buscar alunos da API - não precisamos passar parâmetros adicionais, pois a API já usa o companyId do usuário logado
       const response = await axios.get('/api/admin/training/students');
-      const studentsData = response.data.map((student: any) => ({
-        ...student,
-        status: student.status as 'active' | 'inactive'
+      
+      // Verificar se temos dados na resposta
+      if (!response.data || !response.data.data) {
+        console.error('Resposta da API não contém dados esperados:', response.data);
+        setError('Formato de resposta inválido da API');
+        setStudents([]);
+        setFilteredStudents([]);
+        setLoading(false);
+        return;
+      }
+      
+      console.log('Dados recebidos da API:', response.data);
+      
+      // A API retorna os dados em um formato diferente, com um objeto que contém data e pagination
+      const studentsData = response.data.data.map((student: any) => ({
+        id: student.id,
+        name: student.user.name,
+        email: student.user.email,
+        department: student.user.department || 'Não especificado',
+        position: student.user.position || 'Não especificado',
+        enrolledCourses: student.courseEnrollments.length,
+        completedCourses: student.courseEnrollments.filter((enrollment: any) => enrollment.completionDate).length,
+        averageScore: student.courseEnrollments.length > 0 
+          ? student.courseEnrollments.reduce((acc: number, curr: any) => acc + curr.progress, 0) / student.courseEnrollments.length 
+          : 0,
+        status: student.user.status || 'active',
+        lastActivity: student.user.lastLoginAt || student.enrollmentDate
       }));
+      
+      console.log('Dados processados:', studentsData);
       
       setStudents(studentsData);
       setFilteredStudents(studentsData);
       
       // Extrair departamentos únicos para o filtro
-      const uniqueDepartmentsSet = new Set(studentsData.map(student => student.department));
+      const uniqueDepartmentsSet = new Set(studentsData.map((student: any) => student.department).filter(Boolean));
       const uniqueDepartments = Array.from(uniqueDepartmentsSet) as string[];
       setDepartments(uniqueDepartments);
       
@@ -79,87 +106,10 @@ const TrainingStudents: NextPage = () => {
     } catch (err) {
       console.error('Erro ao buscar alunos:', err);
       setError('Ocorreu um erro ao buscar os alunos.');
-      
-      // Carregar dados de exemplo para desenvolvimento
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Carregando dados de exemplo para desenvolvimento...');
-        
-        const mockStudents: Student[] = [
-          {
-            id: '1',
-            name: 'João Silva',
-            email: 'joao.silva@exemplo.com',
-            department: 'Vendas',
-            position: 'Gerente de Vendas',
-            enrolledCourses: 3,
-            completedCourses: 2,
-            averageScore: 85,
-            status: 'active',
-            lastActivity: '2023-10-15T14:30:00Z'
-          },
-          {
-            id: '2',
-            name: 'Maria Oliveira',
-            email: 'maria.oliveira@exemplo.com',
-            department: 'RH',
-            position: 'Analista de RH',
-            enrolledCourses: 5,
-            completedCourses: 5,
-            averageScore: 92,
-            status: 'active',
-            lastActivity: '2023-10-18T09:15:00Z'
-          },
-          {
-            id: '3',
-            name: 'Carlos Pereira',
-            email: 'carlos.pereira@exemplo.com',
-            department: 'TI',
-            position: 'Desenvolvedor',
-            enrolledCourses: 2,
-            completedCourses: 1,
-            averageScore: 78,
-            status: 'active',
-            lastActivity: '2023-10-10T16:45:00Z'
-          },
-          {
-            id: '4',
-            name: 'Ana Santos',
-            email: 'ana.santos@exemplo.com',
-            department: 'Marketing',
-            position: 'Coordenadora de Marketing',
-            enrolledCourses: 4,
-            completedCourses: 3,
-            averageScore: 88,
-            status: 'active',
-            lastActivity: '2023-10-17T11:20:00Z'
-          },
-          {
-            id: '5',
-            name: 'Roberto Almeida',
-            email: 'roberto.almeida@exemplo.com',
-            department: 'Financeiro',
-            position: 'Analista Financeiro',
-            enrolledCourses: 1,
-            completedCourses: 0,
-            averageScore: 0,
-            status: 'inactive',
-            lastActivity: '2023-09-30T10:00:00Z'
-          }
-        ];
-        
-        setStudents(mockStudents);
-        setFilteredStudents(mockStudents);
-        
-        // Extrair departamentos únicos para o filtro
-        const uniqueDepartmentsSet = new Set(mockStudents.map(student => student.department));
-        const uniqueDepartments = Array.from(uniqueDepartmentsSet) as string[];
-        setDepartments(uniqueDepartments);
-        
-        setLoading(false);
-      }
+      setLoading(false);
     }
   };
-
+  
   // Filtrar alunos quando os filtros mudarem
   useEffect(() => {
     if (students.length > 0) {
@@ -178,7 +128,7 @@ const TrainingStudents: NextPage = () => {
   }, [searchTerm, statusFilter, departmentFilter, students]);
   
   // Função para adicionar novo aluno
-  const handleAddStudent = () => {
+  const handleAddStudent = async () => {
     if (!newStudent.name || !newStudent.email) {
       setError('Por favor, preencha os campos obrigatórios: nome e e-mail.');
       return;
@@ -186,35 +136,43 @@ const TrainingStudents: NextPage = () => {
     
     setLoading(true);
     
-    // Em produção, substituir por chamada real à API
-    // Simulação de adição de aluno
-    const newStudentData: Student = {
-      id: `${students.length + 1}`,
-      name: newStudent.name,
-      email: newStudent.email,
-      department: newStudent.department,
-      position: newStudent.position,
-      enrolledCourses: 0,
-      completedCourses: 0,
-      averageScore: 0,
-      status: 'active',
-      lastActivity: new Date().toISOString()
-    };
-    
-    // Adicionar o novo aluno à lista
-    setStudents([...students, newStudentData]);
-    setShowAddModal(false);
-    setNewStudent({
-      name: '',
-      email: '',
-      department: '',
-      position: '',
-    });
-    setLoading(false);
-    
-    // Adicionar o departamento à lista de departamentos se for novo
-    if (newStudent.department && !departments.includes(newStudent.department)) {
-      setDepartments([...departments, newStudent.department]);
+    try {
+      // Fazer chamada à API para adicionar o aluno
+      const response = await axios.post('/api/admin/training/students', {
+        name: newStudent.name,
+        email: newStudent.email,
+        department: newStudent.department,
+        position: newStudent.position,
+      });
+      
+      if (response.status === 201) {
+        // Limpar o formulário e fechar o modal
+        setNewStudent({
+          name: '',
+          email: '',
+          department: '',
+          position: '',
+        });
+        setShowAddModal(false);
+        
+        // Recarregar a lista de alunos
+        await fetchStudents();
+        
+        // Exibir mensagem de sucesso
+        toast.success('Aluno adicionado com sucesso.');
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar aluno:', error);
+      let errorMessage = 'Ocorreu um erro ao adicionar o aluno.';
+      
+      if (axios.isAxiosError(error) && error.response) {
+        errorMessage = error.response.data.message || errorMessage;
+      }
+      
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
   

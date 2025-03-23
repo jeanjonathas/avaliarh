@@ -45,6 +45,8 @@ export default async function handler(
   switch (req.method) {
     case 'GET':
       return getStudents(req, res, isAdmin, companyId);
+    case 'POST':
+      return createStudent(req, res, isAdmin, companyId);
     default:
       return res.status(405).json({ message: 'Método não permitido' });
   }
@@ -64,7 +66,7 @@ async function getStudents(
       return res.status(400).json({ message: 'Parâmetros inválidos', errors: queryResult.error.format() });
     }
 
-    const { companyId, search, page = 1, limit = 10 } = queryResult.data;
+    const { companyId, search, page = 1, limit = 50 } = queryResult.data;
 
     // Verificar se o usuário tem acesso à empresa solicitada
     if (companyId && !isAdmin && companyId !== userCompanyId) {
@@ -73,6 +75,12 @@ async function getStudents(
 
     // Definir o ID da empresa a ser usado na consulta
     const targetCompanyId = companyId || userCompanyId;
+    
+    if (!targetCompanyId) {
+      return res.status(400).json({ message: 'ID da empresa é obrigatório' });
+    }
+
+    console.log('Buscando estudantes para a empresa:', targetCompanyId);
 
     // Calcular paginação
     const skip = (page - 1) * limit;
@@ -90,7 +98,7 @@ async function getStudents(
         u.role as "user_role"
       FROM "Student" s
       JOIN "User" u ON s."userId" = u.id
-      WHERE u."companyId" = $1
+      WHERE s."companyId" = $1
     `;
 
     const queryParams: any[] = [targetCompanyId];
@@ -98,7 +106,7 @@ async function getStudents(
       SELECT COUNT(*) as total
       FROM "Student" s
       JOIN "User" u ON s."userId" = u.id
-      WHERE u."companyId" = $1
+      WHERE s."companyId" = $1
     `;
 
     // Adicionar condição de busca se fornecida
@@ -118,6 +126,8 @@ async function getStudents(
     // Executar consulta para contar total de registros
     const countResult: { total: BigInt }[] = await prisma.$queryRawUnsafe(countQuery, ...queryParams.slice(0, search ? 2 : 1));
     const totalStudents = Number(countResult[0].total);
+
+    console.log(`Encontrados ${totalStudents} estudantes`);
 
     // Buscar matrículas de cursos para cada estudante
     const studentIds = (studentsResult as any[]).map((s: any) => s.id);
@@ -192,5 +202,99 @@ async function getStudents(
   } catch (error) {
     console.error('Erro ao buscar estudantes:', error);
     return res.status(500).json({ message: 'Erro ao buscar estudantes' });
+  }
+}
+
+// Função para criar um novo estudante
+async function createStudent(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  isAdmin: boolean,
+  userCompanyId: string | null
+) {
+  try {
+    // Validar dados do corpo da requisição
+    const schema = z.object({
+      name: z.string().min(1, 'Nome é obrigatório'),
+      email: z.string().email('Email inválido'),
+      department: z.string().optional(),
+      position: z.string().optional(),
+    });
+
+    const validationResult = schema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({ 
+        message: 'Dados inválidos', 
+        errors: validationResult.error.format() 
+      });
+    }
+
+    const { name, email, department, position } = validationResult.data;
+
+    if (!userCompanyId) {
+      return res.status(400).json({ message: 'ID da empresa é obrigatório' });
+    }
+
+    // Verificar se já existe um usuário com este email
+    const existingUser = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    let userId: string;
+
+    if (existingUser) {
+      // Se o usuário já existe, verificar se já é um estudante
+      const existingStudent = await prisma.student.findFirst({
+        where: { userId: existingUser.id }
+      });
+
+      if (existingStudent) {
+        return res.status(400).json({ message: 'Este usuário já é um estudante' });
+      }
+
+      userId = existingUser.id;
+    } else {
+      // Criar um novo usuário
+      const newUser = await prisma.user.create({
+        data: {
+          name,
+          email,
+          role: Role.STUDENT,
+          password: '', // Senha vazia ou gerar uma aleatória
+          companyId: userCompanyId,
+        }
+      });
+
+      userId = newUser.id;
+    }
+
+    // Criar o estudante
+    const newStudent = await prisma.student.create({
+      data: {
+        userId,
+        companyId: userCompanyId,
+        progress: 0,
+      },
+      include: {
+        user: true
+      }
+    });
+
+    return res.status(201).json({
+      id: newStudent.id,
+      userId: newStudent.userId,
+      enrollmentDate: newStudent.enrollmentDate,
+      progress: newStudent.progress,
+      user: {
+        id: newStudent.user.id,
+        name: newStudent.user.name,
+        email: newStudent.user.email,
+        role: newStudent.user.role
+      },
+      courseEnrollments: []
+    });
+  } catch (error) {
+    console.error('Erro ao criar estudante:', error);
+    return res.status(500).json({ message: 'Erro ao criar estudante' });
   }
 }

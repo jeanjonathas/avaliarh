@@ -1,132 +1,243 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '../../../auth/[...nextauth]';
 import { prisma } from '../../../../../lib/prisma';
+import { Role } from '@prisma/client';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Check authentication
-  const session = await getSession({ req });
+  const session = await getServerSession(req, res, authOptions);
   if (!session || !session.user) {
     return res.status(401).json({ error: 'Não autorizado' });
   }
 
-  // Get user and check if they are an admin
-  const user = await prisma.$queryRaw`
-    SELECT u.id, u."companyId", r.name as role
-    FROM "User" u
-    JOIN "Role" r ON u."roleId" = r.id
-    WHERE u.id = ${session.user.id}
-  `;
+  try {
+    // Get user and check if they are an admin
+    const user = await prisma.$queryRaw`
+      SELECT * FROM "User" 
+      WHERE id = ${session.user.id}
+    `;
 
-  if (!Array.isArray(user) || user.length === 0 || user[0].role !== 'admin') {
-    return res.status(403).json({ error: 'Acesso negado' });
-  }
-
-  const companyId = user[0].companyId;
-
-  // Handle GET request - List users with enrollment status for a course
-  if (req.method === 'GET') {
-    const { courseId } = req.query;
-
-    if (!courseId) {
-      return res.status(400).json({ error: 'ID do curso é obrigatório' });
+    if (!Array.isArray(user) || user.length === 0) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
     }
 
-    try {
-      // First check if the course belongs to the company
-      const courseExists = await prisma.$queryRaw`
-        SELECT id FROM "Course" WHERE id = ${courseId} AND "companyId" = ${companyId}
-      `;
+    // Check if user is an admin
+    if (user[0].role !== Role.COMPANY_ADMIN && user[0].role !== Role.SUPER_ADMIN && user[0].role !== Role.INSTRUCTOR) {
+      return res.status(403).json({ error: 'Acesso negado. Apenas administradores podem acessar este recurso.' });
+    }
 
-      if (!Array.isArray(courseExists) || courseExists.length === 0) {
-        return res.status(404).json({ error: 'Curso não encontrado ou não pertence à empresa' });
+    const companyId = user[0].companyId;
+    if (!companyId) {
+      return res.status(400).json({ error: 'Usuário não está associado a uma empresa' });
+    }
+
+    // Handle GET request - Get all enrollments
+    if (req.method === 'GET') {
+      const { courseId } = req.query;
+
+      try {
+        if (courseId) {
+          // Get all students enrolled in the specified course
+          const studentsWithEnrollments = await prisma.$queryRaw`
+            SELECT 
+              s.id as "studentId", 
+              s."userId",
+              u.name as "studentName", 
+              u.email as "studentEmail",
+              u.role as "studentRole",
+              COUNT(ce.id) as "enrollmentCount",
+              ce."courseId",
+              c.name as "courseName",
+              c.description as "courseDescription"
+            FROM "Student" s
+            JOIN "User" u ON s."userId" = u.id
+            JOIN "CourseEnrollment" ce ON ce."studentId" = s.id
+            JOIN "TrainingCourse" c ON c.id = ce."courseId"
+            WHERE s."companyId" = ${companyId}
+              AND ce."courseId" = ${courseId}
+            GROUP BY s.id, s."userId", u.name, u.email, u.role, ce."courseId", c.name, c.description
+            ORDER BY u.name
+          `;
+
+          // Convert BigInt to Number before returning
+          const serializedData = (studentsWithEnrollments as any[]).map(student => ({
+            ...student,
+            enrollmentCount: Number(student.enrollmentCount),
+            student: {
+              name: student.studentName,
+              email: student.studentEmail,
+              role: student.studentRole
+            },
+            course: {
+              id: student.courseId,
+              name: student.courseName,
+              description: student.courseDescription
+            }
+          }));
+
+          return res.status(200).json(serializedData);
+        } else {
+          // Get all students with enrollments
+          const studentsWithEnrollments = await prisma.$queryRaw`
+            SELECT 
+              s.id as "studentId", 
+              s."userId",
+              u.name as "studentName", 
+              u.email as "studentEmail",
+              u.role as "studentRole",
+              COUNT(ce.id) as "enrollmentCount",
+              ce."courseId",
+              c.name as "courseName",
+              c.description as "courseDescription"
+            FROM "Student" s
+            JOIN "User" u ON s."userId" = u.id
+            JOIN "CourseEnrollment" ce ON ce."studentId" = s.id
+            JOIN "TrainingCourse" c ON c.id = ce."courseId"
+            WHERE s."companyId" = ${companyId}
+            GROUP BY s.id, s."userId", u.name, u.email, u.role, ce."courseId", c.name, c.description
+            ORDER BY u.name
+          `;
+
+          // Convert BigInt to Number before returning
+          const serializedData = (studentsWithEnrollments as any[]).map(student => ({
+            ...student,
+            enrollmentCount: Number(student.enrollmentCount),
+            student: {
+              name: student.studentName,
+              email: student.studentEmail,
+              role: student.studentRole
+            },
+            course: {
+              id: student.courseId,
+              name: student.courseName,
+              description: student.courseDescription
+            }
+          }));
+
+          return res.status(200).json(serializedData);
+        }
+      } catch (error) {
+        console.error('Error fetching enrollments:', error);
+        return res.status(500).json({ error: 'Erro ao buscar matrículas' });
+      }
+    }
+
+    // Handle POST request - Enroll or unenroll a user
+    if (req.method === 'POST') {
+      const { userId, courseId, action } = req.body;
+
+      if (!userId || !courseId || !action) {
+        return res.status(400).json({ 
+          error: 'ID do usuário, ID do curso e ação (enroll/unenroll) são obrigatórios' 
+        });
       }
 
-      // Get all users from the company with their enrollment status
-      const users = await prisma.$queryRaw`
-        SELECT 
-          u.id, 
-          u.name, 
-          u.email, 
-          d.name as department,
-          r.name as role,
-          CASE WHEN e.id IS NOT NULL THEN true ELSE false END as enrolled
-        FROM "User" u
-        LEFT JOIN "Department" d ON u."departmentId" = d.id
-        LEFT JOIN "Role" r ON u."roleId" = r.id
-        LEFT JOIN "Enrollment" e ON e."userId" = u.id AND e."courseId" = ${courseId}
-        WHERE u."companyId" = ${companyId}
-        ORDER BY u.name
-      `;
-
-      return res.status(200).json(users);
-    } catch (error) {
-      console.error('Error fetching users with enrollment status:', error);
-      return res.status(500).json({ error: 'Erro ao buscar usuários' });
-    }
-  }
-
-  // Handle POST request - Enroll or unenroll a user
-  if (req.method === 'POST') {
-    const { userId, courseId, action } = req.body;
-
-    if (!userId || !courseId || !action) {
-      return res.status(400).json({ 
-        error: 'ID do usuário, ID do curso e ação (enroll/unenroll) são obrigatórios' 
-      });
-    }
-
-    if (action !== 'enroll' && action !== 'unenroll') {
-      return res.status(400).json({ error: 'Ação inválida. Use "enroll" ou "unenroll"' });
-    }
-
-    try {
-      // Check if the course belongs to the company
-      const courseExists = await prisma.$queryRaw`
-        SELECT id FROM "Course" WHERE id = ${courseId} AND "companyId" = ${companyId}
-      `;
-
-      if (!Array.isArray(courseExists) || courseExists.length === 0) {
-        return res.status(404).json({ error: 'Curso não encontrado ou não pertence à empresa' });
+      if (action !== 'enroll' && action !== 'unenroll') {
+        return res.status(400).json({ error: 'Ação inválida. Use "enroll" ou "unenroll"' });
       }
 
-      // Check if the user belongs to the company
-      const userExists = await prisma.$queryRaw`
-        SELECT id FROM "User" WHERE id = ${userId} AND "companyId" = ${companyId}
-      `;
-
-      if (!Array.isArray(userExists) || userExists.length === 0) {
-        return res.status(404).json({ error: 'Usuário não encontrado ou não pertence à empresa' });
-      }
-
-      if (action === 'enroll') {
-        // Check if enrollment already exists
-        const enrollmentExists = await prisma.$queryRaw`
-          SELECT id FROM "Enrollment" WHERE "userId" = ${userId} AND "courseId" = ${courseId}
+      try {
+        // Check if the course belongs to the company
+        const courseExists = await prisma.$queryRaw`
+          SELECT id FROM "TrainingCourse" 
+          WHERE id = ${courseId} AND "companyId" = ${companyId}
         `;
 
-        if (!Array.isArray(enrollmentExists) || enrollmentExists.length === 0) {
-          // Create enrollment
-          await prisma.$executeRaw`
-            INSERT INTO "Enrollment" ("userId", "courseId", "enrollmentDate", "status")
-            VALUES (${userId}, ${courseId}, NOW(), 'active')
-          `;
+        if (!Array.isArray(courseExists) || courseExists.length === 0) {
+          return res.status(404).json({ error: 'Curso não encontrado ou não pertence à empresa' });
         }
 
-        return res.status(200).json({ message: 'Usuário matriculado com sucesso' });
-      } else {
-        // Unenroll - Delete enrollment if exists
-        await prisma.$executeRaw`
-          DELETE FROM "Enrollment" WHERE "userId" = ${userId} AND "courseId" = ${courseId}
+        // Check if the student exists and belongs to the company
+        const student = await prisma.$queryRaw`
+          SELECT id FROM "Student" 
+          WHERE "userId" = ${userId} AND "companyId" = ${companyId}
         `;
 
-        return res.status(200).json({ message: 'Matrícula removida com sucesso' });
-      }
-    } catch (error) {
-      console.error('Error updating enrollment:', error);
-      return res.status(500).json({ error: 'Erro ao atualizar matrícula' });
-    }
-  }
+        if (!Array.isArray(student) || student.length === 0) {
+          return res.status(404).json({ error: 'Estudante não encontrado ou não pertence à empresa' });
+        }
 
-  // If the request method is not supported
-  return res.status(405).json({ error: 'Método não permitido' });
+        const studentId = student[0].id;
+
+        if (action === 'enroll') {
+          // Check if the user is already enrolled
+          const enrollmentExists = await prisma.$queryRaw`
+            SELECT id FROM "CourseEnrollment" 
+            WHERE "studentId" = ${studentId} AND "courseId" = ${courseId}
+          `;
+
+          if (Array.isArray(enrollmentExists) && enrollmentExists.length > 0) {
+            return res.status(400).json({ error: 'Estudante já está matriculado neste curso' });
+          }
+
+          // Enroll the user
+          await prisma.$executeRaw`
+            INSERT INTO "CourseEnrollment" ("id", "studentId", "courseId", "enrollmentDate", "progress", "createdAt", "updatedAt")
+            VALUES (gen_random_uuid(), ${studentId}, ${courseId}, NOW(), 0, NOW(), NOW())
+          `;
+
+          // Get all students for the company
+          const students = await prisma.$queryRaw`
+            SELECT 
+              s.id as "studentId", 
+              s."userId",
+              u.name as "studentName", 
+              u.email as "studentEmail",
+              u.role as "studentRole"
+            FROM "Student" s
+            JOIN "User" u ON s."userId" = u.id
+            WHERE s."companyId" = ${companyId}
+            ORDER BY u.name
+          `;
+
+          return res.status(200).json({ 
+            message: 'Estudante matriculado com sucesso',
+            students: (students as any[]).map(student => ({
+              id: student.studentId,
+              name: student.studentName,
+              email: student.studentEmail
+            }))
+          });
+        } else {
+          // Unenroll the user - Delete enrollment if exists
+          const result = await prisma.$executeRaw`
+            DELETE FROM "CourseEnrollment" 
+            WHERE "studentId" = ${studentId} AND "courseId" = ${courseId}
+          `;
+
+          // Get all students for the company
+          const students = await prisma.$queryRaw`
+            SELECT 
+              s.id as "studentId", 
+              s."userId",
+              u.name as "studentName", 
+              u.email as "studentEmail",
+              u.role as "studentRole"
+            FROM "Student" s
+            JOIN "User" u ON s."userId" = u.id
+            WHERE s."companyId" = ${companyId}
+            ORDER BY u.name
+          `;
+
+          return res.status(200).json({ 
+            message: 'Matrícula do estudante removida com sucesso',
+            students: (students as any[]).map(student => ({
+              id: student.studentId,
+              name: student.studentName,
+              email: student.studentEmail
+            }))
+          });
+        }
+      } catch (error) {
+        console.error('Error enrolling/unenrolling user:', error);
+        return res.status(500).json({ error: 'Erro ao processar matrícula' });
+      }
+    }
+
+    return res.status(405).json({ error: 'Método não permitido' });
+  } catch (error) {
+    console.error('Error in enrollment handler:', error);
+    return res.status(500).json({ error: 'Erro interno do servidor' });
+  }
 }
