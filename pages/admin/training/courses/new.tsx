@@ -287,7 +287,7 @@ export default function NewCourse() {
                 <div className="grid grid-cols-1 gap-6">
                   {/* Course Name */}
                   <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                    <label htmlFor="name" className="block text-sm font-medium text-secondary-700 mb-1">
                       Nome do Curso *
                     </label>
                     <input
@@ -297,14 +297,14 @@ export default function NewCourse() {
                       required
                       value={formData.name}
                       onChange={handleChange}
-                      className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                      className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                       placeholder="Ex: Treinamento de Atendimento ao Cliente"
                     />
                   </div>
 
                   {/* Description */}
                   <div>
-                    <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+                    <label htmlFor="description" className="block text-sm font-medium text-secondary-700 mb-1">
                       Descrição
                     </label>
                     <textarea
@@ -313,14 +313,14 @@ export default function NewCourse() {
                       rows={3}
                       value={formData.description}
                       onChange={handleChange}
-                      className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                      className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                       placeholder="Descreva o objetivo e conteúdo do curso"
                     />
                   </div>
 
                   {/* Sector */}
                   <div>
-                    <label htmlFor="sectorId" className="block text-sm font-medium text-gray-700">
+                    <label htmlFor="sectorId" className="block text-sm font-medium text-secondary-700 mb-1">
                       Setor Relacionado
                     </label>
                     <select
@@ -328,7 +328,7 @@ export default function NewCourse() {
                       name="sectorId"
                       value={formData.sectorId}
                       onChange={handleChange}
-                      className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                      className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                     >
                       <option value="">Selecione um setor (opcional)</option>
                       {sectors.map((sector: any) => (
@@ -401,28 +401,33 @@ export default function NewCourse() {
                     {showModuleForm && (
                       <div className="mt-4 bg-white p-6 shadow-sm rounded-lg border border-gray-200">
                         <h4 className="text-md font-medium text-gray-900 mb-4">Novo Módulo</h4>
-                        <label htmlFor="moduleName" className="block text-sm font-medium text-gray-700">
-                          Nome do Módulo *
-                        </label>
-                        <input
-                          type="text"
-                          id="moduleName"
-                          name="name"
-                          value={moduleForm.name}
-                          onChange={handleModuleFormChange}
-                          className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                        />
-                        <label htmlFor="moduleDescription" className="block text-sm font-medium text-gray-700 mt-4">
-                          Descrição do Módulo
-                        </label>
-                        <textarea
-                          id="moduleDescription"
-                          name="description"
-                          rows={3}
-                          value={moduleForm.description}
-                          onChange={handleModuleFormChange}
-                          className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                        />
+                        <div className="space-y-4">
+                          <label className="block text-sm font-medium text-secondary-700 mb-1">
+                            Nome do Módulo *
+                          </label>
+                          <input
+                            type="text"
+                            value={moduleForm.name}
+                            onChange={handleModuleFormChange}
+                            className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                            placeholder="Ex: Introdução ao Atendimento"
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-4">
+                          <label className="block text-sm font-medium text-secondary-700 mb-1">
+                            Descrição do Módulo
+                          </label>
+                          <textarea
+                            value={moduleForm.description}
+                            onChange={handleModuleFormChange}
+                            rows={3}
+                            className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                            placeholder="Descreva o conteúdo deste módulo"
+                          />
+                        </div>
+
                         <div className="mt-4 flex justify-end space-x-3">
                           <button
                             type="button"
@@ -503,7 +508,7 @@ export default function NewCourse() {
                                 <h4 className="text-md font-medium text-gray-900 mb-4">Nova Lição</h4>
                                 <div className="grid grid-cols-1 gap-4">
                                   <div>
-                                    <label htmlFor="lessonName" className="block text-sm font-medium text-gray-700">
+                                    <label htmlFor="lessonName" className="block text-sm font-medium text-secondary-700 mb-1">
                                       Nome da Lição *
                                     </label>
                                     <input
@@ -512,12 +517,14 @@ export default function NewCourse() {
                                       name="name"
                                       value={lessonForm.name}
                                       onChange={handleLessonFormChange}
-                                      className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                                      className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                      placeholder="Ex: Princípios de Atendimento ao Cliente"
+                                      required
                                     />
                                   </div>
                                   
                                   <div>
-                                    <label htmlFor="lessonDescription" className="block text-sm font-medium text-gray-700">
+                                    <label htmlFor="lessonDescription" className="block text-sm font-medium text-secondary-700 mb-1">
                                       Descrição da Lição
                                     </label>
                                     <textarea
@@ -526,12 +533,13 @@ export default function NewCourse() {
                                       rows={2}
                                       value={lessonForm.description}
                                       onChange={handleLessonFormChange}
-                                      className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                                      className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                      placeholder="Descreva o conteúdo desta lição"
                                     />
                                   </div>
                                   
                                   <div>
-                                    <label htmlFor="lessonType" className="block text-sm font-medium text-gray-700">
+                                    <label htmlFor="lessonType" className="block text-sm font-medium text-secondary-700 mb-1">
                                       Tipo de Conteúdo *
                                     </label>
                                     <select
@@ -539,8 +547,10 @@ export default function NewCourse() {
                                       name="type"
                                       value={lessonForm.type}
                                       onChange={handleLessonFormChange}
-                                      className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                      className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                      required
                                     >
+                                      <option value="">Selecione o tipo</option>
                                       <option value="TEXT">Texto</option>
                                       <option value="SLIDES">Slides</option>
                                       <option value="VIDEO">Vídeo</option>
@@ -550,40 +560,40 @@ export default function NewCourse() {
                                   
                                   {lessonForm.type === 'VIDEO' && (
                                     <div>
-                                      <label htmlFor="videoUrl" className="block text-sm font-medium text-gray-700">
+                                      <label htmlFor="videoUrl" className="block text-sm font-medium text-secondary-700 mb-1">
                                         URL do Vídeo *
                                       </label>
                                       <input
-                                        type="text"
+                                        type="url"
                                         id="videoUrl"
                                         name="videoUrl"
                                         value={lessonForm.videoUrl}
                                         onChange={handleLessonFormChange}
                                         placeholder="https://www.youtube.com/watch?v=..."
-                                        className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                                        className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                                       />
                                     </div>
                                   )}
                                   
                                   {lessonForm.type === 'SLIDES' && (
                                     <div>
-                                      <label htmlFor="slidesUrl" className="block text-sm font-medium text-gray-700">
+                                      <label htmlFor="slidesUrl" className="block text-sm font-medium text-secondary-700 mb-1">
                                         URL das Slides *
                                       </label>
                                       <input
-                                        type="text"
+                                        type="url"
                                         id="slidesUrl"
                                         name="slidesUrl"
                                         value={lessonForm.slidesUrl}
                                         onChange={handleLessonFormChange}
                                         placeholder="https://docs.google.com/presentation/..."
-                                        className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                                        className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                                       />
                                     </div>
                                   )}
                                   
                                   <div>
-                                    <label htmlFor="lessonContent" className="block text-sm font-medium text-gray-700">
+                                    <label htmlFor="lessonContent" className="block text-sm font-medium text-secondary-700 mb-1">
                                       Conteúdo da Lição *
                                     </label>
                                     <textarea
@@ -592,7 +602,8 @@ export default function NewCourse() {
                                       rows={4}
                                       value={lessonForm.content}
                                       onChange={handleLessonFormChange}
-                                      className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                                      className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                                      placeholder="Conteúdo da lição (para lições do tipo texto)"
                                     />
                                   </div>
                                 </div>

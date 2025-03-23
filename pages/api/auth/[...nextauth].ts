@@ -80,18 +80,12 @@ const isProduction = process.env.NODE_ENV === 'production'
 const baseUrl = process.env.NEXTAUTH_URL || (isProduction ? 'https://admitto.com.br' : 'http://localhost:3000')
 const internalUrl = process.env.NEXTAUTH_URL_INTERNAL || baseUrl
 
-console.log('NextAuth URL:', baseUrl)
-console.log('NextAuth URL Internal:', internalUrl)
-console.log('Ambiente:', isProduction ? 'Produção' : 'Desenvolvimento')
-console.log('Domain:', process.env.NEXT_PUBLIC_DOMAIN || 'não definido')
-
 // Função para garantir que as URLs de redirecionamento usem o domínio correto
 const ensureCorrectDomain = (url: string) => {
   if (!url) return url
   
   // Se for uma URL relativa, retorne-a diretamente
   if (url.startsWith('/')) {
-    console.log(`URL relativa detectada: ${url}, retornando sem modificações`)
     return url
   }
   
@@ -103,13 +97,12 @@ const ensureCorrectDomain = (url: string) => {
     
     // Se o domínio for diferente, corrija-o
     if (parsedUrl.hostname !== targetDomain) {
-      console.log(`Corrigindo URL de redirecionamento: ${url} -> ${targetDomain}`)
       parsedUrl.hostname = targetDomain
       parsedUrl.protocol = isProduction ? 'https:' : 'http:'
       return parsedUrl.toString()
     }
   } catch (error) {
-    console.error('Erro ao processar URL:', error)
+    // Silenciado
   }
   
   return url
@@ -125,7 +118,6 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          console.log('Autorização: Credenciais incompletas');
           return null
         }
 
@@ -141,7 +133,6 @@ export const authOptions: NextAuthOptions = {
           })
 
           if (!user) {
-            console.log(`Autorização: Usuário não encontrado para o email ${credentials.email}`);
             return null
           }
 
@@ -149,14 +140,12 @@ export const authOptions: NextAuthOptions = {
           const isPasswordValid = await bcrypt.compare(credentials.password, user.password)
 
           if (!isPasswordValid) {
-            console.log(`Autorização: Senha inválida para o usuário ${user.email}`);
             return null
           }
 
           // Verifica se a empresa está ativa (para usuários vinculados a empresas)
           if (user.companyId && user.company) {
             if (!user.company.isActive) {
-              console.log(`Autorização: Empresa ${user.company.name} está inativa`);
               return null
             }
           }
@@ -173,7 +162,6 @@ export const authOptions: NextAuthOptions = {
           }
 
           // Retorna os dados do usuário autenticado
-          console.log(`Autorização: Usuário ${user.email} autenticado com sucesso`);
           return {
             id: user.id,
             name: user.name,
@@ -183,7 +171,6 @@ export const authOptions: NextAuthOptions = {
             company: companyData,
           }
         } catch (error) {
-          console.error('Autorização: Erro ao autenticar usuário:', error);
           return null
         } finally {
           // Não é necessário desconectar o cliente Prisma aqui, pois ele é reutilizado
@@ -207,9 +194,6 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role as Role
         session.user.companyId = token.companyId
         session.user.company = token.company
-        
-        // Log para depuração da sessão
-        console.log('NextAuth Session: Papel do usuário:', token.role);
       }
       return session
     },
@@ -217,21 +201,8 @@ export const authOptions: NextAuthOptions = {
       // Garantir que as URLs de redirecionamento usem o domínio correto
       const correctedUrl = ensureCorrectDomain(url)
       
-      // Log para depuração de redirecionamento
-      console.log('NextAuth Redirect:', { 
-        originalUrl: url, 
-        baseUrl, 
-        correctedUrl 
-      })
-      
-      // Se a URL começar com o baseUrl, retorne-a diretamente
-      if (correctedUrl.startsWith(baseUrl) || correctedUrl.startsWith('/')) {
-        return correctedUrl
-      }
-      
-      // Caso contrário, retorne o baseUrl
-      return baseUrl
-    }
+      return correctedUrl.startsWith('/') ? `${baseUrl}${correctedUrl}` : correctedUrl
+    },
   },
   pages: {
     signIn: ensureCorrectDomain('/admin/login'),
@@ -278,13 +249,13 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   logger: {
     error(code, metadata) {
-      console.error(`NextAuth Error [${code}]:`, metadata);
+      console.error(`NextAuth Error [${code}]:`);
     },
     warn(code) {
-      console.warn(`NextAuth Warning [${code}]`);
+      // Silenciado para produção
     },
     debug(code, metadata) {
-      console.log(`NextAuth Debug [${code}]:`, metadata);
+      // Silenciado para produção
     },
   },
   // Configurações específicas para proxy reverso

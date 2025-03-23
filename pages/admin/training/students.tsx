@@ -51,139 +51,115 @@ const TrainingStudents: NextPage = () => {
     }
     
     if (status === 'authenticated') {
-      // Simular busca de alunos da API
-      // Em produção, substituir por chamada real à API
-      const fetchStudents = async () => {
-        try {
-          const response = await axios.get('/api/admin/training/students');
-          const studentsData = Array.isArray(response.data) ? response.data : [];
-          setStudents(studentsData);
-          setFilteredStudents(studentsData);
-          
-          // Extrair departamentos únicos para o filtro
-          const uniqueDepartments = [...new Set(studentsData.map(student => student.department))];
-          setDepartments(uniqueDepartments);
-          
-          setLoading(false);
-        } catch (err) {
-          console.error('Erro ao buscar alunos:', err);
-          setError('Ocorreu um erro ao buscar os alunos.');
-          
-          // Dados de exemplo para desenvolvimento
-          const mockStudents: Student[] = [
-            {
-              id: '1',
-              name: 'Ana Silva',
-              email: 'ana.silva@empresa.com',
-              department: 'Recursos Humanos',
-              position: 'Analista de RH',
-              enrolledCourses: 3,
-              completedCourses: 2,
-              averageScore: 92,
-              status: 'active',
-              lastActivity: '2025-03-20T14:30:00Z'
-            },
-            {
-              id: '2',
-              name: 'Carlos Oliveira',
-              email: 'carlos.oliveira@empresa.com',
-              department: 'Tecnologia',
-              position: 'Desenvolvedor',
-              enrolledCourses: 5,
-              completedCourses: 3,
-              averageScore: 88,
-              status: 'active',
-              lastActivity: '2025-03-21T10:15:00Z'
-            },
-            {
-              id: '3',
-              name: 'Mariana Costa',
-              email: 'mariana.costa@empresa.com',
-              department: 'Marketing',
-              position: 'Coordenadora de Marketing',
-              enrolledCourses: 2,
-              completedCourses: 2,
-              averageScore: 95,
-              status: 'active',
-              lastActivity: '2025-03-19T16:45:00Z'
-            },
-            {
-              id: '4',
-              name: 'Roberto Santos',
-              email: 'roberto.santos@empresa.com',
-              department: 'Vendas',
-              position: 'Gerente de Vendas',
-              enrolledCourses: 4,
-              completedCourses: 1,
-              averageScore: 76,
-              status: 'active',
-              lastActivity: '2025-03-18T09:20:00Z'
-            },
-            {
-              id: '5',
-              name: 'Juliana Ferreira',
-              email: 'juliana.ferreira@empresa.com',
-              department: 'Financeiro',
-              position: 'Analista Financeiro',
-              enrolledCourses: 1,
-              completedCourses: 0,
-              averageScore: 0,
-              status: 'inactive',
-              lastActivity: '2025-03-10T11:30:00Z'
-            },
-            {
-              id: '6',
-              name: 'Pedro Almeida',
-              email: 'pedro.almeida@empresa.com',
-              department: 'Tecnologia',
-              position: 'Analista de Sistemas',
-              enrolledCourses: 6,
-              completedCourses: 5,
-              averageScore: 91,
-              status: 'active',
-              lastActivity: '2025-03-22T08:45:00Z'
-            },
-            {
-              id: '7',
-              name: 'Camila Rodrigues',
-              email: 'camila.rodrigues@empresa.com',
-              department: 'Recursos Humanos',
-              position: 'Recrutadora',
-              enrolledCourses: 2,
-              completedCourses: 1,
-              averageScore: 84,
-              status: 'active',
-              lastActivity: '2025-03-21T13:10:00Z'
-            },
-            {
-              id: '8',
-              name: 'Lucas Martins',
-              email: 'lucas.martins@empresa.com',
-              department: 'Operações',
-              position: 'Supervisor de Operações',
-              enrolledCourses: 3,
-              completedCourses: 0,
-              averageScore: 0,
-              status: 'inactive',
-              lastActivity: '2025-03-15T15:20:00Z'
-            }
-          ];
-          
-          setStudents(mockStudents);
-          setFilteredStudents(mockStudents);
-          
-          // Extrair departamentos únicos para o filtro
-          const uniqueDepartments = [...new Set(mockStudents.map(student => student.department))];
-          setDepartments(uniqueDepartments);
-          
-          setLoading(false);
-        }
-      };
-      
       fetchStudents();
     }
   }, [status, router]);
   
+  const fetchStudents = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Tentar buscar alunos da API
+      const response = await axios.get('/api/admin/training/students');
+      const studentsData = response.data.map((student: any) => ({
+        ...student,
+        status: student.status as 'active' | 'inactive'
+      }));
+      
+      setStudents(studentsData);
+      setFilteredStudents(studentsData);
+      
+      // Extrair departamentos únicos para o filtro
+      const uniqueDepartmentsSet = new Set(studentsData.map(student => student.department));
+      const uniqueDepartments = Array.from(uniqueDepartmentsSet) as string[];
+      setDepartments(uniqueDepartments);
+      
+      setLoading(false);
+    } catch (err) {
+      console.error('Erro ao buscar alunos:', err);
+      setError('Ocorreu um erro ao buscar os alunos.');
+      
+      // Carregar dados de exemplo para desenvolvimento
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Carregando dados de exemplo para desenvolvimento...');
+        
+        const mockStudents: Student[] = [
+          {
+            id: '1',
+            name: 'João Silva',
+            email: 'joao.silva@exemplo.com',
+            department: 'Vendas',
+            position: 'Gerente de Vendas',
+            enrolledCourses: 3,
+            completedCourses: 2,
+            averageScore: 85,
+            status: 'active',
+            lastActivity: '2023-10-15T14:30:00Z'
+          },
+          {
+            id: '2',
+            name: 'Maria Oliveira',
+            email: 'maria.oliveira@exemplo.com',
+            department: 'RH',
+            position: 'Analista de RH',
+            enrolledCourses: 5,
+            completedCourses: 5,
+            averageScore: 92,
+            status: 'active',
+            lastActivity: '2023-10-18T09:15:00Z'
+          },
+          {
+            id: '3',
+            name: 'Carlos Pereira',
+            email: 'carlos.pereira@exemplo.com',
+            department: 'TI',
+            position: 'Desenvolvedor',
+            enrolledCourses: 2,
+            completedCourses: 1,
+            averageScore: 78,
+            status: 'active',
+            lastActivity: '2023-10-10T16:45:00Z'
+          },
+          {
+            id: '4',
+            name: 'Ana Santos',
+            email: 'ana.santos@exemplo.com',
+            department: 'Marketing',
+            position: 'Coordenadora de Marketing',
+            enrolledCourses: 4,
+            completedCourses: 3,
+            averageScore: 88,
+            status: 'active',
+            lastActivity: '2023-10-17T11:20:00Z'
+          },
+          {
+            id: '5',
+            name: 'Roberto Almeida',
+            email: 'roberto.almeida@exemplo.com',
+            department: 'Financeiro',
+            position: 'Analista Financeiro',
+            enrolledCourses: 1,
+            completedCourses: 0,
+            averageScore: 0,
+            status: 'inactive',
+            lastActivity: '2023-09-30T10:00:00Z'
+          }
+        ];
+        
+        setStudents(mockStudents);
+        setFilteredStudents(mockStudents);
+        
+        // Extrair departamentos únicos para o filtro
+        const uniqueDepartmentsSet = new Set(mockStudents.map(student => student.department));
+        const uniqueDepartments = Array.from(uniqueDepartmentsSet) as string[];
+        setDepartments(uniqueDepartments);
+        
+        setLoading(false);
+      }
+    }
+  };
+
   // Filtrar alunos quando os filtros mudarem
   useEffect(() => {
     if (students.length > 0) {
@@ -256,11 +232,10 @@ const TrainingStudents: NextPage = () => {
   };
   
   // Função para alternar o status do aluno
-  const handleToggleStatus = (studentId: string) => {
+  const toggleStudentStatus = (studentId: string) => {
     setLoading(true);
     
-    // Em produção, substituir por chamada real à API
-    // Simulação de alteração de status
+    // Atualizar o status do aluno localmente
     const updatedStudents = students.map(student => {
       if (student.id === studentId) {
         return {
@@ -271,7 +246,7 @@ const TrainingStudents: NextPage = () => {
       return student;
     });
     
-    setStudents(updatedStudents);
+    setStudents(updatedStudents as Student[]);
     setLoading(false);
   };
   
@@ -534,7 +509,7 @@ const TrainingStudents: NextPage = () => {
                             <PencilIcon className="h-5 w-5" />
                           </button>
                           <button
-                            onClick={() => handleToggleStatus(student.id)}
+                            onClick={() => toggleStudentStatus(student.id)}
                             className={`${
                               student.status === 'active' ? 'text-red-600 hover:text-red-800' : 'text-green-600 hover:text-green-800'
                             }`}

@@ -71,8 +71,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ message: 'Não autenticado' })
     }
 
-    console.log('NextAuth Session: Papel do usuário:', session.user?.role)
-
     const { id } = req.query
 
     if (req.method === 'GET') {

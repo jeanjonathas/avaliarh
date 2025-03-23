@@ -14,8 +14,6 @@ export default async function handler(
     return res.status(401).json({ message: 'Não autorizado' });
   }
 
-  console.log('NextAuth Session:', session);
-  
   // Verificar método
   if (req.method !== 'DELETE') {
     return res.status(405).json({ message: 'Método não permitido' });
