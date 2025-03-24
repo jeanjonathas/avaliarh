@@ -48,6 +48,8 @@ interface OpinionQuestionWizardProps {
   onCancel?: () => void;
   initialData?: any;
   isEditing?: boolean;
+  questionType?: string;
+  categoriesEndpoint?: string;
 }
 
 interface SystemCategory {
@@ -60,7 +62,9 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
   onSubmit, 
   onCancel, 
   initialData = null,
-  isEditing = false
+  isEditing = false,
+  questionType,
+  categoriesEndpoint
 }) => {
   const router = useRouter();
   const [step, setStep] = useState(1);
