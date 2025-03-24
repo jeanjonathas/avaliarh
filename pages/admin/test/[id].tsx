@@ -1,5 +1,5 @@
 import { NextPage } from 'next'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/router'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
@@ -116,6 +116,9 @@ const TestDetail: NextPage = () => {
   
   // Estado para armazenar o tipo de pergunta da etapa selecionada
   const [selectedStageQuestionType, setSelectedStageQuestionType] = useState<string | null>(null);
+  
+  // Ref para controlar se já carregamos os dados
+  const hasLoadedDataRef = useRef(false);
   
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -242,8 +245,9 @@ const TestDetail: NextPage = () => {
       }
     }
 
-    if (status === 'authenticated' && id) {
-      fetchData()
+    if (status === 'authenticated' && id && !hasLoadedDataRef.current) {
+      hasLoadedDataRef.current = true;
+      fetchData();
     }
   }, [id, status, notify])
 
