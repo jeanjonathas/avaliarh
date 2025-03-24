@@ -59,12 +59,18 @@ export default async function handler(
           )
         }));
         
+        console.log(`Após filtragem, temos ${filteredQuestions.length} perguntas com opções válidas`);
+        
+        // Verificar se há perguntas com opções
+        const questionsWithOptions = filteredQuestions.filter(q => q.options && q.options.length > 0);
+        console.log(`Perguntas com opções: ${questionsWithOptions.length}`);
+        
         // Criar grupos de categorias
         const opinionGroups = [];
         const processedQuestionIds = new Set();
         
         // Processar perguntas para identificar grupos únicos de categorias
-        for (const question of filteredQuestions) {
+        for (const question of questionsWithOptions) {
           // Pular perguntas já processadas
           if (processedQuestionIds.has(question.id)) continue;
           
