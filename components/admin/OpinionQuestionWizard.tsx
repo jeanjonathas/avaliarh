@@ -478,14 +478,16 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
 
   // Verificar se a quantidade de categorias mudou
   useEffect(() => {
+    const categoriesLength = watch('categories').length;
+    
     if (selectedGroup && originalCategoryCount > 0) {
       // Se a quantidade atual de categorias for diferente da original
-      if (watch('categories').length !== originalCategoryCount) {
-        console.log(`Quantidade de categorias modificada: de ${originalCategoryCount} para ${watch('categories').length}`);
+      if (categoriesLength !== originalCategoryCount) {
+        console.log(`Quantidade de categorias modificada: de ${originalCategoryCount} para ${categoriesLength}`);
         setCategoriesModified(true);
       }
     }
-  }, [watch('categories').length, selectedGroup, originalCategoryCount]);
+  }, [watch, selectedGroup, originalCategoryCount]);
 
   return (
     <div className="w-full max-w-4xl mx-auto">
