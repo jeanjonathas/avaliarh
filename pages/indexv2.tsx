@@ -83,7 +83,7 @@ const Home: NextPage = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [inviteCode])
+  }, [inviteCode, router])
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white">
