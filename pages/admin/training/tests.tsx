@@ -1,5 +1,5 @@
 import { NextPage } from 'next'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
@@ -41,7 +41,7 @@ const Tests: NextPage = () => {
     if (status === 'unauthenticated') {
       router.push('/admin/login')
     }
-  }, [status, router])
+  }, [status, router, notify])
   
   useEffect(() => {
     const fetchTests = async () => {
@@ -65,7 +65,7 @@ const Tests: NextPage = () => {
     if (status === 'authenticated') {
       fetchTests()
     }
-  }, [status])
+  }, [status, notify])
   
   const handleSubmit = async (values: any, { resetForm }: any) => {
     try {
