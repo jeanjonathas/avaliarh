@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
@@ -195,7 +195,7 @@ const CandidateDetails = () => {
       fetchCandidates()
       fetchTests()
     }
-  }, [id, status])
+  }, [id, status, fetchCandidate])
   
   // Atualizar o índice atual quando a lista de candidatos for carregada
   useEffect(() => {
@@ -206,7 +206,7 @@ const CandidateDetails = () => {
   }, [candidates, id])
   
   // Buscar dados do candidato específico
-  const fetchCandidate = async () => {
+  const fetchCandidate = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/admin/candidates/${id}`);
@@ -261,7 +261,7 @@ const CandidateDetails = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
   
   // Buscar lista de todos os candidatos para navegação
   const fetchCandidates = async () => {
@@ -832,7 +832,7 @@ const CandidateDetails = () => {
         }));
       }
     }
-  }, [candidate?.test]);
+  }, [candidate?.test, candidate]);
 
   useEffect(() => {
     if (candidate && candidate.stageScores) {
