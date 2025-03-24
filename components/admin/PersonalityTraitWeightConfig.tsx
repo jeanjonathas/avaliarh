@@ -70,73 +70,51 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
       
       // Processar as questões para extrair grupos e traços
       questions.forEach((question: any) => {
-        // Verificar se a questão tem categorias (traços de personalidade)
-        if (question.categories && question.categories.length > 0) {
-          // Usar o texto da questão como nome do grupo
-          const groupName = question.text;
-          const groupId = `group-${question.id}`;
-          
-          if (!groupMap[groupId]) {
-            groupMap[groupId] = [];
-            groups.push({
-              id: groupId,
-              name: groupName,
-              traits: [],
-              selectedTraits: []
-            });
-          }
-          
-          // Adicionar cada categoria como um traço disponível
-          question.categories.forEach((category: any) => {
-            if (category.name && !groupMap[groupId].includes(category.name)) {
-              groupMap[groupId].push(category.name);
-              
-              // Encontrar o grupo correspondente
-              const groupIndex = groups.findIndex(g => g.id === groupId);
-              if (groupIndex !== -1) {
-                groups[groupIndex].traits.push(category.name);
-              }
-            }
+        // Usar o texto da questão como nome do grupo
+        const groupName = question.text;
+        const groupId = `group-${question.id}`;
+        
+        if (!groupMap[groupId]) {
+          groupMap[groupId] = [];
+          groups.push({
+            id: groupId,
+            name: groupName,
+            traits: [],
+            selectedTraits: []
           });
         }
         
-        // Também verificar nas opções se houver traços de personalidade
+        // Extrair categorias das opções
         if (question.options && question.options.length > 0) {
-          // Usar o texto da questão como nome do grupo se ainda não foi criado
-          const groupName = question.text;
-          const groupId = `group-${question.id}`;
+          // Coletar todas as categorias únicas das opções
+          const categoryNames = new Set<string>();
           
-          if (!groupMap[groupId]) {
-            groupMap[groupId] = [];
-            groups.push({
-              id: groupId,
-              name: groupName,
-              traits: [],
-              selectedTraits: []
+          question.options.forEach((option: any) => {
+            // Verificar se a opção tem uma categoria associada
+            if (option.categoryName) {
+              categoryNames.add(option.categoryName);
+            }
+          });
+          
+          // Se não encontramos categorias, usar os textos das opções como último recurso
+          if (categoryNames.size === 0) {
+            question.options.forEach((option: any) => {
+              if (option.text) {
+                categoryNames.add(option.text);
+              }
             });
           }
           
-          // Verificar se as opções têm categorias associadas
-          question.options.forEach((option: any) => {
-            if (option.category && option.category.name && !groupMap[groupId].includes(option.category.name)) {
-              groupMap[groupId].push(option.category.name);
-              
-              // Encontrar o grupo correspondente
-              const groupIndex = groups.findIndex(g => g.id === groupId);
-              if (groupIndex !== -1) {
-                groups[groupIndex].traits.push(option.category.name);
+          // Adicionar as categorias encontradas ao grupo
+          const groupIndex = groups.findIndex(g => g.id === groupId);
+          if (groupIndex !== -1) {
+            categoryNames.forEach(categoryName => {
+              if (!groupMap[groupId].includes(categoryName)) {
+                groupMap[groupId].push(categoryName);
+                groups[groupIndex].traits.push(categoryName);
               }
-            } else if (option.text && !groupMap[groupId].includes(option.text)) {
-              // Se não tiver categoria, usar o texto da opção como traço
-              groupMap[groupId].push(option.text);
-              
-              // Encontrar o grupo correspondente
-              const groupIndex = groups.findIndex(g => g.id === groupId);
-              if (groupIndex !== -1) {
-                groups[groupIndex].traits.push(option.text);
-              }
-            }
-          });
+            });
+          }
         }
       });
       
