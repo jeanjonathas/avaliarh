@@ -3,6 +3,7 @@ import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Candidate } from '../types'
 import toast from 'react-hot-toast'
+import Image from 'next/image'
 
 interface Test {
   id: string;
@@ -704,11 +705,15 @@ export const CandidateInfoTab = ({ candidate, onUpdate }: CandidateInfoTabProps)
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
-            <img
-              src={candidate.photoUrl}
-              alt={`Foto de ${candidate.name}`}
-              className="w-full h-auto"
-            />
+            <div className="relative w-full h-[80vh]">
+              <Image
+                src={candidate.photoUrl}
+                alt={`Foto de ${candidate.name}`}
+                fill
+                sizes="(max-width: 768px) 100vw, 80vw"
+                style={{ objectFit: 'contain' }}
+              />
+            </div>
           </div>
         </div>
       )}
