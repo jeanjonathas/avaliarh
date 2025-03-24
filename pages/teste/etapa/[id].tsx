@@ -1,5 +1,5 @@
 import { NextPage } from 'next'
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -73,7 +73,7 @@ const TestStage: NextPage = () => {
   }
 
   // Função para salvar o tempo no localStorage
-  const saveTimeToLocalStorage = (remainingTime: number | null, spentTime: number) => {
+  const saveTimeToLocalStorage = useCallback((remainingTime: number | null, spentTime: number) => {
     if (typeof window !== 'undefined' && candidateId) {
       const timeData = {
         remainingTime,
@@ -88,10 +88,10 @@ const TestStage: NextPage = () => {
       
       console.log(`Tempo salvo no localStorage: ${remainingTime}s restantes, ${spentTime}s gastos, timestamp: ${new Date().toISOString()}`);
     }
-  };
+  }, [candidateId]);
 
   // Função para carregar o tempo do localStorage
-  const loadTimeFromLocalStorage = () => {
+  const loadTimeFromLocalStorage = useCallback(() => {
     if (typeof window !== 'undefined' && candidateId) {
       const saved = localStorage.getItem(`candidate_${candidateId}_time`);
       if (saved) {
@@ -105,7 +105,7 @@ const TestStage: NextPage = () => {
       }
     }
     return null;
-  };
+  }, [candidateId]);
 
   // Carregar dados do teste da sessão
   useEffect(() => {
@@ -155,7 +155,7 @@ const TestStage: NextPage = () => {
         }
       }
     }
-  }, [candidateId, stageId]); // Recarregar quando o candidato ou a etapa mudar
+  }, [candidateId, loadTimeFromLocalStorage]); // Adicionar loadTimeFromLocalStorage como dependência
 
   // Contador de tempo para testes com limite de tempo (regressivo)
   useEffect(() => {
@@ -435,10 +435,6 @@ const TestStage: NextPage = () => {
   // Função para avançar para a próxima etapa
   const goToNextStage = async (values?: Record<string, string>) => {
     setIsSubmitting(true);
-    
-    // Salvar o tempo atual antes de avançar
-    saveTimeToLocalStorage(timeRemaining, timeSpent);
-    console.log(`Salvando tempo antes de avançar: ${timeRemaining}s restantes, ${timeSpent}s gastos`);
     
     try {
       console.log(`Buscando próxima etapa para stageId=${stageId} e candidateId=${candidateId}...`);
