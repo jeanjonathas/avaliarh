@@ -157,7 +157,7 @@ export default async function handler(
           ${title},
           ${description || ''},
           ${timeLimit ? parseInt(timeLimit) : null},
-          ${active === undefined ? true : false},
+          ${active === false ? false : true},
           ${testType},
           ${companyId},
           CURRENT_TIMESTAMP,
