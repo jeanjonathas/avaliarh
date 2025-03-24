@@ -13,6 +13,10 @@ interface Company {
   trialEndDate?: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
+  userCount?: number;
+  candidateCount?: number;
+  testCount?: number;
+  processCount?: number;
 }
 
 interface CompanyListProps {
@@ -104,10 +108,10 @@ const CompanyList: React.FC<CompanyListProps> = ({
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {company.maxUsers}
+                    {company.userCount !== undefined ? company.userCount : 0}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {company.maxCandidates}
+                    {company.candidateCount !== undefined ? company.candidateCount : 0}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(company.createdAt).toLocaleDateString()}

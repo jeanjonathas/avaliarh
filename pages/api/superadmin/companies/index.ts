@@ -26,15 +26,24 @@ async function getCompanies(req: NextApiRequest, res: NextApiResponse) {
     // Usando $queryRaw para evitar problemas com o modelo Company no Prisma
     const companies = await prisma.$queryRaw`
       SELECT c.*, 
-        (SELECT COUNT(*) FROM "User" WHERE "companyId" = c.id) as "userCount",
-        (SELECT COUNT(*) FROM "Candidate" WHERE "companyId" = c.id) as "candidateCount",
-        (SELECT COUNT(*) FROM "Test" WHERE "companyId" = c.id) as "testCount",
-        (SELECT COUNT(*) FROM "SelectionProcess" WHERE "companyId" = c.id) as "processCount"
+        COALESCE((SELECT COUNT(*) FROM "User" WHERE "companyId" = c.id), 0) as "userCount",
+        COALESCE((SELECT COUNT(*) FROM "Candidate" WHERE "companyId" = c.id), 0) as "candidateCount",
+        COALESCE((SELECT COUNT(*) FROM "Test" WHERE "companyId" = c.id), 0) as "testCount",
+        COALESCE((SELECT COUNT(*) FROM "SelectionProcess" WHERE "companyId" = c.id), 0) as "processCount"
       FROM "Company" c
       ORDER BY c.name ASC
     `;
 
-    return res.status(200).json(companies);
+    // Garantir que os valores sejam convertidos para números
+    const formattedCompanies = Array.isArray(companies) ? companies.map(company => ({
+      ...company,
+      userCount: Number(company.userCount || 0),
+      candidateCount: Number(company.candidateCount || 0),
+      testCount: Number(company.testCount || 0),
+      processCount: Number(company.processCount || 0)
+    })) : [];
+
+    return res.status(200).json(formattedCompanies);
   } catch (error) {
     console.error('Error fetching companies:', error);
     return res.status(500).json({ message: 'Erro ao buscar empresas' });

@@ -7,6 +7,13 @@ const nextConfig = {
   },
   // Configuração para lidar com proxy reverso HTTPS
   poweredByHeader: false,
+  // Desabilitar cache para páginas do superadmin
+  onDemandEntries: {
+    // Tempo de vida da página em cache (em ms)
+    maxInactiveAge: 10 * 1000, // 10 segundos
+    // Número de páginas a manter em cache
+    pagesBufferLength: 2,
+  },
   // Configuração para headers de segurança
   async headers() {
     return [

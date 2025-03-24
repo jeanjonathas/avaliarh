@@ -56,6 +56,11 @@ const CompaniesPage: React.FC<CompaniesPageProps> = ({ initialCompanies }) => {
     try {
       const response = await fetch('/api/superadmin/companies', {
         credentials: 'include',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
       });
       if (!response.ok) {
         throw new Error('Falha ao carregar empresas');
@@ -117,6 +122,11 @@ const CompaniesPage: React.FC<CompaniesPageProps> = ({ initialCompanies }) => {
     setShowDeleteAlert(false);
     setCompanyToDelete(null);
   };
+
+  // Carregar empresas quando o componente for montado
+  useEffect(() => {
+    loadCompanies();
+  }, []);
 
   // Função para desativar uma empresa
   const handleDeactivateCompany = async () => {
