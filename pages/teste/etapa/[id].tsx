@@ -338,7 +338,7 @@ const TestStage: NextPage = () => {
     }
 
     fetchQuestions()
-  }, [stageId, candidateId])
+  }, [stageId, candidateId, loadResponsesFromLocalStorage, testData])
 
   // Função para validar as respostas
   const validateResponses = (values: Record<string, string>) => {
