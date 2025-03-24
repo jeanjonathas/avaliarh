@@ -94,11 +94,11 @@ This checklist outlines the implementation plan for the training management syst
 - [x] Create `/api/admin/training/tests/[id]` endpoint (GET, PUT, DELETE)
 - [x] Create `/api/admin/training/questions` endpoint (GET, POST)
 - [x] Create `/api/admin/training/questions/[id]` endpoint (GET, PUT, DELETE)
-- [x] Fix TypeScript errors in API implementations
-  - [x] Fix errors in `/api/admin/training/students/[id]` endpoint
-  - [x] Fix errors in `/api/admin/training/students/[id]/enroll` endpoint
-  - [x] Fix errors in `/api/admin/training/statistics` endpoint
-  - [x] Fix errors in remaining API endpoints
+- [ ] Fix TypeScript errors in API implementations
+  - [ ] Fix errors in `/api/admin/training/students/[id]` endpoint
+  - [ ] Fix errors in `/api/admin/training/students/[id]/enroll` endpoint
+  - [ ] Fix errors in `/api/admin/training/statistics` endpoint
+  - [ ] Fix errors in remaining API endpoints
 
 ### Student API Endpoints
 - [x] Create `/api/training/courses` endpoint (GET)
@@ -109,6 +109,7 @@ This checklist outlines the implementation plan for the training management syst
 - [x] Create `/api/training/lessons/[id]/progress` endpoint (POST)
 - [x] Create `/api/training/tests/[id]` endpoint (GET)
 - [x] Create `/api/training/tests/[id]/submit` endpoint (POST)
+- [x] Create `/api/training/statistics` endpoint (GET)
 
 ## Admin UI Implementation
 
@@ -208,6 +209,7 @@ This checklist outlines the implementation plan for the training management syst
 - [x] Create TestProgress component for navigating between questions
 - [x] Create TestResults component for displaying test outcomes
 - [x] Add support for different question types (multiple choice, single choice)
+- [x] Create LessonContent component for displaying different content types
 
 ### 5. Certificados e Conclusão
 - [ ] Criar página `/treinamento/certificados/[id]` para exibir certificados
@@ -233,9 +235,9 @@ This checklist outlines the implementation plan for the training management syst
 ## Additional Features
 
 ### 1. Reporting
-- [x] Create reports for course completion rates
-- [x] Create reports for test performance
-- [x] Create reports for time spent on training
+- [ ] Create reports for course completion rates
+- [ ] Create reports for test performance
+- [ ] Create reports for time spent on training
 
 ### 2. Notifications
 - [ ] Implement email notifications for course enrollment
@@ -243,8 +245,8 @@ This checklist outlines the implementation plan for the training management syst
 - [ ] Implement reminders for incomplete courses
 
 ### 3. Certificates
-- [x] Create certificate generation for completed courses
-- [x] Implement certificate download functionality
+- [ ] Create certificate generation for completed courses
+- [ ] Implement certificate download functionality
 
 ## Testing
 

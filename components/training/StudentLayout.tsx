@@ -83,7 +83,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
                 </button>
                 <Link href="/treinamento">
                   <span className="text-xl font-bold text-primary-600 ml-2 md:ml-0">
-                    AvaliaRH Treinamento
+                    Treinamento - Admitto
                   </span>
                 </Link>
               </div>

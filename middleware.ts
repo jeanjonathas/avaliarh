@@ -10,8 +10,10 @@ const routePermissions: Record<string, RoleType[]> = {
   '/api/admin': ['SUPER_ADMIN', 'COMPANY_ADMIN'],
   '/api/instructor': ['SUPER_ADMIN', 'COMPANY_ADMIN', 'INSTRUCTOR'],
   '/api/student': ['SUPER_ADMIN', 'COMPANY_ADMIN', 'INSTRUCTOR', 'STUDENT'],
+  '/api/training': ['SUPER_ADMIN', 'COMPANY_ADMIN', 'INSTRUCTOR', 'STUDENT'],
   '/superadmin': ['SUPER_ADMIN'],
   '/admin': ['SUPER_ADMIN', 'COMPANY_ADMIN'],
+  '/treinamento': ['SUPER_ADMIN', 'COMPANY_ADMIN', 'INSTRUCTOR', 'STUDENT'],
 };
 
 // Função para verificar se a rota é protegida
@@ -19,14 +21,16 @@ function isProtectedRoute(pathname: string): boolean {
   return (
     pathname.startsWith('/api/admin') ||
     pathname.startsWith('/api/superadmin') ||
+    pathname.startsWith('/api/training') ||
     pathname.startsWith('/admin/dashboard') ||
-    pathname.startsWith('/superadmin/dashboard')
+    pathname.startsWith('/superadmin/dashboard') ||
+    pathname.startsWith('/treinamento') && !pathname.startsWith('/treinamento/login')
   )
 }
 
 // Função para verificar se a rota é de login
 function isLoginRoute(pathname: string): boolean {
-  return pathname === '/admin/login' || pathname === '/superadmin/login'
+  return pathname === '/admin/login' || pathname === '/superadmin/login' || pathname === '/treinamento/login'
 }
 
 // Configuração do middleware
@@ -34,8 +38,10 @@ const config = {
   matcher: [
     '/api/admin/:path*',
     '/api/superadmin/:path*',
+    '/api/training/:path*',
     '/admin/:path*',
     '/superadmin/:path*',
+    '/treinamento/:path*',
   ],
 }
 
@@ -120,7 +126,7 @@ export async function middleware(request: NextRequest) {
       // Determinar a página de login apropriada com base na rota
       const loginUrl = pathname.startsWith('/superadmin') 
         ? '/superadmin/login' 
-        : '/admin/login'
+        : pathname.startsWith('/treinamento') ? '/treinamento/login' : '/admin/login'
       
       // Criar URL de redirecionamento com callbackUrl
       const url = request.nextUrl.clone()
@@ -149,6 +155,17 @@ export async function middleware(request: NextRequest) {
     // Verificar permissões para rotas de admin
     if (pathname.startsWith('/api/admin') || pathname.startsWith('/admin')) {
       if (token.role !== 'SUPER_ADMIN' && token.role !== 'COMPANY_ADMIN') {
+        return new NextResponse(
+          JSON.stringify({ success: false, message: 'Acesso negado. Permissão insuficiente.' }),
+          { status: 403, headers: { 'content-type': 'application/json' } }
+        )
+      }
+    }
+    
+    // Verificar permissões para rotas de treinamento
+    if (pathname.startsWith('/api/training') || pathname.startsWith('/treinamento')) {
+      if (token.role !== 'SUPER_ADMIN' && token.role !== 'COMPANY_ADMIN' && 
+          token.role !== 'INSTRUCTOR' && token.role !== 'STUDENT') {
         return new NextResponse(
           JSON.stringify({ success: false, message: 'Acesso negado. Permissão insuficiente.' }),
           { status: 403, headers: { 'content-type': 'application/json' } }
@@ -194,7 +211,7 @@ export async function middleware(request: NextRequest) {
     // Em caso de erro, redirecionar para a página de login
     const loginUrl = pathname.startsWith('/superadmin') 
       ? '/superadmin/login' 
-      : '/admin/login'
+      : pathname.startsWith('/treinamento') ? '/treinamento/login' : '/admin/login'
     
     const url = request.nextUrl.clone()
     url.pathname = loginUrl

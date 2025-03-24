@@ -21,8 +21,8 @@ import {
 
 // Componentes
 import StudentLayout from '../../../components/training/StudentLayout';
-import LoadingSpinner from '../../../../components/LoadingSpinner';
-import EmptyState from '../../../../components/EmptyState';
+import LoadingSpinner from '../../../components/LoadingSpinner';
+import EmptyState from '../../../components/EmptyState';
 
 // Tipos
 interface Lesson {
