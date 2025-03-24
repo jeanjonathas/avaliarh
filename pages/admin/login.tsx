@@ -18,7 +18,11 @@ export default function AdminLogin() {
     
     try {
       // Se a URL for relativa, retorne-a como está
-      if (url.startsWith('/')) return url
+      if (url.startsWith('/')) {
+        // Se for /admin, redirecione para /admin/dashboard
+        if (url === '/admin') return '/admin/dashboard'
+        return url
+      }
       
       // Se for uma URL absoluta, extraia apenas o caminho
       const urlObj = new URL(url)
@@ -28,7 +32,7 @@ export default function AdminLogin() {
         const currentHost = window.location.hostname
         if (urlObj.hostname !== currentHost) {
           console.log(`Normalizando URL de callback: ${url} -> ${urlObj.pathname}`)
-          return urlObj.pathname
+          return urlObj.pathname === '/admin' ? '/admin/dashboard' : urlObj.pathname
         }
       }
       
