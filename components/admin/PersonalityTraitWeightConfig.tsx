@@ -247,48 +247,109 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
         console.log('Valores iniciais recebidos:', value);
         const updatedGroups = [...groups];
         
-        // Criar um mapa de traços por nome para facilitar a busca
-        const traitsByName: Record<string, PersonalityTrait> = {};
+        // Criar mapas para facilitar a busca
+        const traitsByName: Record<string, PersonalityTrait[]> = {};
+        const traitsById: Record<string, PersonalityTrait> = {};
+        
+        // Indexar os traços salvos por nome e ID
         value.forEach(trait => {
+          // Indexar por ID se disponível
+          if (trait.id) {
+            traitsById[trait.id] = trait;
+          }
+          
+          // Também indexar por nome para fallback
           if (trait.traitName) {
-            traitsByName[trait.traitName] = trait;
+            if (!traitsByName[trait.traitName]) {
+              traitsByName[trait.traitName] = [];
+            }
+            traitsByName[trait.traitName].push(trait);
           }
         });
         
+        console.log('Mapa de traços por ID:', traitsById);
         console.log('Mapa de traços por nome:', traitsByName);
         
         // Para cada grupo, verificar se há traços salvos correspondentes
         updatedGroups.forEach((group, groupIndex) => {
-          // Para cada traço disponível no grupo, verificar se há um valor salvo
-          group.traits.forEach(traitName => {
-            const savedTrait = traitsByName[traitName];
+          // Primeiro, tentar encontrar traços salvos pelo ID do grupo
+          const savedTraitsByGroup = value.filter(trait => 
+            trait.groupId === group.id || trait.groupName === group.name
+          );
+          
+          if (savedTraitsByGroup.length > 0) {
+            // Se encontrou traços pelo ID do grupo, usar esses
+            console.log(`Encontrados ${savedTraitsByGroup.length} traços para o grupo ${group.name} pelo ID/nome do grupo`);
             
-            if (savedTrait) {
-              // Verificar se o traço já existe no grupo
-              const existingTraitIndex = group.selectedTraits.findIndex(t => 
-                t.traitName === traitName
-              );
-              
-              if (existingTraitIndex === -1) {
-                // Se o traço não existe, adicionar
-                group.selectedTraits.push({
-                  id: savedTrait.id || `trait-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                  traitName: traitName,
-                  weight: savedTrait.weight || 0,
-                  order: savedTrait.order || group.selectedTraits.length + 1,
-                  groupId: group.id,
-                  groupName: group.name
-                });
-              } else {
-                // Se o traço já existe, atualizar
-                group.selectedTraits[existingTraitIndex] = {
-                  ...group.selectedTraits[existingTraitIndex],
-                  weight: savedTrait.weight || group.selectedTraits[existingTraitIndex].weight,
-                  order: savedTrait.order || group.selectedTraits[existingTraitIndex].order
-                };
+            savedTraitsByGroup.forEach(savedTrait => {
+              // Verificar se o traço está disponível no grupo atual
+              if (group.traits.includes(savedTrait.traitName)) {
+                // Verificar se o traço já existe no grupo
+                const existingTraitIndex = group.selectedTraits.findIndex(t => 
+                  t.id === savedTrait.id || t.traitName === savedTrait.traitName
+                );
+                
+                if (existingTraitIndex === -1) {
+                  // Se o traço não existe, adicionar
+                  group.selectedTraits.push({
+                    id: savedTrait.id || `trait-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    traitName: savedTrait.traitName,
+                    weight: savedTrait.weight || 0,
+                    order: savedTrait.order || group.selectedTraits.length + 1,
+                    groupId: group.id,
+                    groupName: group.name
+                  });
+                } else {
+                  // Se o traço já existe, atualizar
+                  group.selectedTraits[existingTraitIndex] = {
+                    ...group.selectedTraits[existingTraitIndex],
+                    weight: savedTrait.weight || group.selectedTraits[existingTraitIndex].weight,
+                    order: savedTrait.order || group.selectedTraits[existingTraitIndex].order
+                  };
+                }
               }
-            }
-          });
+            });
+          } else {
+            // Se não encontrou pelo ID do grupo, tentar pelo nome dos traços
+            console.log(`Tentando encontrar traços para o grupo ${group.name} pelo nome dos traços`);
+            
+            // Para cada traço disponível no grupo, verificar se há um valor salvo
+            group.traits.forEach(traitName => {
+              const matchingTraits = traitsByName[traitName] || [];
+              
+              if (matchingTraits.length > 0) {
+                // Se há múltiplos traços com o mesmo nome, tentar encontrar o que melhor corresponde a este grupo
+                // Priorizar traços que têm o mesmo groupId ou groupName
+                const bestMatch = matchingTraits.find(t => 
+                  t.groupId === group.id || t.groupName === group.name
+                ) || matchingTraits[0]; // Fallback para o primeiro se não encontrar correspondência exata
+                
+                // Verificar se o traço já existe no grupo
+                const existingTraitIndex = group.selectedTraits.findIndex(t => 
+                  t.traitName === traitName || (t.id && t.id === bestMatch.id)
+                );
+                
+                if (existingTraitIndex === -1) {
+                  // Se o traço não existe, adicionar
+                  group.selectedTraits.push({
+                    id: bestMatch.id || `trait-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    traitName: traitName,
+                    weight: bestMatch.weight || 0,
+                    order: bestMatch.order || group.selectedTraits.length + 1,
+                    groupId: group.id,
+                    groupName: group.name
+                  });
+                } else {
+                  // Se o traço já existe, atualizar
+                  group.selectedTraits[existingTraitIndex] = {
+                    ...group.selectedTraits[existingTraitIndex],
+                    weight: bestMatch.weight || group.selectedTraits[existingTraitIndex].weight,
+                    order: bestMatch.order || group.selectedTraits[existingTraitIndex].order
+                  };
+                }
+              }
+            });
+          }
           
           // Ordenar os traços em cada grupo por ordem
           group.selectedTraits.sort((a, b) => a.order - b.order);

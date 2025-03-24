@@ -10,6 +10,7 @@ import { useNotification } from '../../../contexts/NotificationContext'
 interface Question {
   id: string
   text: string
+  type?: string
   options: {
     id: string
     text: string
@@ -43,6 +44,8 @@ const TestStage: NextPage = () => {
   const [totalStages, setTotalStages] = useState<number | null>(null)
   const [stageCompleted, setStageCompleted] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showOpinionModal, setShowOpinionModal] = useState(false);
+  const [hasOpinionQuestions, setHasOpinionQuestions] = useState(false);
   const { showToast } = useNotification()
 
   // Função para salvar respostas no localStorage
@@ -327,6 +330,15 @@ const TestStage: NextPage = () => {
           description: data.stageDescription || 'Responda todas as questões abaixo'
         })
 
+        // Verificar se há questões opinativas
+        const hasOpinion = data.questions.some(q => q.type === 'OPINION_MULTIPLE');
+        setHasOpinionQuestions(hasOpinion);
+        
+        // Se houver questões opinativas, mostrar a modal
+        if (hasOpinion) {
+          setShowOpinionModal(true);
+        }
+
         // Carregar respostas salvas do localStorage
         loadResponsesFromLocalStorage()
         
@@ -539,7 +551,7 @@ const TestStage: NextPage = () => {
   };
 
   useEffect(() => {
-    if (!stageId || !candidateId) return;
+    if (!stageId || !candidateId) return
 
     const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(stageId as string);
     
@@ -800,7 +812,25 @@ const TestStage: NextPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white">
-      <div className="container mx-auto px-4 py-8">
+      {/* Modal para questões opinativas */}
+      {showOpinionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+            <h2 className="text-2xl font-bold text-secondary-900 mb-4">{stageInfo.title}</h2>
+            <p className="text-secondary-700 mb-6">{stageInfo.description}</p>
+            <div className="flex justify-center">
+              <button 
+                onClick={() => setShowOpinionModal(false)} 
+                className="bg-primary-600 hover:bg-primary-700 text-white font-bold py-2 px-6 rounded focus:outline-none focus:shadow-outline"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="container mx-auto px-4 py-12">
         <header className="flex justify-between items-center mb-8">
           <Link href="/" className="text-2xl font-bold text-primary-700">
             <Image 
