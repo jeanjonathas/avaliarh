@@ -108,6 +108,11 @@ const SettingsPage: NextPage = () => {
   if (status === 'loading' || loading) {
     return (
       <AdminLayout activeSection="treinamento">
+        <Breadcrumbs items={[
+          { label: 'Início', href: '/admin/training/dashboard' },
+          { label: 'Configurações', href: '/admin/training/settings' }
+        ]} />
+        <ContextualNavigation />
         <div className="p-6">
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
@@ -119,13 +124,14 @@ const SettingsPage: NextPage = () => {
 
   return (
     <AdminLayout activeSection="treinamento">
+      <Breadcrumbs items={[
+        { label: 'Início', href: '/admin/training/dashboard' },
+        { label: 'Configurações', href: '/admin/training/settings' }
+      ]} />
+      <ContextualNavigation />
       <div className="p-6">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-secondary-900 mb-2">Configurações de Treinamento</h1>
-          <Breadcrumbs items={[
-            { label: 'Início', href: '/admin/training/dashboard' },
-            { label: 'Configurações', href: '/admin/training/settings' }
-          ]} />
           {contextualNav && (
             <div className="mt-4">
               {contextualNav.prev && (

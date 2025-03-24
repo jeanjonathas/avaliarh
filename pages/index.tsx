@@ -227,9 +227,11 @@ export default function Home() {
                 <div className="absolute -top-6 -right-6 w-32 h-32 bg-yellow-400 rounded-full opacity-20"></div>
                 <div className="absolute -bottom-6 -left-6 w-32 h-32 bg-sky-400 rounded-full opacity-20"></div>
                 <div className="bg-white p-6 rounded-lg shadow-lg relative z-10">
-                  <img 
+                  <Image 
                     src="/dashboard-preview.png" 
                     alt="Admitto Dashboard" 
+                    width={500}
+                    height={300}
                     className="w-full h-auto rounded-md shadow-sm"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
@@ -523,7 +525,7 @@ export default function Home() {
                 </div>
               </div>
               <p className="text-gray-700">
-                "O Admitto revolucionou nosso processo seletivo. Reduzimos o tempo de contratação em 40% e melhoramos significativamente a qualidade das nossas contratações."
+                O Admitto revolucionou nosso processo seletivo. Reduzimos o tempo de contratação em 40% e melhoramos significativamente a qualidade das nossas contratações.
               </p>
               <div className="mt-4 flex">
                 <div className="flex text-yellow-400">
@@ -543,7 +545,7 @@ export default function Home() {
                 </div>
               </div>
               <p className="text-gray-700">
-                "Os insights gerados pela plataforma nos ajudaram a montar times mais equilibrados e produtivos. A análise de compatibilidade é simplesmente incrível."
+                Os insights gerados pela plataforma nos ajudaram a montar times mais equilibrados e produtivos. A análise de compatibilidade é simplesmente incrí vel.
               </p>
               <div className="mt-4 flex">
                 <div className="flex text-yellow-400">
@@ -563,7 +565,7 @@ export default function Home() {
                 </div>
               </div>
               <p className="text-gray-700">
-                "A facilidade de uso e a qualidade dos relatórios são impressionantes. Conseguimos identificar talentos que passariam despercebidos em processos tradicionais."
+                A facilidade de uso e a qualidade dos relatórios são impressionantes. Conseguimos identificar talentos que passariam despercebidos em processos tradicionais.
               </p>
               <div className="mt-4 flex">
                 <div className="flex text-yellow-400">

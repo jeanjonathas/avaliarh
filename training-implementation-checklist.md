@@ -172,28 +172,63 @@ This checklist outlines the implementation plan for the training management syst
 ## Student UI Implementation
 
 ### 1. Course Listing
-- [ ] Create `/treinamento` page with available courses
-- [ ] Implement course filtering and search functionality
+- [x] Create `/treinamento` page with available courses
+- [x] Implement course filtering and search functionality
+- [x] Create StudentLayout component for consistent navigation
+- [x] Implement CourseCard component for displaying course information
+- [x] Create ProgressStats component for tracking overall progress
 
 ### 2. Course Details
-- [ ] Create `/treinamento/cursos/[id]` page with course overview
-- [ ] Display modules and progress information
-- [ ] Show completion status and certificates (if applicable)
+- [x] Create `/treinamento/cursos/[id]` page with course overview
+- [x] Display modules and progress information
+- [x] Show completion status and certificates (if applicable)
+- [x] Implement module expansion/collapse functionality
+- [x] Add navigation between course modules and lessons
+- [x] Display lesson status (completed, locked, in progress)
 
 ### 3. Lesson Viewing
-- [ ] Create `/treinamento/aulas/[id]` page for consuming lesson content
-- [ ] Implement video player for video content
-- [ ] Implement audio player for audio content
-- [ ] Implement PDF viewer for slide content
-- [ ] Implement text viewer for text content
-- [ ] Create progress tracking functionality (time spent, completion)
+- [x] Create `/treinamento/aulas/[id]` page for consuming lesson content
+- [x] Implement video player for video content
+- [x] Implement audio player for audio content
+- [x] Implement PDF viewer for slide content
+- [x] Implement text viewer for text content
+- [x] Create progress tracking functionality (time spent, completion)
+- [x] Add "Mark as completed" button with appropriate timing
+- [x] Implement navigation between lessons
+- [x] Add test prompts after lesson completion when applicable
 
 ### 4. Test Taking
-- [ ] Create test interface for students
-- [ ] Implement timer functionality
-- [ ] Create question navigation
-- [ ] Implement test submission and scoring
-- [ ] Display results based on course configuration
+- [x] Create test interface for students
+- [x] Implement timer functionality
+- [x] Create question navigation
+- [x] Implement test submission and scoring
+- [x] Display results based on course configuration
+- [x] Create TestQuestion component for displaying and answering questions
+- [x] Create TestTimer component for tracking time limits
+- [x] Create TestProgress component for navigating between questions
+- [x] Create TestResults component for displaying test outcomes
+- [x] Add support for different question types (multiple choice, single choice)
+
+### 5. Certificados e Conclusão
+- [ ] Criar página `/treinamento/certificados/[id]` para exibir certificados
+- [ ] Implementar geração de PDF para certificados
+- [ ] Adicionar opção para compartilhar certificados
+- [ ] Criar página de histórico de cursos concluídos
+- [ ] Implementar sistema de badges/conquistas
+
+### 6. Perfil do Aluno
+- [ ] Criar página `/treinamento/perfil` para gerenciar informações do aluno
+- [ ] Implementar visualização de estatísticas pessoais
+- [ ] Adicionar histórico de atividades
+- [ ] Permitir personalização de preferências de notificação
+- [ ] Implementar sistema de favoritos para cursos
+
+### 7. Notificações e Lembretes
+- [ ] Implementar sistema de notificações para novos cursos disponíveis
+- [ ] Criar lembretes para cursos em andamento
+- [ ] Adicionar alertas para testes pendentes
+- [ ] Implementar notificações de prazos de conclusão
+- [ ] Criar sistema de e-mails para lembretes importantes
 
 ## Additional Features
 
