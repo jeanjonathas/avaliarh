@@ -432,31 +432,35 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
     }
   };
 
-  const onFormSubmit = async (data: any) => {
-    // Formatar as opções para garantir que cada opção tenha a categoria correta
-    const formattedOptions = data.options.map((option: any, index: number) => {
-      const category = data.categories[index];
-      return {
-        id: option.id, // Manter o ID original se estiver editando
-        text: option.text,
-        category: category?.name || '',
-        categoryNameUuid: category?.uuid || option.categoryNameUuid,
-        weight: option.weight || 1,
-        position: index,
-        isCorrect: true // Todas as opções em perguntas opinativas são "corretas"
-      };
-    });
-
-    const formData = {
-      ...data,
-      type: 'OPINION_MULTIPLE',
-      opinionGroupId: selectedGroup?.id,
-      categoriesModified: categoriesModified,
-      options: formattedOptions
-    };
-    
+  const onSubmitForm = async (data: any) => {
     try {
-      setIsSubmitting(true);
+      // Adicionar o tipo de questão aos dados, se fornecido
+      if (questionType) {
+        data.questionType = questionType;
+      }
+      
+      // Formatar as opções para garantir que cada opção tenha a categoria correta
+      const formattedOptions = data.options.map((option: any, index: number) => {
+        const category = data.categories[index];
+        return {
+          id: option.id, // Manter o ID original se estiver editando
+          text: option.text,
+          category: category?.name || '',
+          categoryNameUuid: category?.uuid || option.categoryNameUuid,
+          weight: option.weight || 1,
+          position: index,
+          isCorrect: true // Todas as opções em perguntas opinativas são "corretas"
+        };
+      });
+
+      const formData = {
+        ...data,
+        type: 'OPINION_MULTIPLE',
+        opinionGroupId: selectedGroup?.id,
+        categoriesModified: categoriesModified,
+        options: formattedOptions
+      };
+      
       await onSubmit(formData);
     } catch (error) {
       console.error('Erro ao salvar pergunta opinativa:', error);
@@ -529,7 +533,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(onFormSubmit)}>
+      <form onSubmit={handleSubmit(onSubmitForm)}>
         {/* Etapa 1: Definir categorias de opinião - Layout mais compacto */}
         {step === 1 && (
           <div>
