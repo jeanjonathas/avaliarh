@@ -11,7 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const prisma = new PrismaClient()
   
   try {
-    const { id, name, email, phone, position, instagram, photoUrl, fromTest } = req.body
+    const { id, name, email, phone, position, instagram, photoUrl, fromTest, testId } = req.body
 
     if (!id || !name || !email) {
       return res.status(400).json({ error: 'ID, nome e email são obrigatórios' })
@@ -44,6 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         position = ${position || null},
         instagram = ${instagram || null},
         "photoUrl" = ${photoUrl || null},
+        "testId" = ${req.body.testId || existingCandidate.testId},
         "updatedAt" = NOW()
       WHERE id = ${id}
       RETURNING *

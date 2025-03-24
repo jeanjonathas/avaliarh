@@ -28,11 +28,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Buscar o processo seletivo para verificar se existe
     const process = await prisma.selectionProcess.findUnique({
       where: { id: processId },
-      include: { stages: true }
+      include: { 
+        stages: {
+          include: {
+            test: true
+          }
+        } 
+      }
     });
 
     if (!process) {
       return res.status(404).json({ error: 'Processo seletivo não encontrado' });
+    }
+    
+    // Verificar se o processo tem uma etapa de teste e obter o testId
+    let testId = null;
+    if (process.stages && process.stages.length > 0) {
+      // Encontrar a primeira etapa que tem um teste associado
+      const testStage = process.stages.find(stage => stage.testId);
+      if (testStage) {
+        testId = testStage.testId;
+        console.log(`Processo tem teste associado: ${testId}`);
+      }
     }
     
     let candidate;
@@ -60,7 +77,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Atualizar o candidato para associá-lo ao processo
       candidate = await prisma.candidate.update({
         where: { id: candidateId },
-        data: { processId }
+        data: { 
+          processId,
+          testId: testId // Associar o testId se disponível
+        }
       });
     } else {
       // Criar um novo candidato
@@ -85,6 +105,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         requestPhoto: requestPhoto !== undefined ? requestPhoto : true,
         showResults: showResults !== undefined ? showResults : true,
         processId, // Vincular ao processo seletivo
+        testId: testId, // Associar o testId se disponível
         companyId: process.companyId, // Usar a mesma empresa do processo seletivo
         observations: JSON.stringify({
           requestPhoto: requestPhoto !== undefined ? requestPhoto : true,

@@ -272,6 +272,74 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         } else {
           console.log(`Teste com ID ${candidate.testId} não encontrado`);
         }
+      } else if (candidate.processId) {
+        // Se o candidato não tem testId mas tem processId, tentar encontrar um teste associado ao processo
+        console.log(`Candidato não tem testId. Verificando se o processo ${candidate.processId} tem um teste associado.`);
+        
+        try {
+          // Buscar o processo e suas etapas
+          const process = await prisma.selectionProcess.findUnique({
+            where: { id: candidate.processId },
+            include: {
+              stages: {
+                include: {
+                  test: true
+                }
+              }
+            }
+          });
+          
+          if (process && process.stages.length > 0) {
+            // Encontrar a primeira etapa que tem um teste associado
+            const testStage = process.stages.find(stage => stage.testId);
+            
+            if (testStage && testStage.testId) {
+              console.log(`Encontrado teste ${testStage.testId} associado ao processo ${candidate.processId}. Atualizando candidato...`);
+              
+              // Atualizar o candidato com o testId encontrado
+              await prisma.candidate.update({
+                where: { id: candidate.id },
+                data: { testId: testStage.testId }
+              });
+              
+              // Atualizar o objeto do candidato em memória
+              candidate.testId = testStage.testId;
+              
+              // Buscar informações do teste
+              const tests = await prisma.$queryRaw`
+                SELECT id, title, description, "timeLimit"
+                FROM "Test"
+                WHERE id = ${testStage.testId}
+              `;
+              
+              test = Array.isArray(tests) && tests.length > 0 ? tests[0] : null;
+              
+              if (test) {
+                // Contar quantas etapas o teste tem
+                const testStages = await prisma.testStage.findMany({
+                  where: {
+                    testId: testStage.testId
+                  },
+                  orderBy: {
+                    order: 'asc'
+                  }
+                });
+                
+                stageCount = testStages.length;
+                console.log(`Teste encontrado: ${test.title}, com ${stageCount} etapas`);
+                
+                // Adicionar o número de etapas ao objeto de teste
+                test.stageCount = stageCount;
+              }
+            } else {
+              console.log(`Nenhum teste encontrado nas etapas do processo ${candidate.processId}`);
+            }
+          } else {
+            console.log(`Processo ${candidate.processId} não encontrado ou não tem etapas`);
+          }
+        } catch (error) {
+          console.error('Erro ao buscar teste associado ao processo:', error);
+        }
       }
       
       // Buscar a configuração requestCandidatePhoto da primeira etapa do processo seletivo

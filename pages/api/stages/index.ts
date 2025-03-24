@@ -19,12 +19,58 @@ export default async function handler(
     // Buscar o testId associado ao candidato
     const candidate = await prisma.candidate.findUnique({
       where: { id: candidateId },
-      select: { testId: true }
+      select: { testId: true, processId: true }
     });
     
-    if (!candidate || !candidate.testId) {
+    if (!candidate) {
       return res.status(404).json({ 
-        error: 'Candidato não encontrado ou sem teste associado',
+        error: 'Candidato não encontrado',
+        stages: []
+      });
+    }
+    
+    // Se o candidato não tem testId mas tem processId, buscar o teste associado ao processo
+    if (!candidate.testId && candidate.processId) {
+      console.log(`Candidato ${candidateId} não tem testId, mas tem processId ${candidate.processId}. Buscando teste associado...`);
+      
+      try {
+        // Buscar o processo e suas etapas
+        const process = await prisma.selectionProcess.findUnique({
+          where: { id: candidate.processId },
+          include: {
+            stages: {
+              include: {
+                test: true
+              }
+            }
+          }
+        });
+        
+        if (process && process.stages.length > 0) {
+          // Encontrar a primeira etapa que tem um teste associado
+          const testStage = process.stages.find(stage => stage.testId);
+          
+          if (testStage && testStage.testId) {
+            console.log(`Encontrado teste ${testStage.testId} associado ao processo ${candidate.processId}. Atualizando candidato...`);
+            
+            // Atualizar o candidato com o testId encontrado
+            await prisma.candidate.update({
+              where: { id: candidateId },
+              data: { testId: testStage.testId }
+            });
+            
+            // Atualizar o objeto do candidato em memória
+            candidate.testId = testStage.testId;
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao buscar teste associado ao processo:', error);
+      }
+    }
+    
+    if (!candidate.testId) {
+      return res.status(404).json({ 
+        error: 'Candidato sem teste associado',
         stages: []
       });
     }

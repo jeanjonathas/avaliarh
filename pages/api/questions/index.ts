@@ -198,6 +198,108 @@ export default async function handler(
       // mas limitando a 3 questões para evitar sobrecarga
       if (!testId || questions.length === 0) {
         console.log(`Usando fallback: buscando questões da etapa ${stage.id} com limite`);
+        
+        // Registrar aviso sobre a falta de testId
+        if (!testId) {
+          console.warn(`ATENÇÃO: Candidato ${candidateId} não tem testId associado. Isso pode causar problemas na exibição das questões corretas.`);
+          
+          // Se temos candidateId, tentar atualizar o candidato com o testId correto
+          if (candidateId && typeof candidateId === 'string') {
+            try {
+              // Buscar o processo do candidato para tentar encontrar um teste associado
+              const candidate = await prisma.candidate.findUnique({
+                where: { id: candidateId },
+                include: { 
+                  process: { 
+                    include: { 
+                      stages: true 
+                    } 
+                  }
+                }
+              });
+              
+              if (candidate && candidate.process) {
+                // Verificar se alguma etapa do processo tem um teste associado
+                const processStages = candidate.process.stages;
+                const testStage = processStages.find(stage => stage.testId);
+                
+                if (testStage && testStage.testId) {
+                  console.log(`Encontrado testId ${testStage.testId} no processo do candidato. Atualizando candidato...`);
+                  
+                  // Atualizar o candidato com o testId encontrado
+                  await prisma.candidate.update({
+                    where: { id: candidateId },
+                    data: { testId: testStage.testId }
+                  });
+                  
+                  console.log(`Candidato ${candidateId} atualizado com testId ${testStage.testId}`);
+                  
+                  // Atualizar o testId em memória para usar nas próximas operações
+                  testId = testStage.testId;
+                  
+                  // Tentar buscar questões novamente com o testId atualizado
+                  try {
+                    // Buscar as etapas do teste
+                    const testStages = await prisma.testStage.findMany({
+                      where: { testId },
+                      include: { stage: true },
+                      orderBy: { order: 'asc' }
+                    });
+                    
+                    // Encontrar a etapa correspondente ao stageId
+                    let matchingStage;
+                    
+                    if (isOrderNumber) {
+                      const order = parseInt(stageId);
+                      const testStage = testStages.find(ts => ts.order === order);
+                      if (testStage) {
+                        matchingStage = testStage.stage;
+                      }
+                    } else {
+                      const testStage = testStages.find(ts => ts.stageId === stageId);
+                      if (testStage) {
+                        matchingStage = testStage.stage;
+                      }
+                    }
+                    
+                    if (matchingStage) {
+                      // Atualizar a variável stage
+                      stage = matchingStage;
+                      
+                      // Buscar questões específicas para esta etapa e teste
+                      const stageQuestions = await prisma.question.findMany({
+                        where: { stageId: stage.id },
+                        include: {
+                          options: true,
+                          categories: true
+                        },
+                        take: 10
+                      });
+                      
+                      if (stageQuestions.length > 0) {
+                        console.log(`Encontradas ${stageQuestions.length} questões após atualização do testId`);
+                        questions = stageQuestions;
+                        // Não precisamos continuar com o fallback
+                        return res.status(200).json({
+                          stageTitle: stage.title,
+                          stageDescription: stage.description,
+                          questions,
+                          diagnosticLogs: logs,
+                          testId: testId
+                        });
+                      }
+                    }
+                  } catch (error) {
+                    console.error('Erro ao buscar questões após atualização do testId:', error);
+                  }
+                }
+              }
+            } catch (error) {
+              console.error('Erro ao tentar atualizar candidato com testId:', error);
+            }
+          }
+        }
+        
         questions = await prisma.question.findMany({
           where: {
             stageId: stage.id, // Usar o ID real da etapa

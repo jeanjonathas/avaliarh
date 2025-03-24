@@ -233,6 +233,15 @@ export default async function handler(
       });
       
       console.log(`Retornando ${formattedQuestions.length} perguntas formatadas`);
+      
+      // Verificar se há perguntas opinativas e se o tipo solicitado é OPINION_MULTIPLE
+      if (type === 'OPINION_MULTIPLE' && formattedQuestions.length > 0) {
+        console.log('Retornando perguntas opinativas para configuração de traços de personalidade');
+      } else if (type === 'OPINION_MULTIPLE' && formattedQuestions.length === 0) {
+        console.log('Nenhum traço de personalidade encontrado no teste selecionado.');
+        console.log('Verifique se o teste contém perguntas opinativas com categorias de personalidade definidas.');
+      }
+      
       return res.status(200).json(formattedQuestions);
     } catch (error) {
       console.error('Erro ao buscar perguntas:', error);

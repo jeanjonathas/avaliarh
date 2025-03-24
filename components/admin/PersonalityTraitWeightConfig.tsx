@@ -49,22 +49,25 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
         throw new Error(`Erro ao buscar questões: ${response.status}`);
       }
       
-      const data = await response.json();
+      const questions = await response.json();
       
-      if (!data || !data.questions || data.questions.length === 0) {
+      console.log('Resposta completa da API:', questions);
+      
+      if (!questions || questions.length === 0) {
         console.log('Nenhuma questão encontrada para o teste:', testId);
+        setError('Nenhum traço de personalidade encontrado no teste selecionado.\n\nVerifique se o teste contém perguntas opinativas com categorias de personalidade definidas.');
         setTraitGroups([]);
         return;
       }
       
-      console.log('Questões encontradas:', data.questions);
+      console.log('Questões encontradas:', questions);
       
       // Extrair grupos e traços das questões
       const groups: TraitGroup[] = [];
       const groupMap: Record<string, string[]> = {};
       
       // Processar as questões para extrair grupos e traços
-      data.questions.forEach((question: any) => {
+      questions.forEach((question: any) => {
         if (question.options && question.options.length > 0) {
           // Usar o texto da questão como nome do grupo
           const groupName = question.text;
@@ -361,6 +364,15 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
     }
   }, [normalizeAllWeights, traitGroups.length]);
 
+  useEffect(() => {
+    if (testId) {
+      fetchPersonalityTraits(testId);
+    } else {
+      setTraitGroups([]);
+      setError('Selecione um teste para configurar os traços de personalidade.');
+    }
+  }, [testId, fetchPersonalityTraits]);
+
   // Lidar com o reordenamento por drag and drop dentro de um grupo
   const handleDragEnd = useCallback((result: DropResult) => {
     // Se não houver destino ou se a origem e o destino forem iguais, não fazer nada
@@ -458,16 +470,6 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
       console.log('Grupos atualizados com valores iniciais:', updatedGroups);
     }
   }, [testId, value, traitGroups]);
-
-  // Buscar traços de personalidade do teste selecionado
-  useEffect(() => {
-    if (testId) {
-      fetchPersonalityTraits(testId);
-    } else {
-      // Limpar traços disponíveis se não houver teste selecionado
-      setTraitGroups([]);
-    }
-  }, [testId, fetchPersonalityTraits]);
 
   // Gerar um ID único
   const generateId = () => `trait-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
