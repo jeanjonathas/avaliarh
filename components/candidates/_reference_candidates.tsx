@@ -777,7 +777,7 @@ const CandidateDetails = () => {
         });
       }
     }
-  }, [candidate]);
+  }, [candidate?.stageScores, candidate]);
 
   // Ordenar as etapas para exibição na tabela de desempenho detalhado e nas respostas
   useEffect(() => {
