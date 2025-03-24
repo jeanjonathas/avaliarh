@@ -175,15 +175,60 @@ const NewProcess: React.FC = () => {
   };
 
   // Função para alternar a expansão de um teste
-  const toggleTestExpansion = (testId: string) => {
-    setExpandedTests(prev => ({
-      ...prev,
-      [testId]: !prev[testId]
-    }));
+  const toggleTestExpansion = async (testId: string) => {
+    // Se já estiver expandido, apenas recolhe
+    if (expandedTests[testId]) {
+      setExpandedTests(prev => ({
+        ...prev,
+        [testId]: false
+      }));
+      return;
+    }
+    
+    // Se não estiver expandido, busca os detalhes do teste
+    try {
+      // Verificar se já temos os detalhes do teste
+      const testWithDetails = tests.find(t => t.id === testId);
+      if (testWithDetails && testWithDetails.stages && testWithDetails.stages.length > 0) {
+        // Se já temos os detalhes, apenas expande
+        setExpandedTests(prev => ({
+          ...prev,
+          [testId]: true
+        }));
+        return;
+      }
+      
+      // Buscar detalhes do teste
+      const response = await fetch(`/api/admin/tests/${testId}`);
+      if (response.ok) {
+        const testDetails = await response.json();
+        
+        // Atualizar o teste na lista com os detalhes
+        setTests(prevTests => 
+          prevTests.map(test => 
+            test.id === testId 
+              ? { 
+                  ...test, 
+                  stages: testDetails.stages || [] 
+                } 
+              : test
+          )
+        );
+      }
+      
+      // Expandir o teste
+      setExpandedTests(prev => ({
+        ...prev,
+        [testId]: true
+      }));
+    } catch (error) {
+      console.error('Erro ao buscar detalhes do teste:', error);
+      toast.error('Erro ao carregar detalhes do teste');
+    }
   };
 
-  // Limpar rascunho e inicializar formulário ao montar o componente
   useEffect(() => {
+    // Limpar rascunho e inicializar formulário ao montar o componente
     // Limpar qualquer rascunho anterior ao acessar a página de novo processo
     localStorage.removeItem('processDraft');
     
