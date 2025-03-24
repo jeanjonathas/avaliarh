@@ -124,7 +124,8 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
     // Carregar categorias do sistema
     const fetchSystemCategories = async () => {
       try {
-        const response = await fetch('/api/admin/categories');
+        const endpoint = categoriesEndpoint || '/api/admin/categories';
+        const response = await fetch(endpoint);
         if (response.ok) {
           const data = await response.json();
           setSystemCategories(data);
@@ -138,7 +139,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
 
     fetchOpinionGroups();
     fetchSystemCategories();
-  }, []);
+  }, [categoriesEndpoint]);
 
   // Carregar dados iniciais se estiver em modo de edição
   useEffect(() => {
