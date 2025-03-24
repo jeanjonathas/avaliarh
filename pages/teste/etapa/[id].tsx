@@ -336,22 +336,24 @@ const TestStage: NextPage = () => {
         
         // Verificar se TODAS as questões são opinativas
         const allQuestionsAreOpinion = data.questions.length > 0 && 
-                                      data.questions.every(q => q.type === 'OPINION_MULTIPLE');
+                                     data.questions.every(q => q.type === 'OPINION_MULTIPLE');
         
-        // Se todas as questões forem opinativas, mostrar a modal
+        // Carregar respostas salvas do localStorage
+        loadResponsesFromLocalStorage()
+        
+        setLoading(false)
+        
+        // Só mostrar o modal depois que todos os dados estiverem carregados
         if (allQuestionsAreOpinion) {
           console.log('Todas as questões são opinativas, exibindo modal de alerta');
-          setShowOpinionModal(true);
+          setTimeout(() => {
+            setShowOpinionModal(true);
+          }, 500); // Pequeno delay para garantir que a página terminou de renderizar
         } else if (hasOpinion) {
           console.log('Etapa contém algumas questões opinativas, mas não todas');
         } else {
           console.log('Etapa não contém questões opinativas');
         }
-
-        // Carregar respostas salvas do localStorage
-        loadResponsesFromLocalStorage()
-        
-        setLoading(false)
       } catch (error) {
         setError('Erro ao carregar as questões. Por favor, tente novamente.')
         setLoading(false)

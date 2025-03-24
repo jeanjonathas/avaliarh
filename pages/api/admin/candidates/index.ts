@@ -116,7 +116,7 @@ export default async function handler(
         // Calcular estatísticas
         const totalResponses = candidate.responses.length
         const correctResponses = candidate.responses.filter(r => r.isCorrect).length
-        const score = totalResponses > 0 ? Math.round((correctResponses / totalResponses) * 100) : 0
+        const calculatedScore = totalResponses > 0 ? Math.round((correctResponses / totalResponses) * 100) : 0
 
         // Agrupar respostas por etapa para calcular pontuação por etapa
         const stageMap: Record<string, { id: string; name: string; correct: number; total: number }> = {}
@@ -169,11 +169,11 @@ export default async function handler(
           instagram: candidate.instagram,
           timeSpent: candidate.timeSpent,
           photoUrl: candidate.photoUrl,
-          score: candidate.score || score,
+          score: typeof candidate.score === 'number' ? candidate.score : calculatedScore,
           test: candidate.test,
           totalResponses,
           correctResponses,
-          calculatedScore: score,
+          calculatedScore,
           stageScores
         }
       })

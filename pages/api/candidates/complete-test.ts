@@ -110,7 +110,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       data: {
         completed: true,
         status: 'APPROVED',
-        score: correctMultipleChoiceAnswers, // Salvar apenas o número de acertos em questões de múltipla escolha
+        score: multipleChoiceAccuracyRate, // Salvar a porcentagem de acertos em vez do número absoluto
         updatedAt: new Date()
       }
     });
@@ -124,7 +124,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         id: updatedCandidate.id,
         name: updatedCandidate.name,
         email: updatedCandidate.email,
-        score: correctMultipleChoiceAnswers,
+        score: multipleChoiceAccuracyRate,
         multipleChoiceQuestions: totalMultipleChoiceQuestions,
         opinionQuestions: opinionResponses.length,
         accuracyRate: multipleChoiceAccuracyRate,

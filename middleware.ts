@@ -86,6 +86,7 @@ export async function middleware(request: NextRequest) {
 
   // Endpoints públicos que não exigem autenticação
   const publicEndpoints = [
+    '/api/responses',
     '/api/responses/save-progress',
     '/api/responses/save-answers',
     '/api/candidates/validate-invite',

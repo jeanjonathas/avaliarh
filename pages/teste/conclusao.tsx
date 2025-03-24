@@ -442,7 +442,7 @@ const Conclusao: NextPage = () => {
                     
                     <div className="text-center">
                       <p className="text-sm text-gray-600 mb-1">
-                        Você acertou <span className="font-semibold">{formatCandidateData(candidateData)?.score || 0}</span> de <span className="font-semibold">{formatCandidateData(candidateData)?.multipleChoiceQuestions || 0}</span> questões de múltipla escolha
+                        Você acertou <span className="font-semibold">{Math.round((formatCandidateData(candidateData)?.accuracyRate || 0) * (formatCandidateData(candidateData)?.multipleChoiceQuestions || 0) / 100)}</span> de <span className="font-semibold">{formatCandidateData(candidateData)?.multipleChoiceQuestions || 0}</span> questões de múltipla escolha
                       </p>
                       {formatCandidateData(candidateData)?.opinionQuestions > 0 && (
                         <p className="text-sm text-gray-600 mb-1">
