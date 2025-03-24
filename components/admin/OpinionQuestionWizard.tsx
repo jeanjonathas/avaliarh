@@ -434,9 +434,21 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
 
   const onSubmitForm = async (data: any) => {
     try {
-      // Adicionar o tipo de questão aos dados, se fornecido
-      if (questionType) {
-        data.questionType = questionType;
+      // Determinar o tipo de questão com base na URL atual, se não for fornecido explicitamente
+      let questionTypeValue = questionType;
+      
+      if (!questionTypeValue && typeof window !== 'undefined') {
+        const url = window.location.href;
+        if (url.includes('/admin/training')) {
+          questionTypeValue = 'training';
+        } else if (url.includes('/admin/')) {
+          questionTypeValue = 'selection';
+        }
+      }
+      
+      // Adicionar o tipo de questão aos dados
+      if (questionTypeValue) {
+        data.questionType = questionTypeValue;
       }
       
       // Formatar as opções para garantir que cada opção tenha a categoria correta

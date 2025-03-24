@@ -147,14 +147,26 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
 
   // Manipular envio do formulário
   const handleSubmit = (values: any, { setSubmitting }: any) => {
+    // Determinar o tipo de questão com base na URL atual, se não for fornecido explicitamente
+    let questionTypeValue = questionType;
+    
+    if (!questionTypeValue && typeof window !== 'undefined') {
+      const url = window.location.href;
+      if (url.includes('/admin/training')) {
+        questionTypeValue = 'training';
+      } else if (url.includes('/admin/')) {
+        questionTypeValue = 'selection';
+      }
+    }
+    
     // Preparar dados para envio
     const formData = {
       ...values,
       // Se categoryUuid estiver definido e não for string vazia, usá-lo como categoryId
       // Caso contrário, definir explicitamente como null para remover a categoria
       categoryId: values.categoryUuid && values.categoryUuid !== "" ? values.categoryUuid : null,
-      // Adicionar o tipo de questão, se fornecido
-      questionType: questionType || values.questionType
+      // Adicionar o tipo de questão, com base na detecção automática ou no valor fornecido
+      questionType: questionTypeValue || values.questionType
     };
     
     // Log para debug
