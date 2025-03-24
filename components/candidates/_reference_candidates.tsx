@@ -2128,11 +2128,16 @@ const CandidateDetails = () => {
             </div>
             
             <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
-              <img 
-                src={candidate?.photoUrl} 
-                alt={`Foto de ${candidate?.name}`}
-                className="max-w-full max-h-[70vh] object-contain rounded-lg"
-              />
+              <div className="relative" style={{ width: '100%', height: '70vh' }}>
+                <Image 
+                  src={candidate?.photoUrl} 
+                  alt={`Foto de ${candidate?.name}`}
+                  fill
+                  sizes="(max-width: 1200px) 100vw, 1200px"
+                  style={{ objectFit: 'contain' }}
+                  className="rounded-lg"
+                />
+              </div>
             </div>
             
             <div className="p-4 border-t">
