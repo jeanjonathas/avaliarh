@@ -181,30 +181,6 @@ const CandidateDetails = () => {
     return formattedTime;
   };
 
-  // Verificar autenticação
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin')
-    }
-  }, [status, router])
-  
-  // Buscar dados do candidato e lista de candidatos para navegação
-  useEffect(() => {
-    if (id && status === 'authenticated') {
-      fetchCandidate()
-      fetchCandidates()
-      fetchTests()
-    }
-  }, [id, status, fetchCandidate])
-  
-  // Atualizar o índice atual quando a lista de candidatos for carregada
-  useEffect(() => {
-    if (candidates.length > 0 && id) {
-      const index = candidates.findIndex(c => c.id === id)
-      setCurrentIndex(index)
-    }
-  }, [candidates, id])
-  
   // Buscar dados do candidato específico
   const fetchCandidate = useCallback(async () => {
     try {
@@ -262,6 +238,30 @@ const CandidateDetails = () => {
       setLoading(false);
     }
   }, [id]);
+
+  // Verificar autenticação
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/signin')
+    }
+  }, [status, router])
+  
+  // Buscar dados do candidato e lista de candidatos para navegação
+  useEffect(() => {
+    if (id && status === 'authenticated') {
+      fetchCandidate()
+      fetchCandidates()
+      fetchTests()
+    }
+  }, [id, status, fetchCandidate])
+  
+  // Atualizar o índice atual quando a lista de candidatos for carregada
+  useEffect(() => {
+    if (candidates.length > 0 && id) {
+      const index = candidates.findIndex(c => c.id === id)
+      setCurrentIndex(index)
+    }
+  }, [candidates, id])
   
   // Buscar lista de todos os candidatos para navegação
   const fetchCandidates = async () => {
@@ -1816,7 +1816,7 @@ const CandidateDetails = () => {
                               <div className="mt-2 text-xs text-green-600">
                                 <div className="flex items-center">
                                   <svg className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4a1 1 0 00-1.414-1.414L11 6H7a1 1 0 00-1 1v2a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 00-1-1H7a1 1 0 00-1 1v2a1 1 0 001 1h2a1 1 0 001-1v-2z" />
                                   </svg>
                                   Teste selecionado
                                 </div>
@@ -1874,7 +1874,7 @@ const CandidateDetails = () => {
                                 </p>
                                 <p className="text-xs text-secondary-500 flex items-center">
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                    <path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                                   </svg>
                                   Tentativas: {candidate.inviteAttempts} de 5
                                 </p>
