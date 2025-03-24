@@ -832,7 +832,7 @@ const CandidateDetails = () => {
         }));
       }
     }
-  }, [candidate?.test])
+  }, [candidate?.test, candidate])
 
   useEffect(() => {
     if (candidate && candidate.stageScores) {
