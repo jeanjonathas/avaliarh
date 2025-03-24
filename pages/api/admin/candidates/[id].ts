@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
-import { PrismaClient, Candidate, Response, Test, Stage, Question, Status } from '@prisma/client'
+import { PrismaClient, Candidate, Response, Test, Stage, Question, Status, SelectionProcess } from '@prisma/client'
 import { generateUniqueInviteCode } from '../../../../lib/invites'
 
 // Função auxiliar para converter BigInt para Number
@@ -136,6 +136,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'Status inválido' });
       }
 
+      // Verificar se o testId existe, se fornecido
+      if (testId) {
+        const testExists = await prisma.test.findUnique({
+          where: { id: testId }
+        });
+        
+        if (!testExists) {
+          return res.status(400).json({ error: 'O teste especificado não existe' });
+        }
+      }
+      
+      // Verificar se o processId existe, se fornecido
+      if (processId) {
+        const processExists = await prisma.selectionProcess.findUnique({
+          where: { id: processId }
+        });
+        
+        if (!processExists) {
+          return res.status(400).json({ error: 'O processo seletivo especificado não existe' });
+        }
+      }
+
       // Atualizar candidato
       const updatedCandidate = await prisma.candidate.update({
         where: { id },
@@ -146,8 +168,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           position,
           status: status as Status,
           observations,
-          testId,
-          processId,
+          testId: testId || null,
+          processId: processId || null,
           requestPhoto: requestPhoto !== undefined ? requestPhoto : true,
           showResults: showResults !== undefined ? showResults : true,
           updatedAt: new Date(),
