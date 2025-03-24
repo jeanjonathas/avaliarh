@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import SuperAdminLayout from '@/components/SuperAdminLayout';
 import { useNotification } from '@/contexts/NotificationContext';
 import { useRouter } from 'next/router';
@@ -63,7 +63,7 @@ export default function Subscriptions() {
     };
 
     fetchCompanies();
-  }, []);
+  }, [notification]);
 
   // Buscar detalhes da assinatura de uma empresa
   const fetchSubscriptionDetails = async (companyId: string) => {
