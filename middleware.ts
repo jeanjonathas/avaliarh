@@ -88,6 +88,7 @@ export async function middleware(request: NextRequest) {
   const publicEndpoints = [
     '/api/responses/save-progress',
     '/api/responses/save-answers',
+    '/api/candidates/validate-invite',
     '/api/auth/*',
     '/api/public/*',
     '/_next/*',

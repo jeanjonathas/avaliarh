@@ -227,17 +227,12 @@ export default function Home() {
                 <div className="absolute -top-6 -right-6 w-32 h-32 bg-yellow-400 rounded-full opacity-20"></div>
                 <div className="absolute -bottom-6 -left-6 w-32 h-32 bg-sky-400 rounded-full opacity-20"></div>
                 <div className="bg-white p-6 rounded-lg shadow-lg relative z-10">
-                  <Image 
-                    src="/dashboard-preview.png" 
-                    alt="Admitto Dashboard" 
-                    width={500}
-                    height={300}
-                    className="w-full h-auto rounded-md shadow-sm"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src = "https://via.placeholder.com/500x300?text=Admitto+Dashboard";
-                    }}
-                  />
+                  <div className="w-full h-[300px] rounded-md shadow-sm bg-gray-100 flex items-center justify-center">
+                    <div className="text-gray-500 text-center p-4">
+                      <div className="text-2xl font-semibold mb-2">Admitto Dashboard</div>
+                      <p className="text-sm">Plataforma completa para gestão de processos seletivos</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
