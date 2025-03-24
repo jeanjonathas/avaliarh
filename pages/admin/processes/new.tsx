@@ -123,7 +123,7 @@ const NewProcess: React.FC = () => {
     const fetchTests = async () => {
       try {
         setIsLoadingTests(true);
-        const response = await fetch('/api/admin/tests');
+        const response = await fetch('/api/admin/tests?testType=selection');
         if (response.ok) {
           const { tests: testsData } = await response.json();
           setTests(testsData.map(test => ({
