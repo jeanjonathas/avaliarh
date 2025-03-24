@@ -158,28 +158,40 @@ const CandidateDetails = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
 
-  // Função para formatar o tempo em horas, minutos e segundos
-  const formatTime = (seconds) => {
-    if (!seconds) return '0s';
-    
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const remainingSeconds = seconds % 60;
-    
-    let formattedTime = '';
-    
-    if (hours > 0) {
-      formattedTime += `${hours}h `;
+  // Buscar lista de todos os candidatos para navegação
+  const fetchCandidates = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/candidates')
+      
+      if (!response.ok) {
+        throw new Error('Falha ao carregar lista de candidatos')
+      }
+      
+      const data = await response.json()
+      setCandidates(data)
+    } catch (err) {
+      console.error(err)
     }
-    
-    if (minutes > 0 || hours > 0) {
-      formattedTime += `${minutes}m `;
+  }, []);
+
+  // Buscar testes disponíveis
+  const fetchTests = useCallback(async () => {
+    try {
+      setIsLoadingTests(true);
+      const response = await fetch('/api/admin/tests');
+      
+      if (!response.ok) {
+        throw new Error('Erro ao buscar testes');
+      }
+      
+      const data = await response.json();
+      setAvailableTests(data.tests || []);
+    } catch (error) {
+      console.error('Erro ao buscar testes:', error);
+    } finally {
+      setIsLoadingTests(false);
     }
-    
-    formattedTime += `${remainingSeconds}s`;
-    
-    return formattedTime;
-  };
+  }, []);
 
   // Buscar dados do candidato específico
   const fetchCandidate = useCallback(async () => {
@@ -253,7 +265,7 @@ const CandidateDetails = () => {
       fetchCandidates()
       fetchTests()
     }
-  }, [id, status, fetchCandidate])
+  }, [id, status, fetchCandidate, fetchCandidates, fetchTests])
   
   // Atualizar o índice atual quando a lista de candidatos for carregada
   useEffect(() => {
@@ -263,40 +275,28 @@ const CandidateDetails = () => {
     }
   }, [candidates, id])
   
-  // Buscar lista de todos os candidatos para navegação
-  const fetchCandidates = useCallback(async () => {
-    try {
-      const response = await fetch('/api/admin/candidates')
-      
-      if (!response.ok) {
-        throw new Error('Falha ao carregar lista de candidatos')
-      }
-      
-      const data = await response.json()
-      setCandidates(data)
-    } catch (err) {
-      console.error(err)
+  // Função para formatar o tempo em horas, minutos e segundos
+  const formatTime = (seconds) => {
+    if (!seconds) return '0s';
+    
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = seconds % 60;
+    
+    let formattedTime = '';
+    
+    if (hours > 0) {
+      formattedTime += `${hours}h `;
     }
-  }, []);
-
-  // Buscar testes disponíveis
-  const fetchTests = useCallback(async () => {
-    try {
-      setIsLoadingTests(true);
-      const response = await fetch('/api/admin/tests');
-      
-      if (!response.ok) {
-        throw new Error('Erro ao buscar testes');
-      }
-      
-      const data = await response.json();
-      setAvailableTests(data.tests || []);
-    } catch (error) {
-      console.error('Erro ao buscar testes:', error);
-    } finally {
-      setIsLoadingTests(false);
+    
+    if (minutes > 0 || hours > 0) {
+      formattedTime += `${minutes}m `;
     }
-  }, []);
+    
+    formattedTime += `${remainingSeconds}s`;
+    
+    return formattedTime;
+  };
 
   // Navegar para o próximo candidato
   const goToNextCandidate = () => {
