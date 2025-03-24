@@ -49,15 +49,15 @@ const TrainingQuestionsPage = () => {
     <AdminLayout>
       <div className="container mx-auto px-4 py-8">
         <Breadcrumbs items={breadcrumbItems} />
-        
+
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">Gerenciar Perguntas de Treinamento</h1>
+          <h1 className="text-2xl font-semibold text-secondary-900">Perguntas de Treinamento</h1>
           <Button 
             variant="primary" 
             onClick={() => setShowAddModal(true)}
             className="flex items-center"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+            <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
               <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
             </svg>
             Adicionar Pergunta
@@ -65,7 +65,11 @@ const TrainingQuestionsPage = () => {
         </div>
 
         {/* Navegação contextual */}
-        <ContextualNavigation items={contextualNav} />
+        <ContextualNavigation 
+          prevLink={contextualNav.prev} 
+          nextLink={contextualNav.next} 
+          relatedLinks={contextualNav.related} 
+        />
 
         {/* Lista de perguntas com filtros */}
         <QuestionList apiEndpoint="/api/admin/training/questions" questionType="training" />

@@ -23,7 +23,15 @@ interface Question {
   }[];
 }
 
-const QuestionList: React.FC = () => {
+interface QuestionListProps {
+  apiEndpoint?: string;
+  questionType?: string;
+}
+
+const QuestionList: React.FC<QuestionListProps> = ({ 
+  apiEndpoint = '/api/admin/questions',
+  questionType = 'selection'
+}) => {
   const router = useRouter();
   const { showToast, showModal } = useNotification();
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -57,7 +65,7 @@ const QuestionList: React.FC = () => {
         queryParams.append('testId', filterTest);
       }
       
-      const response = await fetch(`/api/admin/questions?${queryParams.toString()}`);
+      const response = await fetch(`${apiEndpoint}?${queryParams.toString()}`);
       if (!response.ok) {
         throw new Error('Erro ao carregar perguntas');
       }
@@ -69,33 +77,47 @@ const QuestionList: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [filterType, filterDifficulty, filterCategory, filterTest]);
+  }, [filterType, filterDifficulty, filterCategory, filterTest, apiEndpoint]);
 
   const fetchCategories = useCallback(async () => {
     try {
-      const response = await fetch('/api/admin/categories');
+      // Determinar o endpoint correto para categorias com base no tipo de questão
+      const categoriesEndpoint = questionType === 'training' 
+        ? '/api/admin/training/categories' 
+        : '/api/admin/categories';
+      
+      const response = await fetch(categoriesEndpoint);
       if (!response.ok) {
         throw new Error('Erro ao carregar categorias');
       }
+      
       const data = await response.json();
       setCategories(data);
-    } catch (err) {
-      console.error('Erro ao buscar categorias:', err);
+    } catch (error) {
+      console.error('Erro ao buscar categorias:', error);
+      setError('Falha ao carregar categorias');
     }
-  }, []);
+  }, [questionType]);
 
   const fetchTests = useCallback(async () => {
     try {
-      const response = await fetch('/api/admin/tests');
+      // Determinar o endpoint correto para testes com base no tipo de questão
+      const testsEndpoint = questionType === 'training' 
+        ? '/api/admin/training/courses' 
+        : '/api/admin/tests';
+      
+      const response = await fetch(testsEndpoint);
       if (!response.ok) {
         throw new Error('Erro ao carregar testes');
       }
+      
       const data = await response.json();
-      setTests(data.tests || []);
-    } catch (err) {
-      console.error('Erro ao buscar testes:', err);
+      setTests(data);
+    } catch (error) {
+      console.error('Erro ao buscar testes:', error);
+      setError('Falha ao carregar testes');
     }
-  }, []);
+  }, [questionType]);
 
   useEffect(() => {
     fetchQuestions();
@@ -103,62 +125,52 @@ const QuestionList: React.FC = () => {
     fetchTests();
   }, [fetchQuestions, fetchCategories, fetchTests]);
 
-  const handleEdit = (id: string, type: QuestionType) => {
-    if (type === QuestionType.OPINION_MULTIPLE) {
-      router.push(`/admin/questions/edit-opinion/${id}`);
+  const handleEditQuestion = (id: string) => {
+    // Determinar a URL de edição com base no tipo de questão
+    if (questionType === 'training') {
+      // Para questões de treinamento
+      const question = questions.find(q => q.id === id);
+      if (question?.type === QuestionType.OPINION_MULTIPLE) {
+        router.push(`/admin/training/questions/edit-opinion/${id}`);
+      } else {
+        router.push(`/admin/training/questions/edit/${id}`);
+      }
     } else {
-      router.push(`/admin/questions/edit/${id}`);
+      // Para questões de seleção
+      const question = questions.find(q => q.id === id);
+      if (question?.type === QuestionType.OPINION_MULTIPLE) {
+        router.push(`/admin/questions/edit-opinion/${id}`);
+      } else {
+        router.push(`/admin/questions/edit/${id}`);
+      }
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     showModal(
-      'Excluir Pergunta',
+      'Confirmar Exclusão',
       'Tem certeza que deseja excluir esta pergunta?',
       async () => {
         try {
-          const response = await fetch(`/api/admin/questions/${id}`, {
+          const response = await fetch(`${apiEndpoint}/${id}`, {
             method: 'DELETE',
             headers: {
               'Content-Type': 'application/json'
-            },
-            credentials: 'include' // Importante para enviar cookies de sessão
+            }
           });
 
-          if (response.ok) {
-            // Remover a pergunta da lista
-            setQuestions(questions.filter(q => q.id !== id));
-            
-            // Tentar ler a mensagem de sucesso, se disponível
-            try {
-              const data = await response.json();
-              showToast(data.message || 'Pergunta excluída com sucesso!', 'success');
-            } catch (e) {
-              // Se não conseguir ler o JSON, usar mensagem padrão
-              showToast('Pergunta excluída com sucesso!', 'success');
-            }
-          } else {
-            // Ler o corpo da resposta para obter detalhes do erro
-            try {
-              const errorData = await response.json();
-              showToast(errorData.message || errorData.error || 'Erro ao excluir pergunta', 'error');
-            } catch (e) {
-              // Se não conseguir ler o JSON, usar mensagem baseada no status HTTP
-              if (response.status === 401) {
-                showToast('Você precisa estar autenticado para excluir perguntas', 'error');
-              } else if (response.status === 403) {
-                showToast('Você não tem permissão para excluir perguntas', 'error');
-              } else {
-                showToast(`Erro ao excluir pergunta (${response.status})`, 'error');
-              }
-            }
+          if (!response.ok) {
+            throw new Error('Erro ao excluir pergunta');
           }
-        } catch (err) {
-          console.error('Erro ao excluir pergunta:', err);
-          showToast('Erro ao excluir pergunta. Tente novamente mais tarde.', 'error');
+
+          // Atualizar a lista após exclusão bem-sucedida
+          fetchQuestions();
+          showToast('Pergunta excluída com sucesso', 'success');
+        } catch (error) {
+          console.error('Erro ao excluir pergunta:', error);
+          showToast('Erro ao excluir pergunta', 'error');
         }
-      },
-      { type: 'warning', confirmText: 'Excluir', cancelText: 'Cancelar' }
+      }
     );
   };
 
@@ -209,7 +221,7 @@ const QuestionList: React.FC = () => {
   const fetchQuestionDetails = async (id: string) => {
     try {
       setLoadingPreview(true);
-      const response = await fetch(`/api/admin/questions/${id}`);
+      const response = await fetch(`${apiEndpoint}/${id}`);
       
       if (!response.ok) {
         throw new Error('Erro ao carregar detalhes da pergunta');
@@ -406,7 +418,7 @@ const QuestionList: React.FC = () => {
                       Visualizar
                     </button>
                     <button
-                      onClick={() => handleEdit(question.id, question.type)}
+                      onClick={() => handleEditQuestion(question.id)}
                       className="text-primary-600 hover:text-primary-900 mr-4"
                     >
                       Editar
