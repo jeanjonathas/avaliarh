@@ -247,12 +247,7 @@ const TestDetail: NextPage = () => {
         setCategories(categoriesData)
         
         // Buscar todas as perguntas
-        const questionsResponse = await fetch('/api/admin/questions', {
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        })
+        const questionsResponse = await fetch(`/api/admin/questions?questionType=training`);
         if (!questionsResponse.ok) {
           throw new Error('Erro ao carregar as perguntas')
         }
@@ -710,7 +705,7 @@ const TestDetail: NextPage = () => {
       setSelectedStageQuestionType(questionType);
       
       // Buscar todas as perguntas disponíveis
-      const response = await fetch(`/api/admin/questions`);
+      const response = await fetch(`/api/admin/questions?questionType=training`);
       if (!response.ok) {
         throw new Error('Erro ao buscar perguntas disponíveis');
       }

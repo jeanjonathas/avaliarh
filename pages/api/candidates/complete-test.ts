@@ -53,40 +53,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     console.log(`Desempenho do candidato: ${correctAnswers}/${totalQuestions} (${accuracyRate}%)`);
     
-    // Armazenar as informações de pontuação no campo observations
-    const scoreInfo = JSON.stringify({
+    // Atualizar o candidato como concluído
+    const updatedCandidate = await prisma.candidate.update({
+      where: { id: candidateId },
+      data: {
+        completed: true,
+        status: 'APPROVED',
+        score: correctAnswers,
+        updatedAt: new Date()
+      }
+    });
+    
+    console.log(`Candidato atualizado com sucesso: completed=${updatedCandidate.completed}, status=${updatedCandidate.status}`);
+    
+    // Armazenar informações de pontuação em uma variável para retornar na resposta
+    const scoreInfo = {
       score: correctAnswers,
       totalQuestions: totalQuestions,
       accuracyRate: accuracyRate
-    });
-    
-    // Atualizar o candidato como concluído usando SQL raw
-    const updatedCandidate = await prisma.$queryRaw`
-      UPDATE "Candidate"
-      SET 
-        completed = true,
-        status = 'APPROVED',
-        observations = ${scoreInfo},
-        score = ${correctAnswers},
-        "updatedAt" = NOW()
-      WHERE id = ${candidateId}
-      RETURNING *
-    `;
-    
-    console.log(`Candidato atualizado com sucesso: completed=${updatedCandidate[0].completed}, status=${updatedCandidate[0].status}`);
+    };
     
     return res.status(200).json({ 
       success: true, 
       message: 'Teste concluído com sucesso',
       candidate: {
-        id: updatedCandidate[0].id,
-        name: updatedCandidate[0].name,
-        email: updatedCandidate[0].email,
+        id: updatedCandidate.id,
+        name: updatedCandidate.name,
+        email: updatedCandidate.email,
         score: correctAnswers,
         totalQuestions: totalQuestions,
         accuracyRate: accuracyRate,
-        completed: updatedCandidate[0].completed,
-        status: updatedCandidate[0].status
+        completed: updatedCandidate.completed,
+        status: updatedCandidate.status
       }
     });
   } catch (error) {
