@@ -33,14 +33,12 @@ model Company {
   subscription      Subscription?
   tests             Test[]
   testInvitations   TestInvitation[]
-  usedInviteCodes   UsedInviteCode[]
-  users             User[]
-  
-  // Training system relations
   trainingCourses   TrainingCourse[]
+  trainingMaterials TrainingMaterial[]
   trainingSectors   TrainingSector[]
   trainingTests     TrainingTest[]
-  trainingMaterials TrainingMaterial[]
+  usedInviteCodes   UsedInviteCode[]
+  users             User[]
 }
 
 model User {
@@ -70,7 +68,6 @@ model Candidate {
   infoJobsLink   String?
   interviewDate  DateTime?
   observations   String?
-  interviewNotes Json?
   rating         Float?
   resumeFile     String?
   socialMediaUrl String?
@@ -90,6 +87,7 @@ model Candidate {
   companyId      String
   overallStatus  ApprovalStatus      @default(PENDING_EVALUATION)
   processId      String?
+  interviewNotes Json?
   company        Company             @relation(fields: [companyId], references: [id])
   process        SelectionProcess?   @relation(fields: [processId], references: [id])
   test           Test?               @relation(fields: [testId], references: [id])
@@ -102,18 +100,18 @@ model Candidate {
 
 model SelectionProcess {
   id                String         @id @default(uuid())
-  name              String // Nome do processo (ex: "Processo Seletivo Veterinário 2025")
-  jobPosition       String // Cargo específico (ex: "Veterinário Plantonista")
+  name              String
   description       String?
-  vacancyCount      Int            @default(1) // Número de vagas disponíveis
-  registrationStart DateTime? // Data de início das inscrições
-  registrationEnd   DateTime? // Data de término das inscrições
   cutoffScore       Int?
   expectedProfile   Json?
   evaluationType    String         @default("SCORE_BASED")
   companyId         String
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
+  jobPosition       String
+  registrationEnd   DateTime?
+  registrationStart DateTime?
+  vacancyCount      Int            @default(1)
   candidates        Candidate[]
   stages            ProcessStage[]
   company           Company        @relation(fields: [companyId], references: [id])
@@ -125,20 +123,20 @@ model ProcessStage {
   description            String?
   order                  Int
   type                   String                    @default("TEST")
-  scheduledDate          DateTime? // Data agendada para a etapa
-  duration               Int? // Duração em minutos
-  weight                 Int                       @default(1) // Peso na avaliação final
-  requestCandidatePhoto  Boolean                   @default(false)
-  showResultsToCandidate Boolean                   @default(false)
+  duration               Int?
   processId              String
-  testId                 String? // ID do teste associado quando type = "TEST"
-  expectedProfile        Json? // Perfil esperado para perguntas opinativas
   createdAt              DateTime                  @default(now())
   updatedAt              DateTime                  @updatedAt
+  expectedProfile        Json?
+  requestCandidatePhoto  Boolean                   @default(false)
+  showResultsToCandidate Boolean                   @default(false)
+  testId                 String?
+  scheduledDate          DateTime?
+  weight                 Int                       @default(1)
   progresses             CandidateProgress[]
-  process                SelectionProcess          @relation(fields: [processId], references: [id])
-  test                   Test?                     @relation(fields: [testId], references: [id]) // Relação com o teste
   personalityConfig      ProcessPersonalityConfig?
+  process                SelectionProcess          @relation(fields: [processId], references: [id])
+  test                   Test?                     @relation(fields: [testId], references: [id])
 
   @@index([order])
 }
@@ -149,16 +147,16 @@ model ProcessPersonalityConfig {
   emotionGroupId String?
   createdAt      DateTime                 @default(now())
   updatedAt      DateTime                 @updatedAt
-  stage          ProcessStage             @relation(fields: [processStageId], references: [id])
-  emotionGroup   EmotionGroup?            @relation(fields: [emotionGroupId], references: [id])
   traitWeights   PersonalityTraitWeight[]
+  emotionGroup   EmotionGroup?            @relation(fields: [emotionGroupId], references: [id])
+  stage          ProcessStage             @relation(fields: [processStageId], references: [id])
 }
 
 model PersonalityTraitWeight {
   id                         String                   @id @default(uuid())
-  traitName                  String // Nome do traço de personalidade
-  weight                     Int // Peso do traço (5 para o mais importante, 4 para o segundo, etc.)
-  order                      Int // Ordem de importância (1 para o mais importante)
+  traitName                  String
+  weight                     Int
+  order                      Int
   processPersonalityConfigId String
   createdAt                  DateTime                 @default(now())
   updatedAt                  DateTime                 @updatedAt
@@ -176,10 +174,10 @@ model CandidateProgress {
   stageId        String
   interviewerId  String?
   companyId      String
-  completed      Boolean            @default(false)
-  completedAt    DateTime?
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
+  completed      Boolean            @default(false)
+  completedAt    DateTime?
   candidate      Candidate          @relation(fields: [candidateId], references: [id])
   company        Company            @relation(fields: [companyId], references: [id])
   interviewer    User?              @relation(fields: [interviewerId], references: [id])
@@ -198,14 +196,14 @@ model Test {
   companyId       String
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
-  testType        String           @default("selection") // "selection" ou "training"
+  testType        String           @default("selection")
   candidates      Candidate[]
   globalVersions  GlobalAccess[]
+  processStages   ProcessStage[]
   stages          Stage[]
-  testStages      TestStage[]
-  processStages   ProcessStage[] // Relação inversa com ProcessStage
   company         Company          @relation(fields: [companyId], references: [id])
   testInvitations TestInvitation[]
+  testStages      TestStage[]
   usedInviteCodes UsedInviteCode[]
 }
 
@@ -218,7 +216,7 @@ model Stage {
   updatedAt    DateTime    @updatedAt
   testId       String?
   requestPhoto Boolean     @default(false)
-  questionType String? // Tipo de pergunta permitido nesta etapa
+  questionType String?
   questions    Question[]
   test         Test?       @relation(fields: [testId], references: [id])
   TestStage    TestStage[]
@@ -231,8 +229,8 @@ model TestStage {
   order     Int
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  test      Test     @relation(fields: [testId], references: [id])
   stage     Stage    @relation(fields: [stageId], references: [id])
+  test      Test     @relation(fields: [testId], references: [id])
 }
 
 model Question {
@@ -247,15 +245,15 @@ model Question {
   showResults      Boolean         @default(true)
   type             QuestionType    @default(MULTIPLE_CHOICE)
   categoryId       String?         @db.Uuid
-  emotionGroupId   String? // ID do grupo de emoções para perguntas opinativas
-  questionType     String          @default("selection") // "selection" ou "training"
+  emotionGroupId   String?
+  questionType     String          @default("selection")
   options          Option[]
   company          Company?        @relation(fields: [companyId], references: [id])
+  emotionGroup     EmotionGroup?   @relation(fields: [emotionGroupId], references: [id])
   globalQuestion   GlobalQuestion? @relation(fields: [globalQuestionId], references: [id])
   stage            Stage           @relation(fields: [stageId], references: [id])
   responses        Response[]
   categories       Category[]      @relation("CategoryToQuestion")
-  emotionGroup     EmotionGroup?   @relation(fields: [emotionGroupId], references: [id])
 }
 
 model Option {
@@ -267,11 +265,11 @@ model Option {
   updatedAt        DateTime  @updatedAt
   categoryId       String?
   weight           Int?      @default(0)
+  categoryName     String?
+  explanation      String?
   position         Int?      @default(0)
-  categoryName     String? // Nome da categoria/personalidade
-  categoryNameUuid String? // UUID único para a categoria/personalidade
-  emotionGroupId   String? // ID do grupo de emoções a que esta opção pertence
-  explanation      String? // Explicação sobre esta opção/personalidade
+  categoryNameUuid String?
+  emotionGroupId   String?
   category         Category? @relation(fields: [categoryId], references: [id])
   question         Question  @relation(fields: [questionId], references: [id])
 }
@@ -288,15 +286,15 @@ model Response {
   allOptions           Json?
   companyId            String
   isCorrect            Boolean
-  questionSnapshot     Json? // Snapshot completo da questão
-  optionId             String? // ID da opção selecionada
-  stageId              String? // ID da etapa
-  stageName            String? // Nome da etapa
-  categoryName         String? // Nome da categoria
-  optionCharacteristic String? // Característica/personalidade associada à opção selecionada
-  optionOriginalOrder  Int? // Posição original da opção antes do embaralhamento
-  optionsOrder         Json? // Ordem em que as opções foram apresentadas ao candidato
-  questionType         String? // Tipo da questão (múltipla escolha, opinativa, etc.)
+  categoryName         String?
+  optionCharacteristic String?
+  optionId             String?
+  optionOriginalOrder  Int?
+  optionsOrder         Json?
+  questionSnapshot     Json?
+  questionType         String?
+  stageId              String?
+  stageName            String?
   candidate            Candidate @relation(fields: [candidateId], references: [id])
   company              Company   @relation(fields: [companyId], references: [id])
   question             Question  @relation(fields: [questionId], references: [id])
@@ -338,34 +336,32 @@ model UsedInviteCode {
 }
 
 model Student {
-  id              String     @id @default(uuid())
-  enrollmentDate  DateTime   @default(now())
-  progress        Float      @default(0)
-  userId          String     @unique
-  convertedFromId String?    @unique
-  companyId       String
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-  company         Company    @relation(fields: [companyId], references: [id])
-  convertedFrom   Candidate? @relation(fields: [convertedFromId], references: [id])
-  user            User       @relation(fields: [userId], references: [id])
-  
-  // Training system relations
+  id                String              @id @default(uuid())
+  enrollmentDate    DateTime            @default(now())
+  progress          Float               @default(0)
+  userId            String              @unique
+  convertedFromId   String?             @unique
+  companyId         String
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
   courseEnrollments CourseEnrollment[]
   lessonProgress    LessonProgress[]
+  company           Company             @relation(fields: [companyId], references: [id])
+  convertedFrom     Candidate?          @relation(fields: [convertedFromId], references: [id])
+  user              User                @relation(fields: [userId], references: [id])
   testAttempts      TestAttempt[]
   accessLogs        TrainingAccessLog[]
 }
 
 model Category {
-  id          String     @id @default(uuid())
-  name        String
-  description String?
-  categoryType String     @default("selection") // "selection" ou "training"
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  options     Option[]
-  questions   Question[] @relation("CategoryToQuestion")
+  id           String     @id @default(uuid())
+  name         String
+  description  String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  categoryType String     @default("selection")
+  options      Option[]
+  questions    Question[] @relation("CategoryToQuestion")
 }
 
 model Plan {
@@ -494,13 +490,10 @@ model EmotionGroup {
   description               String?
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
-  questions                 Question[]
   processPersonalityConfigs ProcessPersonalityConfig[]
+  questions                 Question[]
 }
 
-// Training Management System Models
-
-// Course model - represents a complete training course
 model TrainingCourse {
   id                String              @id @default(uuid())
   name              String
@@ -510,61 +503,52 @@ model TrainingCourse {
   showResults       Boolean             @default(true)
   finalTestRequired Boolean             @default(false)
   finalTestId       String?
-  imageUrl          String?             // URL da imagem do banner do curso
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
-  
-  // Relations
+  imageUrl          String?
+  enrollments       CourseEnrollment[]
+  accessLogs        TrainingAccessLog[]
   company           Company             @relation(fields: [companyId], references: [id])
+  finalTest         TrainingTest?       @relation("CourseFinalTest", fields: [finalTestId], references: [id])
   sector            TrainingSector?     @relation(fields: [sectorId], references: [id])
   modules           TrainingModule[]
-  enrollments       CourseEnrollment[]
-  finalTest         TrainingTest?       @relation("CourseFinalTest", fields: [finalTestId], references: [id])
-  accessLogs        TrainingAccessLog[]
 }
 
-// Module model - represents a section of a course
 model TrainingModule {
-  id          String              @id @default(uuid())
+  id          String             @id @default(uuid())
   name        String
   description String?
   order       Int
   courseId    String
   finalTestId String?
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
-  
-  // Relations
-  course      TrainingCourse      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
   lessons     TrainingLesson[]
-  finalTest   TrainingTest?       @relation("ModuleFinalTest", fields: [finalTestId], references: [id])
   materials   TrainingMaterial[]
+  course      TrainingCourse     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  finalTest   TrainingTest?      @relation("ModuleFinalTest", fields: [finalTestId], references: [id])
 }
 
-// Lesson model - represents individual learning content
 model TrainingLesson {
-  id          String               @id @default(uuid())
+  id          String              @id @default(uuid())
   name        String
   description String?
   order       Int
   moduleId    String
   type        TrainingContentType
-  content     String               // URL for video/audio/slides, HTML content for text
-  videoUrl    String?              // URL específica para vídeos (YouTube, Vimeo, etc.)
-  slidesUrl   String?              // URL específica para apresentações de slides
-  duration    Int?                 // Duration in seconds (for video/audio)
+  content     String
+  videoUrl    String?
+  slidesUrl   String?
+  duration    Int?
   finalTestId String?
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
-  
-  // Relations
-  module      TrainingModule       @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  finalTest   TrainingTest?        @relation("LessonFinalTest", fields: [finalTestId], references: [id])
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
   progress    LessonProgress[]
+  finalTest   TrainingTest?       @relation("LessonFinalTest", fields: [finalTestId], references: [id])
+  module      TrainingModule      @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   materials   TrainingMaterial[]
 }
 
-// Sector model - represents company departments/sectors
 model TrainingSector {
   id          String           @id @default(uuid())
   name        String
@@ -572,99 +556,79 @@ model TrainingSector {
   companyId   String
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
-  
-  // Relations
-  company     Company          @relation(fields: [companyId], references: [id])
   courses     TrainingCourse[]
+  company     Company          @relation(fields: [companyId], references: [id])
 }
 
-// CourseEnrollment model - tracks student enrollment in courses
 model CourseEnrollment {
-  id             String          @id @default(uuid())
+  id             String         @id @default(uuid())
   studentId      String
   courseId       String
-  enrollmentDate DateTime        @default(now())
+  enrollmentDate DateTime       @default(now())
   completionDate DateTime?
-  progress       Float           @default(0) // 0-100%
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  
-  // Relations
-  student        Student         @relation(fields: [studentId], references: [id])
-  course         TrainingCourse  @relation(fields: [courseId], references: [id])
+  progress       Float          @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  course         TrainingCourse @relation(fields: [courseId], references: [id])
+  student        Student        @relation(fields: [studentId], references: [id])
 }
 
-// LessonProgress model - tracks student progress in individual lessons
 model LessonProgress {
   id          String         @id @default(uuid())
   studentId   String
   lessonId    String
-  timeSpent   Int            @default(0) // Time spent in seconds
+  timeSpent   Int            @default(0)
   completed   Boolean        @default(false)
   completedAt DateTime?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
-  
-  // Relations
-  student     Student        @relation(fields: [studentId], references: [id])
   lesson      TrainingLesson @relation(fields: [lessonId], references: [id])
-  
+  student     Student        @relation(fields: [studentId], references: [id])
+
   @@unique([studentId, lessonId])
 }
 
-// TrainingTest model - represents tests for courses, modules, or lessons
 model TrainingTest {
-  id           String                @id @default(uuid())
-  name         String
-  description  String?
-  timeLimit    Int?                  // Time limit in minutes
-  passingScore Int                   @default(70) // Percentage needed to pass
-  attempts     Int                   @default(1)  // Number of attempts allowed
-  companyId    String
-  createdAt    DateTime              @default(now())
-  updatedAt    DateTime              @updatedAt
-  
-  // Relations
-  company      Company               @relation(fields: [companyId], references: [id])
-  questions    TrainingQuestion[]
-  testAttempts TestAttempt[]
-  
-  // Relation to what this test belongs to (only one will be non-null)
-  courseFinalTests  TrainingCourse[] @relation("CourseFinalTest")
-  moduleFinalTests  TrainingModule[] @relation("ModuleFinalTest")
-  lessonFinalTests  TrainingLesson[] @relation("LessonFinalTest")
+  id               String             @id @default(uuid())
+  name             String
+  description      String?
+  timeLimit        Int?
+  passingScore     Int                @default(70)
+  attempts         Int                @default(1)
+  companyId        String
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  testAttempts     TestAttempt[]
+  courseFinalTests TrainingCourse[]   @relation("CourseFinalTest")
+  lessonFinalTests TrainingLesson[]   @relation("LessonFinalTest")
+  moduleFinalTests TrainingModule[]   @relation("ModuleFinalTest")
+  questions        TrainingQuestion[]
+  company          Company            @relation(fields: [companyId], references: [id])
 }
 
-// TrainingQuestion model - represents questions in training tests
 model TrainingQuestion {
-  id          String                @id @default(uuid())
-  text        String
-  type        TrainingQuestionType  @default(MULTIPLE_CHOICE)
-  testId      String
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
-  
-  // Relations
-  test        TrainingTest          @relation(fields: [testId], references: [id], onDelete: Cascade)
-  options     TrainingOption[]
-  answers     QuestionAnswer[]
+  id        String               @id @default(uuid())
+  text      String
+  type      TrainingQuestionType @default(MULTIPLE_CHOICE)
+  testId    String
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  answers   QuestionAnswer[]
+  options   TrainingOption[]
+  test      TrainingTest         @relation(fields: [testId], references: [id], onDelete: Cascade)
 }
 
-// TrainingOption model - represents answer options for questions
 model TrainingOption {
-  id          String           @id @default(uuid())
-  text        String
-  isCorrect   Boolean          @default(false)
-  questionId  String
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  
-  // Relations
-  question    TrainingQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  answers     QuestionAnswer[]
+  id         String           @id @default(uuid())
+  text       String
+  isCorrect  Boolean          @default(false)
+  questionId String
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  answers    QuestionAnswer[]
+  question   TrainingQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
 }
 
-// TestAttempt model - tracks student attempts at tests
 model TestAttempt {
   id        String           @id @default(uuid())
   studentId String
@@ -675,64 +639,53 @@ model TestAttempt {
   passed    Boolean?
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
-  
-  // Relations
+  answers   QuestionAnswer[]
   student   Student          @relation(fields: [studentId], references: [id])
   test      TrainingTest     @relation(fields: [testId], references: [id])
-  answers   QuestionAnswer[]
 }
 
-// QuestionAnswer model - tracks student answers to questions
 model QuestionAnswer {
-  id          String           @id @default(uuid())
-  attemptId   String
-  questionId  String
-  optionId    String?
-  isCorrect   Boolean?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  
-  // Relations
-  attempt     TestAttempt      @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  question    TrainingQuestion @relation(fields: [questionId], references: [id])
-  option      TrainingOption?  @relation(fields: [optionId], references: [id])
+  id         String           @id @default(uuid())
+  attemptId  String
+  questionId String
+  optionId   String?
+  isCorrect  Boolean?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  attempt    TestAttempt      @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  option     TrainingOption?  @relation(fields: [optionId], references: [id])
+  question   TrainingQuestion @relation(fields: [questionId], references: [id])
 }
 
-// TrainingAccessLog model - tracks student access to courses
 model TrainingAccessLog {
-  id        String         @id @default(uuid())
-  studentId String
-  courseId  String
+  id         String         @id @default(uuid())
+  studentId  String
+  courseId   String
   accessDate DateTime       @default(now())
-  timeSpent Int            @default(0) // Time spent in seconds
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
-  
-  // Relations
-  student   Student        @relation(fields: [studentId], references: [id])
-  course    TrainingCourse @relation(fields: [courseId], references: [id])
+  timeSpent  Int            @default(0)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  course     TrainingCourse @relation(fields: [courseId], references: [id])
+  student    Student        @relation(fields: [studentId], references: [id])
 }
 
-// TrainingMaterial model - represents additional study materials for modules/lessons
 model TrainingMaterial {
-  id          String    @id @default(uuid())
+  id          String          @id @default(uuid())
   title       String
   description String?
-  type        String    // pdf, video, link, other
-  url         String?   // URL externa ou caminho relativo para o arquivo
-  filePath    String?   // Caminho físico do arquivo no servidor
-  fileName    String?   // Nome original do arquivo
-  fileSize    Int?      // Tamanho do arquivo em bytes
-  companyId   String    // ID da empresa para segurança
+  type        String
+  url         String?
+  filePath    String?
+  fileName    String?
+  fileSize    Int?
+  companyId   String
   moduleId    String
   lessonId    String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  
-  // Relations
-  module      TrainingModule  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  lesson      TrainingLesson? @relation(fields: [lessonId], references: [id])
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
   company     Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lesson      TrainingLesson? @relation(fields: [lessonId], references: [id])
+  module      TrainingModule  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 }
 
 enum Role {
@@ -808,7 +761,6 @@ enum PaymentStatus {
   REFUNDED
 }
 
-// Enums for the training system
 enum TrainingContentType {
   VIDEO
   AUDIO

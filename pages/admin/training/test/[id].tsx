@@ -527,6 +527,13 @@ const TestDetail: NextPage = () => {
     }
 
     try {
+      console.log(`Inserindo nova etapa com valores:`, {
+        title: stageData.title,
+        description: stageData.description,
+        order: test?.testStages?.length || 0,
+        questionType: stageData.questionType
+      });
+
       const response = await fetch(`/api/admin/stages`, {
         method: 'POST',
         headers: {
@@ -545,6 +552,7 @@ const TestDetail: NextPage = () => {
       }
 
       const newStage = await response.json();
+      console.log(`Etapa criada com sucesso:`, newStage);
       
       // Associar a etapa ao teste
       const testStageResponse = await fetch(`/api/admin/training/tests/${stageData.testId}/stages`, {
@@ -559,9 +567,14 @@ const TestDetail: NextPage = () => {
       });
 
       if (!testStageResponse.ok) {
-        throw new Error('Erro ao associar etapa ao teste');
+        const errorData = await testStageResponse.json();
+        console.error('Resposta de erro ao associar etapa:', errorData);
+        throw new Error(`Erro ao associar etapa ao teste: ${errorData.error || 'Erro desconhecido'}`);
       }
 
+      // Recarregar os dados do teste imediatamente após adicionar a etapa
+      await reloadTestData();
+      
       return newStage;
     } catch (error) {
       console.error('Erro ao adicionar etapa:', error);
@@ -596,8 +609,8 @@ const TestDetail: NextPage = () => {
       setNewStageQuestionType('');
       setShowAddStageModal(false);
 
-      // Recarregar os dados do teste
-      await reloadTestData();
+      // Não precisamos recarregar os dados aqui, pois a função addStage já faz isso
+      // await reloadTestData();
       
       notify.showSuccess('Etapa adicionada com sucesso!');
     } catch (error) {

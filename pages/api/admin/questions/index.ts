@@ -43,6 +43,10 @@ export default async function handler(
         
         console.log(`Tipo de questão determinado: ${questionType}`);
         
+        // Adicionar filtro de questionType à condição where
+        whereCondition.questionType = questionType;
+        console.log(`Filtrando perguntas por questionType: ${questionType}`);
+        
         // Add type filter if provided
         if (type) {
           whereCondition.type = type;
@@ -396,15 +400,21 @@ export default async function handler(
             stageId: finalStageId,
             type: (type || 'MULTIPLE_CHOICE') as any,
             difficulty: (difficulty || 'MEDIUM') as any,
+            questionType: questionType, // Adicionar o tipo de questão (training ou selection)
             showResults: showResults !== undefined ? showResults : true,
-            // Definir apenas a relação categories, não usar categoryId diretamente
-            ...(finalCategoryId ? {
-              categories: {
-                connect: [{ id: finalCategoryId }]
-              }
-            } : {})
-            // Temporariamente removendo o campo questionType até que o Prisma Client seja atualizado
-            // questionType: questionType
+            options: {
+              create: options.map((option: any, index: number) => ({
+                text: option.text,
+                isCorrect: option.isCorrect,
+                categoryId: option.categoryId || null,
+                weight: option.weight || 0,
+                position: index,
+                explanation: option.explanation || null
+              }))
+            },
+            categories: {
+              connect: categoryId ? [{ id: categoryId }] : []
+            }
           },
           include: {
             categories: true,
@@ -419,47 +429,6 @@ export default async function handler(
 
         console.log('Pergunta criada com sucesso:', newQuestion.id);
         console.log('Categorias conectadas:', newQuestion.categories);
-        
-        // Criar opções para a pergunta
-        console.log('Criando opções para a pergunta:', options);
-        
-        for (const option of options) {
-          console.log('Criando opção:', option);
-          
-          try {
-            // Determinar os campos a serem usados com base no tipo de pergunta
-            const optionData = {
-              text: option.text,
-              isCorrect: option.isCorrect,
-              questionId: newQuestion.id,
-              weight: option.weight || 0
-            };
-            
-            // Adicionar campos específicos para perguntas opinativas
-            if (type === 'OPINION_MULTIPLE') {
-              Object.assign(optionData, {
-                position: option.position || 0,
-                categoryName: option.category || null,
-                categoryNameUuid: option.categoryNameUuid || null,
-                explanation: option.explanation || null
-              });
-            } else if (option.categoryId) {
-              // Para perguntas não opinativas, manter o categoryId se existir
-              Object.assign(optionData, {
-                categoryId: option.categoryId
-              });
-            }
-
-            // Criar a opção usando o Prisma
-            const createdOption = await prisma.option.create({
-              data: optionData
-            });
-            console.log('Opção criada:', createdOption);
-          } catch (error) {
-            console.error('Erro ao criar opção:', error);
-            // Continuar criando as outras opções mesmo se uma falhar
-          }
-        }
         
         // Buscar a pergunta completa com suas relações
         const questionWithRelations = await prisma.question.findUnique({
