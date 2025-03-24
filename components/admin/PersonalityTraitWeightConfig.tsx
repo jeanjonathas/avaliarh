@@ -244,41 +244,53 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
       
       // Se houver valores iniciais, inicializar os traços selecionados
       if (value && value.length > 0) {
+        console.log('Valores iniciais recebidos:', value);
         const updatedGroups = [...groups];
         
-        // Para cada traço no valor inicial
+        // Criar um mapa de traços por nome para facilitar a busca
+        const traitsByName: Record<string, PersonalityTrait> = {};
         value.forEach(trait => {
-          // Encontrar o grupo correspondente
-          const groupIndex = updatedGroups.findIndex(g => g.id === trait.groupId || g.name === trait.groupName);
-          if (groupIndex !== -1) {
-            // Verificar se o traço já existe no grupo
-            const existingTraitIndex = updatedGroups[groupIndex].selectedTraits.findIndex(t => 
-              t.traitName === trait.traitName || t.id === trait.id
-            );
-            
-            if (existingTraitIndex === -1) {
-              // Se o traço não existe, adicionar
-              updatedGroups[groupIndex].selectedTraits.push({
-                id: trait.id || `trait-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                traitName: trait.traitName,
-                weight: trait.weight || 0,
-                order: trait.order || updatedGroups[groupIndex].selectedTraits.length + 1,
-                groupId: trait.groupId || updatedGroups[groupIndex].id,
-                groupName: trait.groupName || updatedGroups[groupIndex].name
-              });
-            } else {
-              // Se o traço já existe, atualizar
-              updatedGroups[groupIndex].selectedTraits[existingTraitIndex] = {
-                ...updatedGroups[groupIndex].selectedTraits[existingTraitIndex],
-                weight: trait.weight || updatedGroups[groupIndex].selectedTraits[existingTraitIndex].weight,
-                order: trait.order || updatedGroups[groupIndex].selectedTraits[existingTraitIndex].order
-              };
-            }
+          if (trait.traitName) {
+            traitsByName[trait.traitName] = trait;
           }
         });
         
-        // Ordenar os traços em cada grupo por ordem
-        updatedGroups.forEach(group => {
+        console.log('Mapa de traços por nome:', traitsByName);
+        
+        // Para cada grupo, verificar se há traços salvos correspondentes
+        updatedGroups.forEach((group, groupIndex) => {
+          // Para cada traço disponível no grupo, verificar se há um valor salvo
+          group.traits.forEach(traitName => {
+            const savedTrait = traitsByName[traitName];
+            
+            if (savedTrait) {
+              // Verificar se o traço já existe no grupo
+              const existingTraitIndex = group.selectedTraits.findIndex(t => 
+                t.traitName === traitName
+              );
+              
+              if (existingTraitIndex === -1) {
+                // Se o traço não existe, adicionar
+                group.selectedTraits.push({
+                  id: savedTrait.id || `trait-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                  traitName: traitName,
+                  weight: savedTrait.weight || 0,
+                  order: savedTrait.order || group.selectedTraits.length + 1,
+                  groupId: group.id,
+                  groupName: group.name
+                });
+              } else {
+                // Se o traço já existe, atualizar
+                group.selectedTraits[existingTraitIndex] = {
+                  ...group.selectedTraits[existingTraitIndex],
+                  weight: savedTrait.weight || group.selectedTraits[existingTraitIndex].weight,
+                  order: savedTrait.order || group.selectedTraits[existingTraitIndex].order
+                };
+              }
+            }
+          });
+          
+          // Ordenar os traços em cada grupo por ordem
           group.selectedTraits.sort((a, b) => a.order - b.order);
         });
         
