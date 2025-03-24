@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../../auth/[...nextauth]';
 import { prisma } from '../../../../lib/prisma';
 import { Prisma } from '@prisma/client';
 
@@ -10,9 +11,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Verificar autenticação
-    const session = await getSession({ req });
-    if (!session) {
+    // Verificar autenticação usando getServerSession
+    const session = await getServerSession(req, res, authOptions);
+    
+    if (!session || !session.user || !session.user.id) {
+      console.error('Erro de autenticação: Sessão inválida ou usuário não identificado');
       return res.status(401).json({ success: false, message: 'Não autenticado' });
     }
 

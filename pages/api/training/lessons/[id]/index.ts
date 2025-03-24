@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../../../auth/[...nextauth]';
 import { prisma } from '../../../../../lib/prisma';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -9,6 +10,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    // Verificar autenticação usando getServerSession em vez de getSession
+    const session = await getServerSession(req, res, authOptions);
+    
+    if (!session || !session.user || !session.user.id) {
+      console.error('Erro de autenticação: Sessão inválida ou usuário não identificado');
+      return res.status(401).json({ success: false, message: 'Não autenticado' });
+    }
+
     // Obter ID da aula da URL
     const { id } = req.query;
     
@@ -17,12 +26,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         success: false, 
         message: 'ID da aula não fornecido' 
       });
-    }
-
-    // Verificar autenticação
-    const session = await getSession({ req });
-    if (!session) {
-      return res.status(401).json({ success: false, message: 'Não autenticado' });
     }
 
     // Obter ID do usuário da sessão
@@ -124,7 +127,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       courseName: lesson.module.course.name,
       type: lesson.type,
       content: lesson.content,
-      duration: lesson.duration,
+      duration: lesson.duration || 0,
       order: lesson.order,
       finalTestId: lesson.module.finalTest?.id,
       prevLessonId,

@@ -198,7 +198,7 @@ async function getCourses(req: NextApiRequest, res: NextApiResponse, companyId: 
 // Create a new course
 async function createCourse(req: NextApiRequest, res: NextApiResponse, companyId: string) {
   try {
-    const { name, description, sectorId, showResults, finalTestRequired, modules } = req.body;
+    const { name, description, sectorId, showResults, finalTestRequired, modules, imageUrl } = req.body;
 
     // Validate required fields
     if (!name) {
@@ -250,7 +250,8 @@ async function createCourse(req: NextApiRequest, res: NextApiResponse, companyId
           "sectorId", 
           "showResults", 
           "finalTestRequired", 
-          "companyId", 
+          "companyId",
+          "imageUrl", 
           "createdAt", 
           "updatedAt"
         ) 
@@ -261,7 +262,8 @@ async function createCourse(req: NextApiRequest, res: NextApiResponse, companyId
           ${sectorId || null}, 
           ${showResults || false}, 
           ${finalTestRequired || false}, 
-          ${companyId}, 
+          ${companyId},
+          ${imageUrl || null}, 
           ${Prisma.raw('NOW()')}, 
           ${Prisma.raw('NOW()')}
         )

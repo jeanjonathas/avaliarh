@@ -57,7 +57,6 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
     { name: 'Meus Cursos', href: '/treinamento/cursos', icon: FiBook },
     { name: 'Meu Progresso', href: '/treinamento/progresso', icon: FiBarChart2 },
     { name: 'Certificados', href: '/treinamento/certificados', icon: FiAward },
-    { name: 'Histórico', href: '/treinamento/historico', icon: FiClock },
     { name: 'Perfil', href: '/treinamento/perfil', icon: FiUser },
   ];
 
@@ -260,7 +259,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       <footer className="bg-white border-t border-secondary-200 py-4">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <p className="text-center text-sm text-secondary-500">
-            &copy; {new Date().getFullYear()} AvaliaRH - Todos os direitos reservados
+            &copy; {new Date().getFullYear()} Admitto - Todos os direitos reservados
           </p>
         </div>
       </footer>

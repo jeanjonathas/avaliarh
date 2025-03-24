@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
+import { GetServerSideProps } from 'next';
+import { getSession, useSession } from 'next-auth/react';
 import Head from 'next/head';
 import AdminLayout from '../../../../components/admin/AdminLayout';
 import LoadingSpinner from '../../../../components/common/LoadingSpinner';
@@ -8,6 +9,8 @@ import { TestSelectorTarget } from '../../../../components/admin/training/TestSe
 import TestAssociationManager from '../../../../components/admin/training/TestAssociationManager';
 import RichTextEditor from '../../../../components/admin/training/RichTextEditor';
 import axios from 'axios';
+import Image from 'next/image';
+import { FaPlus, FaEdit, FaTrash, FaArrowLeft, FaArrowRight } from 'react-icons/fa';
 
 interface Sector {
   id: string;
@@ -21,7 +24,7 @@ interface Test {
 }
 
 interface Module {
-  id: string;
+  id?: string;
   name: string;
   description: string;
   order: number;
@@ -31,10 +34,10 @@ interface Module {
 }
 
 interface Lesson {
-  id: string;
+  id?: string;
   name: string;
   description: string;
-  type: 'TEXT' | 'SLIDES' | 'VIDEO' | 'AUDIO';
+  type: 'TEXT' | 'VIDEO' | 'SLIDES' | 'AUDIO';
   content: string;
   videoUrl?: string;
   slidesUrl?: string;
@@ -44,22 +47,27 @@ interface Lesson {
   finalTest?: Test;
 }
 
-export default function NewCourse() {
-  const { data: session, status } = useSession();
+interface FormData {
+  name: string;
+  description: string;
+  sectorId: string;
+  showResults: boolean;
+  finalTestId: string;
+  imageUrl: string;
+}
+
+export default function NewCoursePage({ sectors, tests }) {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [sectors, setSectors] = useState<Sector[]>([]);
-  const [tests, setTests] = useState<Test[]>([]);
-  
+  const { data: session, status } = useSession();
+
   // Form state
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     name: '',
     description: '',
     sectorId: '',
     showResults: true,
-    finalTestId: ''
+    finalTestId: '',
+    imageUrl: ''
   });
 
   // Modules and lessons state
@@ -69,6 +77,15 @@ export default function NewCourse() {
   const [showModuleForm, setShowModuleForm] = useState(false);
   const [showLessonForm, setShowLessonForm] = useState(false);
   const [showTextEditor, setShowTextEditor] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sectorsState, setSectors] = useState<Sector[]>([]);
+  const [testsState, setTests] = useState<Test[]>([]);
   
   // New module/lesson form state
   const [moduleForm, setModuleForm] = useState({
@@ -87,12 +104,12 @@ export default function NewCourse() {
   });
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login');
+    if (router.query.error) {
+      setError(router.query.error as string);
     }
 
     if (status === 'authenticated') {
-      // Fetch sectors
+      // Fetch sectors and tests
       setLoading(true);
       
       // Fetch sectors
@@ -117,7 +134,7 @@ export default function NewCourse() {
           setLoading(false);
         });
     }
-  }, [status, router]);
+  }, [status, router.query.error]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target as HTMLInputElement;
@@ -175,7 +192,7 @@ export default function NewCourse() {
       id: `temp-${Date.now()}`,
       name: lessonForm.name,
       description: lessonForm.description,
-      type: lessonForm.type as 'TEXT' | 'SLIDES' | 'VIDEO' | 'AUDIO',
+      type: lessonForm.type as 'TEXT' | 'VIDEO' | 'SLIDES' | 'AUDIO',
       content: lessonForm.content,
       order: updatedModules[moduleIndex].lessons.length + 1
     };
@@ -230,31 +247,33 @@ export default function NewCourse() {
     }
 
     try {
-      const courseData = {
-        ...formData,
-        finalTestRequired: !!formData.finalTestId, // Define como true se houver um teste final
-        modules: modules.map(module => ({
-          name: module.name,
-          description: module.description,
-          order: module.order,
-          finalTestId: module.finalTestId,
-          lessons: module.lessons.map(lesson => ({
-            name: lesson.name,
-            description: lesson.description,
-            type: lesson.type,
-            content: lesson.content,
-            videoUrl: lesson.videoUrl,
-            slidesUrl: lesson.slidesUrl,
-            duration: lesson.duration,
-            order: lesson.order,
-            finalTestId: lesson.finalTestId
-          }))
-        }))
-      };
-
-      await axios.post('/api/admin/training/courses', courseData);
+      // Upload image if selected
+      let imageUrlToSave = '';
       
-      // Redirect to courses page after successful creation
+      if (selectedFile) {
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        formData.append('type', 'course-banner');
+        
+        setUploadingImage(true);
+        const uploadResponse = await axios.post('/api/admin/training/upload', formData);
+        imageUrlToSave = uploadResponse.data.url;
+        setUploadingImage(false);
+      } else {
+        // Use default banner image
+        imageUrlToSave = '/images/baner-curso-padrao.jpg';
+      }
+      
+      // Create course with image URL
+      const response = await axios.post('/api/admin/training/courses', {
+        ...formData,
+        imageUrl: imageUrlToSave,
+        modules: modules.map(module => ({
+          ...module,
+          lessons: module.lessons
+        }))
+      });
+      
       router.push('/admin/training/courses');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Ocorreu um erro ao criar o curso. Por favor, tente novamente.');
@@ -263,7 +282,7 @@ export default function NewCourse() {
     }
   };
 
-  if (status === 'loading' || loading) {
+  if (loading) {
     return (
       <AdminLayout>
         <div className="flex items-center justify-center h-screen">
@@ -361,7 +380,7 @@ export default function NewCourse() {
                       className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                     >
                       <option value="">Selecione um setor (opcional)</option>
-                      {sectors.map((sector: any) => (
+                      {sectorsState.map((sector: any) => (
                         <option key={sector.id} value={sector.id}>
                           {sector.name}
                         </option>
@@ -397,7 +416,7 @@ export default function NewCourse() {
                       <div className="flex justify-between items-center">
                         <h4 className="text-md font-medium text-gray-900">Teste Final do Curso</h4>
                         <TestAssociationManager
-                          tests={tests}
+                          tests={testsState}
                           onAssociateTest={(target, testId) => {
                             if (target.type === 'course') {
                               setFormData(prev => ({ ...prev, finalTestId: testId }));
@@ -416,7 +435,7 @@ export default function NewCourse() {
                       </div>
                       {formData.finalTestId && (
                         <div className="mt-2 bg-gray-50 p-3 rounded-md border border-gray-200">
-                          {tests.find(t => t.id === formData.finalTestId)?.name || 'Teste selecionado'}
+                          {testsState.find(t => t.id === formData.finalTestId)?.name || 'Teste selecionado'}
                         </div>
                       )}
                       {!formData.finalTestId && (
@@ -425,6 +444,40 @@ export default function NewCourse() {
                         </p>
                       )}
                     </div>
+                  </div>
+
+                  {/* Banner */}
+                  <div>
+                    <label htmlFor="imageUrl" className="block text-sm font-medium text-secondary-700 mb-1">
+                      Imagem de Capa do Curso
+                    </label>
+                    <input
+                      type="file"
+                      id="imageUrl"
+                      name="imageUrl"
+                      accept="image/*"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setSelectedFile(e.target.files[0]);
+                          setImagePreview(URL.createObjectURL(e.target.files[0]));
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                    />
+                    <p className="text-xs text-secondary-500 mt-1">
+                      Se nenhuma imagem for selecionada, será utilizada uma imagem padrão.
+                    </p>
+                    {imagePreview && (
+                      <div className="mt-2 relative w-full h-48">
+                        <Image 
+                          src={imagePreview} 
+                          alt="Imagem de capa do curso" 
+                          layout="fill"
+                          objectFit="cover"
+                          className="rounded-md"
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* Modules */}
@@ -535,7 +588,7 @@ export default function NewCourse() {
                               <div className="flex space-x-2">
                                 {/* Botão para associar/remover teste ao módulo */}
                                 <TestAssociationManager
-                                  tests={tests}
+                                  tests={testsState}
                                   onAssociateTest={(target, testId) => {
                                     if (target.type === 'module' && target.index === index) {
                                       const updatedModules = [...modules];
@@ -618,7 +671,7 @@ export default function NewCourse() {
                                         </div>
                                         <div>
                                           <TestAssociationManager
-                                            tests={tests}
+                                            tests={testsState}
                                             onAssociateTest={(target, testId) => {
                                               if (target.type === 'lesson' && target.index === index && target.lessonIndex === lessonIndex) {
                                                 const updatedModules = [...modules];
@@ -660,7 +713,7 @@ export default function NewCourse() {
                                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                             </svg>
                                             <span className="text-xs font-medium text-gray-700">
-                                              Teste: {tests.find(t => t.id === lesson.finalTestId)?.name || 'Teste selecionado'}
+                                              Teste: {testsState.find(t => t.id === lesson.finalTestId)?.name || 'Teste selecionado'}
                                             </span>
                                           </div>
                                         </div>
@@ -678,7 +731,7 @@ export default function NewCourse() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                   </svg>
                                   <span className="text-sm font-medium text-gray-700">
-                                    Teste final do módulo: {tests.find(t => t.id === module.finalTestId)?.name || 'Teste selecionado'}
+                                    Teste final do módulo: {testsState.find(t => t.id === module.finalTestId)?.name || 'Teste selecionado'}
                                   </span>
                                 </div>
                               </div>

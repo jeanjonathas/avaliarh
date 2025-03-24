@@ -133,7 +133,9 @@ export default function CourseDetails() {
   // Navegar para uma aula
   const navigateToLesson = (lessonId: string, locked: boolean) => {
     if (locked) return; // Não permitir acesso a aulas bloqueadas
-    router.push(`/treinamento/aulas/${lessonId}`);
+    
+    // Usar window.location para garantir que a página seja recarregada completamente
+    window.location.href = `/treinamento/aulas/${lessonId}`;
   };
 
   // Navegar para um teste

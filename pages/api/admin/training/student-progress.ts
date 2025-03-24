@@ -36,7 +36,7 @@ export default async function handler(
       JOIN "TrainingCourse" c ON ce."courseId" = c.id
       JOIN "TrainingModule" m ON c.id = m."courseId"
       JOIN "TrainingLesson" l ON m.id = l."moduleId"
-      LEFT JOIN "LessonProgress" lp ON l.id = lp."lessonId" AND ce.id = lp."enrollmentId"
+      LEFT JOIN "LessonProgress" lp ON l.id = lp."lessonId" AND lp."studentId" = s.id
       WHERE s."companyId" = ${companyId}
       GROUP BY s.id, c.id, m.id
       ORDER BY s.name, c.name, m.name

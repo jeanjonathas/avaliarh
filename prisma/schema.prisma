@@ -510,6 +510,7 @@ model TrainingCourse {
   showResults       Boolean             @default(true)
   finalTestRequired Boolean             @default(false)
   finalTestId       String?
+  imageUrl          String?             // URL da imagem do banner do curso
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   

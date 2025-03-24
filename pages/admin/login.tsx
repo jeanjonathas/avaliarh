@@ -14,6 +14,10 @@ export default function AdminLogin() {
   
   // Função para normalizar a URL de callback
   const normalizeCallbackUrl = (url: string | null | undefined): string => {
+    // Sempre redirecionar para o dashboard após o login
+    return '/admin/dashboard'
+    
+    /* Código antigo comentado
     if (!url) return '/admin/dashboard'
     
     try {
@@ -41,6 +45,7 @@ export default function AdminLogin() {
       console.error('Erro ao normalizar URL de callback:', e)
       return '/admin/dashboard'
     }
+    */
   }
   
   // Obter a URL de callback da query

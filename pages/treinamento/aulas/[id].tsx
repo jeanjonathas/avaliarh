@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { getSession } from 'next-auth/react';
 import Head from 'next/head';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
 import { 
   FiChevronRight, 
   FiChevronLeft, 
@@ -44,13 +45,18 @@ interface Lesson {
   timeSpent: number; // em segundos
 }
 
-export default function LessonView() {
+interface LessonViewProps {
+  initialLesson: Lesson | null;
+  error?: string;
+}
+
+export default function LessonView({ initialLesson, error: initialError }: LessonViewProps) {
   const router = useRouter();
   const { id } = router.query;
-  const [lesson, setLesson] = useState<Lesson | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [timeSpent, setTimeSpent] = useState(0);
+  const [lesson, setLesson] = useState<Lesson | null>(initialLesson);
+  const [loading, setLoading] = useState(!initialLesson);
+  const [error, setError] = useState<string | null>(initialError || null);
+  const [timeSpent, setTimeSpent] = useState(initialLesson?.timeSpent || 0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -62,55 +68,33 @@ export default function LessonView() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
+  const progressSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isProgressSaving = useRef<boolean>(false);
+  const saveProgressErrorCount = useRef<number>(0);
+  const lastSavedTimeSpent = useRef<number>(initialLesson?.timeSpent || 0);
 
-  // Buscar dados da aula
+  // Configurar o botão de marcar como concluído
   useEffect(() => {
-    const fetchLessonData = async () => {
-      if (!id) return;
-
-      try {
-        const session = await getSession();
-        if (!session) {
-          router.push('/');
-          return;
-        }
-
-        // Buscar detalhes da aula
-        const lessonResponse = await fetch(`/api/training/lessons/${id}`);
-        if (!lessonResponse.ok) throw new Error('Falha ao carregar dados da aula');
-        const lessonData = await lessonResponse.json();
-        
-        setLesson(lessonData);
-        setTimeSpent(lessonData.timeSpent || 0);
-        
-        // Se a aula já estiver completa, não mostrar o botão de marcar como concluída
-        if (!lessonData.completed) {
-          // Mostrar botão de marcar como concluída após 70% do tempo estimado
-          const minTimeRequired = lessonData.duration * 60 * 0.7; // 70% do tempo em segundos
-          if (lessonData.timeSpent >= minTimeRequired) {
-            setShowMarkAsCompleted(true);
-          } else {
-            // Programar quando o botão deve aparecer
-            const remainingTime = minTimeRequired - lessonData.timeSpent;
-            setTimeout(() => {
-              setShowMarkAsCompleted(true);
-            }, remainingTime * 1000);
-          }
-        }
-      } catch (err) {
-        console.error('Erro ao carregar dados da aula:', err);
-        setError('Não foi possível carregar os dados da aula. Por favor, tente novamente mais tarde.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLessonData();
-  }, [id, router]);
+    if (!lesson || lesson.completed) return;
+    
+    // Mostrar botão de marcar como concluída após 70% do tempo estimado
+    const minTimeRequired = lesson.duration * 60 * 0.7; // 70% do tempo em segundos
+    if (timeSpent >= minTimeRequired) {
+      setShowMarkAsCompleted(true);
+    } else {
+      // Programar quando o botão deve aparecer
+      const remainingTime = minTimeRequired - timeSpent;
+      const timerId = setTimeout(() => {
+        setShowMarkAsCompleted(true);
+      }, remainingTime * 1000);
+      
+      return () => clearTimeout(timerId);
+    }
+  }, [lesson, timeSpent]);
 
   // Registrar tempo gasto na aula
   useEffect(() => {
-    if (!lesson || lesson.completed) return;
+    if (!lesson || lesson.completed || !id) return;
 
     // Iniciar o timer para registrar o tempo gasto
     const startTimer = () => {
@@ -128,18 +112,71 @@ export default function LessonView() {
       }, 1000);
     };
 
-    // Registrar o tempo no servidor a cada 30 segundos
-    const saveProgressInterval = setInterval(async () => {
+    // Função para salvar o progresso
+    const saveProgress = async () => {
+      if (!id || isProgressSaving.current) return;
+      
+      // Verificar se o tempo mudou desde o último salvamento
+      // Só salvar se o tempo aumentou pelo menos 30 segundos
+      if (timeSpent < lastSavedTimeSpent.current + 30) {
+        // Agendar próxima verificação
+        if (progressSaveTimeoutRef.current) {
+          clearTimeout(progressSaveTimeoutRef.current);
+        }
+        progressSaveTimeoutRef.current = setTimeout(saveProgress, 60000); // Verificar a cada 60 segundos
+        return;
+      }
+      
+      isProgressSaving.current = true;
+      
       try {
-        await fetch(`/api/training/lessons/${id}/progress`, {
+        const response = await fetch(`/api/training/lessons/${id}/progress`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({ timeSpent })
         });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Erro ao salvar progresso:', errorData);
+          
+          // Se o erro for de autenticação e persistir, redirecionar para login
+          if (response.status === 401) {
+            saveProgressErrorCount.current += 1;
+            
+            // Se tivermos 3 erros de autenticação consecutivos, redirecionar
+            if (saveProgressErrorCount.current >= 3) {
+              toast.error('Sua sessão expirou. Redirecionando para a página de login...');
+              setTimeout(() => {
+                window.location.href = '/treinamento/login?callbackUrl=' + encodeURIComponent(window.location.pathname);
+              }, 2000);
+              return;
+            }
+          }
+        } else {
+          // Resetar contador de erros se a requisição for bem-sucedida
+          saveProgressErrorCount.current = 0;
+          lastSavedTimeSpent.current = timeSpent;
+          console.log(`Progresso salvo: ${timeSpent} segundos`);
+        }
       } catch (error) {
         console.error('Erro ao salvar progresso:', error);
+      } finally {
+        isProgressSaving.current = false;
+        
+        // Agendar próxima atualização apenas se não houver muitos erros consecutivos
+        if (saveProgressErrorCount.current < 3) {
+          if (progressSaveTimeoutRef.current) {
+            clearTimeout(progressSaveTimeoutRef.current);
+          }
+          
+          // Aumentar o intervalo entre as requisições para 60 segundos
+          progressSaveTimeoutRef.current = setTimeout(saveProgress, 60000);
+        }
       }
-    }, 30000);
+    };
 
     // Atualizar timestamp de última atividade quando houver interação
     const updateActivity = () => {
@@ -153,14 +190,18 @@ export default function LessonView() {
     window.addEventListener('scroll', updateActivity);
     window.addEventListener('touchstart', updateActivity);
 
-    // Iniciar o timer
+    // Iniciar o timer e salvar progresso inicial
     startTimer();
     updateActivity();
+    
+    // Iniciar o primeiro salvamento após 30 segundos
+    progressSaveTimeoutRef.current = setTimeout(saveProgress, 30000);
 
     // Limpar timers e event listeners
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
-      clearInterval(saveProgressInterval);
+      if (progressSaveTimeoutRef.current) clearTimeout(progressSaveTimeoutRef.current);
+      
       window.removeEventListener('mousemove', updateActivity);
       window.removeEventListener('keydown', updateActivity);
       window.removeEventListener('click', updateActivity);
@@ -168,32 +209,53 @@ export default function LessonView() {
       window.removeEventListener('touchstart', updateActivity);
       
       // Salvar progresso ao sair da página
-      fetch(`/api/training/lessons/${id}/progress`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ timeSpent })
-      }).catch(error => {
-        console.error('Erro ao salvar progresso final:', error);
-      });
+      if (id && !isProgressSaving.current && saveProgressErrorCount.current < 3 && timeSpent > lastSavedTimeSpent.current + 30) {
+        fetch(`/api/training/lessons/${id}/progress`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ timeSpent })
+        }).catch(error => {
+          console.error('Erro ao salvar progresso final:', error);
+        });
+      }
     };
   }, [id, lesson, timeSpent]);
 
   // Marcar aula como concluída
   const markAsCompleted = async () => {
-    if (!lesson || isCompleting) return;
+    if (!lesson || !id || isCompleting) return;
     
     setIsCompleting(true);
     try {
-      const response = await fetch(`/api/training/lessons/${id}/complete`, {
+      const response = await fetch(`/api/training/lessons/${id}/progress`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ timeSpent })
+        headers: { 
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ timeSpent, completed: true })
       });
       
-      if (!response.ok) throw new Error('Falha ao marcar aula como concluída');
+      if (!response.ok) {
+        const errorData = await response.json();
+        
+        // Se o erro for de autenticação, redirecionar para login
+        if (response.status === 401) {
+          toast.error('Sua sessão expirou. Por favor, faça login novamente.');
+          setTimeout(() => {
+            window.location.href = '/treinamento/login?callbackUrl=' + encodeURIComponent(window.location.pathname);
+          }, 2000);
+          return;
+        }
+        
+        throw new Error(errorData.message || 'Falha ao marcar aula como concluída');
+      }
       
       // Atualizar estado local
       setLesson(prev => prev ? { ...prev, completed: true } : null);
+      toast.success('Aula marcada como concluída!');
+      lastSavedTimeSpent.current = timeSpent;
       
       // Verificar se há teste após a aula
       if (lesson.finalTestId) {
@@ -201,7 +263,7 @@ export default function LessonView() {
       }
     } catch (error) {
       console.error('Erro ao marcar aula como concluída:', error);
-      alert('Não foi possível marcar a aula como concluída. Por favor, tente novamente.');
+      toast.error(error instanceof Error ? error.message : 'Não foi possível marcar aula como concluída. Por favor, tente novamente.');
     } finally {
       setIsCompleting(false);
     }
@@ -548,20 +610,55 @@ export default function LessonView() {
   );
 }
 
-// Garantir que o usuário esteja autenticado
 export async function getServerSideProps(context) {
-  const session = await getSession(context);
+  const { id } = context.params;
   
+  // Verificar autenticação no servidor
+  const session = await getSession(context);
   if (!session) {
     return {
       redirect: {
-        destination: '/',
+        destination: '/treinamento/login?callbackUrl=' + encodeURIComponent(`/treinamento/aulas/${id}`),
         permanent: false,
       },
     };
   }
   
-  return {
-    props: {}
-  };
+  try {
+    // Buscar detalhes da aula diretamente no servidor
+    const baseUrl = process.env.NEXTAUTH_URL || `https://${context.req.headers.host}`;
+    const response = await fetch(`${baseUrl}/api/training/lessons/${id}`, {
+      headers: {
+        Cookie: context.req.headers.cookie || '',
+      },
+    });
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        return {
+          redirect: {
+            destination: '/treinamento/login?callbackUrl=' + encodeURIComponent(`/treinamento/aulas/${id}`),
+            permanent: false,
+          },
+        };
+      }
+      throw new Error('Falha ao carregar dados da aula');
+    }
+    
+    const lessonData = await response.json();
+    
+    return {
+      props: {
+        initialLesson: lessonData,
+      },
+    };
+  } catch (error) {
+    console.error('Erro ao carregar dados da aula:', error);
+    return {
+      props: {
+        initialLesson: null,
+        error: 'Não foi possível carregar os dados da aula. Por favor, tente novamente mais tarde.',
+      },
+    };
+  }
 }
