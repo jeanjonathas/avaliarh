@@ -38,40 +38,31 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
   // Função para buscar traços de personalidade do teste selecionado
   const fetchPersonalityTraits = useCallback(async (testId: string) => {
     try {
-      // Verificar se os valores atuais são iguais aos anteriores para evitar loop infinito
-      if (JSON.stringify(value) === JSON.stringify(previousValueRef.current)) {
-        console.log('Valores iguais aos anteriores, evitando re-renderização');
-        return;
-      }
-      
-      // Atualizar a referência para os valores atuais
-      previousValueRef.current = [...value];
-      
       setIsLoadingTraits(true);
       setError(null);
       
       console.log('Buscando traços para o teste:', testId);
-      console.log('Valores atuais:', value);
       
-      // Buscar as questões do teste
+      // Buscar as questões do teste com tipo OPINION_MULTIPLE
       const response = await fetch(`/api/admin/questions?testId=${testId}&type=OPINION_MULTIPLE`);
       
       if (!response.ok) {
         throw new Error(`Erro ao buscar questões: ${response.status}`);
       }
       
-      const questions = await response.json();
+      const data = await response.json();
+      const questions = Array.isArray(data) ? data : [];
       
-      console.log('Resposta completa da API:', questions);
+      console.log('Resposta da API:', data);
+      console.log('Questões encontradas:', questions);
       
       if (!questions || questions.length === 0) {
         console.log('Nenhuma questão encontrada para o teste:', testId);
         setError('Nenhum traço de personalidade encontrado no teste selecionado.\n\nVerifique se o teste contém perguntas opinativas com categorias de personalidade definidas.');
         setTraitGroups([]);
+        setIsLoadingTraits(false);
         return;
       }
-      
-      console.log('Questões encontradas:', questions);
       
       // Extrair grupos e traços das questões
       const groups: TraitGroup[] = [];
@@ -415,19 +406,27 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
     }
   }, [normalizeAllWeights, traitGroups.length]);
 
+  // Efeito para buscar traços quando o testId mudar
+  useEffect(() => {
+    if (testId) {
+      console.log('TestId mudou, buscando traços:', testId);
+      fetchPersonalityTraits(testId);
+    } else {
+      // Se não houver testId, limpar os grupos
+      setTraitGroups([]);
+      setError('Selecione um teste para configurar os traços de personalidade.');
+    }
+  }, [testId, fetchPersonalityTraits]);
+
   useEffect(() => {
     if (testId) {
       // Verificar se já inicializamos para este testId
       if (!hasInitializedRef.current[testId]) {
         console.log(`Inicializando traços para o teste ${testId}`);
         hasInitializedRef.current[testId] = true;
-        fetchPersonalityTraits(testId);
       }
-    } else {
-      setTraitGroups([]);
-      setError('Selecione um teste para configurar os traços de personalidade.');
     }
-  }, [testId, fetchPersonalityTraits]);
+  }, [testId]);
 
   // Lidar com o reordenamento por drag and drop dentro de um grupo
   const handleDragEnd = useCallback((result: DropResult) => {
