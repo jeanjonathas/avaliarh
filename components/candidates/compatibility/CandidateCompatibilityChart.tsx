@@ -56,232 +56,140 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
   const [mergedTraits, setMergedTraits] = useState<PersonalityTrait[]>([]);
   const [usingDefaultData, setUsingDefaultData] = useState<boolean>(false);
 
-  // Função para calcular a compatibilidade conforme a fórmula especificada
+  // Função para calcular a compatibilidade entre os traços do candidato e os pesos do processo
   const calculateCompatibility = useCallback((
     traits: PersonalityTrait[], 
     processTraits: Array<{name: string, weight: number, categoryNameUuid?: string}>,
     expectedProfile: Record<string, number>
   ): {traitsWithCompatibility: TraitWithCompatibility[], totalCompatibility: number} => {
-    console.log('Calculando compatibilidade - Traços:', traits, 'Perfil esperado:', expectedProfile);
+    console.log('Calculando compatibilidade com os seguintes dados:');
+    console.log('- Traços do candidato:', traits);
+    console.log('- Traços do processo:', processTraits);
+    console.log('- Perfil esperado:', expectedProfile);
     
     if (!traits || traits.length === 0) {
-      console.log('Sem traços para calcular compatibilidade');
-      return {traitsWithCompatibility: [], totalCompatibility: 0};
+      console.error('Nenhum traço de personalidade fornecido para o candidato');
+      return { traitsWithCompatibility: [], totalCompatibility: 0 };
     }
     
-    // Verificar se há pesos de traços configurados
     if (!processTraits || processTraits.length === 0) {
-      console.log('Sem pesos de traços configurados para o processo');
-      return {traitsWithCompatibility: [], totalCompatibility: 0};
+      console.error('Nenhum traço de personalidade configurado para o processo');
+      return { traitsWithCompatibility: [], totalCompatibility: 0 };
     }
     
-    // Criar um mapa para facilitar a correspondência entre traços do candidato e do processo
-    const candidateTraitMap = new Map<string, PersonalityTrait>();
-    const candidateTraitUuidMap = new Map<string, PersonalityTrait>();
+    // Mapear os traços do candidato para o formato esperado
+    const candidateTraitsMap = traits.reduce((acc: Record<string, PersonalityTrait>, trait) => {
+      acc[trait.trait] = trait;
+      return acc;
+    }, {});
     
-    traits.forEach(trait => {
-      // Mapear por nome normalizado
-      candidateTraitMap.set(trait.trait.toLowerCase().trim(), trait);
-      
-      // Mapear por UUID se disponível
-      if (trait.categoryNameUuid) {
-        candidateTraitUuidMap.set(trait.categoryNameUuid, trait);
-      }
-    });
+    // Mapear os traços do processo para o formato esperado
+    const processTraitsMap = processTraits.reduce((acc: Record<string, {name: string, weight: number, categoryNameUuid?: string}>, trait) => {
+      acc[trait.name] = trait;
+      return acc;
+    }, {});
     
-    console.log('Mapa de traços do candidato por nome:', Object.fromEntries(candidateTraitMap.entries()));
-    console.log('Mapa de traços do candidato por UUID:', Object.fromEntries(candidateTraitUuidMap.entries()));
+    // Criar uma lista de todos os traços únicos (união dos traços do candidato e do processo)
+    const allTraitNames = Array.from(new Set([
+      ...Object.keys(candidateTraitsMap),
+      ...Object.keys(processTraitsMap)
+    ]));
     
-    // Mapear os traços do processo para os traços do candidato
-    const matchedTraits: PersonalityTrait[] = [];
+    console.log('Lista de todos os traços únicos:', allTraitNames);
     
-    processTraits.forEach(processTrait => {
-      // Tentar encontrar o traço do candidato correspondente
-      let candidateTrait: PersonalityTrait | undefined;
-      
-      // Primeiro tentar por UUID
-      if (processTrait.categoryNameUuid && candidateTraitUuidMap.has(processTrait.categoryNameUuid)) {
-        candidateTrait = candidateTraitUuidMap.get(processTrait.categoryNameUuid);
-        console.log(`Traço encontrado por UUID (${processTrait.categoryNameUuid}): ${candidateTrait?.trait}`);
-      } 
-      // Depois tentar por nome normalizado
-      else {
-        const normalizedName = processTrait.name.toLowerCase().trim();
-        if (candidateTraitMap.has(normalizedName)) {
-          candidateTrait = candidateTraitMap.get(normalizedName);
-          console.log(`Traço encontrado por nome (${normalizedName}): ${candidateTrait?.trait}`);
-        }
-      }
-      
-      // Se encontrou o traço, adicionar à lista com o peso do processo
-      if (candidateTrait) {
-        matchedTraits.push({
-          ...candidateTrait,
-          weight: processTrait.weight
-        });
-      } else {
-        console.log(`Nenhum traço do candidato encontrado para ${processTrait.name}`);
-        // Adicionar um traço vazio para manter a correspondência com o processo
-        matchedTraits.push({
-          trait: processTrait.name,
-          count: 0,
-          percentage: 0,
-          weight: processTrait.weight,
-          weightedScore: 0,
-          categoryNameUuid: processTrait.categoryNameUuid
-        });
-      }
-    });
+    // Se não houver traços em comum, retornar compatibilidade zero
+    if (allTraitNames.length === 0) {
+      console.error('Nenhum traço em comum entre candidato e processo');
+      return { traitsWithCompatibility: [], totalCompatibility: 0 };
+    }
     
-    console.log('Traços correspondidos:', matchedTraits);
-    
-    // Ordenar os traços por peso (do maior para o menor)
-    const sortedTraits = [...matchedTraits].sort((a, b) => (b.weight || 0) - (a.weight || 0));
-    const totalTraits = sortedTraits.length;
-    
-    // Atribuir pesos hierárquicos baseados no número de traços (n, n-1, n-2, ..., 1)
-    // Isso garante uma distribuição consistente independente do número de traços
-    const hierarchicalWeights = new Map<string, number>();
-    sortedTraits.forEach((trait, index) => {
-      hierarchicalWeights.set(trait.trait, totalTraits - index); // Peso n para o primeiro, n-1 para o segundo, etc.
-    });
-    
-    // Criar um mapa de posição na hierarquia para cada traço
-    const positionMap = new Map<string, number>();
-    sortedTraits.forEach((trait, index) => {
-      positionMap.set(trait.trait, index + 1); // Posição começa em 1
-    });
-    
-    // Calcular o número médio de questões por traço para normalização
-    const questionsPerTrait = new Map<string, number>();
-    let totalQuestions = 0;
-    
-    // Assumimos que cada traço tem pelo menos uma questão
-    // Na prática, isso deveria ser obtido dos dados reais
-    traits.forEach(trait => {
-      // Aqui poderíamos obter o número real de questões para cada traço
-      // Por enquanto, assumimos um valor padrão de 4 questões por traço
-      const questionCount = 4; // Valor padrão, idealmente seria dinâmico
-      questionsPerTrait.set(trait.trait, questionCount);
-      totalQuestions += questionCount;
-    });
-    
-    const averageQuestionsPerTrait = totalQuestions / totalTraits;
-    
-    console.log('Pesos hierárquicos:', Object.fromEntries(hierarchicalWeights.entries()));
-    console.log('Mapa de posições:', Object.fromEntries(positionMap.entries()));
-    console.log('Questões por traço:', Object.fromEntries(questionsPerTrait.entries()));
-    console.log('Média de questões por traço:', averageQuestionsPerTrait);
-    
-    // Filtrar traços com valores reais (não zero) apenas para o cálculo especial
-    const traitsWithValues = traits.filter(trait => (trait.percentage || 0) > 0);
-    
-    // Caso especial: se apenas um traço tem valor, a compatibilidade total
-    // deve ser igual à compatibilidade hierárquica desse traço
-    if (traitsWithValues.length === 1 && traits.length > 1) {
-      const onlyTrait = traitsWithValues[0];
-      const position = positionMap.get(onlyTrait.trait) || totalTraits;
-      const hierarchyCompatibility = ((totalTraits - position + 1) / totalTraits) * 100;
-      
-      console.log(`Apenas um traço com valor: ${onlyTrait.trait}, Compatibilidade: ${hierarchyCompatibility}%`);
-      
-      // Se o valor não é 100%, ajustar proporcionalmente
-      const actualValue = onlyTrait.percentage || 0;
-      const finalCompatibility = (actualValue / 100) * hierarchyCompatibility;
-      
-      // Calcular a compatibilidade para TODOS os traços, mesmo os sem valor
-      const allTraitsWithCompatibility = traits.map(trait => {
-        const traitPosition = positionMap.get(trait.trait) || totalTraits;
-        const traitHierarchyCompatibility = ((totalTraits - traitPosition + 1) / totalTraits) * 100;
-        const traitActualValue = trait.percentage || 0;
-        const traitRealCompatibility = (traitActualValue / 100) * traitHierarchyCompatibility;
-        const questionCount = questionsPerTrait.get(trait.trait) || 4;
-        const normalizationFactor = Math.sqrt(questionCount / averageQuestionsPerTrait);
-        const hierarchicalWeight = hierarchicalWeights.get(trait.trait) || 1;
+    // Calcular a compatibilidade para cada traço
+    let traitsWithCompatibility: TraitWithCompatibility[] = allTraitNames
+      // Filtrar apenas os traços que existem tanto no candidato quanto no processo
+      .filter(traitName => 
+        candidateTraitsMap[traitName] && 
+        (processTraitsMap[traitName] || expectedProfile[traitName])
+      )
+      // Mapear para o formato TraitWithCompatibility
+      .map(traitName => {
+        const candidateTrait = candidateTraitsMap[traitName];
+        const processTrait = processTraitsMap[traitName];
+        const expectedValue = expectedProfile[traitName] || (processTrait ? processTrait.weight : 0);
+        
+        // Calcular a diferença entre o valor do candidato e o valor esperado
+        const difference = Math.abs(candidateTrait.percentage - expectedValue);
+        
+        // Calcular a compatibilidade (100% - diferença normalizada)
+        // Quanto menor a diferença, maior a compatibilidade
+        const compatibility = Math.max(0, 100 - (difference * 100 / 100));
         
         return {
-          ...trait,
-          compatibility: traitHierarchyCompatibility, // Mantemos a compatibilidade hierárquica para exibição
-          realCompatibility: traitRealCompatibility, // Usamos a compatibilidade normalizada
-          expectedValue: traitHierarchyCompatibility,
-          weight: trait.weight || 1,
-          hierarchicalWeight,
-          position: traitPosition,
-          questionCount,
-          normalizationFactor
-        } as TraitWithCompatibility;
+          ...candidateTrait,
+          compatibility,
+          realCompatibility: compatibility, // Inicialmente igual à compatibilidade
+          weight: processTrait ? processTrait.weight : 1,
+          expectedValue,
+          position: 0, // Será definido depois de ordenar
+        };
       });
-      
-      // Retornar todos os traços com a compatibilidade total calculada
-      return {
-        traitsWithCompatibility: allTraitsWithCompatibility,
-        totalCompatibility: Math.round(finalCompatibility)
-      };
+    
+    // Se não houver traços com compatibilidade calculada, retornar compatibilidade zero
+    if (traitsWithCompatibility.length === 0) {
+      console.error('Não foi possível calcular a compatibilidade para nenhum traço');
+      return { traitsWithCompatibility: [], totalCompatibility: 0 };
     }
     
-    let totalWeightedCompatibility = 0;
-    let totalHierarchicalWeight = 0;
+    // Ordenar os traços por porcentagem (do maior para o menor)
+    traitsWithCompatibility.sort((a, b) => b.percentage - a.percentage);
     
-    const traitsCompatibility = traits.map(trait => {
-      const actualValue = trait.percentage || 0;
-      const originalWeight = trait.weight || 1;
-      const hierarchicalWeight = hierarchicalWeights.get(trait.trait) || 1;
-      const position = positionMap.get(trait.trait) || totalTraits;
-      const questionCount = questionsPerTrait.get(trait.trait) || 4;
-      
-      // Calcular a compatibilidade máxima possível para este traço com base na sua posição
-      // Ci = ((n - posição(Pi) + 1) / n) × 100
-      const maxCompatibility = ((totalTraits - position + 1) / totalTraits) * 100;
-      
-      // A compatibilidade hierárquica é baseada apenas na posição
-      const hierarchyCompatibility = maxCompatibility;
-      
-      // Normalizar o valor do traço considerando o número de questões
-      // Isso ajuda a compensar traços com diferentes números de questões
-      const normalizationFactor = Math.sqrt(questionCount / averageQuestionsPerTrait);
-      
-      // A compatibilidade real do candidato é baseada no valor real do traço
-      // Se o valor real é 100%, então a compatibilidade é máxima para este traço
-      // Se o valor real é menor, a compatibilidade é proporcional
-      const realCompatibility = (actualValue / 100) * hierarchyCompatibility;
-      
-      // Aplicar o fator de normalização para compensar diferenças no número de questões
-      const normalizedCompatibility = realCompatibility * normalizationFactor;
-      
-      // Usar o peso hierárquico para o cálculo da compatibilidade total
-      // Isso garante uma distribuição consistente dos pesos independente do número de traços
-      totalWeightedCompatibility += hierarchicalWeight * normalizedCompatibility;
-      totalHierarchicalWeight += hierarchicalWeight;
-      
-      console.log(`Traço: ${trait.trait}, Peso Original: ${originalWeight}, Peso Hierárquico: ${hierarchicalWeight}, Posição: ${position}, Valor: ${actualValue}%, Questões: ${questionCount}, Fator Normalização: ${normalizationFactor.toFixed(2)}, Compatibilidade Hierárquica: ${hierarchyCompatibility.toFixed(2)}%, Compatibilidade Real: ${realCompatibility.toFixed(2)}%, Compatibilidade Normalizada: ${normalizedCompatibility.toFixed(2)}%`);
+    // Atribuir posições com base na ordenação
+    traitsWithCompatibility = traitsWithCompatibility.map((trait, index) => ({
+      ...trait,
+      position: index + 1
+    }));
+    
+    // Calcular pesos hierárquicos com base na posição
+    // Quanto menor a posição (mais dominante o traço), maior o peso
+    const totalPositions = traitsWithCompatibility.length;
+    traitsWithCompatibility = traitsWithCompatibility.map(trait => {
+      const hierarchicalWeight = (totalPositions - trait.position + 1) / totalPositions;
+      return {
+        ...trait,
+        hierarchicalWeight
+      };
+    });
+    
+    // Calcular compatibilidade real considerando os pesos hierárquicos
+    traitsWithCompatibility = traitsWithCompatibility.map(trait => {
+      // Normalizar o fator de compatibilidade para dar mais peso aos traços dominantes
+      const normalizationFactor = trait.hierarchicalWeight || 1;
+      // Aplicar o fator de normalização à compatibilidade
+      const realCompatibility = trait.compatibility * normalizationFactor;
       
       return {
         ...trait,
-        compatibility: hierarchyCompatibility, // Mantemos a compatibilidade hierárquica para exibição
-        realCompatibility: normalizedCompatibility, // Usamos a compatibilidade normalizada
-        expectedValue: maxCompatibility, // Valor esperado é a compatibilidade máxima
-        weight: originalWeight, // Mantemos o peso original para exibição
-        hierarchicalWeight, // Adicionamos o peso hierárquico para referência
-        position,
-        questionCount, // Adicionamos o número de questões para referência
-        normalizationFactor // Adicionamos o fator de normalização para referência
+        realCompatibility,
+        normalizationFactor
       };
-    }) as TraitWithCompatibility[];
+    });
     
-    console.log('Traços com compatibilidade calculada:', traitsCompatibility);
-    console.log(`Total ponderado: ${totalWeightedCompatibility}, Peso hierárquico total: ${totalHierarchicalWeight}`);
+    // Calcular a compatibilidade total (média ponderada das compatibilidades reais)
+    const totalWeights = traitsWithCompatibility.reduce((sum, trait) => 
+      sum + (trait.hierarchicalWeight || 1), 0);
     
-    // Calcular a compatibilidade total como média ponderada das compatibilidades reais normalizadas
-    // Compatibilidade Total = ∑(Wi × Ci_norm) / ∑Wi
-    // Onde Wi é o peso hierárquico (n, n-1, ..., 1)
-    if (traitsWithValues.length > 1 && totalHierarchicalWeight > 0) {
-      const finalScore = totalWeightedCompatibility / totalHierarchicalWeight;
-      console.log(`Compatibilidade calculada: ${finalScore.toFixed(2)}%`);
-      return {traitsWithCompatibility, totalCompatibility: Math.round(finalScore)};
-    }
-
-    return {traitsWithCompatibility, totalCompatibility: 0};
-  }, [traitsWithCompatibility]);
+    const totalCompatibility = traitsWithCompatibility.reduce((sum, trait) => 
+      sum + (trait.realCompatibility * (trait.hierarchicalWeight || 1)), 0) / totalWeights;
+    
+    console.log('Compatibilidade calculada:', {
+      traitsWithCompatibility,
+      totalCompatibility
+    });
+    
+    return {
+      traitsWithCompatibility,
+      totalCompatibility
+    };
+  }, []);
 
   // Função para buscar os dados de personalidade do processo
   const fetchProcessPersonalityData = useCallback(async () => {
@@ -419,30 +327,18 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
     }
   }, [processId, personalityTraits, propExpectedProfile]);
 
+  // Efeito para buscar os dados de personalidade do processo quando o componente é montado
   useEffect(() => {
-    if (processId) {
+    if (personalityTraits && personalityTraits.length > 0) {
+      console.log('Iniciando busca de dados de personalidade do processo...');
       fetchProcessPersonalityData();
-    } else if (personalityTraits.length > 0) {
-      // Se não temos ID do processo, usar apenas os traços fornecidos
-      setMergedTraits(personalityTraits);
-      
-      // Criar dados de processo padrão
-      const defaultTraits = personalityTraits.map((trait, index) => ({
-        name: trait.trait,
-        weight: trait.weight || (personalityTraits.length - index), // Peso baseado na ordem
-        categoryNameUuid: trait.categoryNameUuid
-      }));
-      
-      setProcessPersonalityData({
-        traits: defaultTraits,
-        expectedProfile: propExpectedProfile || null,
-        isDefaultData: true
-      });
-      
-      setUsingDefaultData(true);
+    } else {
+      console.log('Sem traços de personalidade para o candidato, não é possível calcular compatibilidade');
+      setError('Candidato não possui traços de personalidade');
     }
-  }, [processId, personalityTraits, propExpectedProfile, fetchProcessPersonalityData]);
+  }, [personalityTraits, fetchProcessPersonalityData]);
 
+  // Efeito para calcular a compatibilidade quando os dados do processo são carregados
   useEffect(() => {
     if (loading) return;
     
@@ -456,8 +352,29 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
     
     // Verificar se há dados de personalidade do processo
     if (!processPersonalityData) {
-      setError('Dados de personalidade do processo não disponíveis');
-      return;
+      // Se não temos dados do processo, tentar criar dados padrão
+      if (personalityTraits.length > 0) {
+        console.log('Criando dados padrão baseados nos traços do candidato');
+        
+        // Criar dados de processo padrão
+        const defaultTraits = personalityTraits.map((trait, index) => ({
+          name: trait.trait,
+          weight: trait.weight || (personalityTraits.length - index), // Peso baseado na ordem
+          categoryNameUuid: trait.categoryNameUuid
+        }));
+        
+        setProcessPersonalityData({
+          traits: defaultTraits,
+          expectedProfile: propExpectedProfile || null,
+          isDefaultData: true
+        });
+        
+        setUsingDefaultData(true);
+        return; // O próximo ciclo do useEffect vai pegar esses dados
+      } else {
+        setError('Dados de personalidade do processo não disponíveis');
+        return;
+      }
     }
     
     // Verificar se há traços configurados no processo
@@ -488,7 +405,7 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
       
       // Atualizar o estado com os resultados
       setTraitsWithCompatibility(traitsWithCompatibility);
-      setCompatibilityScore(totalCompatibility);
+      setCompatibilityScore(Math.round(totalCompatibility));
       
       // Encontrar o perfil alvo (traço com maior peso)
       let targetProfile = '';
@@ -519,7 +436,18 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
       console.error('Erro ao calcular compatibilidade:', error);
       setError('Erro ao calcular compatibilidade');
     }
-  }, [processPersonalityData, personalityTraits, calculateCompatibility, loading, onCompatibilityCalculated]);
+  }, [processPersonalityData, personalityTraits, calculateCompatibility, loading, onCompatibilityCalculated, propExpectedProfile]);
+
+  // Efeito para atualizar o componente quando o estado muda
+  useEffect(() => {
+    // Mostrar mensagens de depuração no console
+    console.log('Estado atual do componente:', {
+      loading,
+      error,
+      traitsWithCompatibility: traitsWithCompatibility?.length || 0,
+      compatibilityScore
+    });
+  }, [loading, error, traitsWithCompatibility, compatibilityScore]);
 
   // Buscar os traços de personalidade completos do processo seletivo
   const mergePersonalityTraits = (
@@ -633,47 +561,18 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
     }
   };
 
-  useEffect(() => {
-    if (processId) {
-      fetchProcessPersonalityData();
-    } else if (personalityTraits.length > 0) {
-      // Se não temos ID do processo, usar apenas os traços fornecidos
-      setMergedTraits(personalityTraits);
-      
-      // Criar dados de processo padrão
-      const defaultTraits = personalityTraits.map((trait, index) => ({
-        name: trait.trait,
-        weight: trait.weight || (personalityTraits.length - index), // Peso baseado na ordem
-        categoryNameUuid: trait.categoryNameUuid
-      }));
-      
-      setProcessPersonalityData({
-        traits: defaultTraits,
-        expectedProfile: propExpectedProfile || null,
-        isDefaultData: true
-      });
-      
-      setUsingDefaultData(true);
-    }
-  }, [processId, personalityTraits, propExpectedProfile, fetchProcessPersonalityData]);
-
   // Dados para o gráfico de rosca
   const chartData = {
-    labels: ['Compatibilidade', 'Diferença'],
+    labels: ['Compatível', 'Não Compatível'],
     datasets: [
       {
         data: [compatibilityScore, 100 - compatibilityScore],
-        backgroundColor: [
-          'rgba(54, 162, 235, 0.8)',
-          'rgba(211, 211, 211, 0.3)'
-        ],
-        borderColor: [
-          'rgba(54, 162, 235, 1)',
-          'rgba(211, 211, 211, 1)'
-        ],
+        backgroundColor: ['rgba(59, 130, 246, 0.8)', 'rgba(229, 231, 235, 0.5)'],
+        borderColor: ['rgb(59, 130, 246)', 'rgb(229, 231, 235)'],
         borderWidth: 1,
-      },
-    ],
+        hoverOffset: 4
+      }
+    ]
   };
 
   // Opções para o gráfico
@@ -790,6 +689,7 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
                 </div>
               </div>
             </div>
+            
             {usingDefaultData && (
               <div className="mt-2 text-xs text-amber-600 text-center">
                 <p>Usando perfil padrão para demonstração</p>
@@ -809,7 +709,7 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
                 <div className="flex justify-between mb-1">
                   <span className="text-sm font-medium text-gray-700">
                     {trait.trait}
-                    <span className="ml-2 text-xs text-gray-500">(Peso hierárquico: {trait.hierarchicalWeight})</span>
+                    <span className="ml-2 text-xs text-gray-500">(Peso hierárquico: {trait.hierarchicalWeight?.toFixed(2)})</span>
                   </span>
                   <span className="text-sm text-gray-500">
                     Valor: {trait.percentage}%
