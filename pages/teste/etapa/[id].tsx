@@ -159,15 +159,15 @@ const TestStage: NextPage = () => {
 
   // Contador de tempo para testes com limite de tempo (regressivo)
   useEffect(() => {
-    // Só executar se tiver limite de tempo
+    // Só executar se tiver limite de tempo e ele for maior que 0
     if (timeRemaining === null || timeRemaining <= 0) return;
     
-    console.log("Iniciando contador regressivo...");
+    console.log(`Iniciando contador regressivo com ${timeRemaining} segundos...`);
     
     const timerInterval = setInterval(() => {
       setTimeRemaining(prev => {
-        if (prev === null || prev <= 0) {
-          clearInterval(timerInterval);
+        if (prev === null) return null;
+        if (prev <= 0) {
           return 0;
         }
         return prev - 1;
@@ -188,8 +188,8 @@ const TestStage: NextPage = () => {
       console.log("Limpando timer regressivo");
       clearInterval(timerInterval);
     };
-  }, [timeRemaining]);
-
+  }, [timeRemaining, saveTimeToLocalStorage]);
+  
   // Contador de tempo para testes sem limite de tempo (progressivo)
   useEffect(() => {
     // Só executar se não tiver limite de tempo
