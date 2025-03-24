@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import AdminLayout from '../../../../components/admin/AdminLayout';
@@ -15,16 +15,7 @@ const EditOpinionQuestionPage = () => {
   const [questionData, setQuestionData] = useState<any>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  useEffect(() => {
-    // Verificar autenticação
-    if (status === 'unauthenticated') {
-      router.push('/login');
-    } else if (status === 'authenticated' && id) {
-      fetchQuestionData();
-    }
-  }, [status, router, id]);
-
-  const fetchQuestionData = async () => {
+  const fetchQuestionData = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/admin/questions/${id}`, {
@@ -92,7 +83,16 @@ const EditOpinionQuestionPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, notify, router]);
+
+  useEffect(() => {
+    // Verificar autenticação
+    if (status === 'unauthenticated') {
+      router.push('/login');
+    } else if (status === 'authenticated' && id) {
+      fetchQuestionData();
+    }
+  }, [status, router, id, fetchQuestionData]);
 
   const handleSubmit = async (values: any) => {
     try {
