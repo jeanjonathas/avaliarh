@@ -434,10 +434,17 @@ const TestStage: NextPage = () => {
       });
       
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Erro ao enviar respostas:', errorText);
+        const errorData = await response.text();
+        console.error('Erro ao enviar respostas:', errorData);
         showToast('Erro ao enviar respostas. Por favor, tente novamente.', 'error');
         return false;
+      }
+
+      const responseData = await response.json();
+      console.log('Resposta do servidor:', responseData);
+      
+      if (responseData.errors && responseData.errors.length > 0) {
+        console.warn('Avisos ao processar respostas:', responseData.errors);
       }
       
       // Limpar respostas do localStorage após envio bem-sucedido
