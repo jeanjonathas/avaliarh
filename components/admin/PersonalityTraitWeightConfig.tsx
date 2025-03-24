@@ -68,55 +68,174 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
       const groups: TraitGroup[] = [];
       const groupMap: Record<string, string[]> = {};
       
-      // Processar as questões para extrair grupos e traços
-      questions.forEach((question: any) => {
-        // Usar o texto da questão como nome do grupo
-        const groupName = question.text;
-        const groupId = `group-${question.id}`;
-        
-        if (!groupMap[groupId]) {
-          groupMap[groupId] = [];
-          groups.push({
-            id: groupId,
-            name: groupName,
-            traits: [],
-            selectedTraits: []
-          });
+      // Primeiro, vamos buscar os grupos de opinião para obter informações sobre os grupos
+      try {
+        const opinionGroupsResponse = await fetch('/api/admin/opinion-groups');
+        if (opinionGroupsResponse.ok) {
+          const opinionGroups = await opinionGroupsResponse.json();
+          console.log('Grupos de opinião encontrados:', opinionGroups);
+          
+          if (opinionGroups && opinionGroups.length > 0) {
+            // Criar um grupo para cada grupo de opinião
+            opinionGroups.forEach((group: any) => {
+              const groupId = group.id;
+              const groupName = group.name;
+              
+              if (!groupMap[groupId]) {
+                groupMap[groupId] = [];
+                groups.push({
+                  id: groupId,
+                  name: groupName,
+                  traits: [],
+                  selectedTraits: []
+                });
+              }
+              
+              // Adicionar as categorias do grupo como traços
+              if (group.categories && group.categories.length > 0) {
+                const groupIndex = groups.findIndex(g => g.id === groupId);
+                if (groupIndex !== -1) {
+                  group.categories.forEach((category: any) => {
+                    if (category.name && !groupMap[groupId].includes(category.name)) {
+                      groupMap[groupId].push(category.name);
+                      groups[groupIndex].traits.push(category.name);
+                    }
+                  });
+                }
+              }
+            });
+          }
         }
+      } catch (error) {
+        console.error('Erro ao buscar grupos de opinião:', error);
+      }
+      
+      // Se não conseguimos obter grupos de opinião, vamos criar grupos baseados nas categorias das opções
+      if (groups.length === 0) {
+        console.log('Criando grupos baseados nas categorias das opções');
         
-        // Extrair categorias das opções
-        if (question.options && question.options.length > 0) {
-          // Coletar todas as categorias únicas das opções
-          const categoryNames = new Set<string>();
-          
-          question.options.forEach((option: any) => {
-            // Verificar se a opção tem uma categoria associada
-            if (option.categoryName) {
-              categoryNames.add(option.categoryName);
-            }
-          });
-          
-          // Se não encontramos categorias, usar os textos das opções como último recurso
-          if (categoryNames.size === 0) {
+        // Mapear categorias por UUID para agrupar perguntas com as mesmas categorias
+        const categoriesByUUID: Record<string, { name: string, questions: any[] }> = {};
+        
+        // Primeiro passo: coletar todas as categorias únicas por UUID
+        questions.forEach((question: any) => {
+          if (question.options && question.options.length > 0) {
             question.options.forEach((option: any) => {
-              if (option.text) {
-                categoryNames.add(option.text);
+              if (option.categoryName && option.categoryId) {
+                const uuid = option.categoryId;
+                if (!categoriesByUUID[uuid]) {
+                  categoriesByUUID[uuid] = {
+                    name: option.categoryName,
+                    questions: []
+                  };
+                }
+                
+                // Adicionar a questão à categoria se ainda não estiver lá
+                if (!categoriesByUUID[uuid].questions.some((q: any) => q.id === question.id)) {
+                  categoriesByUUID[uuid].questions.push(question);
+                }
               }
+            });
+          }
+        });
+        
+        // Segundo passo: criar grupos baseados nas categorias únicas
+        const processedGroups = new Set<string>();
+        
+        Object.entries(categoriesByUUID).forEach(([uuid, categoryInfo]) => {
+          // Criar um ID de grupo baseado nas categorias presentes nas questões
+          const questionsIds = categoryInfo.questions.map(q => q.id).sort().join('-');
+          const groupId = `group-${questionsIds}`;
+          
+          // Evitar duplicação de grupos
+          if (!processedGroups.has(groupId)) {
+            processedGroups.add(groupId);
+            
+            // Criar um nome para o grupo baseado nas categorias
+            const categoryNames = Object.values(categoriesByUUID)
+              .filter(cat => cat.questions.some(q => categoryInfo.questions.includes(q)))
+              .map(cat => cat.name);
+            
+            const groupName = `Grupo: ${categoryNames.join(', ')}`;
+            
+            if (!groupMap[groupId]) {
+              groupMap[groupId] = [];
+              groups.push({
+                id: groupId,
+                name: groupName,
+                traits: [],
+                selectedTraits: []
+              });
+            }
+            
+            // Adicionar todas as categorias únicas como traços
+            const groupIndex = groups.findIndex(g => g.id === groupId);
+            if (groupIndex !== -1) {
+              Object.values(categoriesByUUID)
+                .filter(cat => cat.questions.some(q => categoryInfo.questions.includes(q)))
+                .forEach(cat => {
+                  if (!groupMap[groupId].includes(cat.name)) {
+                    groupMap[groupId].push(cat.name);
+                    groups[groupIndex].traits.push(cat.name);
+                  }
+                });
+            }
+          }
+        });
+      }
+      
+      // Se ainda não temos grupos, criar um grupo para cada pergunta (fallback)
+      if (groups.length === 0) {
+        console.log('Fallback: Criando um grupo para cada pergunta');
+        
+        questions.forEach((question: any) => {
+          const groupName = `Grupo: ${question.text}`;
+          const groupId = `group-${question.id}`;
+          
+          if (!groupMap[groupId]) {
+            groupMap[groupId] = [];
+            groups.push({
+              id: groupId,
+              name: groupName,
+              traits: [],
+              selectedTraits: []
             });
           }
           
-          // Adicionar as categorias encontradas ao grupo
-          const groupIndex = groups.findIndex(g => g.id === groupId);
-          if (groupIndex !== -1) {
-            categoryNames.forEach(categoryName => {
-              if (!groupMap[groupId].includes(categoryName)) {
-                groupMap[groupId].push(categoryName);
-                groups[groupIndex].traits.push(categoryName);
+          // Extrair categorias das opções
+          if (question.options && question.options.length > 0) {
+            // Coletar todas as categorias únicas das opções
+            const categoryNames = new Set<string>();
+            
+            question.options.forEach((option: any) => {
+              // Verificar se a opção tem uma categoria associada
+              if (option.categoryName) {
+                categoryNames.add(option.categoryName);
               }
             });
+            
+            // Se não encontramos categorias, usar os textos das opções como último recurso
+            if (categoryNames.size === 0) {
+              question.options.forEach((option: any) => {
+                if (option.text) {
+                  categoryNames.add(option.text);
+                }
+              });
+            }
+            
+            // Adicionar as categorias encontradas ao grupo
+            const groupIndex = groups.findIndex(g => g.id === groupId);
+            if (groupIndex !== -1) {
+              categoryNames.forEach(categoryName => {
+                if (!groupMap[groupId].includes(categoryName)) {
+                  groupMap[groupId].push(categoryName);
+                  groups[groupIndex].traits.push(categoryName);
+                }
+              });
+            }
           }
-        }
-      });
+        });
+      }
       
       console.log('Grupos extraídos:', groups);
       
