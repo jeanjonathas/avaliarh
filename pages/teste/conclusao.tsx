@@ -14,7 +14,8 @@ interface CandidateData {
   instagram?: string;
   photoUrl?: string;
   score?: number;
-  totalQuestions?: number;
+  multipleChoiceQuestions?: number;
+  opinionQuestions?: number;
   accuracyRate?: number;
   observations?: string;
   showResults?: boolean;
@@ -50,11 +51,12 @@ const Conclusao: NextPage = () => {
       try {
         const parsedObservations = JSON.parse(data.observations);
         if (parsedObservations.score !== undefined && 
-            parsedObservations.totalQuestions !== undefined && 
+            parsedObservations.multipleChoiceQuestions !== undefined && 
             parsedObservations.accuracyRate !== undefined) {
           scoreData = {
             score: parsedObservations.score,
-            totalQuestions: parsedObservations.totalQuestions,
+            multipleChoiceQuestions: parsedObservations.multipleChoiceQuestions,
+            opinionQuestions: parsedObservations.opinionQuestions || 0,
             accuracyRate: parsedObservations.accuracyRate
           };
         }
@@ -72,7 +74,8 @@ const Conclusao: NextPage = () => {
       position: data.position || 'Não informado',
       instagram: data.instagram || 'Não informado',
       score: data.score !== undefined ? data.score : (scoreData as any).score || 0,
-      totalQuestions: data.totalQuestions !== undefined ? data.totalQuestions : (scoreData as any).totalQuestions || 0,
+      multipleChoiceQuestions: data.multipleChoiceQuestions !== undefined ? data.multipleChoiceQuestions : (scoreData as any).multipleChoiceQuestions || 0,
+      opinionQuestions: data.opinionQuestions !== undefined ? data.opinionQuestions : (scoreData as any).opinionQuestions || 0,
       accuracyRate: data.accuracyRate !== undefined ? data.accuracyRate : (scoreData as any).accuracyRate || 0
     };
   }
@@ -99,7 +102,7 @@ const Conclusao: NextPage = () => {
             position: parsedData.position,
             instagram: parsedData.instagram,
             score: parsedData.score,
-            totalQuestions: parsedData.totalQuestions,
+            multipleChoiceQuestions: parsedData.multipleChoiceQuestions,
             accuracyRate: parsedData.accuracyRate
           })
           setCandidateData(parsedData)
@@ -160,7 +163,7 @@ const Conclusao: NextPage = () => {
             const updatedCandidateData = {
               ...candidateData,
               score: data.candidate.score,
-              totalQuestions: data.candidate.totalQuestions,
+              multipleChoiceQuestions: data.candidate.multipleChoiceQuestions,
               accuracyRate: data.candidate.accuracyRate,
               completed: true
             };
@@ -439,8 +442,13 @@ const Conclusao: NextPage = () => {
                     
                     <div className="text-center">
                       <p className="text-sm text-gray-600 mb-1">
-                        Você acertou <span className="font-semibold">{formatCandidateData(candidateData)?.score || 0}</span> de <span className="font-semibold">{formatCandidateData(candidateData)?.totalQuestions || 0}</span> questões
+                        Você acertou <span className="font-semibold">{formatCandidateData(candidateData)?.score || 0}</span> de <span className="font-semibold">{formatCandidateData(candidateData)?.multipleChoiceQuestions || 0}</span> questões de múltipla escolha
                       </p>
+                      {formatCandidateData(candidateData)?.opinionQuestions > 0 && (
+                        <p className="text-sm text-gray-600 mb-1">
+                          Você também respondeu <span className="font-semibold">{formatCandidateData(candidateData)?.opinionQuestions || 0}</span> questões opinativas
+                        </p>
+                      )}
                       <p className="text-sm text-gray-500">
                         Obrigado por participar do nosso processo seletivo!
                       </p>

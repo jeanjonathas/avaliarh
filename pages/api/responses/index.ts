@@ -124,6 +124,15 @@ export default async function handler(
             // Verificar se a questão é do tipo opinativo
             const isOpinionQuestion = question.type?.includes('OPINION') || false;
             
+            // Determinar se a resposta está correta com base na opção selecionada
+            // Para questões opinativas, todas as respostas são consideradas corretas
+            const isCorrect = isOpinionQuestion ? true : selectedOption.isCorrect;
+            
+            console.log(`Questão: ${question.text.substring(0, 30)}...`);
+            console.log(`Opção selecionada: ${selectedOption.text.substring(0, 30)}...`);
+            console.log(`É questão opinativa? ${isOpinionQuestion ? 'Sim' : 'Não'}`);
+            console.log(`Resposta correta? ${isCorrect ? 'Sim' : 'Não'}`);
+            
             // Obter a característica/personalidade associada à opção selecionada (para questões opinativas)
             const optionCharacteristic = (selectedOption as any).characteristic || 
                                         (selectedOption as any).personality || 
@@ -149,7 +158,7 @@ export default async function handler(
               timeSpent: response.timeSpent || 0,
               companyId: candidate.companyId || question.companyId,
               // Para questões opinativas, todas as respostas são consideradas corretas
-              isCorrect: isOpinionQuestion ? true : selectedOption.isCorrect,
+              isCorrect: isCorrect,
               // Campos de snapshot
               questionSnapshot: question,
               stageId: stageId || testQuestion?.stageId || null,
@@ -185,7 +194,7 @@ export default async function handler(
                     "optionId" = ${response.optionId},
                     "timeSpent" = ${response.timeSpent || 0},
                     "companyId" = ${candidate.companyId || question.companyId}, 
-                    "isCorrect" = ${isOpinionQuestion ? true : selectedOption.isCorrect},
+                    "isCorrect" = ${isCorrect},
                     "questionSnapshot" = ${JSON.stringify(question)}::jsonb,
                     "stageId" = ${stageId || testQuestion?.stageId || null},
                     "stageName" = ${testQuestion?.stage?.title || null},
@@ -307,7 +316,7 @@ export default async function handler(
                           _stageId: stageId || testQuestion?.stageId || null
                         })}::jsonb,
                         ${candidate.companyId || question.companyId}, 
-                        ${isOpinionQuestion ? true : selectedOption.isCorrect},
+                        ${isCorrect},
                         ${JSON.stringify(question)}::jsonb,
                         ${stageId || testQuestion?.stageId || null},
                         ${testQuestion?.stage?.title || null},

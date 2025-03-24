@@ -334,9 +334,18 @@ const TestStage: NextPage = () => {
         const hasOpinion = data.questions.some(q => q.type === 'OPINION_MULTIPLE');
         setHasOpinionQuestions(hasOpinion);
         
-        // Se houver questões opinativas, mostrar a modal
-        if (hasOpinion) {
+        // Verificar se TODAS as questões são opinativas
+        const allQuestionsAreOpinion = data.questions.length > 0 && 
+                                      data.questions.every(q => q.type === 'OPINION_MULTIPLE');
+        
+        // Se todas as questões forem opinativas, mostrar a modal
+        if (allQuestionsAreOpinion) {
+          console.log('Todas as questões são opinativas, exibindo modal de alerta');
           setShowOpinionModal(true);
+        } else if (hasOpinion) {
+          console.log('Etapa contém algumas questões opinativas, mas não todas');
+        } else {
+          console.log('Etapa não contém questões opinativas');
         }
 
         // Carregar respostas salvas do localStorage

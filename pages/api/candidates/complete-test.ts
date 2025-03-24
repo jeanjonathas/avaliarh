@@ -35,15 +35,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(`Candidato encontrado: ${candidate.name} (${candidate.email})`);
     console.log(`Status atual: completed=${candidate.completed}, status=${candidate.status}`);
     
-    // Buscar as respostas do candidato com informações sobre o tipo de questão
+    // Buscar as respostas do candidato
     const responses = await prisma.response.findMany({
       where: { candidateId },
-      select: {
-        id: true,
-        isCorrect: true,
-        questionType: true,
+      include: {
         question: {
           select: {
+            id: true,
             type: true
           }
         }
@@ -52,26 +50,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     console.log(`Candidato ${candidate.name} encontrado, processando ${responses.length} respostas`);
     
-    // Filtrar apenas as questões de múltipla escolha (não opinativas)
-    const multipleChoiceResponses = responses.filter(response => {
-      // Verificar se não é uma questão opinativa baseado no tipo da questão
-      // ou no questionType da resposta
-      const isOpinion = 
-        (response.question?.type === 'OPINION_MULTIPLE') || 
-        (response.questionType === 'OPINION_MULTIPLE') ||
-        (response.questionType === 'opinion');
-      
-      return !isOpinion;
-    });
+    // Separar as respostas por tipo de questão
+    const multipleChoiceResponses = responses.filter(r => r.question?.type === 'MULTIPLE_CHOICE');
+    const opinionResponses = responses.filter(r => r.question?.type === 'OPINION_MULTIPLE');
     
-    console.log(`Respostas de múltipla escolha: ${multipleChoiceResponses.length} de ${responses.length} total`);
+    console.log(`Respostas de múltipla escolha: ${multipleChoiceResponses.length}`);
+    console.log(`Respostas opinativas: ${opinionResponses.length}`);
     
     // Calcular a taxa de acerto apenas para questões de múltipla escolha
     const totalMultipleChoiceQuestions = multipleChoiceResponses.length;
-    const correctAnswers = multipleChoiceResponses.filter(r => r.isCorrect).length;
-    const accuracyRate = totalMultipleChoiceQuestions > 0 ? (correctAnswers / totalMultipleChoiceQuestions) * 100 : 0;
+    const correctMultipleChoiceAnswers = multipleChoiceResponses.filter(r => r.isCorrect).length;
+    const multipleChoiceAccuracyRate = totalMultipleChoiceQuestions > 0 
+      ? (correctMultipleChoiceAnswers / totalMultipleChoiceQuestions) * 100 
+      : 0;
     
-    console.log(`Desempenho do candidato em questões de múltipla escolha: ${correctAnswers}/${totalMultipleChoiceQuestions} (${accuracyRate.toFixed(1)}%)`);
+    // Total de todas as questões (múltipla escolha + opinativas)
+    const totalQuestions = responses.length;
+    
+    console.log(`Desempenho do candidato (múltipla escolha): ${correctMultipleChoiceAnswers}/${totalMultipleChoiceQuestions} (${multipleChoiceAccuracyRate.toFixed(1)}%)`);
+    console.log(`Total de questões (todas): ${totalQuestions}`);
     
     // Atualizar o candidato como concluído
     const updatedCandidate = await prisma.candidate.update({
@@ -79,19 +76,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       data: {
         completed: true,
         status: 'APPROVED',
-        score: correctAnswers,
+        score: correctMultipleChoiceAnswers, // Salvar apenas o número de acertos em questões de múltipla escolha
         updatedAt: new Date()
       }
     });
     
     console.log(`Candidato atualizado com sucesso: completed=${updatedCandidate.completed}, status=${updatedCandidate.status}`);
-    
-    // Armazenar informações de pontuação em uma variável para retornar na resposta
-    const scoreInfo = {
-      score: correctAnswers,
-      totalQuestions: totalMultipleChoiceQuestions,
-      accuracyRate: accuracyRate
-    };
     
     return res.status(200).json({ 
       success: true, 
@@ -100,9 +90,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         id: updatedCandidate.id,
         name: updatedCandidate.name,
         email: updatedCandidate.email,
-        score: correctAnswers,
-        totalQuestions: totalMultipleChoiceQuestions,
-        accuracyRate: accuracyRate,
+        score: correctMultipleChoiceAnswers,
+        multipleChoiceQuestions: totalMultipleChoiceQuestions,
+        opinionQuestions: opinionResponses.length,
+        accuracyRate: multipleChoiceAccuracyRate,
         completed: updatedCandidate.completed,
         status: updatedCandidate.status
       }

@@ -159,13 +159,49 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const multipleChoiceScore = accuracy;
       const opinionScore = personalityAnalysis.weightedScore || 0;
       
+      // Calcular a pontuação geral com base nos pesos definidos no processo seletivo
       let overallScore = 0;
+      
+      // Verificar se temos configurações de peso para o processo
+      let multipleChoiceWeight = 0.5; // Peso padrão para questões de múltipla escolha
+      let opinionWeight = 0.5; // Peso padrão para questões opinativas
+      
+      // Tentar obter os pesos definidos no processo seletivo
+      if (candidate.process?.stages && candidate.process.stages.length > 0) {
+        // Procurar por configurações de peso nas etapas do processo
+        const processConfig = candidate.process.stages.find(
+          (stage: any) => stage.personalityConfig && stage.personalityConfig.multipleChoiceWeight !== undefined
+        );
+        
+        if (processConfig) {
+          console.log('Configuração de pesos encontrada no processo seletivo');
+          multipleChoiceWeight = processConfig.personalityConfig.multipleChoiceWeight || 0.5;
+          opinionWeight = processConfig.personalityConfig.opinionWeight || 0.5;
+          
+          // Garantir que os pesos somam 1
+          const totalWeight = multipleChoiceWeight + opinionWeight;
+          if (totalWeight !== 0) {
+            multipleChoiceWeight = multipleChoiceWeight / totalWeight;
+            opinionWeight = opinionWeight / totalWeight;
+          }
+          
+          console.log(`Pesos ajustados: Múltipla escolha=${multipleChoiceWeight}, Opinativa=${opinionWeight}`);
+        }
+      }
+      
+      // Calcular a pontuação geral com base nos pesos e na presença de cada tipo de questão
       if (totalQuestions > 0 && opinionResponses.length > 0) {
-        overallScore = (multipleChoiceScore * 0.5) + (opinionScore * 0.5);
+        // Se temos ambos os tipos de questões, usar os pesos
+        overallScore = (multipleChoiceScore * multipleChoiceWeight) + (opinionScore * opinionWeight);
+        console.log(`Pontuação geral: (${multipleChoiceScore} * ${multipleChoiceWeight}) + (${opinionScore} * ${opinionWeight}) = ${overallScore}`);
       } else if (totalQuestions > 0) {
+        // Se só temos questões de múltipla escolha
         overallScore = multipleChoiceScore;
+        console.log(`Pontuação geral (apenas múltipla escolha): ${overallScore}`);
       } else if (opinionResponses.length > 0) {
+        // Se só temos questões opinativas
         overallScore = opinionScore;
+        console.log(`Pontuação geral (apenas opinativas): ${overallScore}`);
       }
 
       // Calcular a data de término com base na data de início e no tempo real gasto
