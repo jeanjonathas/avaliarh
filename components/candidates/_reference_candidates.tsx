@@ -1766,10 +1766,13 @@ const CandidateDetails = () => {
                               className="relative w-48 h-auto rounded-lg overflow-hidden border border-secondary-200 cursor-pointer"
                               onClick={() => setShowPhotoModal(true)}
                             >
-                              <img 
+                              <Image 
                                 src={candidate.photoUrl} 
                                 alt={`Foto de ${candidate.name}`}
                                 className="max-w-full w-full object-contain rounded-lg"
+                                fill
+                                sizes="40px"
+                                style={{ objectFit: 'cover' }}
                               />
                             </div>
                             <p className="text-sm text-secondary-600 mt-2">Clique na foto para visualizar em tamanho completo</p>

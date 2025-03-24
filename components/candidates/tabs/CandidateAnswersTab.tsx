@@ -1,5 +1,5 @@
 import { Candidate } from '../types'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'react-toastify'
 
 interface CandidateAnswersTabProps {
@@ -10,13 +10,7 @@ export const CandidateAnswersTab = ({ candidate }: CandidateAnswersTabProps) => 
   const [responses, setResponses] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (candidate.id) {
-      loadCandidateData()
-    }
-  }, [candidate.id])
-
-  const loadCandidateData = async () => {
+  const loadCandidateData = useCallback(async () => {
     setLoading(true)
 
     try {
@@ -43,7 +37,13 @@ export const CandidateAnswersTab = ({ candidate }: CandidateAnswersTabProps) => 
     } finally {
       setLoading(false)
     }
-  }
+  }, [candidate.id])
+
+  useEffect(() => {
+    if (candidate.id) {
+      loadCandidateData()
+    }
+  }, [candidate.id, loadCandidateData])
 
   // Função para verificar se a pergunta é opinativa
   const isOpinionQuestion = (response: any) => {

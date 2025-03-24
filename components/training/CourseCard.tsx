@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { FiBookOpen, FiLayers, FiClock, FiCheckCircle } from 'react-icons/fi';
 
 interface CourseCardProps {
@@ -59,10 +60,13 @@ export default function CourseCard({
         {/* Imagem do curso */}
         <div className="h-40 bg-primary-100 relative">
           {imageUrl ? (
-            <img
+            <Image
               src={imageUrl}
               alt={title}
-              className="w-full h-full object-cover"
+              fill
+              sizes="(max-width: 768px) 100vw, 384px"
+              style={{ objectFit: 'cover' }}
+              priority
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-r from-primary-500 to-primary-600">

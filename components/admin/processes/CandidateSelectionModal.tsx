@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import AddCandidateModal from '../../candidates/modals/AddCandidateModal';
 import { 
@@ -40,18 +40,11 @@ const CandidateSelectionModal: React.FC<CandidateSelectionModalProps> = ({
   const [selectionModel, setSelectionModel] = useState<GridRowSelectionModel>([]);
   const router = useRouter();
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchAvailableCandidates();
-    }
-  }, [isOpen, processId]);
-
-  const fetchAvailableCandidates = async () => {
+  const fetchAvailableCandidates = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Buscar candidatos que não estão associados ao processo atual
       const response = await fetch(`/api/admin/candidates/available?processId=${processId}`);
       
       if (!response.ok) {
@@ -66,7 +59,13 @@ const CandidateSelectionModal: React.FC<CandidateSelectionModalProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [processId]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchAvailableCandidates();
+    }
+  }, [isOpen, fetchAvailableCandidates]);
 
   const handleAddSelectedCandidates = async () => {
     if (selectionModel.length === 0) {

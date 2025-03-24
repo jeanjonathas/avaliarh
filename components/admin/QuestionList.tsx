@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { QuestionType, QuestionDifficulty } from '../../types/questions';
 import Link from 'next/link';
@@ -38,13 +38,7 @@ const QuestionList: React.FC = () => {
   const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
 
-  useEffect(() => {
-    fetchQuestions();
-    fetchCategories();
-    fetchTests();
-  }, [filterType, filterDifficulty, filterCategory, filterTest]);
-
-  const fetchQuestions = async () => {
+  const fetchQuestions = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -75,9 +69,9 @@ const QuestionList: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filterType, filterDifficulty, filterCategory, filterTest]);
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       const response = await fetch('/api/admin/categories');
       if (!response.ok) {
@@ -88,9 +82,9 @@ const QuestionList: React.FC = () => {
     } catch (err) {
       console.error('Erro ao buscar categorias:', err);
     }
-  };
+  }, []);
 
-  const fetchTests = async () => {
+  const fetchTests = useCallback(async () => {
     try {
       const response = await fetch('/api/admin/tests');
       if (!response.ok) {
@@ -101,7 +95,13 @@ const QuestionList: React.FC = () => {
     } catch (err) {
       console.error('Erro ao buscar testes:', err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchQuestions();
+    fetchCategories();
+    fetchTests();
+  }, [fetchQuestions, fetchCategories, fetchTests]);
 
   const handleEdit = (id: string, type: QuestionType) => {
     if (type === QuestionType.OPINION_MULTIPLE) {

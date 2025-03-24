@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, ReactNode } from 'react';
+import React, { useRef, useEffect, useCallback, ReactNode } from 'react';
 
 interface ModalProps {
   isOpen: boolean;
@@ -28,13 +28,13 @@ const Modal: React.FC<ModalProps> = ({
   const modalRef = useRef<HTMLDivElement>(null);
   
   // Função para lidar com o fechamento do modal
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     if (onClose) {
       onClose();
     } else if (onCancel) {
       onCancel();
     }
-  };
+  }, [onClose, onCancel]);
 
   useEffect(() => {
     // Focar no modal quando aberto para acessibilidade
@@ -63,11 +63,11 @@ const Modal: React.FC<ModalProps> = ({
   }, [isOpen, handleClose]);
 
   // Fechar o modal se clicar fora dele
-  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleBackdropClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) {
       handleClose();
     }
-  };
+  }, [handleClose]);
 
   // Definir as cores com base no tipo de modal
   const getTypeStyles = () => {

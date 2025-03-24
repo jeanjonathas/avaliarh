@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { toast } from 'react-hot-toast';
 import axios from 'axios';
+import Image from 'next/image';
 
 interface User {
   id: string;
@@ -319,8 +320,15 @@ const UserSettings: React.FC<UserSettingsProps> = ({ users, onUpdate }) => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         {user.image ? (
-                          <div className="flex-shrink-0 h-10 w-10">
-                            <img className="h-10 w-10 rounded-full" src={user.image} alt="" />
+                          <div className="flex-shrink-0 h-10 w-10 relative">
+                            <Image 
+                              className="rounded-full" 
+                              src={user.image} 
+                              alt={`Foto de perfil de ${user.name}`}
+                              fill
+                              sizes="40px"
+                              style={{ objectFit: 'cover' }}
+                            />
                           </div>
                         ) : (
                           <div className="flex-shrink-0 h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center">
