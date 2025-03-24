@@ -386,11 +386,16 @@ export const CandidateInfoTab = ({ candidate, onUpdate }: CandidateInfoTabProps)
                     className="relative w-48 h-auto rounded-lg overflow-hidden border border-secondary-200 cursor-pointer"
                     onClick={() => setShowPhotoModal(true)}
                   >
-                    <img 
-                      src={candidate.photoUrl} 
-                      alt={`Foto de ${candidate.name}`}
-                      className="max-w-full w-full object-contain rounded-lg"
-                    />
+                    <div className="relative w-full" style={{ aspectRatio: '1' }}>
+                      <Image 
+                        src={candidate.photoUrl} 
+                        alt={`Foto de ${candidate.name}`}
+                        fill
+                        sizes="(max-width: 768px) 100vw, 192px"
+                        style={{ objectFit: 'contain' }}
+                        className="rounded-lg"
+                      />
+                    </div>
                   </div>
                   <p className="text-sm text-secondary-600 mt-2">Clique na foto para visualizar em tamanho completo</p>
                 </div>
