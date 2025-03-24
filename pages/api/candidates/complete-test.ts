@@ -35,23 +35,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(`Candidato encontrado: ${candidate.name} (${candidate.email})`);
     console.log(`Status atual: completed=${candidate.completed}, status=${candidate.status}`);
     
-    // Buscar as respostas do candidato separadamente
+    // Buscar as respostas do candidato com informações sobre o tipo de questão
     const responses = await prisma.response.findMany({
       where: { candidateId },
       select: {
         id: true,
-        isCorrect: true
+        isCorrect: true,
+        questionType: true,
+        question: {
+          select: {
+            type: true
+          }
+        }
       }
     });
     
     console.log(`Candidato ${candidate.name} encontrado, processando ${responses.length} respostas`);
     
-    // Calcular a taxa de acerto
-    const totalQuestions = responses.length;
-    const correctAnswers = responses.filter(r => r.isCorrect).length;
-    const accuracyRate = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
+    // Filtrar apenas as questões de múltipla escolha (não opinativas)
+    const multipleChoiceResponses = responses.filter(response => {
+      // Verificar se não é uma questão opinativa baseado no tipo da questão
+      // ou no questionType da resposta
+      const isOpinion = 
+        (response.question?.type === 'OPINION_MULTIPLE') || 
+        (response.questionType === 'OPINION_MULTIPLE') ||
+        (response.questionType === 'opinion');
+      
+      return !isOpinion;
+    });
     
-    console.log(`Desempenho do candidato: ${correctAnswers}/${totalQuestions} (${accuracyRate}%)`);
+    console.log(`Respostas de múltipla escolha: ${multipleChoiceResponses.length} de ${responses.length} total`);
+    
+    // Calcular a taxa de acerto apenas para questões de múltipla escolha
+    const totalMultipleChoiceQuestions = multipleChoiceResponses.length;
+    const correctAnswers = multipleChoiceResponses.filter(r => r.isCorrect).length;
+    const accuracyRate = totalMultipleChoiceQuestions > 0 ? (correctAnswers / totalMultipleChoiceQuestions) * 100 : 0;
+    
+    console.log(`Desempenho do candidato em questões de múltipla escolha: ${correctAnswers}/${totalMultipleChoiceQuestions} (${accuracyRate.toFixed(1)}%)`);
     
     // Atualizar o candidato como concluído
     const updatedCandidate = await prisma.candidate.update({
@@ -69,7 +89,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Armazenar informações de pontuação em uma variável para retornar na resposta
     const scoreInfo = {
       score: correctAnswers,
-      totalQuestions: totalQuestions,
+      totalQuestions: totalMultipleChoiceQuestions,
       accuracyRate: accuracyRate
     };
     
@@ -81,7 +101,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         name: updatedCandidate.name,
         email: updatedCandidate.email,
         score: correctAnswers,
-        totalQuestions: totalQuestions,
+        totalQuestions: totalMultipleChoiceQuestions,
         accuracyRate: accuracyRate,
         completed: updatedCandidate.completed,
         status: updatedCandidate.status
