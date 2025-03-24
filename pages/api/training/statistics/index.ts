@@ -47,13 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       FROM "CourseEnrollment" ce
       JOIN "TrainingCourse" tc ON ce."courseId" = tc.id
       WHERE ce."studentId" = ${studentId}
-      AND (
-        SELECT COUNT(tl.id) = COUNT(lp.id)
-        FROM "TrainingModule" tm 
-        JOIN "TrainingLesson" tl ON tl."moduleId" = tm.id 
-        LEFT JOIN "LessonProgress" lp ON lp."lessonId" = tl.id AND lp."studentId" = ${studentId} AND lp.completed = true
-        WHERE tm."courseId" = tc.id AND COUNT(tl.id) > 0
-      )
+      AND ce."completionDate" IS NOT NULL
     `;
     
     const completedCourses = parseInt(completedCoursesResult[0].count);
@@ -62,18 +56,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const inProgressCoursesResult = await prisma.$queryRaw<{ count: string }[]>`
       SELECT COUNT(DISTINCT ce.id) as count
       FROM "CourseEnrollment" ce
-      JOIN "TrainingCourse" tc ON ce."courseId" = tc.id
-      JOIN "TrainingModule" tm ON tm."courseId" = tc.id
-      JOIN "TrainingLesson" tl ON tl."moduleId" = tm.id
-      JOIN "LessonProgress" lp ON lp."lessonId" = tl.id AND lp."studentId" = ${studentId} AND lp.completed = true
       WHERE ce."studentId" = ${studentId}
-      AND (
-        SELECT COUNT(tl2.id) > COUNT(lp2.id)
-        FROM "TrainingModule" tm2 
-        JOIN "TrainingLesson" tl2 ON tl2."moduleId" = tm2.id 
-        LEFT JOIN "LessonProgress" lp2 ON lp2."lessonId" = tl2.id AND lp2."studentId" = ${studentId} AND lp2.completed = true
-        WHERE tm2."courseId" = tc.id
-      )
+      AND ce.progress > 0
+      AND ce.progress < 100
     `;
     
     const inProgressCourses = parseInt(inProgressCoursesResult[0].count);
@@ -99,10 +84,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Buscar tempo total gasto (em minutos)
     const totalTimeSpentResult = await prisma.$queryRaw<{ total: string | null }[]>`
-      SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (tal."endTime" - tal."startTime")) / 60), 0) as total
+      SELECT COALESCE(SUM("timeSpent") / 60, 0) as total
       FROM "TrainingAccessLog" tal
       WHERE tal."studentId" = ${studentId}
-      AND tal."endTime" IS NOT NULL
     `;
     
     const totalTimeSpent = totalTimeSpentResult[0].total ? Math.round(parseFloat(totalTimeSpentResult[0].total)) : 0;
