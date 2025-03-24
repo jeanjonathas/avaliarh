@@ -48,6 +48,7 @@ interface QuestionFormProps {
   onCancel?: () => void;
   onSuccess?: () => void;
   hideStageField?: boolean;
+  questionType?: string;
 }
 
 const QuestionForm: React.FC<QuestionFormProps> = ({
@@ -59,7 +60,8 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
   preSelectedStageId = '',
   onCancel,
   onSuccess,
-  hideStageField = false
+  hideStageField = false,
+  questionType,
 }) => {
   const notify = useNotificationSystem();
   const [existingOpinions, setExistingOpinions] = useState<string[]>([]);
@@ -151,6 +153,8 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
       // Se categoryUuid estiver definido e não for string vazia, usá-lo como categoryId
       // Caso contrário, definir explicitamente como null para remover a categoria
       categoryId: values.categoryUuid && values.categoryUuid !== "" ? values.categoryUuid : null,
+      // Adicionar o tipo de questão, se fornecido
+      questionType: questionType || values.questionType
     };
     
     // Log para debug
