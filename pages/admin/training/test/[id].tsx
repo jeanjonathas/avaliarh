@@ -1,5 +1,5 @@
 import { NextPage } from 'next'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/router'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
@@ -116,12 +116,16 @@ const TestDetail: NextPage = () => {
   // Estado para armazenar o tipo de pergunta da etapa selecionada
   const [selectedStageQuestionType, setSelectedStageQuestionType] = useState<string | null>(null);
   
+  // Referência para controlar se os dados já foram carregados
+  const hasLoadedDataRef = useRef(false);
+  
+  // Verificar autenticação e redirecionar se necessário
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/admin/login')
+      router.push('/admin/login');
     }
-  }, [status, router])
-
+  }, [status, router]);
+  
   useEffect(() => {
     const fetchData = async () => {
       if (!id || typeof id !== 'string') return
@@ -134,7 +138,14 @@ const TestDetail: NextPage = () => {
         // Buscar dados do teste
         console.log(`[TestDetail] Fazendo requisição para /api/admin/training/tests/${id}`)
         addDebugLog(`Fazendo requisição para /api/admin/training/tests/${id}`)
-        const testResponse = await fetch(`/api/admin/training/tests/${id}`)
+        const testResponse = await fetch(`/api/admin/training/tests/${id}`, {
+          // Adicionar cabeçalhos para evitar problemas de cache
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        })
+        
         if (!testResponse.ok) {
           throw new Error('Erro ao carregar os dados do teste')
         }
@@ -209,7 +220,12 @@ const TestDetail: NextPage = () => {
         setTest(adaptedTest)
         
         // Buscar todas as etapas disponíveis
-        const stagesResponse = await fetch('/api/admin/stages')
+        const stagesResponse = await fetch('/api/admin/stages', {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        })
         if (!stagesResponse.ok) {
           throw new Error('Erro ao carregar as etapas')
         }
@@ -217,7 +233,12 @@ const TestDetail: NextPage = () => {
         setStages(stagesData)
         
         // Buscar todas as categorias
-        const categoriesResponse = await fetch('/api/admin/categories')
+        const categoriesResponse = await fetch('/api/admin/categories', {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        })
         if (!categoriesResponse.ok) {
           throw new Error('Erro ao carregar as categorias')
         }
@@ -226,7 +247,12 @@ const TestDetail: NextPage = () => {
         setCategories(categoriesData)
         
         // Buscar todas as perguntas
-        const questionsResponse = await fetch('/api/admin/questions')
+        const questionsResponse = await fetch('/api/admin/questions', {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        })
         if (!questionsResponse.ok) {
           throw new Error('Erro ao carregar as perguntas')
         }
@@ -238,40 +264,52 @@ const TestDetail: NextPage = () => {
         notify.showError('Não foi possível carregar os dados do teste. Por favor, tente novamente.')
       } finally {
         setPageLoading(false)
+        hasLoadedDataRef.current = true;
       }
     }
 
-    if (status === 'authenticated' && id) {
-      fetchData()
+    // Verificar se já carregamos os dados para evitar loop infinito
+    if (status === 'authenticated' && id && !hasLoadedDataRef.current) {
+      console.log(`[TestDetail] Carregando dados pela primeira vez para o teste ID: ${id}`);
+      fetchData();
+    } else if (hasLoadedDataRef.current) {
+      console.log(`[TestDetail] Dados já foram carregados anteriormente, ignorando chamada`);
     }
-  }, [id, status, notify])
+    
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, status]); // Removendo notify das dependências para evitar re-renderizações desnecessárias
 
   // Função para recarregar os dados do teste
   const reloadTestData = async () => {
     if (!id || typeof id !== 'string') return
 
     try {
-      console.log('Iniciando recarregamento de dados...');
+      console.log('[TestDetail] Iniciando recarregamento de dados...');
       setTestDataLoading(true)
       
       // Buscar dados do teste
-      console.log('Fazendo requisição para:', `/api/admin/training/tests/${id}`);
-      const testResponse = await fetch(`/api/admin/training/tests/${id}`)
+      console.log('[TestDetail] Fazendo requisição para:', `/api/admin/training/tests/${id}`);
+      const testResponse = await fetch(`/api/admin/training/tests/${id}`, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      })
       if (!testResponse.ok) {
         throw new Error('Erro ao carregar os dados do teste')
       }
       const testData = await testResponse.json()
-      console.log('Dados recebidos da API:', testData);
+      console.log('[TestDetail] Dados recebidos da API:', testData);
       
       if (testData.stages && testData.stages.length > 0) {
-        console.log('Ordens das etapas ANTES de ordenar:', testData.stages.map(s => ({ id: s.id, title: s.title, order: s.order })));
+        console.log('[TestDetail] Ordens das etapas ANTES de ordenar:', testData.stages.map(s => ({ id: s.id, title: s.title, order: s.order })));
       }
       
       // Garantir que as etapas estejam ordenadas corretamente
       const orderedStages = testData.stages ? [...testData.stages].sort((a, b) => a.order - b.order) : [];
       
       if (orderedStages.length > 0) {
-        console.log('Ordens das etapas DEPOIS de ordenar:', orderedStages.map(s => ({ id: s.id, title: s.title, order: s.order })));
+        console.log('[TestDetail] Ordens das etapas DEPOIS de ordenar:', orderedStages.map(s => ({ id: s.id, title: s.title, order: s.order })));
       }
       
       // Adaptar a estrutura de dados para o formato esperado pelo componente
@@ -295,9 +333,9 @@ const TestDetail: NextPage = () => {
         }))
       }
       
-      console.log('Adaptação concluída, atualizando estado...');
+      console.log('[TestDetail] Adaptação concluída, atualizando estado...');
       setTest(adaptedTest)
-      console.log('Estado atualizado com sucesso');
+      console.log('[TestDetail] Estado atualizado com sucesso');
     } catch (error) {
       console.error('Erro ao recarregar dados:', error)
       notify.showError('Não foi possível recarregar os dados do teste. Por favor, tente novamente.')
@@ -973,14 +1011,14 @@ const TestDetail: NextPage = () => {
 
   if (!test) {
     return (
-      <AdminLayout activeSection="selecao">
+      <AdminLayout activeSection="treinamento">
         <div className="p-6">
           <div className="container mx-auto">
             <div className="bg-white rounded-lg shadow-md p-6 text-center">
               <h2 className="text-xl font-semibold text-secondary-800 mb-2">Teste não encontrado</h2>
               <p className="text-secondary-600 mb-4">O teste solicitado não foi encontrado ou você não tem permissão para acessá-lo.</p>
               <Link 
-                href="/admin/tests"
+                href="/admin/training/tests"
                 className="px-4 py-2 text-sm text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50"
               >
                 Voltar para a lista de testes
@@ -993,11 +1031,11 @@ const TestDetail: NextPage = () => {
   }
 
   return (
-    <AdminLayout activeSection="selecao">
+    <AdminLayout activeSection="treinamento">
       <div className="p-6">
         <div className="container mx-auto">
           <div className="mb-6">
-            <Link href="/admin/tests" className="text-primary-600 hover:text-primary-800 flex items-center">
+            <Link href="/admin/training/tests" className="text-primary-600 hover:text-primary-800 flex items-center">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
@@ -1024,7 +1062,7 @@ const TestDetail: NextPage = () => {
                 </div>
               </div>
               <Link 
-                href={`/admin/tests`}
+                href={`/admin/training/tests`}
                 className="px-4 py-2 text-sm text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50"
               >
                 Editar teste
@@ -1198,7 +1236,7 @@ const TestDetail: NextPage = () => {
                                 .map((questionStage, qIndex) => (
                                   <div key={questionStage.id} className="border border-secondary-200 rounded-md p-4">
                                     <div className="flex justify-between">
-                                      <div className="flex-1">
+                                      <div>
                                         <div className="font-medium text-secondary-800">
                                           <span className="mr-2">{qIndex + 1}.</span>
                                           <span dangerouslySetInnerHTML={{ __html: questionStage.question.text }} />
@@ -1538,177 +1576,158 @@ const TestDetail: NextPage = () => {
                               {category.name}
                             </span>
                           ))}
-                        </div>
-                        <div className="mt-2">
-                          {question.categories && question.categories.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              <span className="text-xs text-gray-500 mr-1">Categorias:</span>
-                              {question.categories.map(category => (
-                                <span 
-                                  key={`${question.id}-${category.id}`}
-                                  className="px-2 py-1 text-xs bg-indigo-100 text-indigo-800 border border-indigo-300 rounded-full flex items-center"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                                  </svg>
-                                  {category.name}
-                                </span>
-                              ))}
+                                         </div>                                        
+                                      </div>
+                                      <div className="mt-3 flex justify-end">
+                                        <div className={`h-6 w-6 rounded-full border ${
+                                          selectedQuestions.includes(question.id)
+                                            ? 'bg-primary-500 border-primary-600 text-white'
+                                            : 'border-secondary-400'
+                                        } flex items-center justify-center`}>
+                                          {selectedQuestions.includes(question.id) && (
+                                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                            </svg>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                          )}
+                            
+                            <div className="flex justify-end space-x-3 mt-6">
+                              <button
+                                onClick={() => setShowAddQuestionsModal(false)}
+                                className="px-4 py-2 text-sm text-secondary-600 border border-secondary-300 rounded-md hover:bg-secondary-50"
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                onClick={addQuestionsToStage}
+                                className="px-4 py-2 text-sm text-white bg-primary-600 rounded-md hover:bg-primary-700"
+                                disabled={selectedQuestions.length === 0}
+                              >
+                                Adicionar {selectedQuestions.length} pergunta(s)
+                              </button>
+                              <button
+                                onClick={() => setShowQuestionTypeModal(true)}
+                                className="px-4 py-2 text-sm text-white bg-primary-600 rounded-md hover:bg-primary-700"
+                              >
+                                Criar Nova Pergunta
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      )}
                       
-                      <div className="mt-3 flex justify-end">
-                        <div className={`h-6 w-6 rounded-full border ${
-                          selectedQuestions.includes(question.id)
-                            ? 'bg-primary-500 border-primary-600 text-white'
-                            : 'border-secondary-400'
-                        } flex items-center justify-center`}>
-                          {selectedQuestions.includes(question.id) && (
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          )}
+                      {/* Modal para escolher o tipo de pergunta */}
+                      {showQuestionTypeModal && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+                            <h2 className="text-xl font-semibold text-secondary-800 mb-4">Escolha o Tipo de Pergunta</h2>
+                            
+                            <div className="space-y-4">
+                              <div 
+                                className="p-4 border border-blue-300 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors flex items-center"
+                                onClick={() => {
+                                  setSelectedQuestionType(QuestionType.MULTIPLE_CHOICE);
+                                  setShowQuestionTypeModal(false);
+                                  setShowNewQuestionForm(true);
+                                }}
+                              >
+                                <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 mr-4">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                </div>
+                                <div>
+                                  <h3 className="font-medium text-gray-800">Múltipla Escolha</h3>
+                                  <p className="text-sm text-gray-600">Pergunta com uma única resposta correta</p>
+                                </div>
+                              </div>
+                              
+                              <div 
+                                className="p-4 border border-purple-300 rounded-lg cursor-pointer hover:bg-purple-50 transition-colors flex items-center"
+                                onClick={() => {
+                                  setSelectedQuestionType(QuestionType.OPINION_MULTIPLE);
+                                  setShowQuestionTypeModal(false);
+                                  // Redirecionar para a página de criação de perguntas opinativas
+                                  router.push({
+                                    pathname: '/admin/questions/add-opinion',
+                                    query: { stageId: selectedStageId }
+                                  });
+                                }}
+                              >
+                                <div className="flex-shrink-0 w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 mr-4">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                                  </svg>
+                                </div>
+                                <div>
+                                  <h3 className="font-medium text-gray-800">Opinativa</h3>
+                                  <p className="text-sm text-gray-600">Avalia o perfil e personalidade do candidato</p>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="flex justify-end mt-6">
+                              <button
+                                onClick={() => setShowQuestionTypeModal(false)}
+                                className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            
-            <div className="flex justify-end space-x-3 mt-6">
-              <button
-                onClick={() => setShowAddQuestionsModal(false)}
-                className="px-4 py-2 text-sm text-secondary-600 border border-secondary-300 rounded-md hover:bg-secondary-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={addQuestionsToStage}
-                className="px-4 py-2 text-sm text-white bg-primary-600 rounded-md hover:bg-primary-700"
-                disabled={selectedQuestions.length === 0}
-              >
-                Adicionar {selectedQuestions.length} pergunta(s)
-              </button>
-              <button
-                onClick={() => setShowQuestionTypeModal(true)}
-                className="px-4 py-2 text-sm text-white bg-primary-600 rounded-md hover:bg-primary-700"
-              >
-                Criar Nova Pergunta
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Modal para escolher o tipo de pergunta */}
-      {showQuestionTypeModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-            <h2 className="text-xl font-semibold text-secondary-800 mb-4">Escolha o Tipo de Pergunta</h2>
-            
-            <div className="space-y-4">
-              <div 
-                className="p-4 border border-blue-300 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors flex items-center"
-                onClick={() => {
-                  setSelectedQuestionType(QuestionType.MULTIPLE_CHOICE);
-                  setShowQuestionTypeModal(false);
-                  setShowNewQuestionForm(true);
-                }}
-              >
-                <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 mr-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="font-medium text-gray-800">Múltipla Escolha</h3>
-                  <p className="text-sm text-gray-600">Pergunta com uma única resposta correta</p>
-                </div>
-              </div>
-              
-              <div 
-                className="p-4 border border-purple-300 rounded-lg cursor-pointer hover:bg-purple-50 transition-colors flex items-center"
-                onClick={() => {
-                  setSelectedQuestionType(QuestionType.OPINION_MULTIPLE);
-                  setShowQuestionTypeModal(false);
-                  // Redirecionar para a página de criação de perguntas opinativas
-                  router.push({
-                    pathname: '/admin/questions/add-opinion',
-                    query: { stageId: selectedStageId }
-                  });
-                }}
-              >
-                <div className="flex-shrink-0 w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 mr-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="font-medium text-gray-800">Opinativa</h3>
-                  <p className="text-sm text-gray-600">Avalia o perfil e personalidade do candidato</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex justify-end mt-6">
-              <button
-                onClick={() => setShowQuestionTypeModal(false)}
-                className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Modal para criar nova pergunta de múltipla escolha */}
-      {showNewQuestionForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-3xl mx-auto my-8">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-secondary-800">Adicionar Pergunta de Múltipla Escolha</h2>
-              <button 
-                onClick={() => setShowNewQuestionForm(false)}
-                className="text-gray-500 hover:text-gray-700 focus:outline-none"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            
-            <div className="overflow-y-auto max-h-[70vh]">
-              <QuestionForm
-                stages={stages}
-                categories={categories}
-                preSelectedStageId={selectedStageId || undefined}
-                onSubmit={handleCreateQuestion}
-                onCancel={() => setShowNewQuestionForm(false)}
-                onSuccess={() => {
-                  notify.showSuccess('Pergunta criada com sucesso!');
-                  setShowNewQuestionForm(false);
-                }}
-                hideStageField={true}
-                initialValues={{
-                  type: selectedQuestionType || QuestionType.MULTIPLE_CHOICE,
-                  text: '',
-                  options: [
-                    { text: '', isCorrect: false },
-                    { text: '', isCorrect: false }
-                  ],
-                  difficulty: 'MEDIUM'
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-    </AdminLayout>
-  )
+                      )}
+                      
+                      {/* Modal para criar nova pergunta de múltipla escolha */}
+                      {showNewQuestionForm && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+                          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-3xl mx-auto my-8">
+                            <div className="flex justify-between items-center mb-4">
+                              <h2 className="text-xl font-semibold text-secondary-800">Adicionar Pergunta de Múltipla Escolha</h2>
+                              <button 
+                                onClick={() => setShowNewQuestionForm(false)}
+                                className="text-gray-500 hover:text-gray-700 focus:outline-none"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                            
+                            <div className="overflow-y-auto flex-1">
+                              <QuestionForm
+                                stages={stages}
+                                categories={categories}
+                                preSelectedStageId={selectedStageId || undefined}
+                                onSubmit={handleCreateQuestion}
+                                onCancel={() => setShowNewQuestionForm(false)}
+                                onSuccess={() => {
+                                  notify.showSuccess('Pergunta criada com sucesso!');
+                                  setShowNewQuestionForm(false);
+                                }}
+                                hideStageField={true}
+                                initialValues={{
+                                  type: selectedQuestionType || QuestionType.MULTIPLE_CHOICE,
+                                  text: '',
+                                  options: [
+                                    { text: '', isCorrect: false },
+                                    { text: '', isCorrect: false }
+                                  ],
+                                  difficulty: 'MEDIUM'
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </AdminLayout>
+                  )
 }
 
 export default TestDetail

@@ -1,5 +1,5 @@
 import { NextPage } from 'next'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/router'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
@@ -36,6 +36,7 @@ const Tests: NextPage = () => {
   const [error, setError] = useState('')
   const [isEditing, setIsEditing] = useState(false)
   const [currentTest, setCurrentTest] = useState<Test | null>(null)
+  const hasLoadedTestsRef = useRef(false)
   
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -46,26 +47,44 @@ const Tests: NextPage = () => {
   useEffect(() => {
     const fetchTests = async () => {
       try {
-        setLoading(true)
-        const response = await fetch('/api/admin/training/tests')
+        console.log("Iniciando carregamento dos testes de treinamento...");
+        setLoading(true);
+        
+        const response = await fetch('/api/admin/training/tests', {
+          // Adicionar cabeçalhos para evitar problemas de cache
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        
         if (!response.ok) {
-          throw new Error('Erro ao carregar os testes')
+          throw new Error('Erro ao carregar os testes');
         }
-        const data = await response.json()
-        setTests(data.tests || [])
+        
+        const data = await response.json();
+        console.log(`Testes de treinamento carregados com sucesso: ${data.tests?.length || 0}`);
+        setTests(data.tests || []);
       } catch (error) {
-        console.error('Erro:', error)
-        setError('Não foi possível carregar os testes. Por favor, tente novamente.')
-        notify.showError('Não foi possível carregar os testes. Por favor, tente novamente.')
+        console.error('Erro ao carregar testes:', error);
+        setError('Não foi possível carregar os testes. Por favor, tente novamente.');
+        notify.showError('Não foi possível carregar os testes. Por favor, tente novamente.');
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
+    };
+    
+    // Verificar se já carregamos os testes para evitar loop infinito
+    if (status === 'authenticated' && !hasLoadedTestsRef.current) {
+      console.log("Carregando testes de treinamento pela primeira vez...");
+      hasLoadedTestsRef.current = true; // Marcar como carregado antes de fazer a chamada
+      fetchTests();
+    } else if (hasLoadedTestsRef.current) {
+      console.log("Testes já foram carregados anteriormente, ignorando chamada");
     }
     
-    if (status === 'authenticated') {
-      fetchTests()
-    }
-  }, [status, notify])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]); // Removendo notify das dependências para evitar re-renderizações desnecessárias
   
   const handleSubmit = async (values: any, { resetForm }: any) => {
     try {
@@ -76,6 +95,8 @@ const Tests: NextPage = () => {
         method,
         headers: {
           'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
         },
         body: JSON.stringify(values),
       })
@@ -85,10 +106,21 @@ const Tests: NextPage = () => {
         throw new Error(errorData.error || `Erro ao ${isEditing ? 'atualizar' : 'criar'} o teste`)
       }
       
-      // Atualizar a lista de testes
-      const testsResponse = await fetch('/api/admin/training/tests')
-      const testsData = await testsResponse.json()
-      setTests(testsData.tests || [])
+      // Atualizar a lista de testes manualmente sem fazer uma nova chamada à API
+      const responseData = await response.json();
+      const newOrUpdatedTest = responseData.test;
+      
+      if (isEditing) {
+        // Atualizar o teste existente na lista
+        setTests(prevTests => 
+          prevTests.map(test => 
+            test.id === newOrUpdatedTest.id ? newOrUpdatedTest : test
+          )
+        );
+      } else {
+        // Adicionar o novo teste à lista
+        setTests(prevTests => [...prevTests, newOrUpdatedTest]);
+      }
       
       // Limpar o formulário e o estado de edição
       resetForm()
@@ -108,14 +140,9 @@ const Tests: NextPage = () => {
     setCurrentTest(null)
   }
   
-  const handleDelete = async (id: string) => {
-    // Encontrar o teste para mostrar o título na confirmação
+  const handleDelete = (id: string) => {
     const testToDelete = tests.find(test => test.id === id);
-    
-    if (!testToDelete) {
-      notify.showError('Teste não encontrado');
-      return;
-    }
+    if (!testToDelete) return;
     
     // Usar o sistema de notificações para confirmar a exclusão
     notify.confirm(
@@ -125,21 +152,25 @@ const Tests: NextPage = () => {
         try {
           const response = await fetch(`/api/admin/training/tests/${id}`, {
             method: 'DELETE',
-          })
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            }
+          });
           
           if (!response.ok) {
-            const errorData = await response.json()
-            throw new Error(errorData.error || 'Erro ao excluir o teste')
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Erro ao excluir o teste');
           }
           
-          // Atualizar a lista de testes
-          setTests(tests.filter(test => test.id !== id))
+          // Atualizar a lista de testes localmente
+          setTests(tests.filter(test => test.id !== id));
           
           // Mostrar mensagem de sucesso
-          notify.showSuccess('Teste excluído com sucesso!')
+          notify.showSuccess('Teste excluído com sucesso!');
         } catch (error) {
-          console.error('Erro:', error)
-          notify.showError('Ocorreu um erro ao excluir o teste. Por favor, tente novamente.')
+          console.error('Erro ao excluir teste:', error);
+          notify.showError('Ocorreu um erro ao excluir o teste. Por favor, tente novamente.');
         }
       },
       {
@@ -151,8 +182,8 @@ const Tests: NextPage = () => {
   }
   
   const handleEdit = (test: Test) => {
-    setCurrentTest(test)
-    setIsEditing(true)
+    setCurrentTest(test);
+    setIsEditing(true);
   }
   
   const handleToggleActive = async (id: string, currentActive: boolean) => {
@@ -161,25 +192,27 @@ const Tests: NextPage = () => {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
         },
         body: JSON.stringify({ active: !currentActive }),
-      })
+      });
       
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Erro ao atualizar o status do teste')
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao atualizar o status do teste');
       }
       
-      // Atualizar o teste na lista
-      setTests(tests.map(test => 
+      // Atualizar o teste na lista localmente
+      setTests(prevTests => prevTests.map(test => 
         test.id === id ? { ...test, active: !currentActive } : test
-      ))
+      ));
       
       // Mostrar mensagem de sucesso
-      notify.showSuccess(`Teste ${!currentActive ? 'ativado' : 'desativado'} com sucesso!`)
+      notify.showSuccess(`Teste ${!currentActive ? 'ativado' : 'desativado'} com sucesso!`);
     } catch (error) {
-      console.error('Erro:', error)
-      notify.showError('Ocorreu um erro ao atualizar o status do teste. Por favor, tente novamente.')
+      console.error('Erro ao atualizar status:', error);
+      notify.showError('Ocorreu um erro ao atualizar o status do teste. Por favor, tente novamente.');
     }
   }
   
