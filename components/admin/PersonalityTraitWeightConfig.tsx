@@ -559,6 +559,8 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
     );
   });
 
+  DraggableItem.displayName = 'DraggableItem';
+
   // Componente de área soltável memoizado para melhor performance
   const DroppableArea = React.memo(({ group, onRemoveTrait }: {
     group: TraitGroup;
@@ -589,6 +591,8 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
       </Droppable>
     );
   });
+
+  DroppableArea.displayName = 'DroppableArea';
 
   return (
     <div className="space-y-6">
