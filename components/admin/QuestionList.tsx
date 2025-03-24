@@ -112,10 +112,19 @@ const QuestionList: React.FC<QuestionListProps> = ({
       }
       
       const data = await response.json();
-      setTests(data);
+      // Verificar se a resposta contém um array de testes ou se está em uma propriedade
+      if (data.tests && Array.isArray(data.tests)) {
+        setTests(data.tests);
+      } else if (Array.isArray(data)) {
+        setTests(data);
+      } else {
+        console.error('Formato de resposta inesperado:', data);
+        setTests([]);
+      }
     } catch (error) {
       console.error('Erro ao buscar testes:', error);
       setError('Falha ao carregar testes');
+      setTests([]);
     }
   }, [questionType]);
 

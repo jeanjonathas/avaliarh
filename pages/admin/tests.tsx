@@ -1,5 +1,5 @@
 import { NextPage } from 'next'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/router'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
@@ -35,6 +35,7 @@ const Tests: NextPage = () => {
   const [error, setError] = useState('')
   const [isEditing, setIsEditing] = useState(false)
   const [currentTest, setCurrentTest] = useState<Test | null>(null)
+  const hasLoadedTests = useRef(false);
   
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -46,11 +47,13 @@ const Tests: NextPage = () => {
     const fetchTests = async () => {
       try {
         setLoading(true)
+        console.log('Iniciando busca de testes...')
         const response = await fetch('/api/admin/tests')
         if (!response.ok) {
           throw new Error('Erro ao carregar os testes')
         }
         const data = await response.json()
+        console.log('Testes carregados com sucesso:', data.tests?.length || 0)
         setTests(data.tests || [])
       } catch (error) {
         console.error('Erro:', error)
@@ -61,10 +64,11 @@ const Tests: NextPage = () => {
       }
     }
     
-    if (status === 'authenticated') {
-      fetchTests()
+    if (status === 'authenticated' && !hasLoadedTests.current) {
+      hasLoadedTests.current = true;
+      fetchTests();
     }
-  }, [status, notify])
+  }, [status, notify]);
   
   const handleSubmit = async (values: any, { resetForm }: any) => {
     try {
