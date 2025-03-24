@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { getSession } from 'next-auth/react';
 import Head from 'next/head';
 import Link from 'next/link';
+import Image from 'next/image';
 import { 
   FiChevronRight, 
   FiChevronDown, 
@@ -250,11 +251,16 @@ export default function CourseDetails() {
       <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
         <div className="h-48 bg-primary-100 relative">
           {course.imageUrl ? (
-            <img
-              src={course.imageUrl}
-              alt={course.name}
-              className="w-full h-full object-cover"
-            />
+            <div className="relative w-full h-full">
+              <Image
+                src={course.imageUrl}
+                alt={course.name}
+                fill
+                sizes="100vw"
+                style={{ objectFit: 'cover' }}
+                priority
+              />
+            </div>
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-r from-primary-500 to-primary-600">
               <h1 className="text-3xl font-bold text-white">{course.name}</h1>
