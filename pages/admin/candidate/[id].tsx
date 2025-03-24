@@ -777,7 +777,7 @@ const CandidateDetails = () => {
         });
       }
     }
-  }, [candidate]);
+  }, [candidate])
 
   // Ordenar as etapas para exibição na tabela de desempenho detalhado e nas respostas
   useEffect(() => {
@@ -832,7 +832,7 @@ const CandidateDetails = () => {
         }));
       }
     }
-  }, [candidate?.test]);
+  }, [candidate?.test])
 
   useEffect(() => {
     if (candidate && candidate.stageScores) {
@@ -872,7 +872,7 @@ const CandidateDetails = () => {
       
       console.log(`Pontuação total calculada: ${totalCorrect}/${totalQuestions} (${percentage}%)`);
     }
-  }, [candidate?.stageScores]);
+  }, [candidate?.stageScores])
 
   if (status === 'loading' || loading) {
     return (
@@ -1766,9 +1766,11 @@ const CandidateDetails = () => {
                               className="relative w-48 h-auto rounded-lg overflow-hidden border border-secondary-200 cursor-pointer"
                               onClick={() => setShowPhotoModal(true)}
                             >
-                              <img 
+                              <Image 
                                 src={candidate.photoUrl} 
                                 alt={`Foto de ${candidate.name}`}
+                                width={100}
+                                height={100}
                                 className="max-w-full w-full object-contain rounded-lg"
                               />
                             </div>
@@ -1964,7 +1966,7 @@ const CandidateDetails = () => {
                           >
                             <span>Ver currículo</span>
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2v-1H4a1 1 0 00-1 1v1H0a2 2 0 000 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1a2 2 0 00-2 2v3a2 2 0 002 2h3a2 2 0 002-2V7a1 1 0 10-2 0v3a1 1 0 10-2 0V7a1 1 0 10-2 0v3a2 2 0 002 2h3z" />
+                              <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-1a2 2 0 00-2 2v3a2 2 0 002 2h3a2 2 0 002-2V7a1 1 0 10-2 0v3a1 1 0 10-2 0V7a1 1 0 10-2 0v3a2 2 0 002 2h3z" />
                             </svg>
                           </Link>
                         </div>
@@ -2125,9 +2127,11 @@ const CandidateDetails = () => {
             </div>
             
             <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
-              <img 
+              <Image 
                 src={candidate?.photoUrl} 
                 alt={`Foto de ${candidate?.name}`}
+                width={400}
+                height={400}
                 className="max-w-full max-h-[70vh] object-contain rounded-lg"
               />
             </div>

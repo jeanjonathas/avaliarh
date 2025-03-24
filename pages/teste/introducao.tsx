@@ -83,7 +83,7 @@ const Introducao: NextPage = () => {
         }
       }
     }
-  }, [])
+  }, [setCandidateData, setTestData])
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -368,7 +368,7 @@ const Introducao: NextPage = () => {
                 <ul className="list-disc pl-6 space-y-2">
                   {testData ? (
                     <>
-                      <li>O teste <strong>"{testData.title}"</strong> foi selecionado especificamente para avaliar suas habilidades.</li>
+                      <li>O teste <strong>&quot;{testData.title}&quot;</strong> foi selecionado especificamente para avaliar suas habilidades.</li>
                       {testData.description && <li>{testData.description}</li>}
                       <li>O teste é composto por <strong>{testData.stageCount || 6} etapas</strong>, cada uma avaliando diferentes aspectos e habilidades.</li>
                       <li>Você deve completar cada etapa para avançar para a próxima.</li>
@@ -395,7 +395,7 @@ const Introducao: NextPage = () => {
                   <li>Leia cada questão com atenção antes de responder.</li>
                   <li>Responda com sinceridade - o objetivo é encontrar a melhor adequação entre suas habilidades e a posição.</li>
                   <li className="text-primary-700">Suas respostas são salvas automaticamente. Se ocorrer algum problema de conexão ou se você precisar sair, poderá continuar de onde parou mais tarde.</li>
-                  <li className="text-primary-700">Utilize o botão "Salvar Progresso" para salvar suas respostas sem enviar, caso precise fazer uma pausa.</li>
+                  <li className="text-primary-700">Utilize o botão &quot;Salvar Progresso&quot; para salvar suas respostas sem enviar, caso precise fazer uma pausa.</li>
                 </ul>
                 
                 <div className="mt-8">

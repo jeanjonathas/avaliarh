@@ -6,6 +6,7 @@ import StudentLayout from '../../components/training/StudentLayout';
 import CourseCard from '../../components/training/CourseCard';
 import ProgressStats from '../../components/training/ProgressStats';
 import { FiBookOpen, FiClock, FiAward, FiAlertCircle } from 'react-icons/fi';
+import Image from 'next/image';
 
 interface Course {
   id: string;

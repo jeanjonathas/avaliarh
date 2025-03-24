@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import axios from 'axios';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
@@ -36,6 +36,12 @@ const DeleteTestModal: React.FC<DeleteTestModalProps> = ({
       setError(err.response?.data?.error || 'Ocorreu um erro ao excluir o teste');
     }
   };
+
+  useEffect(() => {
+    if (isOpen) {
+      // fetchTestData(); // This function is not defined in the provided code
+    }
+  }, [isOpen]);
 
   return (
     <Transition show={isOpen} as={React.Fragment}>
@@ -94,7 +100,7 @@ const DeleteTestModal: React.FC<DeleteTestModalProps> = ({
               
               <div className="mt-4">
                 <p className="text-sm text-gray-500">
-                  Tem certeza que deseja excluir o teste <span className="font-medium text-gray-700">"{test.name}"</span>? 
+                  Tem certeza que deseja excluir o teste <span className="font-medium text-gray-700">&quot;{test.name}&quot;</span>? 
                   Esta ação não pode ser desfeita e todas as questões associadas a este teste também serão excluídas.
                 </p>
               </div>
