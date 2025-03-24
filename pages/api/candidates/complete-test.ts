@@ -38,7 +38,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Buscar as respostas do candidato
     const responses = await prisma.response.findMany({
       where: { candidateId },
-      include: {
+      select: {
+        id: true,
+        questionId: true,
+        questionText: true,
+        optionText: true,
+        isCorrect: true,
+        categoryName: true,
+        optionCharacteristic: true,
+        questionType: true,
+        questionSnapshot: true,
+        allOptions: true,
         question: {
           select: {
             id: true,
@@ -51,8 +61,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(`Candidato ${candidate.name} encontrado, processando ${responses.length} respostas`);
     
     // Separar as respostas por tipo de questão
-    const multipleChoiceResponses = responses.filter(r => r.question?.type === 'MULTIPLE_CHOICE');
-    const opinionResponses = responses.filter(r => r.question?.type === 'OPINION_MULTIPLE');
+    // Primeiro, verificar o tipo no snapshot, se disponível
+    const multipleChoiceResponses = responses.filter(r => {
+      // Verificar primeiro no snapshot
+      if (r.questionSnapshot && typeof r.questionSnapshot === 'object' && (r.questionSnapshot as any).type) {
+        return (r.questionSnapshot as any).type === 'MULTIPLE_CHOICE';
+      }
+      // Se não tiver no snapshot, verificar no questionType
+      if (r.questionType) {
+        return r.questionType === 'MULTIPLE_CHOICE';
+      }
+      // Por último, verificar na relação question
+      return r.question?.type === 'MULTIPLE_CHOICE';
+    });
+    
+    const opinionResponses = responses.filter(r => {
+      // Verificar primeiro no snapshot
+      if (r.questionSnapshot && typeof r.questionSnapshot === 'object' && (r.questionSnapshot as any).type) {
+        return (r.questionSnapshot as any).type === 'OPINION_MULTIPLE';
+      }
+      // Se não tiver no snapshot, verificar no questionType
+      if (r.questionType) {
+        return r.questionType === 'OPINION_MULTIPLE';
+      }
+      // Por último, verificar na relação question
+      return r.question?.type === 'OPINION_MULTIPLE';
+    });
     
     console.log(`Respostas de múltipla escolha: ${multipleChoiceResponses.length}`);
     console.log(`Respostas opinativas: ${opinionResponses.length}`);
