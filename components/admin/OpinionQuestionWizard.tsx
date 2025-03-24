@@ -1,10 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { useRouter } from 'next/router';
 import { v4 as uuidv4 } from 'uuid';
 import Toast from '../ui/Toast';
 import { Button } from '../ui/Button';
 import { QuestionDifficulty, QuestionType } from '../../types/questions';
+
+// Variável estática para controlar se os grupos já foram carregados
+// Isso garante que o estado persista mesmo se o componente for remontado
+const loadedGroups = new Set<string>();
 
 // Função para gerar UUID v4 compatível com navegador
 function generateUUID() {
@@ -68,19 +72,20 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
 }) => {
   const router = useRouter();
   const [step, setStep] = useState(1);
-  const [opinionGroups, setOpinionGroups] = useState<any[]>([]);
-  const [selectedGroup, setSelectedGroup] = useState<any>(null);
+  const [opinionGroups, setOpinionGroups] = useState<OpinionGroup[]>([]);
+  const [systemCategories, setSystemCategories] = useState<SystemCategory[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<OpinionGroup | null>(null);
+  const [groupsLoaded, setGroupsLoaded] = useState(false);
   const [originalCategories, setOriginalCategories] = useState<{[key: string]: string}>({});
   const [originalCategoryCount, setOriginalCategoryCount] = useState(0);
   const [categoriesModified, setCategoriesModified] = useState(false);
-  const [groupsLoaded, setGroupsLoaded] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [systemCategories, setSystemCategories] = useState<SystemCategory[]>([]);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error' | 'info' | 'warning'>('warning');
   const [isCreatingNewGroup, setIsCreatingNewGroup] = useState(false);
   const firstEmptyCategoryRef = React.useRef<HTMLInputElement>(null);
+  const hasLoadedGroupsRef = useRef(false);
 
   const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     defaultValues: initialData || {
@@ -105,41 +110,75 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
   });
 
   useEffect(() => {
-    // Carregar grupos de opinião
+    // Verificar se já carregamos os grupos para evitar chamadas duplicadas
+    if (loadedGroups.has('opinionGroups')) {
+      console.log("Grupos já foram carregados anteriormente, ignorando chamada");
+      return;
+    }
+    
+    console.log("Iniciando carregamento de grupos de opinião e categorias...");
+    // Marcar como carregado imediatamente para evitar chamadas duplicadas mesmo em caso de erro
+    loadedGroups.add('opinionGroups');
+    
+    // Função para carregar grupos de opinião
     const fetchOpinionGroups = async () => {
       try {
-        const response = await fetch('/api/admin/opinion-groups');
-        if (response.ok) {
-          const data = await response.json();
-          setOpinionGroups(data);
-          setGroupsLoaded(true);
-        } else {
-          console.error('Erro ao carregar grupos de opinião');
+        console.log("Buscando grupos de opinião...");
+        const response = await fetch('/api/admin/opinion-groups', {
+          // Adicionar cabeçalhos para evitar problemas de cache
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Erro ao carregar grupos de opinião: ${response.status}`);
         }
+        
+        const data = await response.json();
+        console.log(`Grupos de opinião carregados com sucesso: ${data.length}`);
+        setOpinionGroups(data);
+        setGroupsLoaded(true);
       } catch (error) {
-        console.error('Erro ao buscar grupos de opinião:', error);
+        console.error('Erro ao carregar grupos de opinião:', error);
+        // Mesmo em caso de erro, não tentaremos carregar novamente
       }
     };
 
-    // Carregar categorias do sistema
+    // Função para carregar categorias do sistema
     const fetchSystemCategories = async () => {
       try {
+        console.log("Buscando categorias do sistema...");
         const endpoint = categoriesEndpoint || '/api/admin/categories';
-        const response = await fetch(endpoint);
-        if (response.ok) {
-          const data = await response.json();
-          setSystemCategories(data);
-        } else {
-          console.error('Erro ao carregar categorias do sistema');
+        const response = await fetch(endpoint, {
+          // Adicionar cabeçalhos para evitar problemas de cache
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Erro ao carregar categorias do sistema: ${response.status}`);
         }
+        
+        const data = await response.json();
+        console.log(`Categorias do sistema carregadas com sucesso: ${data.length}`);
+        setSystemCategories(data);
       } catch (error) {
-        console.error('Erro ao buscar categorias do sistema:', error);
+        console.error('Erro ao carregar categorias do sistema:', error);
+        // Mesmo em caso de erro, não tentaremos carregar novamente
       }
     };
 
-    fetchOpinionGroups();
-    fetchSystemCategories();
-  }, [categoriesEndpoint]);
+    // Executar as funções de carregamento em paralelo
+    Promise.all([fetchOpinionGroups(), fetchSystemCategories()])
+      .then(() => console.log("Carregamento de dados concluído"))
+      .catch(error => console.error("Erro durante o carregamento de dados:", error));
+      
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Intencionalmente sem dependências para executar apenas uma vez na montagem
 
   // Carregar dados iniciais se estiver em modo de edição
   useEffect(() => {
@@ -167,7 +206,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
         const options = initialData.options.map((opt: any) => {
           const category = group.categories.find((c: any) => c.name === opt.category);
           return {
-            id: opt.id,
+            id: opt.id, // Manter o ID original se estiver editando
             text: opt.text,
             categoryNameUuid: category?.uuid || generateUUID(),
             category: opt.category,
@@ -196,30 +235,6 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
       }
     }
   }, [initialData, isEditing, setValue]);
-
-  useEffect(() => {
-    if (groupsLoaded) return;
-    
-    const fetchOpinionGroups = async () => {
-      if (!groupsLoaded) {
-        try {
-          const response = await fetch('/api/admin/opinion-groups', {
-            credentials: 'include'
-          });
-          if (response.ok) {
-            const data = await response.json();
-            setOpinionGroups(data);
-          }
-        } catch (error) {
-          console.error('Erro ao carregar grupos de opinião:', error);
-        } finally {
-          setGroupsLoaded(true);
-        }
-      }
-    };
-
-    fetchOpinionGroups();
-  }, [groupsLoaded]);
 
   // Função para criar um novo grupo de categorias
   const handleCreateNewGroup = () => {
@@ -473,6 +488,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
         options: formattedOptions
       };
       
+      setIsSubmitting(true);
       await onSubmit(formData);
     } catch (error) {
       console.error('Erro ao salvar pergunta opinativa:', error);

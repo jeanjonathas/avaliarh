@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import { PlusIcon, XMarkIcon, ArrowsUpDownIcon } from '@heroicons/react/24/outline';
 
@@ -32,10 +32,21 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
   const [traitGroups, setTraitGroups] = useState<TraitGroup[]>([]);
   const [isLoadingTraits, setIsLoadingTraits] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasInitializedRef = useRef<{[key: string]: boolean}>({});
+  const previousValueRef = useRef<PersonalityTrait[]>([]);
 
   // Função para buscar traços de personalidade do teste selecionado
   const fetchPersonalityTraits = useCallback(async (testId: string) => {
     try {
+      // Verificar se os valores atuais são iguais aos anteriores para evitar loop infinito
+      if (JSON.stringify(value) === JSON.stringify(previousValueRef.current)) {
+        console.log('Valores iguais aos anteriores, evitando re-renderização');
+        return;
+      }
+      
+      // Atualizar a referência para os valores atuais
+      previousValueRef.current = [...value];
+      
       setIsLoadingTraits(true);
       setError(null);
       
@@ -68,7 +79,8 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
       
       // Processar as questões para extrair grupos e traços
       questions.forEach((question: any) => {
-        if (question.options && question.options.length > 0) {
+        // Verificar se a questão tem categorias (traços de personalidade)
+        if (question.categories && question.categories.length > 0) {
           // Usar o texto da questão como nome do grupo
           const groupName = question.text;
           const groupId = `group-${question.id}`;
@@ -83,9 +95,48 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
             });
           }
           
-          // Adicionar cada opção como um traço disponível
+          // Adicionar cada categoria como um traço disponível
+          question.categories.forEach((category: any) => {
+            if (category.name && !groupMap[groupId].includes(category.name)) {
+              groupMap[groupId].push(category.name);
+              
+              // Encontrar o grupo correspondente
+              const groupIndex = groups.findIndex(g => g.id === groupId);
+              if (groupIndex !== -1) {
+                groups[groupIndex].traits.push(category.name);
+              }
+            }
+          });
+        }
+        
+        // Também verificar nas opções se houver traços de personalidade
+        if (question.options && question.options.length > 0) {
+          // Usar o texto da questão como nome do grupo se ainda não foi criado
+          const groupName = question.text;
+          const groupId = `group-${question.id}`;
+          
+          if (!groupMap[groupId]) {
+            groupMap[groupId] = [];
+            groups.push({
+              id: groupId,
+              name: groupName,
+              traits: [],
+              selectedTraits: []
+            });
+          }
+          
+          // Verificar se as opções têm categorias associadas
           question.options.forEach((option: any) => {
-            if (option.text && !groupMap[groupId].includes(option.text)) {
+            if (option.category && option.category.name && !groupMap[groupId].includes(option.category.name)) {
+              groupMap[groupId].push(option.category.name);
+              
+              // Encontrar o grupo correspondente
+              const groupIndex = groups.findIndex(g => g.id === groupId);
+              if (groupIndex !== -1) {
+                groups[groupIndex].traits.push(option.category.name);
+              }
+            } else if (option.text && !groupMap[groupId].includes(option.text)) {
+              // Se não tiver categoria, usar o texto da opção como traço
               groupMap[groupId].push(option.text);
               
               // Encontrar o grupo correspondente
@@ -151,7 +202,7 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
     } finally {
       setIsLoadingTraits(false);
     }
-  }, [value]);
+  }, [value]);  
 
   // Calcular o peso com base na ordem
   const calculateWeight = (position: number, totalTraits: number): number => {
@@ -262,7 +313,7 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
       // Ordenar os traços pela ordem atual
       const sortedTraits = [...groupTraits].sort((a, b) => a.order - b.order);
       
-      // Recalcular os pesos para todos os traços
+      // Recalcular os pesos
       updatedGroups[groupIndex].selectedTraits = sortedTraits.map((trait, index) => {
         const calculatedWeight = calculateWeight(index + 1, sortedTraits.length);
         return { ...trait, order: index + 1, weight: calculatedWeight };
@@ -366,7 +417,12 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
 
   useEffect(() => {
     if (testId) {
-      fetchPersonalityTraits(testId);
+      // Verificar se já inicializamos para este testId
+      if (!hasInitializedRef.current[testId]) {
+        console.log(`Inicializando traços para o teste ${testId}`);
+        hasInitializedRef.current[testId] = true;
+        fetchPersonalityTraits(testId);
+      }
     } else {
       setTraitGroups([]);
       setError('Selecione um teste para configurar os traços de personalidade.');
@@ -422,11 +478,25 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
 
   // Inicializar os grupos com os traços já selecionados
   useEffect(() => {
+    // Verificar se já temos grupos carregados e valores iniciais
     if (testId && traitGroups.length > 0 && value.length > 0) {
+      // Verificar se os valores são iguais aos anteriores para evitar loop infinito
+      if (JSON.stringify(value) === JSON.stringify(previousValueRef.current)) {
+        console.log('Valores iniciais iguais aos anteriores, evitando re-renderização');
+        return;
+      }
+      
       console.log('Valores iniciais recebidos:', value);
       
+      // Atualizar a referência para os valores atuais
+      previousValueRef.current = [...value];
+      
+      // Usar uma referência imutável aos grupos atuais
+      const currentGroups = traitGroups;
+      
       // Criar uma cópia dos grupos
-      const updatedGroups = [...traitGroups];
+      const updatedGroups = [...currentGroups];
+      let hasChanges = false;
       
       // Para cada traço no valor inicial
       value.forEach(trait => {
@@ -448,26 +518,38 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
               groupId: trait.groupId || updatedGroups[groupIndex].id,
               groupName: trait.groupName || updatedGroups[groupIndex].name
             });
+            hasChanges = true;
           } else {
-            // Se o traço já existe, atualizar
-            updatedGroups[groupIndex].selectedTraits[existingTraitIndex] = {
-              ...updatedGroups[groupIndex].selectedTraits[existingTraitIndex],
-              weight: trait.weight || updatedGroups[groupIndex].selectedTraits[existingTraitIndex].weight,
-              order: trait.order || updatedGroups[groupIndex].selectedTraits[existingTraitIndex].order
-            };
+            // Se o traço já existe, verificar se precisa atualizar
+            const currentTrait = updatedGroups[groupIndex].selectedTraits[existingTraitIndex];
+            const needsUpdate = 
+              currentTrait.weight !== trait.weight || 
+              currentTrait.order !== trait.order;
+            
+            if (needsUpdate) {
+              updatedGroups[groupIndex].selectedTraits[existingTraitIndex] = {
+                ...currentTrait,
+                weight: trait.weight || currentTrait.weight,
+                order: trait.order || currentTrait.order
+              };
+              hasChanges = true;
+            }
           }
         }
       });
       
-      // Ordenar os traços em cada grupo por ordem
-      updatedGroups.forEach(group => {
-        group.selectedTraits.sort((a, b) => a.order - b.order);
-      });
-      
-      // Atualizar o estado
-      setTraitGroups(updatedGroups);
-      
-      console.log('Grupos atualizados com valores iniciais:', updatedGroups);
+      // Só atualizar o estado se houver mudanças reais
+      if (hasChanges) {
+        // Ordenar os traços em cada grupo por ordem
+        updatedGroups.forEach(group => {
+          group.selectedTraits.sort((a, b) => a.order - b.order);
+        });
+        
+        // Atualizar o estado
+        setTraitGroups(updatedGroups);
+        
+        console.log('Grupos atualizados com valores iniciais:', updatedGroups);
+      }
     }
   }, [testId, value, traitGroups]);
 

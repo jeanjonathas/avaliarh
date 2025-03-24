@@ -14,15 +14,19 @@ import {
   Chip,
   Radio,
   RadioGroup,
-  FormControlLabel
+  FormControlLabel,
+  CircularProgress
 } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 
+// Interfaces para os tipos de dados
 interface Question {
   id: string;
   text: string;
   type: string;
+  difficulty?: string;
+  categories?: { id: string; name: string }[];
 }
 
 interface Stage {
@@ -30,18 +34,19 @@ interface Stage {
   title: string;
   description?: string;
   order: number;
-  questions: Question[];
+  questions?: Question[];
 }
 
 interface Test {
   id: string;
   title: string;
   description?: string;
-  timeLimit?: number;
   active: boolean;
+  timeLimit?: number;
   stages?: Stage[];
   sectionsCount?: number;
   questionsCount?: number;
+  stagesCount?: number;
 }
 
 interface CollapsibleTestTableProps {
@@ -57,6 +62,105 @@ const TestRow = ({ test, isSelected, onSelect }: {
   onSelect: (testId: string) => void;
 }) => {
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [stagesLoaded, setStagesLoaded] = useState(false);
+  
+  // Função para verificar se o teste tem etapas e perguntas válidas
+  const hasValidStages = () => {
+    // Verificar se o teste tem etapas em diferentes formatos possíveis
+    const stages = test.stages || [];
+    
+    console.log("Verificando etapas do teste:", test.id);
+    console.log("Etapas disponíveis:", stages);
+    
+    return stages.length > 0;
+  };
+
+  // Função para carregar detalhes do teste quando expandir
+  const loadTestDetails = async () => {
+    if (stagesLoaded || hasValidStages()) {
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      console.log(`Carregando detalhes do teste ${test.id}...`);
+      
+      // Primeiro, buscar informações básicas do teste
+      const response = await fetch(`/api/admin/tests/${test.id}`);
+      if (!response.ok) {
+        throw new Error(`Erro ao buscar detalhes do teste: ${response.statusText}`);
+      }
+      
+      const testData = await response.json();
+      
+      // Verificar se o teste já tem etapas
+      if (!testData.stages || testData.stages.length === 0) {
+        // Buscar etapas separadamente
+        try {
+          const stagesResponse = await fetch(`/api/admin/tests/${test.id}/stages`);
+          if (stagesResponse.ok) {
+            const stagesData = await stagesResponse.json();
+            
+            // Processar as etapas retornadas
+            if (stagesData.stages && stagesData.stages.length > 0) {
+              // Atualizar o objeto de teste com as etapas carregadas
+              test.stages = stagesData.stages.map(item => {
+                const stageData = item.stage || item;
+                return {
+                  id: stageData.id,
+                  title: stageData.title,
+                  description: stageData.description,
+                  order: item.order || stageData.order || 0,
+                  questions: []
+                };
+              });
+            }
+          }
+        } catch (error) {
+          console.error(`Erro ao buscar etapas:`, error);
+        }
+      } else {
+        test.stages = testData.stages;
+      }
+      
+      setStagesLoaded(true);
+    } catch (error) {
+      console.error(`Erro ao carregar detalhes do teste:`, error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Função para renderizar as etapas do teste
+  const renderStages = () => {
+    // Se estamos carregando, mostrar indicador de carregamento
+    if (loading) {
+      return (
+        <Box sx={{ display: 'flex', alignItems: 'center', py: 1 }}>
+          <CircularProgress size={20} sx={{ mr: 2 }} />
+          <Typography variant="body2" color="text.secondary">
+            Carregando etapas do teste...
+          </Typography>
+        </Box>
+      );
+    }
+    
+    // Se temos etapas, renderizá-las
+    if (test.stages && test.stages.length > 0) {
+      return test.stages.map((stage) => (
+        <StageDetail key={stage.id} stage={stage} />
+      ));
+    }
+    
+    // Caso contrário, mostrar mensagem de que não há etapas
+    return (
+      <Typography variant="body2" color="text.secondary">
+        Nenhuma etapa disponível. Por favor, carregue os detalhes completos do teste.
+      </Typography>
+    );
+  };
   
   return (
     <>
@@ -67,7 +171,12 @@ const TestRow = ({ test, isSelected, onSelect }: {
         <TableCell padding="checkbox">
           <Radio
             checked={isSelected}
-            onChange={() => onSelect(test.id)}
+            onChange={() => {
+              setLoading(true);
+              onSelect(test.id);
+              // Simular um tempo de carregamento para garantir que os dados sejam atualizados
+              setTimeout(() => setLoading(false), 1000);
+            }}
             value={test.id}
             name="test-radio-button"
             inputProps={{ 'aria-label': `Selecionar teste ${test.title}` }}
@@ -79,7 +188,13 @@ const TestRow = ({ test, isSelected, onSelect }: {
             size="small"
             onClick={(e) => {
               e.stopPropagation();
-              setOpen(!open);
+              const newOpenState = !open;
+              setOpen(newOpenState);
+              
+              // Carregar detalhes do teste quando expandir
+              if (newOpenState) {
+                loadTestDetails();
+              }
             }}
           >
             {open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
@@ -89,7 +204,7 @@ const TestRow = ({ test, isSelected, onSelect }: {
           {test.title}
         </TableCell>
         <TableCell align="right">
-          {test.sectionsCount || (test.stages?.length || 0)}
+          {test.sectionsCount || test.stagesCount || (test.stages?.length || 0)}
         </TableCell>
         <TableCell align="right">
           {test.questionsCount || test.stages?.reduce((total, stage) => total + (stage.questions?.length || 0), 0) || 0}
@@ -123,15 +238,7 @@ const TestRow = ({ test, isSelected, onSelect }: {
                 Etapas
               </Typography>
               
-              {test.stages && test.stages.length > 0 ? (
-                test.stages.map((stage) => (
-                  <StageDetail key={stage.id} stage={stage} />
-                ))
-              ) : (
-                <Typography variant="body2" color="text.secondary">
-                  Nenhuma etapa disponível
-                </Typography>
-              )}
+              {renderStages()}
             </Box>
           </Collapse>
         </TableCell>
@@ -143,6 +250,21 @@ const TestRow = ({ test, isSelected, onSelect }: {
 // Componente para detalhes de uma etapa
 const StageDetail = ({ stage }: { stage: Stage }) => {
   const [open, setOpen] = useState(false);
+  
+  // Função para verificar se a etapa tem perguntas válidas
+  const hasValidQuestions = () => {
+    return stage.questions && 
+           Array.isArray(stage.questions) && 
+           stage.questions.length > 0;
+  };
+  
+  // Função para obter o número de perguntas
+  const getQuestionsCount = () => {
+    if (hasValidQuestions()) {
+      return stage.questions.length;
+    }
+    return 0;
+  };
   
   return (
     <Box sx={{ mb: 2, pl: 2 }}>
@@ -162,7 +284,7 @@ const StageDetail = ({ stage }: { stage: Stage }) => {
           {stage.order + 1}. {stage.title}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
-          ({stage.questions?.length || 0} perguntas)
+          ({getQuestionsCount()} perguntas)
         </Typography>
       </Box>
       
@@ -178,7 +300,7 @@ const StageDetail = ({ stage }: { stage: Stage }) => {
             Perguntas:
           </Typography>
           
-          {stage.questions && stage.questions.length > 0 ? (
+          {hasValidQuestions() ? (
             <Box component="ul" sx={{ pl: 2, m: 0 }}>
               {stage.questions.map((question) => (
                 <Box component="li" key={question.id} sx={{ mb: 0.5 }}>
@@ -195,7 +317,7 @@ const StageDetail = ({ stage }: { stage: Stage }) => {
             </Box>
           ) : (
             <Typography variant="body2" color="text.secondary">
-              Nenhuma pergunta disponível
+              Nenhuma pergunta disponível para esta etapa.
             </Typography>
           )}
         </Box>

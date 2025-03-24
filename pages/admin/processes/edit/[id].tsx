@@ -73,6 +73,7 @@ const EditProcess: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingTests, setIsLoadingTests] = useState(false);
   const [detailedTests, setDetailedTests] = useState<{[key: string]: Test}>({});
+  const [forceUpdate, setForceUpdate] = useState(0);
 
   const { control, handleSubmit, register, formState: { errors }, watch, setValue, reset } = useForm<FormData>({
     defaultValues: {
@@ -158,19 +159,136 @@ const EditProcess: React.FC = () => {
 
   // Carregar detalhes dos testes quando necessário
   const loadTestDetails = async (testId: string) => {
-    if (detailedTests[testId]) return;
+    if (detailedTests[testId]) {
+      console.log(`Detalhes do teste ${testId} já carregados:`, detailedTests[testId]);
+      return;
+    }
     
     try {
+      console.log(`Carregando detalhes do teste ${testId}...`);
+      
+      // Primeiro, buscar informações básicas do teste
       const response = await fetch(`/api/admin/tests/${testId}`);
-      if (response.ok) {
-        const testData = await response.json();
-        setDetailedTests(prev => ({
-          ...prev,
-          [testId]: testData
-        }));
+      if (!response.ok) {
+        throw new Error(`Erro ao buscar detalhes do teste: ${response.statusText}`);
       }
+      
+      const testData = await response.json();
+      console.log(`Detalhes básicos do teste carregados:`, testData);
+      
+      // Verificar se o teste já tem etapas
+      if (!testData.stages || testData.stages.length === 0) {
+        // Buscar etapas separadamente
+        console.log(`Buscando etapas separadamente para o teste ${testId}...`);
+        
+        try {
+          const stagesResponse = await fetch(`/api/admin/tests/${testId}/stages`);
+          if (stagesResponse.ok) {
+            const stagesData = await stagesResponse.json();
+            console.log(`Resposta da API de etapas:`, stagesData);
+            
+            // Processar as etapas retornadas
+            if (stagesData.stages && stagesData.stages.length > 0) {
+              // Formatar as etapas para o formato esperado
+              const formattedStages = stagesData.stages.map(item => {
+                // Verificar se o item tem uma propriedade 'stage'
+                const stageData = item.stage || item;
+                
+                return {
+                  id: stageData.id,
+                  title: stageData.title,
+                  description: stageData.description,
+                  order: item.order || stageData.order || 0,
+                  questions: []
+                };
+              });
+              
+              testData.stages = formattedStages;
+              console.log(`Etapas formatadas:`, formattedStages);
+            }
+          }
+        } catch (stagesError) {
+          console.error(`Erro ao buscar etapas:`, stagesError);
+        }
+      }
+      
+      // Para cada etapa, buscar as perguntas
+      if (testData.stages && testData.stages.length > 0) {
+        console.log(`Buscando perguntas para ${testData.stages.length} etapas...`);
+        
+        for (let i = 0; i < testData.stages.length; i++) {
+          const stage = testData.stages[i];
+          
+          // Se a etapa já tem perguntas, pular
+          if (stage.questions && stage.questions.length > 0) {
+            console.log(`Etapa ${stage.id} já tem ${stage.questions.length} perguntas.`);
+            continue;
+          }
+          
+          try {
+            console.log(`Buscando perguntas para a etapa ${stage.id}...`);
+            const questionsResponse = await fetch(`/api/admin/questions?stageId=${stage.id}`);
+            
+            if (questionsResponse.ok) {
+              const questionsData = await questionsResponse.json();
+              console.log(`Perguntas da etapa ${stage.id}:`, questionsData);
+              
+              if (questionsData.questions && questionsData.questions.length > 0) {
+                testData.stages[i].questions = questionsData.questions;
+              } else {
+                testData.stages[i].questions = [];
+              }
+            }
+          } catch (questionsError) {
+            console.error(`Erro ao buscar perguntas para a etapa ${stage.id}:`, questionsError);
+            testData.stages[i].questions = [];
+          }
+        }
+      }
+      
+      // Se ainda não temos etapas ou perguntas, tentar buscar todas as perguntas do teste
+      if (!testData.stages || testData.stages.length === 0 || 
+          !testData.stages.some(stage => stage.questions && stage.questions.length > 0)) {
+        console.log(`Buscando todas as perguntas do teste ${testId}...`);
+        
+        try {
+          const questionsResponse = await fetch(`/api/admin/questions?testId=${testId}`);
+          if (questionsResponse.ok) {
+            const questionsData = await questionsResponse.json();
+            console.log(`Todas as perguntas do teste ${testId}:`, questionsData);
+            
+            if (questionsData.questions && questionsData.questions.length > 0) {
+              // Se não temos etapas, criar uma etapa padrão
+              if (!testData.stages || testData.stages.length === 0) {
+                testData.stages = [{
+                  id: 'default-stage',
+                  title: 'Etapa Padrão',
+                  description: 'Etapa gerada automaticamente',
+                  order: 0,
+                  questions: questionsData.questions
+                }];
+              } 
+              // Se temos etapas mas não temos perguntas, adicionar as perguntas à primeira etapa
+              else if (testData.stages.length > 0) {
+                testData.stages[0].questions = questionsData.questions;
+              }
+            }
+          }
+        } catch (questionsError) {
+          console.error(`Erro ao buscar todas as perguntas do teste ${testId}:`, questionsError);
+        }
+      }
+      
+      // Atualizar o estado com os detalhes completos do teste
+      console.log(`Detalhes finais do teste ${testId}:`, testData);
+      setDetailedTests(prev => ({
+        ...prev,
+        [testId]: testData
+      }));
     } catch (error) {
       console.error(`Erro ao carregar detalhes do teste ${testId}:`, error);
+      toast.error('Erro ao carregar detalhes do teste. Verifique o console para mais informações.');
+      throw error;
     }
   };
 
@@ -179,7 +297,23 @@ const EditProcess: React.FC = () => {
     
     // Carregar detalhes do teste selecionado
     if (testId) {
-      loadTestDetails(testId);
+      try {
+        // Mostrar notificação de carregamento
+        toast.loading('Carregando detalhes do teste...', { id: 'loading-test-details' });
+        
+        // Carregar detalhes do teste
+        await loadTestDetails(testId);
+        
+        // Atualizar notificação para sucesso
+        toast.success('Detalhes do teste carregados com sucesso', { id: 'loading-test-details' });
+        
+        // Forçar uma atualização do componente para garantir que os dados sejam exibidos
+        setForceUpdate(prev => prev + 1);
+      } catch (error) {
+        // Atualizar notificação para erro
+        toast.error('Erro ao carregar detalhes do teste', { id: 'loading-test-details' });
+        console.error('Erro ao carregar detalhes do teste:', error);
+      }
     }
   };
 
@@ -469,6 +603,7 @@ const EditProcess: React.FC = () => {
                           tests={tests}
                           selectedTestId={watch(`stages.${index}.testId`) || ''}
                           onTestSelect={(testId) => handleTestSelect(testId, index)}
+                          key={`test-table-${index}-${forceUpdate}`}
                         />
                       )}
                       

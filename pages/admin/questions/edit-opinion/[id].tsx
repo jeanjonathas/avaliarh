@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import AdminLayout from '../../../../components/admin/AdminLayout';
@@ -14,6 +14,7 @@ const EditOpinionQuestionPage = () => {
   const [loading, setLoading] = useState(true);
   const [questionData, setQuestionData] = useState<any>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const hasLoadedDataRef = useRef(false);
 
   const fetchQuestionData = useCallback(async () => {
     try {
@@ -76,6 +77,7 @@ const EditOpinionQuestionPage = () => {
       
       console.log('Dados adaptados para o wizard:', adaptedData);
       setQuestionData(adaptedData);
+      hasLoadedDataRef.current = true;
     } catch (error) {
       console.error('Erro ao buscar dados da pergunta:', error);
       notify.showError(`Erro ao buscar dados da pergunta: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
@@ -89,7 +91,18 @@ const EditOpinionQuestionPage = () => {
     // Verificar autenticação
     if (status === 'unauthenticated') {
       router.push('/login');
-    } else if (status === 'authenticated' && id) {
+      return;
+    }
+    
+    // Verificar se já carregamos os dados para evitar loop infinito
+    if (hasLoadedDataRef.current) {
+      console.log("Dados já foram carregados anteriormente, ignorando chamada");
+      return;
+    }
+    
+    // Verificar se temos o ID da pergunta
+    if (status === 'authenticated' && id) {
+      console.log("Iniciando carregamento dos dados da pergunta:", id);
       fetchQuestionData();
     }
   }, [status, router, id, fetchQuestionData]);
@@ -125,7 +138,7 @@ const EditOpinionQuestionPage = () => {
     router.push('/admin/questions');
   };
 
-  if (loading) {
+  if (loading && !hasLoadedDataRef.current) {
     return (
       <AdminLayout>
         <div className="flex justify-center items-center h-64">
