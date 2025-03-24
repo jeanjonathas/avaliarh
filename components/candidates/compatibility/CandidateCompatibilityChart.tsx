@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { PersonalityTrait } from '../types';
@@ -56,245 +56,8 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
   const [mergedTraits, setMergedTraits] = useState<PersonalityTrait[]>([]);
   const [usingDefaultData, setUsingDefaultData] = useState<boolean>(false);
 
-  // Buscar os traços de personalidade completos do processo seletivo
-  const fetchProcessPersonalityData = async () => {
-    if (!processId) {
-      // Se não tiver processId, usar apenas os traços fornecidos via props
-      console.log('Sem processId, usando apenas os traços fornecidos via props');
-      setMergedTraits(personalityTraits);
-      setLoading(false);
-      return;
-    }
-    
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Removida a autenticação para testes
-      const response = await fetch(`/api/admin/processes/${processId}/personality-traits`);
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Falha ao buscar traços de personalidade do processo');
-      }
-      
-      const data = await response.json();
-      console.log('Dados de personalidade do processo:', data);
-      setProcessPersonalityData(data);
-      
-      // Verificar se os dados são padrão
-      if (data.isDefaultData) {
-        console.log('Usando dados padrão do endpoint');
-        setUsingDefaultData(true);
-      } else {
-        setUsingDefaultData(false);
-      }
-      
-      // Mesclar os traços do processo com os do candidato
-      if (data && Array.isArray(data.traits)) {
-        const merged = mergePersonalityTraits(personalityTraits, data.traits);
-        console.log('Traços mesclados:', merged);
-        setMergedTraits(merged);
-      } else {
-        // Se não houver traços do processo, usar apenas os do candidato
-        console.log('Sem traços do processo, usando apenas os do candidato');
-        setMergedTraits(personalityTraits);
-      }
-    } catch (error) {
-      console.error('Erro ao buscar traços de personalidade do processo:', error);
-      setError((error as Error).message || 'Erro ao buscar dados de personalidade do processo');
-      toast.error('Erro ao buscar dados de personalidade do processo');
-      // Em caso de erro, ainda usar os traços do candidato
-      setMergedTraits(personalityTraits);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Mesclar os traços do candidato com os traços completos do processo
-  const mergePersonalityTraits = (
-    candidateTraits: PersonalityTrait[], 
-    processTraits: Array<{name: string, weight: number, categoryNameUuid?: string}>
-  ): PersonalityTrait[] => {
-    // Se não houver traços do candidato, retornar vazio
-    if (!candidateTraits || candidateTraits.length === 0) {
-      console.log('Sem traços do candidato para mesclar');
-      return [];
-    }
-
-    console.log('Mesclando traços - Candidato:', candidateTraits, 'Processo:', processTraits);
-    
-    // Criar mapas dos traços do candidato para fácil acesso - um por nome e outro por UUID
-    const candidateTraitsByName = new Map<string, PersonalityTrait>();
-    const candidateTraitsByUuid = new Map<string, PersonalityTrait>();
-    
-    candidateTraits.forEach(trait => {
-      if (trait && trait.trait) {
-        // Normalizar o nome do traço para comparação
-        candidateTraitsByName.set(trait.trait.toLowerCase().trim(), trait);
-        
-        // Se tiver UUID, adicionar ao mapa por UUID também
-        if (trait.categoryNameUuid) {
-          candidateTraitsByUuid.set(trait.categoryNameUuid, trait);
-        }
-      }
-    });
-    
-    console.log('Mapa de traços do candidato por nome:', Array.from(candidateTraitsByName.entries()));
-    console.log('Mapa de traços do candidato por UUID:', Array.from(candidateTraitsByUuid.entries()));
-    
-    // Se houver traços do processo, mesclar com os do candidato
-    if (processTraits && processTraits.length > 0) {
-      // Criar um conjunto para rastrear quais traços do candidato foram usados
-      const usedCandidateTraits = new Set<string>();
-      const usedCandidateTraitUuids = new Set<string>();
-      
-      // Primeiro, mapear os traços do processo
-      const mergedTraits = processTraits.map(processTrait => {
-        // Normalizar o nome do traço para comparação
-        const processTraitName = processTrait.name.toLowerCase().trim();
-        const processTraitUuid = processTrait.categoryNameUuid;
-        
-        console.log(`Buscando traço do candidato para "${processTrait.name}" (UUID: "${processTraitUuid}")`);
-        
-        // Tentar encontrar o traço primeiro pelo UUID, depois pelo nome
-        let candidateTrait = null;
-        
-        if (processTraitUuid && candidateTraitsByUuid.has(processTraitUuid)) {
-          candidateTrait = candidateTraitsByUuid.get(processTraitUuid);
-          usedCandidateTraitUuids.add(processTraitUuid);
-          console.log(`Traço encontrado pelo UUID "${processTraitUuid}":`, candidateTrait);
-        } else if (candidateTraitsByName.has(processTraitName)) {
-          candidateTrait = candidateTraitsByName.get(processTraitName);
-          usedCandidateTraits.add(processTraitName);
-          console.log(`Traço encontrado pelo nome "${processTraitName}":`, candidateTrait);
-        }
-        
-        if (candidateTrait) {
-          // Se o candidato tem este traço, usar seus valores mas manter o peso do traço do processo
-          return {
-            ...candidateTrait,
-            trait: processTrait.name, // Garantir que o nome do traço é o mesmo do processo
-            weight: processTrait.weight,
-            weightedScore: ((candidateTrait.percentage / 100) * processTrait.weight),
-            categoryNameUuid: processTraitUuid || candidateTrait.categoryNameUuid
-          };
-        } else {
-          console.log(`Traço NÃO encontrado para "${processTrait.name}"`);
-          // Se o candidato não tem este traço, usar o traço do processo com valores zerados
-          return {
-            trait: processTrait.name,
-            count: 0,
-            percentage: 0,
-            weight: processTrait.weight,
-            weightedScore: 0,
-            categoryNameUuid: processTraitUuid
-          };
-        }
-      });
-      
-      // Agora, adicionar os traços do candidato que não foram usados
-      candidateTraits.forEach(trait => {
-        const normalizedTraitName = trait.trait.toLowerCase().trim();
-        const traitUuid = trait.categoryNameUuid;
-        
-        // Verificar se o traço já foi usado (por nome ou UUID)
-        const wasUsedByName = usedCandidateTraits.has(normalizedTraitName);
-        const wasUsedByUuid = traitUuid && usedCandidateTraitUuids.has(traitUuid);
-        
-        if (!wasUsedByName && !wasUsedByUuid) {
-          console.log(`Adicionando traço do candidato não mapeado: "${trait.trait}" (UUID: "${traitUuid}")`);
-          mergedTraits.push({
-            ...trait,
-            weight: trait.weight || 1,
-            weightedScore: trait.weightedScore || (trait.percentage / 100)
-          });
-        }
-      });
-      
-      return mergedTraits;
-    } else {
-      // Se não houver traços do processo, usar apenas os do candidato
-      return candidateTraits.map(trait => ({
-        ...trait,
-        weight: trait.weight || 1,
-        weightedScore: trait.weightedScore || (trait.percentage / 100)
-      }));
-    }
-  };
-
-  useEffect(() => {
-    if (processId) {
-      fetchProcessPersonalityData();
-    } else if (personalityTraits.length > 0) {
-      // Se não temos ID do processo, usar apenas os traços fornecidos
-      setMergedTraits(personalityTraits);
-      
-      // Criar dados de processo padrão
-      const defaultTraits = personalityTraits.map((trait, index) => ({
-        name: trait.trait,
-        weight: trait.weight || (personalityTraits.length - index), // Peso baseado na ordem
-        categoryNameUuid: trait.categoryNameUuid
-      }));
-      
-      setProcessPersonalityData({
-        traits: defaultTraits,
-        expectedProfile: propExpectedProfile || null,
-        isDefaultData: true
-      });
-      
-      setUsingDefaultData(true);
-    }
-  }, [processId, personalityTraits, propExpectedProfile]);
-
-  useEffect(() => {
-    if (mergedTraits.length > 0 && processPersonalityData) {
-      try {
-        const result = calculateCompatibility(
-          mergedTraits, 
-          processPersonalityData.traits, 
-          processPersonalityData.expectedProfile || propExpectedProfile || {}
-        );
-        
-        if (result) {
-          setTraitsWithCompatibility(result.traitsWithCompatibility);
-          setCompatibilityScore(result.totalCompatibility);
-          
-          // Encontrar o perfil alvo (traço com maior peso)
-          let targetProfile = '';
-          let targetProfileMatchPercentage = 0;
-          
-          if (result.traitsWithCompatibility.length > 0) {
-            // Ordenar por peso para encontrar o traço com maior peso
-            const sortedByWeight = [...result.traitsWithCompatibility].sort((a, b) => (b.weight || 1) - (a.weight || 1));
-            if (sortedByWeight.length > 0) {
-              targetProfile = sortedByWeight[0].trait;
-              // Encontrar a porcentagem de compatibilidade para o perfil alvo
-              const targetProfileData = result.traitsWithCompatibility.find(t => t.trait === targetProfile);
-              targetProfileMatchPercentage = targetProfileData ? targetProfileData.percentage : 0;
-            }
-          }
-          
-          // Notificar o componente pai sobre o cálculo de compatibilidade
-          if (onCompatibilityCalculated) {
-            onCompatibilityCalculated(
-              result.totalCompatibility,
-              targetProfile,
-              targetProfileMatchPercentage
-            );
-          }
-        }
-      } catch (error) {
-        console.error("Erro ao calcular compatibilidade:", error);
-        setError("Erro ao calcular compatibilidade");
-      } finally {
-        setLoading(false);
-      }
-    }
-  }, [mergedTraits, processPersonalityData, propExpectedProfile, onCompatibilityCalculated]);
-
   // Função para calcular a compatibilidade conforme a fórmula especificada
-  const calculateCompatibility = (
+  const calculateCompatibility = useCallback((
     traits: PersonalityTrait[], 
     processTraits: Array<{name: string, weight: number, categoryNameUuid?: string}>,
     expectedProfile: Record<string, number>
@@ -452,7 +215,271 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
     }
 
     return {traitsWithCompatibility, totalCompatibility: 0};
+  }, [traitsWithCompatibility]);
+
+  // Função para buscar os dados de personalidade do processo
+  const fetchProcessPersonalityData = useCallback(async () => {
+    if (!processId) {
+      console.log("Nenhum ID de processo fornecido, usando dados padrão");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await fetch(`/api/admin/processes/${processId}/personality-data`);
+      
+      if (!response.ok) {
+        throw new Error('Erro ao carregar dados de personalidade do processo');
+      }
+      
+      const data = await response.json();
+      
+      if (data && data.traits && data.traits.length > 0) {
+        setProcessPersonalityData({
+          traits: data.traits,
+          expectedProfile: data.expectedProfile || propExpectedProfile || null
+        });
+        setUsingDefaultData(false);
+      } else {
+        // Se não houver dados específicos do processo, usar dados padrão
+        const defaultTraits = personalityTraits.map(trait => ({
+          name: trait.trait,
+          weight: 1
+        }));
+        
+        setProcessPersonalityData({
+          traits: defaultTraits,
+          expectedProfile: propExpectedProfile || null,
+          isDefaultData: true
+        });
+        
+        setUsingDefaultData(true);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar dados de personalidade do processo:', error);
+      setError('Erro ao carregar dados de personalidade do processo');
+      
+      // Em caso de erro, usar dados padrão
+      const defaultTraits = personalityTraits.map(trait => ({
+        name: trait.trait,
+        weight: 1
+      }));
+      
+      setProcessPersonalityData({
+        traits: defaultTraits,
+        expectedProfile: propExpectedProfile || null,
+        isDefaultData: true
+      });
+      
+      setUsingDefaultData(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [processId, personalityTraits, propExpectedProfile]);
+
+  useEffect(() => {
+    if (processId) {
+      fetchProcessPersonalityData();
+    } else {
+      // Se não houver ID de processo, usar dados padrão
+      const defaultTraits = personalityTraits.map(trait => ({
+        name: trait.trait,
+        weight: 1
+      }));
+      
+      setProcessPersonalityData({
+        traits: defaultTraits,
+        expectedProfile: propExpectedProfile || null,
+        isDefaultData: true
+      });
+      
+      setUsingDefaultData(true);
+    }
+  }, [processId, personalityTraits, propExpectedProfile, fetchProcessPersonalityData]);
+
+  useEffect(() => {
+    if (mergedTraits.length > 0 && processPersonalityData) {
+      try {
+        const result = calculateCompatibility(
+          mergedTraits, 
+          processPersonalityData.traits, 
+          processPersonalityData.expectedProfile || propExpectedProfile || {}
+        );
+        
+        if (result) {
+          setTraitsWithCompatibility(result.traitsWithCompatibility);
+          setCompatibilityScore(result.totalCompatibility);
+          
+          // Encontrar o perfil alvo (traço com maior peso)
+          let targetProfile = '';
+          let targetProfileMatchPercentage = 0;
+          
+          if (result.traitsWithCompatibility.length > 0) {
+            // Ordenar por peso para encontrar o traço com maior peso
+            const sortedByWeight = [...result.traitsWithCompatibility].sort((a, b) => (b.weight || 1) - (a.weight || 1));
+            if (sortedByWeight.length > 0) {
+              targetProfile = sortedByWeight[0].trait;
+              // Encontrar a porcentagem de compatibilidade para o perfil alvo
+              const targetProfileData = result.traitsWithCompatibility.find(t => t.trait === targetProfile);
+              targetProfileMatchPercentage = targetProfileData ? targetProfileData.percentage : 0;
+            }
+          }
+          
+          // Notificar o componente pai sobre o cálculo de compatibilidade
+          if (onCompatibilityCalculated) {
+            onCompatibilityCalculated(
+              result.totalCompatibility,
+              targetProfile,
+              targetProfileMatchPercentage
+            );
+          }
+        }
+      } catch (error) {
+        console.error("Erro ao calcular compatibilidade:", error);
+        setError("Erro ao calcular compatibilidade");
+      } finally {
+        setLoading(false);
+      }
+    }
+  }, [mergedTraits, processPersonalityData, propExpectedProfile, onCompatibilityCalculated, calculateCompatibility]);
+
+  // Buscar os traços de personalidade completos do processo seletivo
+  const mergePersonalityTraits = (
+    candidateTraits: PersonalityTrait[], 
+    processTraits: Array<{name: string, weight: number, categoryNameUuid?: string}>
+  ): PersonalityTrait[] => {
+    // Se não houver traços do candidato, retornar vazio
+    if (!candidateTraits || candidateTraits.length === 0) {
+      console.log('Sem traços do candidato para mesclar');
+      return [];
+    }
+
+    console.log('Mesclando traços - Candidato:', candidateTraits, 'Processo:', processTraits);
+    
+    // Criar mapas dos traços do candidato para fácil acesso - um por nome e outro por UUID
+    const candidateTraitsByName = new Map<string, PersonalityTrait>();
+    const candidateTraitsByUuid = new Map<string, PersonalityTrait>();
+    
+    candidateTraits.forEach(trait => {
+      if (trait && trait.trait) {
+        // Normalizar o nome do traço para comparação
+        candidateTraitsByName.set(trait.trait.toLowerCase().trim(), trait);
+        
+        // Se tiver UUID, adicionar ao mapa por UUID também
+        if (trait.categoryNameUuid) {
+          candidateTraitsByUuid.set(trait.categoryNameUuid, trait);
+        }
+      }
+    });
+    
+    console.log('Mapa de traços do candidato por nome:', Array.from(candidateTraitsByName.entries()));
+    console.log('Mapa de traços do candidato por UUID:', Array.from(candidateTraitsByUuid.entries()));
+    
+    // Se houver traços do processo, mesclar com os do candidato
+    if (processTraits && processTraits.length > 0) {
+      // Criar um conjunto para rastrear quais traços do candidato foram usados
+      const usedCandidateTraits = new Set<string>();
+      const usedCandidateTraitUuids = new Set<string>();
+      
+      // Primeiro, mapear os traços do processo
+      const mergedTraits = processTraits.map(processTrait => {
+        // Normalizar o nome do traço para comparação
+        const processTraitName = processTrait.name.toLowerCase().trim();
+        const processTraitUuid = processTrait.categoryNameUuid;
+        
+        console.log(`Buscando traço do candidato para "${processTrait.name}" (UUID: "${processTraitUuid}")`);
+        
+        // Tentar encontrar o traço primeiro pelo UUID, depois pelo nome
+        let candidateTrait = null;
+        
+        if (processTraitUuid && candidateTraitsByUuid.has(processTraitUuid)) {
+          candidateTrait = candidateTraitsByUuid.get(processTraitUuid);
+          usedCandidateTraitUuids.add(processTraitUuid);
+          console.log(`Traço encontrado pelo UUID "${processTraitUuid}":`, candidateTrait);
+        } else if (candidateTraitsByName.has(processTraitName)) {
+          candidateTrait = candidateTraitsByName.get(processTraitName);
+          usedCandidateTraits.add(processTraitName);
+          console.log(`Traço encontrado pelo nome "${processTraitName}":`, candidateTrait);
+        }
+        
+        if (candidateTrait) {
+          // Se o candidato tem este traço, usar seus valores mas manter o peso do traço do processo
+          return {
+            ...candidateTrait,
+            trait: processTrait.name, // Garantir que o nome do traço é o mesmo do processo
+            weight: processTrait.weight,
+            weightedScore: ((candidateTrait.percentage / 100) * processTrait.weight),
+            categoryNameUuid: processTraitUuid || candidateTrait.categoryNameUuid
+          };
+        } else {
+          console.log(`Traço NÃO encontrado para "${processTrait.name}"`);
+          // Se o candidato não tem este traço, usar o traço do processo com valores zerados
+          return {
+            trait: processTrait.name,
+            count: 0,
+            percentage: 0,
+            weight: processTrait.weight,
+            weightedScore: 0,
+            categoryNameUuid: processTraitUuid
+          };
+        }
+      });
+      
+      // Agora, adicionar os traços do candidato que não foram usados
+      candidateTraits.forEach(trait => {
+        const normalizedTraitName = trait.trait.toLowerCase().trim();
+        const traitUuid = trait.categoryNameUuid;
+        
+        // Verificar se o traço já foi usado (por nome ou UUID)
+        const wasUsedByName = usedCandidateTraits.has(normalizedTraitName);
+        const wasUsedByUuid = traitUuid && usedCandidateTraitUuids.has(traitUuid);
+        
+        if (!wasUsedByName && !wasUsedByUuid) {
+          console.log(`Adicionando traço do candidato não mapeado: "${trait.trait}" (UUID: "${traitUuid}")`);
+          mergedTraits.push({
+            ...trait,
+            weight: trait.weight || 1,
+            weightedScore: trait.weightedScore || (trait.percentage / 100)
+          });
+        }
+      });
+      
+      return mergedTraits;
+    } else {
+      // Se não houver traços do processo, usar apenas os do candidato
+      return candidateTraits.map(trait => ({
+        ...trait,
+        weight: trait.weight || 1,
+        weightedScore: trait.weightedScore || (trait.percentage / 100)
+      }));
+    }
   };
+
+  useEffect(() => {
+    if (processId) {
+      fetchProcessPersonalityData();
+    } else if (personalityTraits.length > 0) {
+      // Se não temos ID do processo, usar apenas os traços fornecidos
+      setMergedTraits(personalityTraits);
+      
+      // Criar dados de processo padrão
+      const defaultTraits = personalityTraits.map((trait, index) => ({
+        name: trait.trait,
+        weight: trait.weight || (personalityTraits.length - index), // Peso baseado na ordem
+        categoryNameUuid: trait.categoryNameUuid
+      }));
+      
+      setProcessPersonalityData({
+        traits: defaultTraits,
+        expectedProfile: propExpectedProfile || null,
+        isDefaultData: true
+      });
+      
+      setUsingDefaultData(true);
+    }
+  }, [processId, personalityTraits, propExpectedProfile, fetchProcessPersonalityData]);
 
   // Dados para o gráfico de rosca
   const chartData = {
