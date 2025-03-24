@@ -37,6 +37,7 @@
     "@mui/icons-material": "^6.4.8",
     "@mui/material": "^6.4.8",
     "@mui/x-data-grid": "^7.28.0",
+    "@next/eslint-plugin-next": "^15.2.3",
     "@prisma/client": "^5.10.0",
     "@types/nodemailer": "^6.4.17",
     "@types/react-beautiful-dnd": "^13.1.8",
@@ -78,7 +79,7 @@
     "prisma": "^5.22.0",
     "ts-jest": "^29.2.6",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.2"
+    "typescript": "^5.3.3"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

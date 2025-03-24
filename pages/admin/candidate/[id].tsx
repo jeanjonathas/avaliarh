@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
@@ -188,25 +188,8 @@ const CandidateDetails = () => {
     }
   }, [status, router])
   
-  // Buscar dados do candidato e lista de candidatos para navegação
-  useEffect(() => {
-    if (id && status === 'authenticated') {
-      fetchCandidate()
-      fetchCandidates()
-      fetchTests()
-    }
-  }, [id, status])
-  
-  // Atualizar o índice atual quando a lista de candidatos for carregada
-  useEffect(() => {
-    if (candidates.length > 0 && id) {
-      const index = candidates.findIndex(c => c.id === id)
-      setCurrentIndex(index)
-    }
-  }, [candidates, id])
-  
   // Buscar dados do candidato específico
-  const fetchCandidate = async () => {
+  const fetchCandidate = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/admin/candidates/${id}`);
@@ -261,10 +244,10 @@ const CandidateDetails = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
   
   // Buscar lista de todos os candidatos para navegação
-  const fetchCandidates = async () => {
+  const fetchCandidates = useCallback(async () => {
     try {
       const response = await fetch('/api/admin/candidates')
       
@@ -277,10 +260,10 @@ const CandidateDetails = () => {
     } catch (err) {
       console.error(err)
     }
-  }
+  }, []);
   
   // Buscar testes disponíveis
-  const fetchTests = async () => {
+  const fetchTests = useCallback(async () => {
     try {
       setIsLoadingTests(true);
       const response = await fetch('/api/admin/tests');
@@ -296,8 +279,25 @@ const CandidateDetails = () => {
     } finally {
       setIsLoadingTests(false);
     }
-  };
+  }, []);
 
+  // Buscar dados do candidato e lista de candidatos para navegação
+  useEffect(() => {
+    if (id && status === 'authenticated') {
+      fetchCandidate()
+      fetchCandidates()
+      fetchTests()
+    }
+  }, [id, status, fetchCandidate, fetchCandidates, fetchTests])
+  
+  // Atualizar o índice atual quando a lista de candidatos for carregada
+  useEffect(() => {
+    if (candidates.length > 0 && id) {
+      const index = candidates.findIndex(c => c.id === id)
+      setCurrentIndex(index)
+    }
+  }, [candidates, id])
+  
   // Navegar para o próximo candidato
   const goToNextCandidate = () => {
     if (currentIndex < candidates.length - 1) {
@@ -1544,6 +1544,7 @@ const CandidateDetails = () => {
                                     const totalCorrect = candidate.stageScores?.reduce((acc, stage) => acc + stage.correct, 0) || 0;
                                     const totalQuestions = candidate.stageScores?.reduce((acc, stage) => acc + stage.total, 0) || 0;
                                     const percentage = totalQuestions > 0 ? parseFloat((totalCorrect / totalQuestions * 100).toFixed(1)) : 0;
+                                    
                                     return (
                                       <>
                                         <span className="mr-2">{percentage}%</span>
