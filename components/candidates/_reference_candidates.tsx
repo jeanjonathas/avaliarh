@@ -872,7 +872,7 @@ const CandidateDetails = () => {
       
       console.log(`Pontuação total calculada: ${totalCorrect}/${totalQuestions} (${percentage}%)`);
     }
-  }, [candidate?.stageScores]);
+  }, [candidate?.stageScores, candidate]);
 
   if (status === 'loading' || loading) {
     return (
