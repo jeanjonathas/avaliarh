@@ -56,12 +56,13 @@ const TestStage: NextPage = () => {
   }
 
   // Função para carregar respostas do localStorage
-  const loadResponsesFromLocalStorage = () => {
+  const loadResponsesFromLocalStorage = useCallback(() => {
     if (typeof window !== 'undefined' && candidateId && stageId) {
       const saved = localStorage.getItem(`candidate_${candidateId}_stage_${stageId}`)
       if (saved) {
         try {
           const parsedResponses = JSON.parse(saved)
+          console.log('Respostas carregadas do localStorage:', parsedResponses)
           setSavedResponses(parsedResponses)
           return parsedResponses
         } catch (e) {
@@ -70,7 +71,7 @@ const TestStage: NextPage = () => {
       }
     }
     return {}
-  }
+  }, [candidateId, stageId]);
 
   // Função para salvar o tempo no localStorage
   const saveTimeToLocalStorage = useCallback((remainingTime: number | null, spentTime: number) => {
