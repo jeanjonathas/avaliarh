@@ -21,17 +21,33 @@ export default async function handler(
       try {
         console.log('Buscando grupos de categorias para perguntas opinativas...');
         
+        // Determinar o tipo de questão com base no referer ou query parameter
+        const referer = req.headers.referer || '';
+        const questionTypeFromQuery = req.query.questionType as string;
+        let questionType = 'selection'; // Valor padrão
+        
+        if (questionTypeFromQuery) {
+          // Se fornecido explicitamente na query, use esse valor
+          questionType = questionTypeFromQuery;
+        } else if (referer.includes('/admin/training/')) {
+          // Se o referer contém '/admin/training/', é uma questão de treinamento
+          questionType = 'training';
+        }
+        
+        console.log(`Tipo de questão determinado: ${questionType}`);
+        
         // Buscar todas as perguntas do tipo opinião múltipla com suas opções
         const questions = await prisma.question.findMany({
           where: {
-            type: 'OPINION_MULTIPLE'
+            type: 'OPINION_MULTIPLE',
+            questionType: questionType
           },
           include: {
             options: true
           }
         });
 
-        console.log(`Encontradas ${questions.length} perguntas opinativas`);
+        console.log(`Encontradas ${questions.length} perguntas opinativas do tipo ${questionType}`);
 
         // Criar grupos de categorias
         const opinionGroups = [];
@@ -45,18 +61,24 @@ export default async function handler(
           // Extrair categorias das opções
           const categoriesFromOptions = [];
           const optionsByCategory = {};
+          const categoryNames = new Set();
           
           // Agrupar opções por categoria
           for (const option of question.options) {
             if (option.categoryName && option.categoryNameUuid) {
-              if (!optionsByCategory[option.categoryNameUuid]) {
-                optionsByCategory[option.categoryNameUuid] = [];
-                categoriesFromOptions.push({
-                  id: `cat-${option.categoryName.replace(/\s+/g, '-').toLowerCase()}`,
-                  name: option.categoryName,
-                  description: option.explanation || '',
-                  uuid: option.categoryNameUuid
-                });
+              // Evitar categorias duplicadas
+              if (!categoryNames.has(option.categoryName)) {
+                categoryNames.add(option.categoryName);
+                
+                if (!optionsByCategory[option.categoryNameUuid]) {
+                  optionsByCategory[option.categoryNameUuid] = [];
+                  categoriesFromOptions.push({
+                    id: `cat-${option.categoryName.replace(/\s+/g, '-').toLowerCase()}`,
+                    name: option.categoryName,
+                    description: option.explanation || '',
+                    uuid: option.categoryNameUuid
+                  });
+                }
               }
               optionsByCategory[option.categoryNameUuid].push(option);
             }

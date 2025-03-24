@@ -287,29 +287,51 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
         newOptions.push({
           text: '',
           categoryNameUuid: uuid,
-          category: category.name,
+          category: category.name, // Garantir que o nome da categoria seja definido corretamente
           weight: 1,
           position: newOptions.length
         });
       });
       
+      console.log('Categorias configuradas:', newCategories);
+      console.log('Opções configuradas:', newOptions);
+      
       // Definir categorias e opções de uma vez
       setValue('categories', newCategories);
       setValue('options', newOptions);
       
+      // Atualizar explicitamente o estado do formulário para garantir que as mudanças sejam aplicadas
+      setTimeout(() => {
+        const updatedOptions = watch('options');
+        const updatedCategories = watch('categories');
+        
+        console.log('Categorias após atualização:', updatedCategories);
+        console.log('Opções após atualização:', updatedOptions);
+        
+        // Verificar se as categorias foram corretamente associadas às opções
+        const fixedOptions = updatedOptions.map((option, index) => {
+          if (index < updatedCategories.length) {
+            return {
+              ...option,
+              category: updatedCategories[index].name,
+              categoryNameUuid: updatedCategories[index].uuid
+            };
+          }
+          return option;
+        });
+        
+        setValue('options', fixedOptions);
+      }, 100);
+      
       // Salvar as categorias originais para posterior comparação
       const origCats: {[key: string]: string} = {};
-      group.categories.forEach(category => {
+      group.categories.forEach((category: any) => {
         if (category.uuid) {
           origCats[category.uuid] = category.name;
         }
       });
       setOriginalCategories(origCats);
-      
-      // Salvar a quantidade original de categorias
       setOriginalCategoryCount(group.categories.length);
-      
-      // Resetar o flag de modificação
       setCategoriesModified(false);
       
       // Definir o grupo selecionado após configurar os campos
