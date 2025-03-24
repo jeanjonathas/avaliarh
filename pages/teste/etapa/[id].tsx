@@ -213,7 +213,7 @@ const TestStage: NextPage = () => {
       console.log("Limpando timer progressivo");
       clearInterval(timerInterval);
     };
-  }, [timeRemaining]);
+  }, [timeRemaining, saveTimeToLocalStorage]);
 
   // Referências para valores atuais
   const timeRemainingRef = useRef(timeRemaining);
