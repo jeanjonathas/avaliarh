@@ -1,7 +1,8 @@
-const { PrismaClient } = require('@prisma/client');
+// Importação modificada para evitar conflito de redeclaração
+import { PrismaClient as PrismaClientUpdate } from '@prisma/client';
 
 // Inicializar o cliente Prisma
-const prisma = new PrismaClient();
+const prisma = new PrismaClientUpdate();
 
 async function updateOptionsQuestionType() {
   try {

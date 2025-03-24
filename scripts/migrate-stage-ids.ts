@@ -1,6 +1,6 @@
-const { PrismaClient } = require('@prisma/client');
+import { PrismaClient as PrismaClientMigration } from '@prisma/client';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClientMigration();
 
 async function main() {
   console.log('Iniciando migração de IDs personalizados para UUIDs...');
@@ -22,7 +22,7 @@ async function main() {
     include: {
       question: {
         include: {
-          Stage: true
+          stage: true
         }
       }
     }
