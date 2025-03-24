@@ -270,6 +270,7 @@ model Option {
   position         Int?      @default(0)
   categoryNameUuid String?
   emotionGroupId   String?
+  questionType     String    @default("selection")
   category         Category? @relation(fields: [categoryId], references: [id])
   question         Question  @relation(fields: [questionId], references: [id])
 }

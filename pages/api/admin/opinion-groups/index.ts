@@ -49,12 +49,22 @@ export default async function handler(
 
         console.log(`Encontradas ${questions.length} perguntas opinativas do tipo ${questionType}`);
 
+        // Filtrar as opções pelo tipo de questão após a consulta
+        const filteredQuestions = questions.map(question => ({
+          ...question,
+          options: question.options.filter(option => 
+            // Se a opção já tem questionType definido, use-o, caso contrário, use o da pergunta
+            (option as any).questionType === questionType || 
+            !((option as any).questionType) // Para compatibilidade com opções antigas
+          )
+        }));
+        
         // Criar grupos de categorias
         const opinionGroups = [];
         const processedQuestionIds = new Set();
         
         // Processar perguntas para identificar grupos únicos de categorias
-        for (const question of questions) {
+        for (const question of filteredQuestions) {
           // Pular perguntas já processadas
           if (processedQuestionIds.has(question.id)) continue;
           
@@ -65,6 +75,7 @@ export default async function handler(
           
           // Agrupar opções por categoria
           for (const option of question.options) {
+            // Verificar se a opção tem categoria e UUID válidos
             if (option.categoryName && option.categoryNameUuid) {
               // Evitar categorias duplicadas
               if (!categoryNames.has(option.categoryName)) {
@@ -72,15 +83,25 @@ export default async function handler(
                 
                 if (!optionsByCategory[option.categoryNameUuid]) {
                   optionsByCategory[option.categoryNameUuid] = [];
+                  
+                  // Garantir que categoryName seja uma string válida antes de chamar replace
+                  const safeId = option.categoryName ? 
+                    `cat-${option.categoryName.replace(/\s+/g, '-').toLowerCase()}` : 
+                    `cat-${option.categoryNameUuid}`;
+                  
                   categoriesFromOptions.push({
-                    id: `cat-${option.categoryName.replace(/\s+/g, '-').toLowerCase()}`,
-                    name: option.categoryName,
+                    id: safeId,
+                    name: option.categoryName || 'Categoria sem nome',
                     description: option.explanation || '',
                     uuid: option.categoryNameUuid
                   });
                 }
               }
-              optionsByCategory[option.categoryNameUuid].push(option);
+              
+              // Adicionar a opção à categoria correspondente
+              if (optionsByCategory[option.categoryNameUuid]) {
+                optionsByCategory[option.categoryNameUuid].push(option);
+              }
             }
           }
           

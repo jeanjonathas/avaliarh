@@ -393,6 +393,27 @@ export default async function handler(
           categoryId: finalCategoryId
         });
 
+        // Verificar se é uma pergunta opinativa e processar dados específicos
+        let opinionData = {};
+        let processedOptions = options;
+        if (type === 'OPINION_MULTIPLE') {
+          console.log('Processando dados específicos para pergunta opinativa');
+          
+          // Processar opções com informações de categoria para perguntas opinativas
+          if (processedOptions && Array.isArray(processedOptions)) {
+            processedOptions = processedOptions.map((option: any) => {
+              return {
+                ...option,
+                categoryName: option.category || null,
+                categoryNameUuid: option.categoryNameUuid || null,
+                isCorrect: true // Todas as opções em perguntas opinativas são "corretas"
+              };
+            });
+            
+            console.log('Opções processadas para pergunta opinativa:', processedOptions.length);
+          }
+        }
+
         // Criar pergunta usando o Prisma Client em vez de SQL raw
         const newQuestion = await prisma.question.create({
           data: {
@@ -403,13 +424,16 @@ export default async function handler(
             questionType: questionType, // Adicionar o tipo de questão (training ou selection)
             showResults: showResults !== undefined ? showResults : true,
             options: {
-              create: options.map((option: any, index: number) => ({
+              create: processedOptions.map((option: any, index: number) => ({
                 text: option.text,
-                isCorrect: option.isCorrect,
+                isCorrect: option.isCorrect !== undefined ? option.isCorrect : true,
                 categoryId: option.categoryId || null,
+                categoryName: option.category || null,
+                categoryNameUuid: option.categoryNameUuid || null,
                 weight: option.weight || 0,
                 position: index,
-                explanation: option.explanation || null
+                explanation: option.explanation || null,
+                questionType: questionType // Adicionar o tipo de questão às opções
               }))
             },
             categories: {

@@ -61,16 +61,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const traitWeightMap = new Map();
     
     allTraitWeights.forEach(weight => {
-      if (!weight.trait) return;
+      // Usar traitName em vez de trait
+      const traitName = weight.traitName;
+      if (!traitName) return;
       
-      if (!traitWeightMap.has(weight.trait)) {
-        traitWeightMap.set(weight.trait, {
+      if (!traitWeightMap.has(traitName)) {
+        traitWeightMap.set(traitName, {
           totalWeight: weight.weight || 1,
           count: 1
         });
       } else {
-        const current = traitWeightMap.get(weight.trait);
-        traitWeightMap.set(weight.trait, {
+        const current = traitWeightMap.get(traitName);
+        traitWeightMap.set(traitName, {
           totalWeight: current.totalWeight + (weight.weight || 1),
           count: current.count + 1
         });
@@ -78,8 +80,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     // Converter o mapa em um array de traços com seus pesos médios
-    const traits = Array.from(traitWeightMap.entries()).map(([trait, data]) => ({
-      name: trait,
+    const traits = Array.from(traitWeightMap.entries()).map(([traitName, data]) => ({
+      name: traitName,
       weight: data.totalWeight / data.count
     }));
 

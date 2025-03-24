@@ -6,10 +6,6 @@ import Toast from '../ui/Toast';
 import { Button } from '../ui/Button';
 import { QuestionDifficulty, QuestionType } from '../../types/questions';
 
-// Variável estática para controlar se os grupos já foram carregados
-// Isso garante que o estado persista mesmo se o componente for remontado
-const loadedGroups = new Set<string>();
-
 // Função para gerar UUID v4 compatível com navegador
 function generateUUID() {
   // https://stackoverflow.com/questions/105034/how-to-create-a-guid-uuid
@@ -110,25 +106,23 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
   });
 
   useEffect(() => {
-    // Verificar se já carregamos os grupos para evitar chamadas duplicadas
-    if (loadedGroups.has('opinionGroups')) {
-      console.log("Grupos já foram carregados anteriormente, ignorando chamada");
-      return;
-    }
-    
+    // Não verificar mais se já carregamos os grupos, sempre carregar novamente
     console.log("Iniciando carregamento de grupos de opinião e categorias...");
-    // Marcar como carregado imediatamente para evitar chamadas duplicadas mesmo em caso de erro
-    loadedGroups.add('opinionGroups');
     
     // Função para carregar grupos de opinião
     const fetchOpinionGroups = async () => {
       try {
         console.log("Buscando grupos de opinião...");
-        const response = await fetch('/api/admin/opinion-groups', {
+        // Determinar o tipo de questão (selection ou training)
+        const qType = questionType || 'selection';
+        console.log(`Tipo de questão para busca: ${qType}`);
+        
+        const response = await fetch(`/api/admin/opinion-groups?questionType=${qType}&_=${Date.now()}`, {
           // Adicionar cabeçalhos para evitar problemas de cache
           headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
           }
         });
         
@@ -154,8 +148,9 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
         const response = await fetch(endpoint, {
           // Adicionar cabeçalhos para evitar problemas de cache
           headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
           }
         });
         
