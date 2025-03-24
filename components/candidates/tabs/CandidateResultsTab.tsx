@@ -462,12 +462,12 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
     let text = `Este candidato demonstrou excelente desempenho técnico com ${performance?.summary?.accuracy?.toFixed(1)}% de acertos. `;
     
     if (performance?.personalityAnalysis?.dominantPersonality) {
-      text += `Seu perfil dominante é "${performance.personalityAnalysis.dominantPersonality.trait}" (${performance.personalityAnalysis.dominantPersonality.percentage.toFixed(1)}%), `;
+      text += `Seu perfil dominante é &ldquo;${performance.personalityAnalysis.dominantPersonality.trait}&rdquo; (${performance.personalityAnalysis.dominantPersonality.percentage.toFixed(1)}%), `;
       text += 'o que complementa suas habilidades técnicas. ';
       
       // Adicionar informações sobre o perfil procurado
       if (performance.personalityAnalysis.hasTraitWeights && targetProfile) {
-        text += `\n\nO perfil procurado para esta vaga é "${targetProfile}" `;
+        text += `\n\nO perfil procurado para esta vaga é &ldquo;${targetProfile}&rdquo; `;
         
         if (profileMatch) {
           text += `e o candidato demonstra forte alinhamento com este perfil (${profileMatchPercentage.toFixed(1)}%). `;
@@ -1256,12 +1256,12 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
               recommendationText = `Este candidato demonstrou excelente desempenho técnico com ${accuracy.toFixed(1)}% de acertos. `;
               
               if (dominantPersonality) {
-                recommendationText += `Seu perfil dominante é "${dominantPersonality}" (${performance?.personalityAnalysis?.dominantPersonality?.percentage.toFixed(1)}%), `;
+                recommendationText += `Seu perfil dominante é &ldquo;${dominantPersonality}&rdquo; (${performance?.personalityAnalysis?.dominantPersonality?.percentage.toFixed(1)}%), `;
                 recommendationText += 'o que complementa suas habilidades técnicas. ';
                 
                 // Adicionar informações sobre o perfil procurado
                 if (hasTraitWeights && targetProfile) {
-                  recommendationText += `\n\nO perfil procurado para esta vaga é "${targetProfile}" `;
+                  recommendationText += `\n\nO perfil procurado para esta vaga é &ldquo;${targetProfile}&rdquo; `;
                   
                   if (profileMatch) {
                     recommendationText += `e o candidato demonstra forte alinhamento com este perfil (${profileMatchPercentage.toFixed(1)}%). `;
@@ -1295,11 +1295,11 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
               }
               
               if (dominantPersonality) {
-                recommendationText += `\n\nSeu perfil dominante é "${dominantPersonality}" (${performance?.personalityAnalysis?.dominantPersonality?.percentage.toFixed(1)}%). `;
+                recommendationText += `\n\nSeu perfil dominante é &ldquo;${dominantPersonality}&rdquo; (${performance?.personalityAnalysis?.dominantPersonality?.percentage.toFixed(1)}%). `;
                 
                 // Adicionar informações sobre o perfil procurado
                 if (hasTraitWeights && targetProfile) {
-                  recommendationText += `O perfil procurado para esta vaga é "${targetProfile}". `;
+                  recommendationText += `O perfil procurado para esta vaga é &ldquo;${targetProfile}&rdquo;. `;
                   
                   if (profileMatch) {
                     recommendationText += `O alinhamento do candidato com o perfil desejado (${profileMatchPercentage.toFixed(1)}%) é um ponto positivo que pode compensar parcialmente seu desempenho técnico moderado. `;
@@ -1321,7 +1321,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
               
               if (dominantPersonality && hasTraitWeights && targetProfile) {
                 if (profileMatch) {
-                  recommendationText += `\n\nApesar do baixo desempenho técnico, o candidato demonstra forte alinhamento com o perfil comportamental desejado ("${targetProfile}"). `;
+                  recommendationText += `\n\nApesar do baixo desempenho técnico, o candidato demonstra forte alinhamento com o perfil comportamental desejado (&ldquo;${targetProfile}&rdquo;). `;
                   recommendationText += 'Isto pode indicar potencial para desenvolvimento com o treinamento adequado. ';
                 }
               }
@@ -1335,7 +1335,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                 );
                 
                 if (bestStage && bestStage.stageName) {
-                  recommendationText += `Destaque para "${bestStage.stageName}" com ${bestStage.accuracy.toFixed(1)}% de acertos. `;
+                  recommendationText += `Destaque para &ldquo;${bestStage.stageName}&rdquo; com ${bestStage.accuracy.toFixed(1)}% de acertos. `;
                 }
                 
                 recommendationText += 'Pode ser considerado para outras posições que exijam essas habilidades específicas.';
@@ -1485,7 +1485,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
             <div className="mt-4">
               <h4 className="font-medium text-gray-800">Perfil Comportamental:</h4>
               <p className="mt-2 text-gray-600">
-                O perfil predominante do candidato é "{performance.personalityAnalysis.dominantPersonality.trait}" 
+                O perfil predominante do candidato é &ldquo;{performance.personalityAnalysis.dominantPersonality.trait}&rdquo; 
                 ({performance.personalityAnalysis.dominantPersonality.percentage.toFixed(1)}%). 
                 O que complementa suas habilidades técnicas.
               </p>

@@ -337,7 +337,7 @@ const Home: NextPage = () => {
                   </div>
                 </div>
                 <p className="text-secondary-600 italic">
-                  "O Admitto transformou nosso processo de recrutamento. Conseguimos reduzir o tempo de contratação em 40% e melhorar significativamente a qualidade dos candidatos selecionados para entrevistas."
+                  &ldquo;O Admitto transformou nosso processo de recrutamento. Conseguimos reduzir o tempo de contratação em 40% e melhorar significativamente a qualidade dos candidatos selecionados para entrevistas.&rdquo;
                 </p>
               </div>
               
@@ -352,7 +352,7 @@ const Home: NextPage = () => {
                   </div>
                 </div>
                 <p className="text-secondary-600 italic">
-                  "A análise de personalidade e compatibilidade com o perfil desejado nos ajudou a formar equipes mais equilibradas e produtivas. Os relatórios detalhados são fundamentais para nossas decisões."
+                  &ldquo;A análise de personalidade e compatibilidade com o perfil desejado nos ajudou a formar equipes mais equilibradas e produtivas. Os relatórios detalhados são fundamentais para nossas decisões.&rdquo;
                 </p>
               </div>
             </div>

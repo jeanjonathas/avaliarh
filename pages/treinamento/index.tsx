@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSession, getSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import Link from 'next/link';
 import StudentLayout from '../../components/training/StudentLayout';
 import CourseCard from '../../components/training/CourseCard';
 import ProgressStats from '../../components/training/ProgressStats';
@@ -158,9 +159,9 @@ export default function TrainingPortal() {
                   <FiClock className="mr-2 text-primary-500" />
                   Continuar Aprendendo
                 </h2>
-                <a href="/treinamento/cursos" className="text-sm text-primary-600 hover:text-primary-700">
+                <Link href="/treinamento/cursos" className="text-sm text-primary-600 hover:text-primary-700">
                   Ver todos
-                </a>
+                </Link>
               </div>
               
               {recentCourses.length > 0 ? (
@@ -225,12 +226,12 @@ export default function TrainingPortal() {
               
               {courses.length > 6 && (
                 <div className="mt-6 text-center">
-                  <a 
-                    href="/treinamento/cursos" 
+                  <Link 
+                    href={{ pathname: '/treinamento/cursos' }} 
                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700"
                   >
                     Ver todos os cursos
-                  </a>
+                  </Link>
                 </div>
               )}
             </div>
@@ -243,21 +244,21 @@ export default function TrainingPortal() {
                     <FiAward className="mr-2 text-primary-500" />
                     Certificados Recentes
                   </h2>
-                  <a href="/treinamento/certificados" className="text-sm text-primary-600 hover:text-primary-700">
+                  <Link href="/treinamento/certificados" className="text-sm text-primary-600 hover:text-primary-700">
                     Ver todos
-                  </a>
+                  </Link>
                 </div>
                 
                 <div className="text-center py-8">
                   <FiAward className="mx-auto h-12 w-12 text-secondary-400" />
                   <h3 className="mt-2 text-sm font-medium text-secondary-900">Certificados disponíveis</h3>
                   <p className="mt-1 text-sm text-secondary-500">Você tem {stats.completedCourses} certificados disponíveis.</p>
-                  <a 
-                    href="/treinamento/certificados" 
+                  <Link 
+                    href={{ pathname: '/treinamento/certificados' }} 
                     className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-primary-600 bg-primary-50 hover:bg-primary-100"
                   >
                     Ver meus certificados
-                  </a>
+                  </Link>
                 </div>
               </div>
             )}
