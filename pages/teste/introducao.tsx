@@ -460,7 +460,6 @@ const Introducao: NextPage = () => {
                         id="phone"
                         className="input-field"
                         placeholder="(00) 00000-0000"
-                        disabled={!!candidateData}
                       />
                       <ErrorMessage name="phone" component="div" className="text-red-500 text-sm mt-1" />
                     </div>
