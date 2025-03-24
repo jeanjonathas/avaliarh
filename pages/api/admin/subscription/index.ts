@@ -62,7 +62,7 @@ export default async function handler(
         startDate: company.subscription?.startDate || null,
         endDate: company.subscription?.endDate || null,
         lastPaymentDate: company.paymentHistory[0]?.paymentDate || null,
-        nextPaymentDate: company.subscription?.nextBillingDate || null,
+        nextPaymentDate: company.subscription?.nextPaymentDate || null,
         usedCandidates: candidateCount,
         totalCandidates: company.maxCandidates || 100,
         usedUsers: userCount,
