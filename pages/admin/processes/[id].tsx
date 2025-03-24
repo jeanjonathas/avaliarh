@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import AdminLayout from '../../../components/admin/AdminLayout';
@@ -83,13 +83,7 @@ const ProcessDetails: React.FC = () => {
   const [confirmRemoveDialogOpen, setConfirmRemoveDialogOpen] = useState(false);
   const [candidateToRemove, setCandidateToRemove] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (id) {
-      fetchProcessDetails();
-    }
-  }, [id]);
-
-  const fetchProcessDetails = async () => {
+  const fetchProcessDetails = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/admin/processes/${id}`);
@@ -115,7 +109,13 @@ const ProcessDetails: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      fetchProcessDetails();
+    }
+  }, [id, fetchProcessDetails]);
 
   const handleInviteSuccess = (candidateId: string, inviteCode: string) => {
     setCandidateInviteCodes(prev => ({
