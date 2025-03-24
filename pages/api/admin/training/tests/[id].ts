@@ -305,36 +305,56 @@ export default async function handler(
     }
   }
 
-  // Handle PATCH request - Update test status
+  // Handle PATCH request - Update test status or specific fields
   if (req.method === 'PATCH') {
     try {
       const { active } = req.body;
-      
+      console.log(`[API] Atualizando status do teste de treinamento ${id}:`, { active });
+
       if (active === undefined) {
         return res.status(400).json({ 
           success: false,
-          error: 'Campo active é obrigatório' 
+          error: 'Status do teste é obrigatório' 
         });
       }
-      
-      // Atualizar apenas o status do teste
+
       await prisma.$executeRaw`
         UPDATE "Test"
-        SET active = ${active}, "updatedAt" = CURRENT_TIMESTAMP
+        SET 
+          active = ${active},
+          "updatedAt" = CURRENT_TIMESTAMP
         WHERE id = ${id}
       `;
-      
+
       // Get the updated test
       const updatedTestRaw = await prisma.$queryRaw`
-        SELECT id, title, active FROM "Test" WHERE id = ${id}
+        SELECT 
+          id, 
+          title, 
+          description, 
+          "timeLimit", 
+          "cutoffScore",
+          active,
+          "createdAt",
+          "updatedAt",
+          "testType"
+        FROM "Test"
+        WHERE id = ${id}
       `;
-      
-      console.log(`[API] Status do teste de treinamento ${id} atualizado para ${active}`);
-      
+
+      // Converter BigInt para Number para evitar erro de serialização
+      const updatedTest = {
+        ...updatedTestRaw[0],
+        timeLimit: updatedTestRaw[0].timeLimit ? Number(updatedTestRaw[0].timeLimit) : null,
+        cutoffScore: updatedTestRaw[0].cutoffScore ? Number(updatedTestRaw[0].cutoffScore) : null
+      };
+
+      console.log(`[API] Status do teste de treinamento ${id} atualizado com sucesso para ${active ? 'ativo' : 'inativo'}`);
+
       return res.status(200).json({
         success: true,
-        message: 'Status do teste atualizado com sucesso',
-        test: updatedTestRaw[0]
+        message: `Teste ${active ? 'ativado' : 'desativado'} com sucesso`,
+        test: updatedTest
       });
     } catch (error) {
       console.error(`[API] Erro ao atualizar status do teste ${id}:`, error);
@@ -346,9 +366,8 @@ export default async function handler(
   }
 
   // If the request method is not supported
-  res.setHeader('Allow', ['GET', 'PUT', 'DELETE', 'PATCH']);
   return res.status(405).json({ 
     success: false,
-    error: `Método ${req.method} não permitido` 
+    error: 'Método não permitido' 
   });
 }

@@ -994,6 +994,40 @@ const TestDetail: NextPage = () => {
     );
   };
 
+  // Função para atualizar o status do teste (ativo/inativo)
+  const toggleTestStatus = async () => {
+    if (!test) return;
+    
+    try {
+      setTestDataLoading(true);
+      const newStatus = !test.active;
+      
+      const response = await fetch(`/api/admin/training/tests/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        },
+        body: JSON.stringify({ active: newStatus }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Erro ao atualizar o status do teste');
+      }
+      
+      // Atualizar o estado local
+      setTest(prevTest => prevTest ? { ...prevTest, active: newStatus } : null);
+      
+      notify.showSuccess(`Teste ${newStatus ? 'ativado' : 'desativado'} com sucesso!`);
+    } catch (error) {
+      console.error('Erro ao atualizar status:', error);
+      notify.showError('Ocorreu um erro ao atualizar o status do teste. Por favor, tente novamente.');
+    } finally {
+      setTestDataLoading(false);
+    }
+  };
+
   if (status === 'loading' || pageLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-primary-50">
@@ -1061,12 +1095,20 @@ const TestDetail: NextPage = () => {
                   )}
                 </div>
               </div>
-              <Link 
-                href={`/admin/training/tests`}
-                className="px-4 py-2 text-sm text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50"
-              >
-                Editar teste
-              </Link>
+              <div className="flex items-center space-x-2">
+                <Link 
+                  href={`/admin/training/tests`}
+                  className="px-4 py-2 text-sm text-primary-600 border border-primary-600 rounded-md hover:bg-primary-50"
+                >
+                  Editar teste
+                </Link>
+                <button
+                  onClick={toggleTestStatus}
+                  className="px-4 py-2 text-sm text-white bg-primary-600 rounded-md hover:bg-primary-700"
+                >
+                  {test.active ? 'Desativar' : 'Ativar'}
+                </button>
+              </div>
             </div>
           </div>
 
