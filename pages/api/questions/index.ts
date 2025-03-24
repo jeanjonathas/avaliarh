@@ -175,10 +175,6 @@ export default async function handler(
         console.log(`Buscando questões específicas do teste ${testId} para a etapa ${stage.id}`);
         
         try {
-          // A tabela StageQuestion não existe, então vamos usar uma abordagem alternativa
-          console.log(`Erro ao buscar questões específicas via SQL raw: A tabela StageQuestion não existe`);
-          console.log(`Tentando abordagem alternativa para buscar questões...`);
-          
           // Buscar questões diretamente pela etapa
           const stageQuestions = await prisma.question.findMany({
             where: {
@@ -194,41 +190,7 @@ export default async function handler(
           console.log(`Encontradas ${stageQuestions.length} questões associadas à etapa ${stage.id}`);
           questions = stageQuestions;
         } catch (error) {
-          console.error('Erro ao buscar questões específicas via SQL raw:', error);
-        }
-        
-        // Se não encontramos questões via SQL raw, tentar uma abordagem alternativa
-        if (questions.length === 0) {
-          console.log('Tentando abordagem alternativa para buscar questões...');
-          
-          try {
-            // Buscar as questões associadas a esta etapa
-            const questions = await prisma.question.findMany({
-              where: {
-                stageId: stage.id
-              },
-              take: 3, // Limitar a 3 questões
-              include: {
-                options: {
-                  select: {
-                    id: true,
-                    text: true,
-                    categoryName: true,
-                    categoryNameUuid: true,
-                    isCorrect: true,
-                    weight: true,
-                    position: true
-                  }
-                }
-              }
-            });
-            
-            if (questions.length > 0) {
-              console.log(`Encontradas ${questions.length} questões associadas à etapa ${stage.id}`);
-            }
-          } catch (error) {
-            console.error('Erro na abordagem alternativa:', error);
-          }
+          console.error('Erro ao buscar questões:', error);
         }
       }
       

@@ -117,49 +117,27 @@ export default async function handler(
         const selectedOption = question.options[0];
         
         try {
-          // Usar o prisma.$queryRaw para contornar problemas de tipagem
-          await prisma.$executeRaw`
-            INSERT INTO "Response" (
-              "id", 
-              "candidateId", 
-              "questionId", 
-              "optionId", 
-              "questionText", 
-              "optionText", 
-              "isCorrect", 
-              "companyId",
-              "createdAt", 
-              "updatedAt"
-            ) VALUES (
-              ${uuidv4()}, 
-              ${candidateId}, 
-              ${question.id}, 
-              ${selectedOption.id}, 
-              ${question.text}, 
-              ${selectedOption.text}, 
-              ${selectedOption.isCorrect}, 
-              ${question.companyId || null},
-              NOW(), 
-              NOW()
-            )
-          `;
+          // Criar a resposta usando o modelo correto do Prisma
+          await prisma.response.create({
+            data: {
+              candidateId: candidateId,
+              questionId: question.id,
+              optionId: selectedOption.id,
+              questionText: question.text || "",
+              optionText: selectedOption.text || "",
+              isCorrect: selectedOption.isCorrect || false,
+              companyId: question.companyId || (await prisma.candidate.findUnique({
+                where: { id: candidateId },
+                select: { companyId: true }
+              })).companyId,
+              stageId: stageUUID,
+              stageName: stageName || ""
+            }
+          });
           
           console.log(`Resposta automática criada para a questão ${question.id}`);
         } catch (error) {
           console.error('Erro ao criar resposta automática:', error);
-          // Fallback: tentar criar apenas com os campos básicos
-          await prisma.response.create({
-            data: {
-              candidateId,
-              questionId: question.id,
-              optionId: selectedOption.id,
-              //@ts-ignore - Ignorar erros de tipagem, pois sabemos que estes campos existem no banco
-              questionText: question.text,
-              optionText: selectedOption.text,
-              isCorrect: selectedOption.isCorrect,
-              companyId: question.companyId || null
-            } as any
-          });
         }
       }
     }
