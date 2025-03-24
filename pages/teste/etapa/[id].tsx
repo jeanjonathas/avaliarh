@@ -134,7 +134,7 @@ const TestStage: NextPage = () => {
         }
       }
     }
-  }, [candidateId]) // Adicionar candidateId como dependência para recarregar quando mudar
+  }, [candidateId, loadTimeFromLocalStorage]) // Adicionar candidateId como dependência para recarregar quando mudar
 
   // Efeito para inicializar o contador de tempo
   useEffect(() => {
