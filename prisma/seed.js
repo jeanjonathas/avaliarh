@@ -31,6 +31,60 @@ async function main() {
   } else {
     console.log('Superadmin já existe, pulando criação.');
   }
+
+  // Verificar se já existe a empresa Dr. Animal
+  const drAnimalCount = await prisma.company.count({
+    where: {
+      cnpj: '37256198000189'
+    }
+  });
+
+  if (drAnimalCount === 0) {
+    // Criar a empresa Dr. Animal
+    const drAnimal = await prisma.company.create({
+      data: {
+        name: 'Dr. Animal',
+        cnpj: '37256198000189',
+        isActive: true,
+        maxUsers: 50,
+        maxCandidates: 500,
+        planType: 'Premium',
+      }
+    });
+
+    console.log('Empresa Dr. Animal criada com sucesso:', drAnimal.id);
+
+    // Verificar se já existe o usuário COMPANY_ADMIN para Dr. Animal
+    const companyAdminCount = await prisma.user.count({
+      where: {
+        email: 'jean@dranimal.com.br'
+      }
+    });
+
+    if (companyAdminCount === 0) {
+      // Criar usuário COMPANY_ADMIN
+      const hashedPassword = await bcrypt.hash('Je@nfree16', 10);
+      
+      const companyAdmin = await prisma.user.create({
+        data: {
+          name: 'Jean Administrador',
+          email: 'jean@dranimal.com.br',
+          password: hashedPassword,
+          role: 'COMPANY_ADMIN',
+          companyId: drAnimal.id,
+        }
+      });
+      
+      console.log('Administrador da empresa criado com sucesso:');
+      console.log('Email: jean@dranimal.com.br');
+      console.log('Senha: Je@nfree16');
+      console.log('Empresa: Dr. Animal');
+    } else {
+      console.log('Administrador da empresa já existe, pulando criação.');
+    }
+  } else {
+    console.log('Empresa Dr. Animal já existe, pulando criação.');
+  }
 }
 
 main()
