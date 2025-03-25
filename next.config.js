@@ -84,6 +84,7 @@ const nextConfig = {
         permanent: false,
       },
       {
+        source: '/admin',
         has: [
           {
             type: 'cookie',
