@@ -171,7 +171,7 @@ export default function SuperAdminDashboard({ stats }: { stats: DashboardStats }
                   </div>
                 </div>
                 <div className="bg-green-50 px-6 py-2">
-                  <Link href="/superadmin/candidates" className="text-green-600 hover:text-green-800 text-sm font-medium">
+                  <Link href="/superadmin/users" className="text-green-600 hover:text-green-800 text-sm font-medium">
                     Ver detalhes →
                   </Link>
                 </div>
@@ -192,7 +192,7 @@ export default function SuperAdminDashboard({ stats }: { stats: DashboardStats }
                   </div>
                 </div>
                 <div className="bg-yellow-50 px-6 py-2">
-                  <Link href="/superadmin/tests" className="text-yellow-600 hover:text-yellow-800 text-sm font-medium">
+                  <Link href="/superadmin/global-tests" className="text-yellow-600 hover:text-yellow-800 text-sm font-medium">
                     Ver detalhes →
                   </Link>
                 </div>
@@ -213,7 +213,7 @@ export default function SuperAdminDashboard({ stats }: { stats: DashboardStats }
                   </div>
                 </div>
                 <div className="bg-red-50 px-6 py-2">
-                  <Link href="/superadmin/processes" className="text-red-600 hover:text-red-800 text-sm font-medium">
+                  <Link href="/superadmin/companies" className="text-red-600 hover:text-red-800 text-sm font-medium">
                     Ver detalhes →
                   </Link>
                 </div>

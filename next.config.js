@@ -83,6 +83,17 @@ const nextConfig = {
         destination: '/admin/dashboard',
         permanent: false,
       },
+      {
+        has: [
+          {
+            type: 'cookie',
+            key: 'role',
+            value: '(COMPANY_ADMIN|SUPER_ADMIN)',
+          },
+        ],
+        destination: '/admin/dashboard',
+        permanent: false,
+      },
     ]
   },
   // Configuração para variáveis de ambiente

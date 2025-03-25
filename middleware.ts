@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
 // Definição dos papéis de usuário como strings
-type RoleType = 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'INSTRUCTOR' | 'STUDENT' | 'USER' | 'ADMIN';
+type RoleType = 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'INSTRUCTOR' | 'STUDENT' | 'USER';
 
 // Mapeamento de rotas para papéis autorizados
 const routePermissions: Record<string, RoleType[]> = {
