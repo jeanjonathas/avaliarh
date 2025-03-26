@@ -1,6 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getSession } from 'next-auth/react';
 import { PrismaClient } from '@prisma/client';
+import { ReadStream } from 'fs';
+import { join } from 'path';
 
 const prisma = new PrismaClient();
 
@@ -154,47 +156,31 @@ async function updateCompany(req: NextApiRequest, res: NextApiResponse, id: stri
 async function deleteCompany(req: NextApiRequest, res: NextApiResponse, id: string) {
   try {
     // Verifica se a empresa existe
-    const existingCompany = await prisma.company.findUnique({
-      where: { id }
+    const company = await prisma.company.findUnique({
+      where: { id },
+      include: {
+        users: true,
+        subscription: true,
+        plan: true,
+      },
     });
 
-    if (!existingCompany) {
+    if (!company) {
       return res.status(404).json({ message: 'Empresa não encontrada' });
     }
 
-    // Busca todos os dados relacionados à empresa para backup
-    const users = await prisma.user.findMany({
-      where: { companyId: id }
-    });
-
-    const candidates = await prisma.candidate.findMany({
-      where: { companyId: id }
-    });
-
-    const tests = await prisma.test.findMany({
-      where: { companyId: id }
-    });
-
-    const processes = await prisma.selectionProcess.findMany({
-      where: { companyId: id }
-    });
-
-    // Cria um backup da empresa e seus dados relacionados
-    const backupData = {
-      company: existingCompany,
-      users,
-      candidates,
-      tests,
-      processes
-    };
-
-    // Salva o backup em log para recuperação posterior se necessário
-    try {
-      // Registra os dados no log para recuperação posterior
-      console.log('COMPANY_BACKUP_DATA:', JSON.stringify(backupData));
-    } catch (backupError) {
-      console.warn('Não foi possível registrar o backup:', backupError);
-    }
+    // Exporta todos os dados relacionados à empresa antes da exclusão
+    const exportData = await exportCompanyData(id);
+    
+    // Salva os dados exportados em um arquivo JSON
+    const exportFileName = `company_export_${id}_${Date.now()}.json`;
+    const exportPath = `/tmp/${exportFileName}`;
+    
+    // Salva o arquivo localmente (em produção, você pode querer salvar em um serviço de armazenamento como S3)
+    const fs = require('fs');
+    fs.writeFileSync(exportPath, JSON.stringify(exportData, null, 2));
+    
+    console.log(`Dados da empresa exportados para: ${exportPath}`);
 
     // Exclui todos os dados relacionados à empresa usando transação
     await prisma.$transaction([
@@ -203,8 +189,18 @@ async function deleteCompany(req: NextApiRequest, res: NextApiResponse, id: stri
         where: { companyId: id }
       }),
       
-      // Exclui os candidatos associados à empresa
-      prisma.candidate.deleteMany({
+      // Exclui as assinaturas associadas à empresa
+      prisma.subscription.deleteMany({
+        where: { companyId: id }
+      }),
+      
+      // Exclui o histórico de pagamentos associado à empresa
+      prisma.paymentHistory.deleteMany({
+        where: { companyId: id }
+      }),
+      
+      // Exclui os processos seletivos associados à empresa
+      prisma.selectionProcess.deleteMany({
         where: { companyId: id }
       }),
       
@@ -213,8 +209,8 @@ async function deleteCompany(req: NextApiRequest, res: NextApiResponse, id: stri
         where: { companyId: id }
       }),
       
-      // Exclui os processos associados à empresa
-      prisma.selectionProcess.deleteMany({
+      // Exclui os candidatos associados à empresa
+      prisma.candidate.deleteMany({
         where: { companyId: id }
       }),
       
@@ -224,13 +220,207 @@ async function deleteCompany(req: NextApiRequest, res: NextApiResponse, id: stri
       })
     ]);
 
+    // Cria uma URL para download do arquivo de exportação
+    const downloadUrl = `/api/superadmin/companies/${id}/export-download?filename=${exportFileName}`;
+
     return res.status(200).json({ 
-      message: 'Empresa excluída com sucesso',
-      backupCreated: true
+      message: 'Empresa excluída com sucesso', 
+      exportPath,
+      downloadUrl 
     });
   } catch (error) {
-    console.error('Error deleting company:', error);
-    return res.status(500).json({ message: 'Erro ao excluir empresa' });
+    console.error('Erro ao excluir empresa:', error);
+    return res.status(500).json({ message: 'Erro ao excluir empresa', error: error.message });
+  }
+}
+
+// Função para exportar todos os dados relacionados a uma empresa
+async function exportCompanyData(companyId: string) {
+  try {
+    // Busca a empresa e todos os dados relacionados
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      include: {
+        // Dados básicos da empresa
+        users: true,
+        subscription: {
+          include: {
+            plan: true
+          }
+        },
+        plan: true,
+        paymentHistory: true,
+        
+        // Processos seletivos e candidatos
+        processes: {
+          include: {
+            stages: {
+              include: {
+                test: true,
+                progresses: true,
+                personalityConfig: {
+                  include: {
+                    traitWeights: true
+                  }
+                }
+              }
+            }
+          }
+        },
+        
+        // Candidatos e suas respostas
+        candidates: {
+          include: {
+            responses: true,
+            progresses: true,
+            testInvites: true
+          }
+        },
+        
+        // Testes e questões
+        tests: true,
+        
+        // Questões da empresa
+        questions: true,
+        
+        // Dados de treinamento
+        trainingCourses: {
+          include: {
+            modules: {
+              include: {
+                lessons: true
+              }
+            },
+            enrollments: true,
+            sector: true
+          }
+        },
+        trainingMaterials: true,
+        trainingSectors: true,
+        trainingTests: true,
+        
+        // Outros relacionamentos
+        globalAccess: true,
+        testInvitations: true,
+        candidateProgress: true,
+        responses: true,
+        students: true,
+        usedInviteCodes: true
+      }
+    });
+
+    // Buscar testes com detalhes
+    const tests = await prisma.test.findMany({
+      where: { companyId },
+      include: {
+        stages: {
+          include: {
+            questions: {
+              include: {
+                options: true
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    // Buscar questões com detalhes
+    const questions = await prisma.question.findMany({
+      where: { companyId },
+      include: {
+        options: true,
+        categories: true
+      }
+    });
+    
+    // Buscar categorias relacionadas às questões da empresa
+    // Primeiro, extrair os IDs das categorias das questões
+    const categoryIds = new Set<string>();
+    questions.forEach(question => {
+      question.categories.forEach(category => {
+        categoryIds.add(category.id);
+      });
+    });
+    
+    // Buscar apenas as categorias relacionadas
+    const categories = await prisma.category.findMany({
+      where: {
+        id: {
+          in: Array.from(categoryIds)
+        }
+      }
+    });
+    
+    // Buscar respostas
+    const responses = await prisma.response.findMany({
+      where: {
+        companyId
+      },
+      include: {
+        question: true,
+        candidate: true
+      }
+    });
+
+    // Buscar estudantes com detalhes
+    const students = await prisma.student.findMany({
+      where: { companyId },
+      include: {
+        user: true,
+      }
+    });
+
+    // Buscar convites de teste
+    const testInvitations = await prisma.testInvitation.findMany({
+      where: { companyId },
+      include: {
+        candidate: true,
+        test: true
+      }
+    });
+
+    // Relação entre opções e respostas
+    const optionResponses = await prisma.response.findMany({
+      where: {
+        companyId
+      },
+      select: {
+        id: true,
+        questionId: true,
+        candidateId: true,
+        optionId: true,
+        isCorrect: true
+      }
+    });
+
+    // Combinar todos os dados em um único objeto para exportação
+    return {
+      company,
+      additionalData: {
+        tests,
+        questions,
+        categories,
+        responses,
+        students,
+        testInvitations,
+        optionResponses
+      },
+      exportDate: new Date(),
+      exportVersion: '1.0'
+    };
+  } catch (error) {
+    console.error('Erro ao exportar dados da empresa:', error);
+    // Em caso de erro, retorna ao menos os dados básicos da empresa
+    const basicCompany = await prisma.company.findUnique({
+      where: { id: companyId }
+    });
+    return {
+      company: basicCompany,
+      exportDate: new Date(),
+      exportVersion: '1.0',
+      error: 'Exportação parcial devido a erro'
+    };
   }
 }
 
