@@ -53,13 +53,12 @@ async function getPayments(req: NextApiRequest, res: NextApiResponse) {
       where.subscriptionId = subscriptionId as string;
     }
     
-    const payments = 
-    console.log(`[PAYMENTHISTORY] Iniciando busca de paymentHistory (${new Date().toISOString()})`);
+    console.log(`[PAYMENTHISTORY] Iniciando busca de histórico de pagamentos (${new Date().toISOString()})`);
     
     // Forçar desconexão e reconexão para garantir dados frescos
     await reconnectPrisma();
     
-    await prisma.paymentHistory.findMany({
+    const payments = await prisma.paymentHistory.findMany({
       where,
       orderBy: {
         paymentDate: 'desc',

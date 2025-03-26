@@ -3,8 +3,11 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import { prisma, reconnectPrisma } from '@/lib/prisma';
 
-
-
+/**
+ * API endpoint para gerenciar testes globais.
+ * 
+ * Suporta métodos GET (listar testes) e POST (criar novo teste).
+ */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     console.log(`[API] Recebida requisição ${req.method} para /api/superadmin/global-tests`);
@@ -24,13 +27,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // GET - Listar todos os testes globais
     if (req.method === 'GET') {
-      const globalTests = 
-    console.log(`[GLOBALTEST] Iniciando busca de globalTest (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    await prisma.globalTest.findMany({
+      console.log(`[GLOBALTEST] Iniciando busca de testes globais (${new Date().toISOString()})`);
+      
+      // Forçar desconexão e reconexão para garantir dados frescos
+      await reconnectPrisma();
+      
+      const globalTests = await prisma.globalTest.findMany({
         include: {
           questions: true,
           companies: true,
@@ -39,6 +41,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           createdAt: 'desc',
         },
       });
+
+      console.log(`[GLOBALTEST] Encontrados ${globalTests.length} testes globais`);
 
       // Formatar os dados para o frontend
       const formattedTests = globalTests.map(test => {

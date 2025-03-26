@@ -406,19 +406,20 @@ async function exportCompanyData(companyId: string) {
     });
     
     // Buscar questões com detalhes
-    const questions = 
-    console.log(`[QUESTION] Iniciando busca de question (${new Date().toISOString()})`);
+    console.log(`[QUESTION] Iniciando busca de questões da empresa (${new Date().toISOString()})`);
     
     // Forçar desconexão e reconexão para garantir dados frescos
     await reconnectPrisma();
     
-    await prisma.question.findMany({
+    const questions = await prisma.question.findMany({
       where: { companyId },
       include: {
         options: true,
         categories: true
       }
     });
+    
+    console.log(`[QUESTION] Encontradas ${questions.length} questões para a empresa`);
     
     // Buscar categorias relacionadas às questões da empresa
     // Primeiro, extrair os IDs das categorias das questões
@@ -430,13 +431,12 @@ async function exportCompanyData(companyId: string) {
     });
     
     // Buscar apenas as categorias relacionadas
-    const categories = 
-    console.log(`[CATEGORY] Iniciando busca de category (${new Date().toISOString()})`);
+    console.log(`[CATEGORY] Iniciando busca de categorias (${new Date().toISOString()})`);
     
     // Forçar desconexão e reconexão para garantir dados frescos
     await reconnectPrisma();
     
-    await prisma.category.findMany({
+    const categories = await prisma.category.findMany({
       where: {
         id: {
           in: Array.from(categoryIds)

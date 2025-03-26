@@ -50,25 +50,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // GET - Obter detalhes da assinatura de uma empresa
     if (req.method === 'GET') {
       // Buscar os pagamentos recentes usando métodos nativos do Prisma
-      const recentPayments = 
-    console.log(`[PAYMENTHISTORY] Iniciando busca de paymentHistory (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    
-    console.log(`[PAYMENTHISTORY] Iniciando busca de paymentHistory (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    
-    console.log(`[PAYMENTHISTORY] Iniciando busca de paymentHistory (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    await prisma.paymentHistory.findMany({
+      console.log(`[PAYMENTHISTORY] Iniciando busca de histórico de pagamentos (${new Date().toISOString()})`);
+      
+      // Forçar desconexão e reconexão para garantir dados frescos
+      await reconnectPrisma();
+      
+      const recentPayments = await prisma.paymentHistory.findMany({
         where: {
           subscriptionId: company.subscription?.id
         },
@@ -77,6 +64,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
         take: 5
       });
+      
+      console.log(`[PAYMENTHISTORY] Encontrados ${recentPayments.length} pagamentos recentes`);
       
       // Formatar a resposta para manter compatibilidade com o frontend
       

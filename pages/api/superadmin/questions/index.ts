@@ -25,13 +25,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // GET - Listar todas as perguntas globais
     if (req.method === 'GET') {
-      const questions = 
-    console.log(`[GLOBALQUESTION] Iniciando busca de globalQuestion (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    await prisma.globalQuestion.findMany({
+      console.log(`[GLOBALQUESTION] Iniciando busca de perguntas globais (${new Date().toISOString()})`);
+      
+      // Forçar desconexão e reconexão para garantir dados frescos
+      await reconnectPrisma();
+      
+      const questions = await prisma.globalQuestion.findMany({
         include: {
           tests: true,
           questions: {

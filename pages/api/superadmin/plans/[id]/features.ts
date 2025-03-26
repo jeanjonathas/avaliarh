@@ -41,32 +41,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // GET - Obter recursos de um plano específico
       if (req.method === 'GET') {
         // Buscar todos os recursos disponíveis
-        const allFeatures = 
-    console.log(`[FEATURE] Iniciando busca de feature (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    await prisma.feature.findMany({
+        console.log(`[FEATURE] Iniciando busca de recursos (${new Date().toISOString()})`);
+        
+        // Forçar desconexão e reconexão para garantir dados frescos
+        await reconnectPrisma();
+        
+        const allFeatures = await prisma.feature.findMany({
           orderBy: {
             name: 'asc',
           },
         });
 
+        console.log(`[FEATURE] Encontrados ${allFeatures.length} recursos disponíveis`);
+
         // Buscar recursos associados ao plano
-        const planFeatures = 
-    console.log(`[PLANFEATURE] Iniciando busca de planFeature (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    
-    console.log(`[PLANFEATURE] Iniciando busca de planFeature (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    await prisma.planFeature.findMany({
+        console.log(`[PLANFEATURE] Iniciando busca de recursos do plano (${new Date().toISOString()})`);
+        
+        // Forçar desconexão e reconexão para garantir dados frescos
+        await reconnectPrisma();
+        
+        const planFeatures = await prisma.planFeature.findMany({
           where: {
             planId: id,
           },

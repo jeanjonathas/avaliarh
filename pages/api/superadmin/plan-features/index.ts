@@ -24,24 +24,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // GET - Listar todos os recursos disponíveis
     if (req.method === 'GET') {
-      const features = 
-    console.log(`[FEATURE] Iniciando busca de feature (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    await prisma.feature.findMany({
+      console.log(`[FEATURE] Iniciando busca de recursos (${new Date().toISOString()})`);
+      
+      // Forçar desconexão e reconexão para garantir dados frescos
+      await reconnectPrisma();
+      
+      const features = await prisma.feature.findMany({
         orderBy: {
           name: 'asc',
         },
       });
 
+      console.log(`[FEATURE] Encontrados ${features.length} recursos`);
       
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
-    return res.status(200).json(features);
+      // Desconectar Prisma após a consulta
+      console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
+      await prisma.$disconnect();
+      
+      return res.status(200).json(features);
     }
 
     // POST - Criar um novo recurso

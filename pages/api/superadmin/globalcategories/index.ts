@@ -25,13 +25,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // GET - Listar todas as categorias globais
     if (req.method === 'GET') {
       // Buscar categorias globais com contagem de questões usando métodos nativos do Prisma
-      const categories = 
-    console.log(`[GLOBALCATEGORY] Iniciando busca de globalCategory (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    await prisma.globalCategory.findMany({
+      console.log(`[GLOBALCATEGORY] Iniciando busca de categorias globais (${new Date().toISOString()})`);
+      
+      // Forçar desconexão e reconexão para garantir dados frescos
+      await reconnectPrisma();
+      
+      const categories = await prisma.globalCategory.findMany({
         orderBy: {
           name: 'asc'
         },

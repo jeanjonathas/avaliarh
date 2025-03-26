@@ -40,13 +40,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // GET - Obter empresas de um plano específico
       if (req.method === 'GET') {
-        const companies = 
-    console.log(`[COMPANY] Iniciando busca de company (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    await prisma.company.findMany({
+        console.log(`[COMPANY] Iniciando busca de empresas do plano ${id} (${new Date().toISOString()})`);
+        
+        // Forçar desconexão e reconexão para garantir dados frescos
+        await reconnectPrisma();
+        
+        const companies = await prisma.company.findMany({
           where: {
             planId: id,
           },
@@ -57,6 +56,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             name: 'asc',
           },
         });
+
+        console.log(`[COMPANY] Encontradas ${companies.length} empresas para o plano ${id}`);
 
         // Formatar a resposta
         const formattedCompanies = companies.map(company => ({

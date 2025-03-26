@@ -1,9 +1,9 @@
-// Gerado automaticamente em 2025-03-26T05:43:15.333Z
+// Gerado automaticamente em 2025-03-26T06:18:42.595Z
 module.exports = {
-  "commitHash": "1c132e9",
+  "commitHash": "6db31af",
   "branch": "master",
   "commitDate": "2025-03-26",
-  "commitTime": "02:37:40",
-  "commitMessage": "mudanças para buscar solução",
-  "buildDate": "2025-03-26T05:43:15.333Z"
+  "commitTime": "03:04:57",
+  "commitMessage": "tentativa de corrigir erros no prisma e singleton",
+  "buildDate": "2025-03-26T06:18:42.595Z"
 };

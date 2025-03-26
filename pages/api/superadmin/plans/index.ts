@@ -24,13 +24,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // GET - Listar todos os planos
     if (req.method === 'GET') {
-      const plans = 
-    console.log(`[PLAN] Iniciando busca de plan (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    await prisma.plan.findMany({
+      console.log(`[PLAN] Iniciando busca de planos (${new Date().toISOString()})`);
+      
+      // Forçar desconexão e reconexão para garantir dados frescos
+      await reconnectPrisma();
+      
+      const plans = await prisma.plan.findMany({
         include: {
           features: {
             include: {
