@@ -250,8 +250,7 @@ export default async function handler(
             include: {
               options: true,
               categories: true
-            },
-            take: 10
+            }
           });
           
           console.log(`Encontradas ${stageQuestions.length} questões associadas à etapa ${stage.id}`);
@@ -262,9 +261,8 @@ export default async function handler(
       }
       
       // Se não temos testId ou não encontramos questões específicas, usar o comportamento original
-      // mas limitando a 3 questões para evitar sobrecarga
       if (!testId || questions.length === 0) {
-        console.log(`Usando fallback: buscando questões da etapa ${stage.id} com limite`);
+        console.log(`Usando fallback: buscando questões da etapa ${stage.id}`);
         
         // Registrar aviso sobre a falta de testId
         if (!testId) {
@@ -339,8 +337,7 @@ export default async function handler(
                         include: {
                           options: true,
                           categories: true
-                        },
-                        take: 10
+                        }
                       });
                       
                       if (stageQuestions.length > 0) {
@@ -371,7 +368,6 @@ export default async function handler(
           where: {
             stageId: stage.id, // Usar o ID real da etapa
           },
-          take: 3, // Limitar a 3 questões
           include: {
             options: {
               select: {

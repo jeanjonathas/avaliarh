@@ -22,7 +22,6 @@ interface TestData {
   title: string;
   description?: string;
   timeLimit?: number;
-  stageCount?: number;
 }
 
 const TestStage: NextPage = () => {
@@ -46,6 +45,9 @@ const TestStage: NextPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showOpinionModal, setShowOpinionModal] = useState(false);
   const [hasOpinionQuestions, setHasOpinionQuestions] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const questionsPerPage = 10;
   const { showToast } = useNotification()
 
   // Função para salvar respostas no localStorage
@@ -111,13 +113,16 @@ const TestStage: NextPage = () => {
     return null;
   }, [candidateId]);
 
-  // Carregar dados do teste da sessão
+  // Carregar dados do teste da sessão quando a página for carregada
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      // Carregar dados do teste da sessão
       const storedTestData = sessionStorage.getItem('testData')
+      
       if (storedTestData) {
         try {
           const parsedData = JSON.parse(storedTestData)
+          console.log('Dados do teste carregados da sessão:', parsedData)
           setTestData(parsedData)
           
           // Carregar o tempo salvo do localStorage
@@ -134,11 +139,13 @@ const TestStage: NextPage = () => {
             setTimeRemaining(parsedData.timeLimit * 60);
           }
         } catch (error) {
-          console.error('Erro ao carregar dados do teste:', error)
+          console.error('Erro ao carregar dados do teste da sessão:', error)
         }
+      } else {
+        console.log('Nenhum dado de teste encontrado na sessão')
       }
     }
-  }, [candidateId, loadTimeFromLocalStorage]) // Adicionar candidateId como dependência para recarregar quando mudar
+  }, [loadTimeFromLocalStorage])
 
   // Efeito para inicializar o contador de tempo
   useEffect(() => {
@@ -159,7 +166,117 @@ const TestStage: NextPage = () => {
         }
       }
     }
-  }, [candidateId, loadTimeFromLocalStorage]); // Adicionar loadTimeFromLocalStorage como dependência
+  }, [candidateId, loadTimeFromLocalStorage]);
+
+  // Efeito para buscar as questões quando os parâmetros da URL estiverem disponíveis
+  useEffect(() => {
+    // Garantir que os parâmetros da URL estejam disponíveis
+    if (!router.isReady) return;
+    
+    const { id: routeStageId, candidateId: routeCandidateId } = router.query;
+    
+    if (!routeStageId || !routeCandidateId) {
+      console.log('Parâmetros da URL ainda não disponíveis:', router.query);
+      return;
+    }
+    
+    // Converter para string caso seja um array
+    const stageIdStr = Array.isArray(routeStageId) ? routeStageId[0] : routeStageId;
+    const candidateIdStr = Array.isArray(routeCandidateId) ? routeCandidateId[0] : routeCandidateId;
+    
+    console.log('Parâmetros da URL disponíveis:', { stageIdStr, candidateIdStr });
+    
+    const fetchQuestions = async () => {
+      try {
+        setLoading(true);
+        setError(''); // Limpar erros anteriores
+        console.log(`Buscando questões para stageId: ${stageIdStr}, candidateId: ${candidateIdStr}`);
+        
+        // Passar o ID do candidato para o endpoint de questões
+        const response = await fetch(`/api/questions?stageId=${stageIdStr}&candidateId=${candidateIdStr}`);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Resposta da API não ok:', response.status, errorText);
+          throw new Error(`Erro ao carregar as questões: ${response.status} ${errorText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Dados recebidos do endpoint de questões:', data);
+        
+        // Verificar se temos questões válidas
+        if (!data.questions || !Array.isArray(data.questions) || data.questions.length === 0) {
+          console.error('API retornou um array de questões vazio ou inválido:', data);
+          throw new Error('Não foram encontradas questões para esta etapa');
+        }
+        
+        // Se não temos testData mas a API retornou um testId, podemos armazenar na sessão
+        if (data.testId && (!testData || testData.id !== data.testId) && typeof window !== 'undefined') {
+          try {
+            const testInfo = {
+              id: data.testId,
+              title: data.testTitle || 'Teste de Avaliação',
+              timeLimit: data.timeLimit
+            };
+            console.log('Armazenando dados do teste na sessão:', testInfo);
+            sessionStorage.setItem('testData', JSON.stringify(testInfo));
+            setTestData(testInfo);
+          } catch (err) {
+            console.error('Erro ao armazenar dados do teste:', err);
+          }
+        }
+        
+        console.log(`Carregadas ${data.questions.length} questões`);
+        setQuestions(data.questions);
+        setStageInfo({
+          title: data.stageTitle || `Etapa ${stageIdStr}`,
+          description: data.stageDescription || 'Responda todas as questões abaixo'
+        });
+
+        // Calcular o número total de páginas
+        const totalPagesCount = Math.ceil(data.questions.length / questionsPerPage);
+        console.log(`Total de páginas: ${totalPagesCount} (${questionsPerPage} questões por página)`);
+        setTotalPages(totalPagesCount);
+        setCurrentPage(1); // Resetar para a primeira página ao carregar novas questões
+
+        // Verificar se há questões opinativas
+        const hasOpinion = data.questions.some(q => q.type === 'OPINION_MULTIPLE');
+        setHasOpinionQuestions(hasOpinion);
+        
+        // Verificar se TODAS as questões são opinativas
+        const allQuestionsAreOpinion = data.questions.length > 0 && 
+                                     data.questions.every(q => q.type === 'OPINION_MULTIPLE');
+        
+        // Carregar respostas salvas do localStorage
+        const savedResponses = loadResponsesFromLocalStorage();
+        console.log('Respostas salvas carregadas:', savedResponses);
+        
+        setLoading(false);
+        
+        // Só mostrar o modal depois que todos os dados estiverem carregados
+        if (allQuestionsAreOpinion) {
+          console.log('Todas as questões são opinativas, exibindo modal de alerta');
+          setTimeout(() => {
+            setShowOpinionModal(true);
+          }, 500); // Pequeno delay para garantir que a página terminou de renderizar
+        } else if (hasOpinion) {
+          console.log('Etapa contém algumas questões opinativas, mas não todas');
+        } else {
+          console.log('Etapa não contém questões opinativas');
+        }
+      } catch (error) {
+        console.error('Erro ao carregar questões:', error);
+        setError(error.message || 'Erro ao carregar as questões. Por favor, tente novamente.');
+        setLoading(false);
+      }
+    };
+
+    // Adicionar um pequeno delay para garantir que a página anterior tenha tempo de salvar os dados na sessão
+    // Isso é importante quando o usuário vem da página de introdução
+    setTimeout(() => {
+      fetchQuestions();
+    }, 500);
+  }, [router.isReady, router.query, questionsPerPage, loadResponsesFromLocalStorage, testData]);
 
   // Contador de tempo para testes com limite de tempo (regressivo)
   useEffect(() => {
@@ -302,66 +419,6 @@ const TestStage: NextPage = () => {
 
     checkIfLastStage();
   }, [stageId, candidateId]);
-
-  useEffect(() => {
-    if (!stageId || !candidateId) return
-
-    const fetchQuestions = async () => {
-      try {
-        setLoading(true)
-        // Passar o ID do candidato para o endpoint de questões
-        const response = await fetch(`/api/questions?stageId=${stageId}&candidateId=${candidateId}`)
-        
-        if (!response.ok) {
-          throw new Error('Erro ao carregar as questões')
-        }
-        
-        const data = await response.json()
-        console.log('Dados recebidos do endpoint de questões:', data)
-        
-        // Verificar se o teste carregado corresponde ao teste do candidato
-        if (data.testId && testData && data.testId !== testData.id) {
-          console.warn(`Teste ID diferente: API retornou ${data.testId}, mas o teste carregado é ${testData.id}`)
-        }
-        
-        setQuestions(data.questions)
-        setStageInfo({
-          title: data.stageTitle || `Etapa ${stageId}`,
-          description: data.stageDescription || 'Responda todas as questões abaixo'
-        })
-
-        // Verificar se há questões opinativas
-        const hasOpinion = data.questions.some(q => q.type === 'OPINION_MULTIPLE');
-        setHasOpinionQuestions(hasOpinion);
-        
-        // Verificar se TODAS as questões são opinativas
-        const allQuestionsAreOpinion = data.questions.length > 0 && 
-                                     data.questions.every(q => q.type === 'OPINION_MULTIPLE');
-        
-        // Carregar respostas salvas do localStorage
-        loadResponsesFromLocalStorage()
-        
-        setLoading(false)
-        
-        // Só mostrar o modal depois que todos os dados estiverem carregados
-        if (allQuestionsAreOpinion) {
-          console.log('Todas as questões são opinativas, exibindo modal de alerta');
-          setTimeout(() => {
-            setShowOpinionModal(true);
-          }, 500); // Pequeno delay para garantir que a página terminou de renderizar
-        } else if (hasOpinion) {
-          console.log('Etapa contém algumas questões opinativas, mas não todas');
-        } else {
-          console.log('Etapa não contém questões opinativas');
-        }
-      } catch (error) {
-        setError('Erro ao carregar as questões. Por favor, tente novamente.')
-        setLoading(false)
-      }
-    }
-
-    fetchQuestions()
-  }, [stageId, candidateId, loadResponsesFromLocalStorage, testData])
 
   // Função para validar as respostas
   const validateResponses = (values: Record<string, string>) => {
@@ -962,10 +1019,12 @@ const TestStage: NextPage = () => {
               {({ values, isSubmitting, errors, touched }) => (
                 <Form>
                   <div className="space-y-8">
-                    {questions.map((question, index) => (
+                    {questions
+                      .slice((currentPage - 1) * questionsPerPage, currentPage * questionsPerPage)
+                      .map((question, index) => (
                       <div key={question.id} className="card">
                         <h3 className="text-lg font-semibold text-secondary-800 mb-4">
-                          <span className="mr-2">{index + 1}.</span>
+                          <span className="mr-2">{(currentPage - 1) * questionsPerPage + index + 1}.</span>
                           <span dangerouslySetInnerHTML={{ __html: question.text }} />
                         </h3>
                         <div className="space-y-3">
@@ -983,11 +1042,11 @@ const TestStage: NextPage = () => {
                                 className="mt-1 mr-3"
                                 onClick={() => {
                                   // Log para depuração
-                                  console.log(`Selecionada opção ${option.id} para pergunta ${question.id} (${index + 1}/${questions.length})`);
+                                  console.log(`Selecionada opção ${option.id} para pergunta ${question.id} (${(currentPage - 1) * questionsPerPage + index + 1}/${questions.length})`);
                                   
                                   // Verificar se é a última pergunta
-                                  if (index === questions.length - 1) {
-                                    console.log(`Esta é a última pergunta (${index + 1}/${questions.length})`);
+                                  if ((currentPage - 1) * questionsPerPage + index === questions.length - 1) {
+                                    console.log(`Esta é a última pergunta (${(currentPage - 1) * questionsPerPage + index + 1}/${questions.length})`);
                                   }
                                 }}
                               />
@@ -1000,6 +1059,54 @@ const TestStage: NextPage = () => {
                         </div>
                       </div>
                     ))}
+                    
+                    {/* Paginação */}
+                    {totalPages > 1 && (
+                      <div className="flex justify-center items-center mt-8 mb-8 space-x-2">
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                          disabled={currentPage === 1}
+                          className={`px-4 py-2 rounded-md ${
+                            currentPage === 1 
+                              ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
+                              : 'bg-primary-100 text-primary-700 hover:bg-primary-200'
+                          }`}
+                        >
+                          Anterior
+                        </button>
+                        
+                        <div className="flex items-center space-x-1">
+                          {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                            <button
+                              key={page}
+                              type="button"
+                              onClick={() => setCurrentPage(page)}
+                              className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                                currentPage === page
+                                  ? 'bg-primary-600 text-white'
+                                  : 'bg-primary-50 text-primary-700 hover:bg-primary-100'
+                              }`}
+                            >
+                              {page}
+                            </button>
+                          ))}
+                        </div>
+                        
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                          disabled={currentPage === totalPages}
+                          className={`px-4 py-2 rounded-md ${
+                            currentPage === totalPages
+                              ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                              : 'bg-primary-100 text-primary-700 hover:bg-primary-200'
+                          }`}
+                        >
+                          Próxima
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-8 flex justify-between">
