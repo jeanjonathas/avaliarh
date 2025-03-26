@@ -115,27 +115,77 @@ export default async function handler(
           }
         });
         
+        console.log(`Encontradas ${testStages.length} etapas para o teste ${testId}:`, 
+          testStages.map(ts => ({ 
+            order: ts.order, 
+            stageId: ts.stageId, 
+            stageTitle: ts.stage?.title 
+          }))
+        );
+        
         logs.push({
           timestamp: new Date().toISOString(),
           action: 'test_stages_found',
-          details: { testId, stageCount: testStages.length }
+          details: { 
+            testId, 
+            stageCount: testStages.length,
+            stages: testStages.map(ts => ({ order: ts.order, stageId: ts.stageId }))
+          }
         });
         
         if (isOrderNumber) {
           // Se stageId é um número, encontrar a etapa correspondente à ordem no teste
           const order = parseInt(stageId);
-          const testStage = testStages.find(ts => ts.order === order);
-          stage = testStage?.stage;
+          console.log(`Buscando etapa com ordem ${order} no teste ${testId}`);
+          
+          // Verificar se a ordem está dentro do intervalo válido
+          if (order <= 0 || order > testStages.length) {
+            console.log(`Ordem ${order} inválida. O teste tem ${testStages.length} etapas.`);
+            
+            // Tentar usar a primeira etapa como fallback
+            if (testStages.length > 0) {
+              const firstStage = testStages[0];
+              stage = firstStage.stage;
+              console.log(`Usando primeira etapa como fallback: ${stage.id} (ordem ${firstStage.order})`);
+            }
+          } else {
+            // Ajustar para índice baseado em zero se necessário
+            // Algumas implementações podem usar ordem começando em 1, outras em 0
+            const testStage = testStages.find(ts => ts.order === order);
+            
+            if (!testStage && order === 1 && testStages.length > 0) {
+              // Caso especial: se a ordem é 1 mas não encontramos, pode ser que a ordem comece em 0
+              const testStage = testStages.find(ts => ts.order === 0);
+              if (testStage) {
+                stage = testStage.stage;
+                console.log(`Encontrada etapa com ordem 0 em vez de 1: ${stage.id}`);
+              } else {
+                // Tentar usar a primeira etapa, independente da ordem
+                stage = testStages[0].stage;
+                console.log(`Usando primeira etapa disponível: ${stage.id} (ordem ${testStages[0].order})`);
+              }
+            } else {
+              stage = testStage?.stage;
+              console.log(`Resultado da busca por ordem ${order}: ${stage ? `Encontrado: ${stage.id}` : 'Não encontrado'}`);
+            }
+          }
           
           logs.push({
             timestamp: new Date().toISOString(),
             action: 'stage_by_order',
-            details: { order, stageFound: !!stage, stageId: stage?.id }
+            details: { 
+              order, 
+              stageFound: !!stage, 
+              stageId: stage?.id,
+              availableOrders: testStages.map(ts => ts.order)
+            }
           });
         } else {
           // Se stageId é um UUID, verificar se pertence ao teste
           const testStage = testStages.find(ts => ts.stageId === stageId);
           stage = testStage?.stage;
+          
+          console.log(`Buscando etapa com ID ${stageId} no teste ${testId}: ${stage ? 'Encontrada' : 'Não encontrada'}`);
           
           logs.push({
             timestamp: new Date().toISOString(),
@@ -148,11 +198,20 @@ export default async function handler(
       // Se não encontramos a etapa específica do teste ou não temos testId,
       // buscar a etapa diretamente (comportamento original)
       if (!stage) {
-        stage = await prisma.stage.findFirst({
-          where: isOrderNumber
-            ? { order: parseInt(stageId) }
-            : { id: stageId },
-        });
+        console.log(`Fallback: buscando etapa diretamente ${isOrderNumber ? `com ordem ${stageId}` : `com ID ${stageId}`}`);
+        
+        if (isOrderNumber) {
+          const order = parseInt(stageId);
+          stage = await prisma.stage.findFirst({
+            where: { order },
+          });
+          console.log(`Resultado da busca direta por ordem ${order}: ${stage ? `Encontrado: ${stage.id}` : 'Não encontrado'}`);
+        } else {
+          stage = await prisma.stage.findUnique({
+            where: { id: stageId },
+          });
+          console.log(`Resultado da busca direta por ID ${stageId}: ${stage ? 'Encontrado' : 'Não encontrado'}`);
+        }
         
         logs.push({
           timestamp: new Date().toISOString(),
@@ -162,7 +221,17 @@ export default async function handler(
       }
 
       if (!stage) {
-        return res.status(404).json({ error: 'Etapa não encontrada', logs })
+        console.log(`ERRO: Etapa não encontrada para stageId=${stageId}, candidateId=${candidateId}, testId=${testId}`);
+        return res.status(404).json({ 
+          error: 'Etapa não encontrada', 
+          logs,
+          details: {
+            stageId,
+            candidateId,
+            testId,
+            isOrderNumber
+          }
+        });
       }
 
       // Buscar as perguntas da etapa com suas opções
