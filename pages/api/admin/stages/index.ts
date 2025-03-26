@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
-import { authOptions } from '../../../../lib/auth'
-import { prisma } from '../../../../lib/prisma'
+import { authOptions } from '@/pages/api/auth/[...nextauth]'
+import { prisma, reconnectPrisma } from '@/lib/prisma';
 import { Role } from '@prisma/client';
 
 export default async function handler(
@@ -11,8 +11,13 @@ export default async function handler(
   // Verificar autenticação
   const session = await getServerSession(req, res, authOptions)
   if (!session) {
+    console.log('[API] Erro de autenticação: Sessão não encontrada');
     return res.status(401).json({ error: 'Não autorizado' })
   }
+
+  // Forçar reconexão do Prisma
+  console.log('[API] Forçando reconexão do Prisma antes de acessar as etapas');
+  await reconnectPrisma();
 
   // Verificar se o usuário é admin
   const userEmail = session.user?.email;

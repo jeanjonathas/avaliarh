@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
-import { prisma } from '../../../../lib/prisma';
+import { prisma } from '@/lib/prisma';;
 import { Prisma, Status } from '@prisma/client';
 
 // Tipo personalizado para o status de exibição na UI

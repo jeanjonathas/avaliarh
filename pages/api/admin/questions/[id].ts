@@ -1,9 +1,9 @@
 /// <reference types="next" />
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getSession } from 'next-auth/react';
-import { prisma } from '../../../../lib/prisma';
+import { prisma } from '@/lib/prisma';;
 import { getServerSession } from 'next-auth/next'
-import { authOptions } from '../../../../lib/auth'
+import { authOptions } from '@/pages/api/auth/[...nextauth]'
 
 export default async function handler(
   req: NextApiRequest,

@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
-import { authOptions } from '../../../../../lib/auth'
+import { authOptions } from '@/pages/api/auth/[...nextauth]'
 import { prisma } from '@/lib/prisma';
 import { generateUniqueInviteCode, saveUsedInviteCode } from '../../../../../lib/invites'
 

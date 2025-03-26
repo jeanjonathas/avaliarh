@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import { getSession } from 'next-auth/react'
-import { prisma } from '../../../../../lib/prisma'
+import { prisma, reconnectPrisma } from '@/lib/prisma'
 
 // Definir interfaces para tipar corretamente os dados
 interface ResponseOption {

@@ -1,8 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { Status } from '@prisma/client';
-import { authOptions } from '../../../../../lib/auth';
-import { prisma } from '../../../../../lib/prisma';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
+import { prisma, reconnectPrisma } from '@/lib/prisma';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Verificar se o usuário está autenticado

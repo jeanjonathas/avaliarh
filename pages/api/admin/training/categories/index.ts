@@ -3,7 +3,7 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../auth/[...nextauth]'
-import { prisma } from '../../../../../lib/prisma'
+import { prisma, reconnectPrisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 
 // Definição dos papéis de usuário conforme o schema

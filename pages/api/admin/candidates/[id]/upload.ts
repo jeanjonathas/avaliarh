@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next'
-import { authOptions } from '../../../../../lib/auth'
+import { authOptions } from '@/pages/api/auth/[...nextauth]'
 import formidable from 'formidable'
 import fs from 'fs'
 import path from 'path'

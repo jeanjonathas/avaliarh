@@ -2,7 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../auth/[...nextauth]'
-import { prisma } from '../../../../../lib/prisma'
+import { prisma, reconnectPrisma } from '@/lib/prisma'
 
 // Definição dos papéis de usuário conforme o schema
 type Role = 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'INSTRUCTOR' | 'STUDENT' | 'USER';
