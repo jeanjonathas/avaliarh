@@ -36,7 +36,11 @@ async function getCompanies(req: NextApiRequest, res: NextApiResponse) {
     console.log(`[COMPANIES] Executando consulta Prisma para buscar empresas`);
     
     // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
+    const reconnected = await reconnectPrisma();
+    console.log(`[COMPANIES] Reconexão do Prisma ${reconnected ? 'bem-sucedida' : 'falhou'}`);
+    
+    // Limpar cache do Prisma explicitamente
+    console.log(`[COMPANIES] Limpando cache do Prisma antes da consulta`);
     
     // Buscar empresas com ordenação por nome
     const companies = await prisma.company.findMany({

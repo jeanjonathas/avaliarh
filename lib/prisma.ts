@@ -5,13 +5,29 @@ declare global {
   var prisma: PrismaClient | undefined
 }
 
+// Função para obter a URL do banco de dados correta
+function getDatabaseUrl() {
+  const originalUrl = process.env.DATABASE_URL || '';
+  
+  // Em produção, substituir 'postgres' pelo nome específico do contêiner
+  if (process.env.NODE_ENV === 'production') {
+    // Usar o nome específico do contêiner PostgreSQL do AvaliaRH
+    return originalUrl.replace('postgres:', 'avaliarh_postgres.1:');
+  }
+  
+  return originalUrl;
+}
+
 // Configurações para evitar problemas de cache
 const prismaClientSingleton = () => {
+  const dbUrl = getDatabaseUrl();
+  console.log(`[PRISMA] Inicializando com URL: ${dbUrl.replace(/:[^:@]+@/, ':****@')}`);
+  
   return new PrismaClient({
     log: ['error'],
     datasources: {
       db: {
-        url: process.env.DATABASE_URL,
+        url: dbUrl,
       },
     },
   })
