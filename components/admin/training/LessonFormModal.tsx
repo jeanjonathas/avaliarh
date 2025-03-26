@@ -138,7 +138,7 @@ const LessonFormModal: React.FC<LessonFormModalProps> = ({
     setLoading(true);
 
     if (!name.trim()) {
-      setError('O nome da lição é obrigatório');
+      setError('O nome da Aula é obrigatório');
       setLoading(false);
       return;
     }
@@ -175,7 +175,7 @@ const LessonFormModal: React.FC<LessonFormModalProps> = ({
       onClose();
     } catch (err: any) {
       setLoading(false);
-      setError(err.response?.data?.error || 'Ocorreu um erro ao salvar a lição');
+      setError(err.response?.data?.error || 'Ocorreu um erro ao salvar a Aula');
     }
   };
 
@@ -463,7 +463,7 @@ const LessonFormModal: React.FC<LessonFormModalProps> = ({
             onChange={(e) => setContent(e.target.value)}
             rows={10}
             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-            placeholder="Digite ou cole o conteúdo da lição aqui..."
+            placeholder="Digite ou cole o conteúdo da Aula aqui..."
           />
         );
     }
@@ -510,7 +510,7 @@ const LessonFormModal: React.FC<LessonFormModalProps> = ({
                 as="h3"
                 className="text-lg font-medium leading-6 text-gray-900"
               >
-                {lesson ? 'Editar Lição' : 'Nova Lição'}
+                {lesson ? 'Editar Aula' : 'Nova Aula'}
               </Dialog.Title>
               
               {error && (
@@ -522,7 +522,7 @@ const LessonFormModal: React.FC<LessonFormModalProps> = ({
               <form onSubmit={handleSubmit} className="mt-4">
                 <div className="mb-4">
                   <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                    Nome da Lição *
+                    Nome da Aula *
                   </label>
                   <input
                     type="text"

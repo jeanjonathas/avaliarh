@@ -81,7 +81,7 @@ const TestFormModal: React.FC<TestFormModalProps> = ({
     const testLevelId = getTestLevelId();
     
     if (!testLevel || !testLevelId) {
-      setError('É necessário associar o teste a um curso, módulo ou lição');
+      setError('É necessário associar o teste a um curso, módulo ou Aula');
       setLoading(false);
       return;
     }

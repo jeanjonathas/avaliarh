@@ -178,7 +178,7 @@ async function createLesson(req: NextApiRequest, res: NextApiResponse, companyId
     } = req.body;
 
     if (!name || !moduleId || !type || !content) {
-      return res.status(400).json({ error: 'Dados incompletos para criar a lição' });
+      return res.status(400).json({ error: 'Dados incompletos para criar a Aula' });
     }
 
     // Verify if the module exists and belongs to the company
@@ -236,7 +236,7 @@ async function createLesson(req: NextApiRequest, res: NextApiResponse, companyId
 
     return res.status(201).json(lesson);
   } catch (error) {
-    console.error('Erro ao criar lição:', error);
-    return res.status(500).json({ error: 'Erro ao criar lição' });
+    console.error('Erro ao criar Aula:', error);
+    return res.status(500).json({ error: 'Erro ao criar Aula' });
   }
 }

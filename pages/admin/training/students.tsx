@@ -65,9 +65,9 @@ const TrainingStudents: NextPage = () => {
       const response = await axios.get('/api/admin/training/students');
       
       // Verificar se temos dados na resposta
-      if (!response.data || !response.data.data) {
+      if (!response.data || response.data.success === false) {
         console.error('Resposta da API não contém dados esperados:', response.data);
-        setError('Formato de resposta inválido da API');
+        setError(response.data?.error || 'Formato de resposta inválido da API');
         setStudents([]);
         setFilteredStudents([]);
         setLoading(false);
@@ -76,8 +76,8 @@ const TrainingStudents: NextPage = () => {
       
       console.log('Dados recebidos da API:', response.data);
       
-      // A API retorna os dados em um formato diferente, com um objeto que contém data e pagination
-      const studentsData = response.data.data.map((student: any) => ({
+      // A API retorna os dados em um formato diferente, com um objeto que contém success, students e pagination
+      const studentsData = response.data.students.map((student: any) => ({
         id: student.id,
         name: student.user.name,
         email: student.user.email,
@@ -145,7 +145,7 @@ const TrainingStudents: NextPage = () => {
         position: newStudent.position,
       });
       
-      if (response.status === 201) {
+      if (response.status === 201 && response.data.success) {
         // Limpar o formulário e fechar o modal
         setNewStudent({
           name: '',

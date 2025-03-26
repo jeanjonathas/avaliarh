@@ -40,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { id } = req.query;
   
   if (!id || typeof id !== 'string') {
-    return res.status(400).json({ error: 'ID da lição é obrigatório' });
+    return res.status(400).json({ error: 'ID da Aula é obrigatório' });
   }
 
   // Handle different HTTP methods
@@ -95,7 +95,7 @@ async function getLesson(req: NextApiRequest, res: NextApiResponse, id: string, 
     `.then((results: any[]) => results[0] || null);
 
     if (!lessonWithDetails) {
-      return res.status(404).json({ error: 'Lição não encontrada' });
+      return res.status(404).json({ error: 'Aula não encontrada' });
     }
 
     // Get final test if it exists
@@ -234,8 +234,8 @@ async function getLesson(req: NextApiRequest, res: NextApiResponse, id: string, 
 
     return res.status(200).json(formattedLesson);
   } catch (error) {
-    console.error('Erro ao buscar lição:', error);
-    return res.status(500).json({ error: 'Erro ao buscar lição' });
+    console.error('Erro ao buscar Aula:', error);
+    return res.status(500).json({ error: 'Erro ao buscar Aula' });
   }
 }
 
@@ -255,7 +255,7 @@ async function updateLesson(req: NextApiRequest, res: NextApiResponse, id: strin
     `.then((results: any[]) => results[0] || null);
 
     if (!lessonExists) {
-      return res.status(404).json({ error: 'Lição não encontrada' });
+      return res.status(404).json({ error: 'Aula não encontrada' });
     }
 
     // If finalTestId is provided, verify if it exists and belongs to the company
@@ -359,13 +359,13 @@ async function updateLesson(req: NextApiRequest, res: NextApiResponse, id: strin
       .then((results: any[]) => results[0] || null);
 
     if (!updatedLesson) {
-      return res.status(500).json({ error: 'Erro ao atualizar lição' });
+      return res.status(500).json({ error: 'Erro ao atualizar Aula' });
     }
 
     return res.status(200).json(updatedLesson);
   } catch (error) {
-    console.error('Erro ao atualizar lição:', error);
-    return res.status(500).json({ error: 'Erro ao atualizar lição' });
+    console.error('Erro ao atualizar Aula:', error);
+    return res.status(500).json({ error: 'Erro ao atualizar Aula' });
   }
 }
 
@@ -383,7 +383,7 @@ async function deleteLesson(req: NextApiRequest, res: NextApiResponse, id: strin
     `.then((results: any[]) => results[0] || null);
 
     if (!lessonExists) {
-      return res.status(404).json({ error: 'Lição não encontrada' });
+      return res.status(404).json({ error: 'Aula não encontrada' });
     }
 
     // Delete related progress records first
@@ -406,9 +406,9 @@ async function deleteLesson(req: NextApiRequest, res: NextApiResponse, id: strin
         AND "order" > ${lessonExists.lessonOrder}
     `;
 
-    return res.status(200).json({ message: 'Lição excluída com sucesso' });
+    return res.status(200).json({ message: 'Aula excluída com sucesso' });
   } catch (error) {
-    console.error('Erro ao excluir lição:', error);
-    return res.status(500).json({ error: 'Erro ao excluir lição' });
+    console.error('Erro ao excluir Aula:', error);
+    return res.status(500).json({ error: 'Erro ao excluir Aula' });
   }
 }

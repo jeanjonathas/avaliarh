@@ -216,7 +216,7 @@ export default function EditCourse() {
 
   const addLesson = (moduleIndex: number) => {
     if (!lessonForm.name.trim()) {
-      setError('O título da lição é obrigatório');
+      setError('O título da Aula é obrigatório');
       return;
     }
 
@@ -271,7 +271,7 @@ export default function EditCourse() {
       return;
     }
 
-    // Verificar se todos os módulos têm pelo menos uma lição
+    // Verificar se todos os módulos têm pelo menos uma Aula
     const emptyModules = modules.filter(module => module.lessons.length === 0);
     if (emptyModules.length > 0) {
       setError(`O(s) módulo(s) "${emptyModules.map(m => m.name).join(', ')}" não possui(em) lições`);
@@ -673,7 +673,7 @@ export default function EditCourse() {
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                   </svg>
-                                  Lição
+                                  Aula
                                 </button>
                               </div>
                             </div>
@@ -681,7 +681,7 @@ export default function EditCourse() {
                             <div className="p-4">
                               {module.lessons.length === 0 ? (
                                 <div className="text-center py-6 bg-gray-50 rounded-md">
-                                  <p className="text-sm text-gray-500">Nenhuma lição adicionada a este módulo.</p>
+                                  <p className="text-sm text-gray-500">Nenhuma Aula adicionada a este módulo.</p>
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -690,7 +690,7 @@ export default function EditCourse() {
                                     }}
                                     className="mt-2 inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-primary-700 bg-primary-100 hover:bg-primary-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                                   >
-                                    Adicionar Lição
+                                    Adicionar Aula
                                   </button>
                                 </div>
                               ) : (
@@ -717,7 +717,7 @@ export default function EditCourse() {
                                             )}
                                           </div>
                                           <div className="ml-3">
-                                            <h5 className="text-md font-medium text-gray-900">Lição {lessonIndex + 1}: {lesson.name}</h5>
+                                            <h5 className="text-md font-medium text-gray-900">Aula {lessonIndex + 1}: {lesson.name}</h5>
                                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800 mt-1">
                                               {lesson.type === 'TEXT' ? 'Texto' : lesson.type === 'VIDEO' ? 'Vídeo' : lesson.type === 'SLIDES' ? 'Slides' : 'Áudio'}
                                             </span>
@@ -800,11 +800,11 @@ export default function EditCourse() {
 
               {showLessonForm && currentModuleIndex !== null && (
                 <div className="p-6 border-b border-gray-200 bg-gray-50">
-                  <h4 className="text-md font-medium text-gray-900 mb-4">Nova Lição</h4>
+                  <h4 className="text-md font-medium text-gray-900 mb-4">Nova Aula</h4>
                   <div className="grid grid-cols-1 gap-4">
                     <div>
                       <label htmlFor="lessonName" className="block text-sm font-medium text-secondary-700 mb-1">
-                        Nome da Lição *
+                        Nome da Aula *
                       </label>
                       <input
                         type="text"
@@ -820,7 +820,7 @@ export default function EditCourse() {
                     
                     <div>
                       <label htmlFor="lessonDescription" className="block text-sm font-medium text-secondary-700 mb-1">
-                        Descrição da Lição
+                        Descrição da Aula
                       </label>
                       <textarea
                         id="lessonDescription"
@@ -829,7 +829,7 @@ export default function EditCourse() {
                         value={lessonForm.description}
                         onChange={handleLessonFormChange}
                         className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                        placeholder="Descreva o conteúdo desta lição"
+                        placeholder="Descreva o conteúdo desta Aula"
                       />
                     </div>
                     
@@ -889,7 +889,7 @@ export default function EditCourse() {
                     
                     <div>
                       <label htmlFor="lessonContent" className="block text-sm font-medium text-secondary-700 mb-1">
-                        Conteúdo da Lição *
+                        Conteúdo da Aula *
                       </label>
                       <div className="flex flex-col">
                         {lessonForm.type === 'TEXT' ? (
@@ -900,7 +900,7 @@ export default function EditCourse() {
                                 dangerouslySetInnerHTML={{ __html: lessonForm.content }}
                               />
                               {!lessonForm.content && (
-                                <p className="text-gray-400">Digite o conteúdo da lição usando o editor completo...</p>
+                                <p className="text-gray-400">Digite o conteúdo da Aula usando o editor completo...</p>
                               )}
                             </div>
                             <button
@@ -922,7 +922,7 @@ export default function EditCourse() {
                             value={lessonForm.content}
                             onChange={handleLessonFormChange}
                             className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                            placeholder="Conteúdo da lição (para lições do tipo texto)"
+                            placeholder="Conteúdo da Aula (para lições do tipo texto)"
                           />
                         )}
                       </div>

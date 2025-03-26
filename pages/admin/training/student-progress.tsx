@@ -85,11 +85,12 @@ const StudentProgressPage: NextPage = () => {
             axios.get('/api/admin/training/student-progress')
           ]);
 
-          setStudents(studentsRes.data);
-          setCourses(coursesRes.data);
-          setModules(modulesRes.data);
-          setProgressData(progressRes.data);
-          setFilteredProgressData(progressRes.data);
+          // Acessar os dados com a nova estrutura de resposta
+          setStudents(studentsRes.data?.students || []);
+          setCourses(coursesRes.data?.courses || []);
+          setModules(modulesRes.data?.modules || []);
+          setProgressData(progressRes.data?.progress || []);
+          setFilteredProgressData(progressRes.data?.progress || []);
         } catch (err) {
           setError('Erro ao carregar dados. Tente novamente mais tarde.');
         } finally {

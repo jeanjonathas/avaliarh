@@ -1,16 +1,24 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../../../auth/[...nextauth]';
-import { prisma } from '../../../../../lib/prisma';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
+import { prisma, reconnectPrisma } from '@/lib/prisma';
 import { Role, Prisma } from '@prisma/client';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Check authentication
   const session = await getServerSession(req, res, authOptions);
   
+  // Log para depuração
+  console.log('[PRISMA] Verificando sessão em training/sectors:', session ? 'Autenticado' : 'Não autenticado');
+  
   if (!session) {
+    console.log('[PRISMA] Erro de autenticação: Sessão não encontrada');
     return res.status(401).json({ error: 'Não autenticado' });
   }
+
+  // Garantir que temos uma conexão fresca com o banco de dados
+  console.log('[PRISMA] Forçando reconexão do Prisma antes de buscar setores');
+  await reconnectPrisma();
 
   // Get user info from session
   const userEmail = session.user?.email;
@@ -50,6 +58,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 // Get all sectors for the company
 async function getSectors(req: NextApiRequest, res: NextApiResponse, companyId: string) {
   try {
+    console.log(`[SECTORS] Buscando setores para empresa ID: ${companyId}`);
+    
     // Get all sectors for the company
     const sectors: {
       id: string;
@@ -70,6 +80,14 @@ async function getSectors(req: NextApiRequest, res: NextApiResponse, companyId: 
       WHERE "companyId" = ${companyId}
       ORDER BY name ASC
     `;
+
+    console.log(`[SECTORS] Encontrados ${sectors.length} setores`);
+    
+    // Se não houver setores, retornar array vazio imediatamente
+    if (sectors.length === 0) {
+      console.log('[SECTORS] Nenhum setor encontrado, retornando array vazio');
+      return res.status(200).json([]);
+    }
 
     // Get course counts for each sector
     const courseCounts: {
@@ -116,12 +134,20 @@ async function getSectors(req: NextApiRequest, res: NextApiResponse, companyId: 
 // Create a new sector
 async function createSector(req: NextApiRequest, res: NextApiResponse, companyId: string) {
   try {
+    console.log(`[SECTORS] Iniciando criação de setor para empresa ID: ${companyId}`);
+    console.log(`[SECTORS] Dados recebidos:`, req.body);
+    
     const { name, description } = req.body;
 
     // Validate required fields
     if (!name) {
+      console.log('[SECTORS] Erro: Nome do setor não fornecido');
       return res.status(400).json({ error: 'Nome do setor é obrigatório' });
     }
+
+    // Garantir que temos uma conexão fresca com o banco de dados
+    console.log('[SECTORS] Forçando reconexão do Prisma antes de verificar duplicatas');
+    await reconnectPrisma();
 
     // Check if sector with the same name already exists
     const existingSector: { id: string } | null = await prisma.$queryRaw`
@@ -133,11 +159,26 @@ async function createSector(req: NextApiRequest, res: NextApiResponse, companyId
     `.then((results: any[]) => results[0] || null);
 
     if (existingSector) {
+      console.log(`[SECTORS] Erro: Já existe um setor com o nome "${name}" para esta empresa`);
       return res.status(400).json({ error: 'Já existe um setor com este nome' });
     }
 
+    // Verificar se a empresa existe
+    const company = await prisma.company.findUnique({
+      where: { id: companyId }
+    });
+
+    if (!company) {
+      console.log(`[SECTORS] Erro: Empresa com ID ${companyId} não encontrada`);
+      return res.status(400).json({ error: 'Empresa não encontrada' });
+    }
+
+    console.log(`[SECTORS] Empresa verificada: ${company.name} (${companyId})`);
+
     // Create the sector
     const sectorId = crypto.randomUUID();
+    console.log(`[SECTORS] Criando setor com ID: ${sectorId}`);
+    
     await prisma.$executeRaw`
       INSERT INTO "TrainingSector" (
         id, 
@@ -157,6 +198,8 @@ async function createSector(req: NextApiRequest, res: NextApiResponse, companyId
       )
     `;
 
+    console.log(`[SECTORS] Setor criado com sucesso, buscando dados completos`);
+
     // Fetch the created sector
     const sector = await prisma.$queryRaw`
       SELECT * 
@@ -164,9 +207,11 @@ async function createSector(req: NextApiRequest, res: NextApiResponse, companyId
       WHERE id = ${sectorId}
     `.then((results: any[]) => results[0]);
 
+    console.log(`[SECTORS] Retornando setor criado:`, sector);
+
     return res.status(201).json(sector);
   } catch (error) {
-    console.error('Erro ao criar setor:', error);
+    console.error('[SECTORS] Erro ao criar setor:', error);
     return res.status(500).json({ error: 'Erro ao criar setor' });
   }
 }

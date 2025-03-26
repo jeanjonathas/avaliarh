@@ -84,7 +84,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ success: false, message: 'Curso não encontrado' });
     }
 
-    // Buscar progresso do estudante para cada lição
+    // Buscar progresso do estudante para cada Aula
     const lessonProgress = await prisma.lessonProgress.findMany({
       where: {
         studentId: student.id,
@@ -94,7 +94,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     });
 
-    // Mapear o progresso para cada lição
+    // Mapear o progresso para cada Aula
     const lessonProgressMap = lessonProgress.reduce((map, progress) => {
       map[progress.lessonId] = progress.completed;
       return map;

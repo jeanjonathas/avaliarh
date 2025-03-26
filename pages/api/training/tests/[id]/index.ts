@@ -124,7 +124,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       courseName = moduleTest.course.name;
       testType = 'MODULE';
     } else if (test.lessonFinalTests.length > 0) {
-      // Teste de lição
+      // Teste de Aula
       const lesson = test.lessonFinalTests[0];
       lessonId = lesson.id;
       lessonName = lesson.name;

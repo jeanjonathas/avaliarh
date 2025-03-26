@@ -143,7 +143,7 @@ const LessonReorderModal: React.FC<LessonReorderModalProps> = ({
                 
                 {orderedLessons.length === 0 ? (
                   <div className="text-center py-4 text-gray-500">
-                    Nenhuma lição encontrada para reordenar.
+                    Nenhuma Aula encontrada para reordenar.
                   </div>
                 ) : (
                   <DragDropContext onDragEnd={handleDragEnd}>

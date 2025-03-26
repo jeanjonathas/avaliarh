@@ -87,7 +87,7 @@ async function getCompanies(req: NextApiRequest, res: NextApiResponse) {
       const candidateResult = await prisma.$queryRaw`
         SELECT COUNT(*) as count 
         FROM "Candidate" 
-        WHERE "companyId" = ${company.id}::uuid
+        WHERE "companyId" = ${company.id}
       `;
       const candidateCount = parseInt(candidateResult[0].count, 10);
       

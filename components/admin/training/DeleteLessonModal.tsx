@@ -32,7 +32,7 @@ const DeleteLessonModal: React.FC<DeleteLessonModalProps> = ({
       onClose();
     } catch (err: any) {
       setLoading(false);
-      setError(err.response?.data?.error || 'Ocorreu um erro ao excluir a lição');
+      setError(err.response?.data?.error || 'Ocorreu um erro ao excluir a Aula');
     }
   };
 
@@ -77,12 +77,12 @@ const DeleteLessonModal: React.FC<DeleteLessonModalProps> = ({
                 as="h3"
                 className="text-lg font-medium leading-6 text-gray-900"
               >
-                Excluir Lição
+                Excluir Aula
               </Dialog.Title>
               
               <div className="mt-2">
                 <p className="text-sm text-gray-500">
-                  Tem certeza que deseja excluir a lição <span className="font-semibold">{lesson.name}</span>? 
+                  Tem certeza que deseja excluir a Aula <span className="font-semibold">{lesson.name}</span>? 
                   Esta ação não pode ser desfeita.
                 </p>
               </div>
