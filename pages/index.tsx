@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Image from 'next/image'
 import { useSession } from 'next-auth/react'
+import LoginOptionsModal from '../components/LoginOptionsModal'
 
 interface TestData {
   id: string;
@@ -19,6 +20,7 @@ export default function Home() {
   const [validationStatus, setValidationStatus] = useState(''); // 'success', 'error', ou ''
   const [candidate, setCandidate] = useState<any>(null);
   const [validationSuccess, setValidationSuccess] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const router = useRouter();
   const { data: session, status } = useSession();
 
@@ -152,12 +154,12 @@ export default function Home() {
               </>
             ) : (
               <>
-                <Link 
-                  href="/admin" 
+                <button 
+                  onClick={() => setIsLoginModalOpen(true)}
                   className="hidden md:inline-block text-gray-700 hover:text-sky-600 font-medium"
                 >
-                  Login
-                </Link>
+                  Iniciar
+                </button>
                 <Link 
                   href="/register" 
                   className="bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-md font-medium transition-colors duration-300"
@@ -169,6 +171,12 @@ export default function Home() {
           </div>
         </div>
       </header>
+      
+      {/* Modal de opções de login */}
+      <LoginOptionsModal 
+        isOpen={isLoginModalOpen} 
+        onClose={() => setIsLoginModalOpen(false)} 
+      />
       
       <main className="container mx-auto px-4">
         {/* Hero Section */}
@@ -216,7 +224,7 @@ export default function Home() {
                 </Link>
                 <Link 
                   href="/demo" 
-                  className="px-6 py-3 bg-sky-600 text-white border border-sky-500 hover:bg-sky-700 font-medium rounded-md shadow-sm hover:shadow-md transition-all duration-300 text-center"
+                  className="bg-sky-600 text-white border border-sky-500 hover:bg-sky-700 font-medium rounded-md shadow-sm hover:shadow-md transition-all duration-300 text-center"
                 >
                   Agendar Demo
                 </Link>
