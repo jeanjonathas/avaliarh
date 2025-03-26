@@ -7,7 +7,7 @@ services:
       "git clone https://github.com/jeanjonathas/avaliarh.git /tmp/app && cd /tmp/app && npm install --no-fund --no-audit --legacy-peer-deps && npx prisma generate && cp /opt/avaliarh/.env /tmp/app/.env && node scripts/setup-db-config.js && npx prisma migrate deploy && npx prisma db seed && npm run build && NODE_ENV=production npm run start"
     ]
     environment:
-      - DATABASE_URL=postgresql://postgres:02e821629ceff274c853f24327a36132@postgres:5432/avaliacao_candidatos?schema=public
+      - DATABASE_URL=postgresql://postgres:02e821629ceff274c853f24327a36132@avaliarh_postgres:5432/avaliacao_candidatos?schema=public
       - NODE_ENV=production
       - NEXTAUTH_SECRET=02e821629ceff274c853f24327a36132
       - NEXTAUTH_URL=https://admitto.com.br
