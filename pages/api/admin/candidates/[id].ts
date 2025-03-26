@@ -1,7 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
-import { PrismaClient, Candidate, Response, Test, Stage, Question, Status, SelectionProcess } from '@prisma/client'
+import { Candidate, Response, Test, Stage, Question, Status, SelectionProcess } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 import { generateUniqueInviteCode } from '../../../../lib/invites'
 
 // Função auxiliar para converter BigInt para Number

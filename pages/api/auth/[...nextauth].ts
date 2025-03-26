@@ -1,6 +1,7 @@
 import NextAuth, { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import { PrismaClient, Role } from '@prisma/client'
+import { Role } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 import * as bcrypt from 'bcryptjs'
 import { NextApiRequest, NextApiResponse } from 'next'
 
