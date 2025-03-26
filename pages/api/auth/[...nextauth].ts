@@ -2,6 +2,7 @@ import NextAuth, { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { PrismaClient, Role } from '@prisma/client'
 import * as bcrypt from 'bcryptjs'
+import { NextApiRequest, NextApiResponse } from 'next'
 
 // Interface para a empresa
 interface CompanyData {
@@ -73,8 +74,34 @@ declare module "next-auth/jwt" {
 // Inicializando o cliente Prisma
 const prisma = new PrismaClient()
 
-// Verificar se estamos em produção
+// Verifica se o ambiente é de produção
 const isProduction = process.env.NODE_ENV === 'production'
+
+// Middleware para adicionar headers anti-cache
+export async function middleware(req: NextApiRequest, res: NextApiResponse) {
+  // Adiciona headers anti-cache
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  
+  // Adiciona headers de CORS
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', isProduction ? 'https://admitto.com.br' : 'http://localhost:3000');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+  
+  // Adiciona headers de debug para identificar o ambiente
+  res.setHeader('X-Environment', isProduction ? 'production' : 'development');
+  res.setHeader('X-Cookie-Prefix', process.env.NEXT_PUBLIC_COOKIE_PREFIX || (isProduction ? 'prod_' : 'dev_'));
+  
+  // Se for uma requisição OPTIONS (preflight), retorna 200
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return true;
+  }
+  
+  return false;
+}
 
 // Obter a URL base do ambiente
 const baseUrl = process.env.NEXTAUTH_URL || (isProduction ? 'https://admitto.com.br' : 'http://localhost:3000')
@@ -215,7 +242,9 @@ export const authOptions: NextAuthOptions = {
   },
   cookies: {
     sessionToken: {
-      name: isProduction ? `__Secure-next-auth.session-token` : `next-auth.session-token`,
+      name: isProduction 
+        ? `${process.env.NEXT_PUBLIC_COOKIE_PREFIX || 'prod_'}next-auth.session-token` 
+        : `${process.env.NEXT_PUBLIC_COOKIE_PREFIX || 'dev_'}next-auth.session-token`,
       options: {
         httpOnly: true,
         sameSite: 'lax',
@@ -225,7 +254,9 @@ export const authOptions: NextAuthOptions = {
       },
     },
     callbackUrl: {
-      name: isProduction ? `__Secure-next-auth.callback-url` : `next-auth.callback-url`,
+      name: isProduction 
+        ? `${process.env.NEXT_PUBLIC_COOKIE_PREFIX || 'prod_'}next-auth.callback-url` 
+        : `${process.env.NEXT_PUBLIC_COOKIE_PREFIX || 'dev_'}next-auth.callback-url`,
       options: {
         httpOnly: true,
         sameSite: 'lax',
@@ -235,7 +266,9 @@ export const authOptions: NextAuthOptions = {
       },
     },
     csrfToken: {
-      name: isProduction ? `__Secure-next-auth.csrf-token` : `next-auth.csrf-token`,
+      name: isProduction 
+        ? `${process.env.NEXT_PUBLIC_COOKIE_PREFIX || 'prod_'}next-auth.csrf-token` 
+        : `${process.env.NEXT_PUBLIC_COOKIE_PREFIX || 'dev_'}next-auth.csrf-token`,
       options: {
         httpOnly: true,
         sameSite: 'lax',
