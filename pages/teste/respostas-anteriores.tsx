@@ -63,6 +63,7 @@ const RespostasAnteriores: NextPage = () => {
       if (storedData) {
         try {
           const parsedData = JSON.parse(storedData)
+          console.log('Dados carregados da sessão:', parsedData)
           setResponseData(parsedData)
           setCandidateData(parsedData)
           setLoading(false)
@@ -309,34 +310,47 @@ const RespostasAnteriores: NextPage = () => {
                 </h2>
                 
                 <div className="flex flex-col md:flex-row items-center justify-center gap-8">
-                  <div className="relative w-36 h-36">
-                    <svg className="w-full h-full" viewBox="0 0 36 36">
+                  <div className="relative w-40 h-40 mb-3">
+                    <svg viewBox="0 0 36 36" className="w-full h-full">
                       <path
-                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        d="M18 2.0845
+                          a 15.9155 15.9155 0 0 1 0 31.831
+                          a 15.9155 15.9155 0 0 1 0 -31.831"
                         fill="none"
-                        stroke="#e6e6e6"
+                        stroke="#eee"
                         strokeWidth="3"
+                        strokeDasharray="100, 100"
                       />
                       <path
-                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        d="M18 2.0845
+                          a 15.9155 15.9155 0 0 1 0 31.831
+                          a 15.9155 15.9155 0 0 1 0 -31.831"
                         fill="none"
-                        stroke="#4f46e5"
+                        stroke={
+                          (responseData.scoreData.accuracyRate * 100) >= 80 ? "#10b981" : 
+                          (responseData.scoreData.accuracyRate * 100) >= 60 ? "#f59e0b" : "#ef4444"
+                        }
                         strokeWidth="3"
-                        strokeDasharray={`${responseData.scoreData.accuracyRate * 100}, 100`}
-                        strokeLinecap="round"
+                        strokeDasharray={`${(responseData.scoreData.accuracyRate * 100).toFixed(1)}, 100`}
                       />
-                      <text x="18" y="20.5" textAnchor="middle" fontSize="8" fill="#333">
-                        {Math.round(responseData.scoreData.accuracyRate * 100)}%
-                      </text>
                     </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="text-center">
+                        <span className="text-3xl font-bold">{(responseData.scoreData.accuracyRate * 100).toFixed(1)}%</span>
+                        <p className="text-sm text-gray-500">Acertos</p>
+                      </div>
+                    </div>
                   </div>
                   
                   <div className="text-center md:text-left">
-                    <p className="text-lg text-secondary-700">
+                    <p className="text-lg text-secondary-700 mb-2">
                       <span className="font-semibold">Pontuação:</span> {responseData.scoreData.score} de {responseData.scoreData.totalQuestions} pontos
                     </p>
-                    <p className="text-lg text-secondary-700">
-                      <span className="font-semibold">Taxa de acerto:</span> {Math.round(responseData.scoreData.accuracyRate * 100)}%
+                    <p className="text-sm text-gray-600 mb-1">
+                      Você acertou <span className="font-semibold">{Math.round(responseData.scoreData.accuracyRate * responseData.scoreData.totalQuestions)}</span> de <span className="font-semibold">{responseData.scoreData.totalQuestions}</span> questões de múltipla escolha
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Obrigado por participar do nosso processo seletivo!
                     </p>
                   </div>
                 </div>

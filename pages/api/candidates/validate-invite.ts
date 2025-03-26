@@ -184,13 +184,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // Extrair dados de pontuação do campo observations se existirem
           let scoreData = {
             score: candidate.score || 0,
-            totalQuestions: 0,
-            accuracyRate: 0
+            totalQuestions: responses.length,
+            accuracyRate: candidate.score ? candidate.score / 100 : 0
           };
+          
+          console.log('Dados do candidato para pontuação:', {
+            candidateId: candidate.id,
+            score: candidate.score,
+            totalQuestions: responses.length,
+            accuracyRate: candidate.score ? candidate.score / 100 : 0
+          });
           
           if (candidate.observations) {
             try {
               const parsedObservations = JSON.parse(candidate.observations);
+              console.log('Observations do candidato:', parsedObservations);
+              
               if (parsedObservations.score !== undefined && 
                   parsedObservations.totalQuestions !== undefined && 
                   parsedObservations.accuracyRate !== undefined) {
@@ -207,6 +216,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   totalQuestions: parsedObservations.totalQuestions,
                   accuracyRate: normalizedAccuracyRate
                 };
+                
+                console.log('Dados de pontuação extraídos do observations:', scoreData);
               }
             } catch (e) {
               console.error('Erro ao analisar observations:', e);
