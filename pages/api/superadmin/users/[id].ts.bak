@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
-import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 
 
@@ -59,11 +59,6 @@ async function getUser(req: NextApiRequest, res: NextApiResponse, id: string) {
       return res.status(404).json({ message: 'Usuário não encontrado' });
     }
 
-    
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
     return res.status(200).json(user);
   } catch (error) {
     console.error('Error fetching user:', error);
@@ -172,11 +167,6 @@ async function updateUser(req: NextApiRequest, res: NextApiResponse, id: string)
       },
     });
 
-    
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
     return res.status(200).json(updatedUser);
   } catch (error) {
     console.error('Error updating user:', error);
@@ -297,11 +287,6 @@ async function deleteUser(req: NextApiRequest, res: NextApiResponse, id: string)
     });
 
     console.log(`[API] Usuário ${id} excluído com sucesso`);
-    
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
     return res.status(200).json({ message: 'Usuário excluído com sucesso' });
   } catch (error) {
     console.error('Error deleting user:', error);

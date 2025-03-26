@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import { prisma } from '@/lib/prisma';
+import { prisma, reconnectPrisma } from '@/lib/prisma';
 
 
 
@@ -25,7 +25,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // GET - Listar todas as categorias globais
     if (req.method === 'GET') {
       // Buscar categorias globais com contagem de questões usando métodos nativos do Prisma
-      const categories = await prisma.globalCategory.findMany({
+      const categories = 
+    console.log(`[GLOBALCATEGORY] Iniciando busca de globalCategory (${new Date().toISOString()})`);
+    
+    // Forçar desconexão e reconexão para garantir dados frescos
+    await reconnectPrisma();
+    
+    await prisma.globalCategory.findMany({
         orderBy: {
           name: 'asc'
         },
@@ -49,7 +55,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         questionsCount: category._count.questions
       }));
 
-      return res.status(200).json(formattedCategories);
+      
+    // Desconectar Prisma após a consulta
+    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
+    await prisma.$disconnect();
+    
+    return res.status(200).json(formattedCategories);
     }
 
     // POST - Criar uma nova categoria global

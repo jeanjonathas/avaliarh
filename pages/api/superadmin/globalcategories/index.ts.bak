@@ -1,13 +1,13 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 
 
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    console.log(`[API] Recebida requisição ${req.method} para /api/superadmin/categories`);
+    console.log(`[API] Recebida requisição ${req.method} para /api/superadmin/globalcategories`);
     
     const session = await getServerSession(req, res, authOptions);
 
@@ -24,14 +24,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // GET - Listar todas as categorias globais
     if (req.method === 'GET') {
-      // Buscar categorias com contagem de questões usando métodos nativos do Prisma
-      const categories = 
-    console.log(`[CATEGORY] Iniciando busca de category (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    await prisma.category.findMany({
+      // Buscar categorias globais com contagem de questões usando métodos nativos do Prisma
+      const categories = await prisma.globalCategory.findMany({
         orderBy: {
           name: 'asc'
         },
@@ -55,12 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         questionsCount: category._count.questions
       }));
 
-      
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
-    return res.status(200).json(formattedCategories);
+      return res.status(200).json(formattedCategories);
     }
 
     // POST - Criar uma nova categoria global
@@ -71,11 +60,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ message: 'Nome da categoria é obrigatório' });
       }
 
-      const newCategory = await prisma.category.create({
+      // Criar nova categoria global usando métodos nativos do Prisma
+      const newCategory = await prisma.globalCategory.create({
         data: {
           name,
-          description: description || null,
-        },
+          description: description || null
+        }
       });
 
       return res.status(201).json(newCategory);
@@ -84,7 +74,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Método não permitido
     return res.status(405).json({ message: 'Método não permitido' });
   } catch (error) {
-    console.error('Erro na API de categorias:', error);
+    console.error('Erro na API de categorias globais:', error);
     return res.status(500).json({ message: 'Erro interno do servidor' });
   } finally {
     await prisma.$disconnect();

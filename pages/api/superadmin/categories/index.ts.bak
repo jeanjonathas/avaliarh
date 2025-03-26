@@ -1,13 +1,13 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 
 
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    console.log(`[API] Recebida requisição ${req.method} para /api/superadmin/plan-features`);
+    console.log(`[API] Recebida requisição ${req.method} para /api/superadmin/categories`);
     
     const session = await getServerSession(req, res, authOptions);
 
@@ -22,51 +22,58 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ message: 'Não autorizado' });
     }
 
-    // GET - Listar todos os recursos disponíveis
+    // GET - Listar todas as categorias globais
     if (req.method === 'GET') {
-      const features = 
-    console.log(`[FEATURE] Iniciando busca de feature (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    await prisma.feature.findMany({
+      // Buscar categorias com contagem de questões usando métodos nativos do Prisma
+      const categories = await prisma.category.findMany({
         orderBy: {
-          name: 'asc',
+          name: 'asc'
         },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          createdAt: true,
+          updatedAt: true,
+          _count: {
+            select: {
+              questions: true
+            }
+          }
+        }
       });
 
-      
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
-    return res.status(200).json(features);
+      // Formatar a resposta para manter compatibilidade com o frontend
+      const formattedCategories = categories.map(category => ({
+        ...category,
+        questionsCount: category._count.questions
+      }));
+
+      return res.status(200).json(formattedCategories);
     }
 
-    // POST - Criar um novo recurso
+    // POST - Criar uma nova categoria global
     if (req.method === 'POST') {
       const { name, description } = req.body;
 
       if (!name) {
-        return res.status(400).json({ message: 'Nome do recurso é obrigatório' });
+        return res.status(400).json({ message: 'Nome da categoria é obrigatório' });
       }
 
-      // Criar o recurso
-      const newFeature = await prisma.feature.create({
+      const newCategory = await prisma.category.create({
         data: {
           name,
           description: description || null,
         },
       });
 
-      return res.status(201).json(newFeature);
+      return res.status(201).json(newCategory);
     }
 
     // Método não permitido
     return res.status(405).json({ message: 'Método não permitido' });
   } catch (error) {
-    console.error('Erro na API de recursos:', error);
+    console.error('Erro na API de categorias:', error);
     return res.status(500).json({ message: 'Erro interno do servidor' });
   } finally {
     await prisma.$disconnect();

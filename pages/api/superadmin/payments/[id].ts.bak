@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 
 
 
@@ -79,11 +79,6 @@ async function getPayment(req: NextApiRequest, res: NextApiResponse, id: string)
     }
 
     // Formatar a resposta para manter compatibilidade com o frontend
-    
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
     return res.status(200).json({
       id: payment.id,
       amount: payment.amount,
@@ -191,11 +186,6 @@ async function updatePayment(req: NextApiRequest, res: NextApiResponse, id: stri
       }
     }
 
-    
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
     return res.status(200).json(updatedPayment);
   } catch (error) {
     console.error('Error updating payment:', error);
@@ -245,11 +235,6 @@ async function deletePayment(req: NextApiRequest, res: NextApiResponse, id: stri
       }
     }
 
-    
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
     return res.status(200).json({ message: 'Pagamento excluído com sucesso' });
   } catch (error) {
     console.error('Error deleting payment:', error);

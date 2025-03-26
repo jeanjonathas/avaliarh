@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 
 
 
@@ -53,13 +53,7 @@ async function getPayments(req: NextApiRequest, res: NextApiResponse) {
       where.subscriptionId = subscriptionId as string;
     }
     
-    const payments = 
-    console.log(`[PAYMENTHISTORY] Iniciando busca de paymentHistory (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    await prisma.paymentHistory.findMany({
+    const payments = await prisma.paymentHistory.findMany({
       where,
       orderBy: {
         paymentDate: 'desc',
@@ -87,11 +81,6 @@ async function getPayments(req: NextApiRequest, res: NextApiResponse) {
       },
     });
 
-    
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
     return res.status(200).json(payments);
   } catch (error) {
     console.error('Error fetching payments:', error);

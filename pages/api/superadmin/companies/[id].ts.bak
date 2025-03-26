@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { ReadStream } from 'fs';
 import { join } from 'path';
 
@@ -110,11 +110,6 @@ async function getCompany(req: NextApiRequest, res: NextApiResponse, id: string)
     };
 
     console.log(`[COMPANY] Retornando empresa ${id} serializada`);
-    
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
     return res.status(200).json(serializedCompany);
   } catch (error) {
     console.error(`[COMPANY] Erro ao buscar empresa ${id}:`, error);
@@ -200,11 +195,6 @@ async function updateCompany(req: NextApiRequest, res: NextApiResponse, id: stri
       }
     });
 
-    
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
     return res.status(200).json(updatedCompany);
   } catch (error) {
     console.error('Error updating company:', error);
@@ -384,13 +374,7 @@ async function exportCompanyData(companyId: string) {
     });
 
     // Buscar testes com detalhes
-    const tests = 
-    console.log(`[TEST] Iniciando busca de test (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    await prisma.test.findMany({
+    const tests = await prisma.test.findMany({
       where: { companyId },
       include: {
         stages: {
@@ -406,13 +390,7 @@ async function exportCompanyData(companyId: string) {
     });
     
     // Buscar questões com detalhes
-    const questions = 
-    console.log(`[QUESTION] Iniciando busca de question (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    await prisma.question.findMany({
+    const questions = await prisma.question.findMany({
       where: { companyId },
       include: {
         options: true,
@@ -430,13 +408,7 @@ async function exportCompanyData(companyId: string) {
     });
     
     // Buscar apenas as categorias relacionadas
-    const categories = 
-    console.log(`[CATEGORY] Iniciando busca de category (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    await prisma.category.findMany({
+    const categories = await prisma.category.findMany({
       where: {
         id: {
           in: Array.from(categoryIds)
@@ -445,19 +417,7 @@ async function exportCompanyData(companyId: string) {
     });
     
     // Buscar respostas
-    const responses = 
-    console.log(`[RESPONSE] Iniciando busca de response (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    
-    console.log(`[RESPONSE] Iniciando busca de response (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    await prisma.response.findMany({
+    const responses = await prisma.response.findMany({
       where: {
         companyId
       },
@@ -468,13 +428,7 @@ async function exportCompanyData(companyId: string) {
     });
 
     // Buscar estudantes com detalhes
-    const students = 
-    console.log(`[STUDENT] Iniciando busca de student (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    await prisma.student.findMany({
+    const students = await prisma.student.findMany({
       where: { companyId },
       include: {
         user: true,
@@ -482,13 +436,7 @@ async function exportCompanyData(companyId: string) {
     });
 
     // Buscar convites de teste
-    const testInvitations = 
-    console.log(`[TESTINVITATION] Iniciando busca de testInvitation (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    await prisma.testInvitation.findMany({
+    const testInvitations = await prisma.testInvitation.findMany({
       where: { companyId },
       include: {
         candidate: true,
@@ -558,11 +506,6 @@ async function deactivateCompany(req: NextApiRequest, res: NextApiResponse, id: 
       data: { isActive: false }
     });
 
-    
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
     return res.status(200).json({ 
       message: 'Empresa desativada com sucesso',
     });

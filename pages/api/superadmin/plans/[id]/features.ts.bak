@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 
 
 
@@ -41,32 +41,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // GET - Obter recursos de um plano específico
       if (req.method === 'GET') {
         // Buscar todos os recursos disponíveis
-        const allFeatures = 
-    console.log(`[FEATURE] Iniciando busca de feature (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    await prisma.feature.findMany({
+        const allFeatures = await prisma.feature.findMany({
           orderBy: {
             name: 'asc',
           },
         });
 
         // Buscar recursos associados ao plano
-        const planFeatures = 
-    console.log(`[PLANFEATURE] Iniciando busca de planFeature (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    
-    console.log(`[PLANFEATURE] Iniciando busca de planFeature (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    await prisma.planFeature.findMany({
+        const planFeatures = await prisma.planFeature.findMany({
           where: {
             planId: id,
           },
@@ -85,12 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           isIncluded: planFeatureIds.includes(feature.id),
         }));
 
-        
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
-    return res.status(200).json(formattedFeatures);
+        return res.status(200).json(formattedFeatures);
       }
 
       // PUT - Atualizar recursos de um plano
@@ -142,12 +119,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           isIncluded: true,
         }));
 
-        
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
-    return res.status(200).json(formattedFeatures);
+        return res.status(200).json(formattedFeatures);
       }
 
       // Método não permitido

@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 
 
 
@@ -40,25 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // GET - Obter empresas com acesso ao teste
       if (req.method === 'GET') {
-        const accessRecords = 
-    console.log(`[GLOBALACCESS] Iniciando busca de globalAccess (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    
-    console.log(`[GLOBALACCESS] Iniciando busca de globalAccess (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    
-    console.log(`[GLOBALACCESS] Iniciando busca de globalAccess (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    await prisma.globalAccess.findMany({
+        const accessRecords = await prisma.globalAccess.findMany({
           where: {
             globalTestId: id,
           },
@@ -67,12 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           },
         });
 
-        
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
-    return res.status(200).json(accessRecords);
+        return res.status(200).json(accessRecords);
       }
 
       // PUT - Atualizar acesso das empresas ao teste
@@ -135,12 +112,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           },
         });
 
-        
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
-    return res.status(200).json(updatedAccessRecords);
+        return res.status(200).json(updatedAccessRecords);
       }
 
       // Método não permitido

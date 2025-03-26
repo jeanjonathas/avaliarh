@@ -51,9 +51,10 @@ const CompaniesPage: React.FC<CompaniesPageProps> = ({ initialCompanies }) => {
   const [companyToDelete, setCompanyToDelete] = useState<CompanyWithRelations | null>(null);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
 
-  const loadCompanies = async () => {
-    setIsLoading(true);
+  // Função para carregar empresas
+  const loadCompanies = useCallback(async () => {
     try {
+      setIsLoading(true);
       console.log('[FRONTEND] Iniciando carregamento de empresas');
       
       const response = await fetch('/api/superadmin/companies', {
@@ -70,52 +71,35 @@ const CompaniesPage: React.FC<CompaniesPageProps> = ({ initialCompanies }) => {
       }
       
       const data = await response.json();
+      
       console.log(`[FRONTEND] Recebidas ${data.length} empresas da API`);
       
-      // Verificar se há duplicatas nos dados recebidos
-      const uniqueIds = new Set(data.map(company => company.id));
+      // Verificar se há duplicatas
+      const uniqueIds = new Set(data.map((company: CompanyWithRelations) => company.id));
       console.log(`[FRONTEND] Número de IDs únicos: ${uniqueIds.size}`);
       
       if (uniqueIds.size !== data.length) {
-        console.warn('[FRONTEND] ALERTA: Foram encontradas empresas com IDs duplicados!');
+        console.warn('[FRONTEND] ALERTA: Foram recebidas empresas com IDs duplicados da API!');
         
-        // Identificar as duplicatas
-        const idCounts: Record<string, number> = {};
-        data.forEach(company => {
-          idCounts[company.id] = (idCounts[company.id] || 0) + 1;
-        });
-        
-        Object.entries(idCounts).forEach(([id, count]) => {
-          if (count as number > 1) {
-            console.warn(`[FRONTEND] ID duplicado: ${id} (${count} ocorrências)`);
-            
-            // Mostrar detalhes das empresas duplicadas
-            const duplicates = data.filter(company => company.id === id);
-            duplicates.forEach((dup, index) => {
-              console.warn(`[FRONTEND] Duplicata #${index + 1} - Nome: ${dup.name}, Plano: ${dup.planType}, Criado em: ${dup.createdAt}`);
-            });
-          }
-        });
-        
-        // Remover duplicatas antes de atualizar o estado
-        console.log('[FRONTEND] Removendo duplicatas antes de atualizar o estado');
+        // Remover duplicatas
         const uniqueCompanies = Array.from(
           new Map(data.map((company: CompanyWithRelations) => [company.id, company])).values()
-        ) as CompanyWithRelations[];
-        console.log(`[FRONTEND] Após remoção de duplicatas: ${uniqueCompanies.length} empresas`);
-        setCompanies(uniqueCompanies);
+        );
+        
+        console.log(`[FRONTEND] Removidas ${data.length - uniqueCompanies.length} empresas duplicadas`);
+        setCompanies(uniqueCompanies as CompanyWithRelations[]);
       } else {
         setCompanies(data);
       }
       
-      setError(null);
-    } catch (err) {
+      console.log('[FRONTEND] Empresas carregadas com sucesso');
+    } catch (error) {
+      console.error('[FRONTEND] Erro ao carregar empresas:', error);
       setError('Erro ao carregar empresas. Por favor, tente novamente.');
-      console.error('[FRONTEND] Erro ao carregar empresas:', err);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   const handleAddCompany = () => {
     setSelectedCompany(null);
@@ -164,34 +148,20 @@ const CompaniesPage: React.FC<CompaniesPageProps> = ({ initialCompanies }) => {
     setCompanyToDelete(null);
   };
 
-  // Carregar empresas quando o componente for montado
+  // Efeito para carregar empresas ao montar o componente
   useEffect(() => {
     // Limpar o cache do navegador antes de carregar as empresas
-    const clearCache = async () => {
-      console.log('[FRONTEND] Limpando cache antes de carregar empresas');
-      
-      // Limpar cache de API
-      if ('caches' in window) {
-        try {
-          const cacheNames = await window.caches.keys();
-          await Promise.all(
-            cacheNames.map(cacheName => {
-              console.log(`[FRONTEND] Excluindo cache: ${cacheName}`);
-              return window.caches.delete(cacheName);
-            })
-          );
-          console.log('[FRONTEND] Cache limpo com sucesso');
-        } catch (error) {
-          console.error('[FRONTEND] Erro ao limpar cache:', error);
-        }
-      }
-      
-      // Carregar empresas após limpar o cache
-      loadCompanies();
-    };
+    console.log('[FRONTEND] Limpando cache antes de carregar empresas');
     
-    clearCache();
-  }, []);
+    // Verificar se há dados no cache
+    const cachedData = localStorage.getItem('companiesCache');
+    if (cachedData) {
+      console.log('[FRONTEND] Removendo dados do cache');
+      localStorage.removeItem('companiesCache');
+    }
+    
+    loadCompanies();
+  }, [loadCompanies]);
 
   // Função para desativar uma empresa
   const handleDeactivateCompany = async () => {

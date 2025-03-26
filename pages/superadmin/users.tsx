@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { GetServerSideProps } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../api/auth/[...nextauth]';
@@ -43,7 +43,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ initialUsers, companies }) => {
   const [userToDelete, setUserToDelete] = useState<UserWithCompany | null>(null);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await fetch('/api/superadmin/users');
@@ -59,7 +59,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ initialUsers, companies }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   const handleAddUser = () => {
     setSelectedUser(null);
@@ -173,6 +173,21 @@ const UsersPage: React.FC<UsersPageProps> = ({ initialUsers, companies }) => {
   const handleCloseDetails = () => {
     setViewingUser(null);
   };
+
+  // Efeito para carregar usuários ao montar o componente
+  useEffect(() => {
+    // Limpar o cache do navegador antes de carregar usuários
+    console.log('[FRONTEND] Limpando cache antes de carregar usuários');
+    
+    // Verificar se há dados no cache
+    const cachedData = localStorage.getItem('usersCache');
+    if (cachedData) {
+      console.log('[FRONTEND] Removendo dados do cache');
+      localStorage.removeItem('usersCache');
+    }
+    
+    loadUsers();
+  }, [loadUsers]);
 
   // Renderização condicional baseada no estado
   const renderContent = () => {

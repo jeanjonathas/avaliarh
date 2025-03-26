@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import { QuestionType, DifficultyLevel } from '@prisma/client';
-import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 
 
 
@@ -67,12 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         updatedAt: globalQuestion.updatedAt,
       };
 
-      
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
-    return res.status(200).json(response);
+      return res.status(200).json(response);
     }
 
     // PUT - Atualizar uma pergunta global
@@ -160,12 +155,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         updatedAt: updatedGlobalQuestion.updatedAt,
       };
 
-      
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
-    return res.status(200).json(response);
+      return res.status(200).json(response);
     }
 
     // DELETE - Excluir uma pergunta global
@@ -199,12 +189,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         where: { id },
       });
 
-      
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
-    return res.status(200).json({ message: 'Pergunta excluída com sucesso' });
+      return res.status(200).json({ message: 'Pergunta excluída com sucesso' });
     }
 
     // Método não permitido

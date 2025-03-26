@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import { QuestionType, DifficultyLevel } from '@prisma/client';
-import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 
 
 
@@ -25,13 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // GET - Listar todas as perguntas globais
     if (req.method === 'GET') {
-      const questions = 
-    console.log(`[GLOBALQUESTION] Iniciando busca de globalQuestion (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    await prisma.globalQuestion.findMany({
+      const questions = await prisma.globalQuestion.findMany({
         include: {
           tests: true,
           questions: {
@@ -63,12 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         };
       });
 
-      
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
-    return res.status(200).json(formattedQuestions);
+      return res.status(200).json(formattedQuestions);
     }
 
     // POST - Criar uma nova pergunta global

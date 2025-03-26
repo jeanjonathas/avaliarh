@@ -1,5 +1,13 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { prisma } from '@/lib/prisma';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
+import { prisma, reconnectPrisma } from '@/lib/prisma';
+
+// Função para normalizar CNPJ (remover formatação)
+function normalizeCNPJ(cnpj: string | null | undefined): string | null {
+  if (!cnpj) return null;
+  return cnpj.replace(/[^0-9]/g, '');
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -20,102 +28,73 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
-// GET - Listar todas as empresas
+// Função para buscar empresas
 async function getCompanies(req: NextApiRequest, res: NextApiResponse) {
+  console.log(`[COMPANIES] Iniciando busca de empresas (${new Date().toISOString()})`);
+  
   try {
-    console.log(`[COMPANIES] Iniciando busca de empresas (${new Date().toISOString()})`);
+    console.log(`[COMPANIES] Executando consulta Prisma para buscar empresas`);
     
-    // Usando métodos nativos do Prisma em vez de $queryRaw
-    console.log('[COMPANIES] Executando consulta Prisma para buscar empresas');
+    // Forçar desconexão e reconexão para garantir dados frescos
+    await reconnectPrisma();
+    
+    // Buscar empresas com ordenação por nome
     const companies = await prisma.company.findMany({
       orderBy: {
         name: 'asc'
       },
-      select: {
-        id: true,
-        name: true,
-        cnpj: true,
-        planType: true,
-        isActive: true,
-        maxUsers: true,
-        maxCandidates: true,
-        lastPaymentDate: true,
-        trialEndDate: true,
-        createdAt: true,
-        updatedAt: true,
-        _count: {
-          select: {
-            users: true,
-            candidates: true,
-            questions: true, // Usamos questions como proxy para testes
-            processes: true
-          }
+    });
+    
+    console.log(`[COMPANIES] Encontradas ${companies.length} empresas`);
+    
+    // Verificar se há duplicatas nos IDs
+    const uniqueIds = new Set(companies.map(company => company.id));
+    console.log(`[COMPANIES] IDs das empresas encontradas: ${companies.map(c => c.id).join(', ')}`);
+    console.log(`[COMPANIES] Número de IDs únicos: ${uniqueIds.size}`);
+    
+    if (uniqueIds.size !== companies.length) {
+      console.warn(`[COMPANIES] ALERTA: Foram encontradas empresas com IDs duplicados!`);
+    }
+    
+    // Verificar duplicatas por CNPJ
+    const cnpjMap = new Map();
+    companies.forEach(company => {
+      const normalizedCnpj = normalizeCNPJ(company.cnpj);
+      if (normalizedCnpj) {
+        if (cnpjMap.has(normalizedCnpj)) {
+          console.warn(`[COMPANIES] ALERTA: CNPJ duplicado encontrado: ${normalizedCnpj}`);
+          console.warn(`[COMPANIES] Empresas com mesmo CNPJ: ${cnpjMap.get(normalizedCnpj).id} e ${company.id}`);
+        } else {
+          cnpjMap.set(normalizedCnpj, company);
         }
       }
     });
     
-    console.log(`[COMPANIES] Encontradas ${companies.length} empresas`);
-    console.log(`[COMPANIES] IDs das empresas encontradas: ${companies.map(c => c.id).join(', ')}`);
-    
-    // Verificar se há duplicatas
-    const uniqueIds = new Set(companies.map(c => c.id));
-    console.log(`[COMPANIES] Número de IDs únicos: ${uniqueIds.size}`);
-    if (uniqueIds.size !== companies.length) {
-      console.warn('[COMPANIES] ALERTA: Foram encontradas empresas com IDs duplicados!');
-      
-      // Identificar as duplicatas
-      const idCounts: Record<string, number> = {};
-      companies.forEach(c => {
-        idCounts[c.id] = (idCounts[c.id] || 0) + 1;
-      });
-      
-      Object.entries(idCounts).forEach(([id, count]) => {
-        if (count as number > 1) {
-          console.warn(`[COMPANIES] ID duplicado: ${id} (${count} ocorrências)`);
-          
-          // Mostrar detalhes das empresas duplicadas
-          const duplicates = companies.filter(c => c.id === id);
-          duplicates.forEach((dup, index) => {
-            console.warn(`[COMPANIES] Duplicata #${index + 1} - Nome: ${dup.name}, Plano: ${dup.planType}, Criado em: ${dup.createdAt}`);
-          });
-        }
-      });
-    }
-
-    // Mapear os resultados para o formato esperado pelo frontend
-    console.log('[COMPANIES] Formatando resultados para o frontend');
+    // Formatar resultados para o frontend
+    console.log(`[COMPANIES] Formatando resultados para o frontend`);
     const formattedCompanies = companies.map(company => ({
       ...company,
-      userCount: company._count.users,
-      candidateCount: company._count.candidates,
-      testCount: company._count.questions, // Usamos questions como proxy para testes
-      processCount: company._count.processes
+      createdAt: company.createdAt?.toISOString() || null,
+      updatedAt: company.updatedAt?.toISOString() || null,
+      lastPaymentDate: company.lastPaymentDate?.toISOString() || null,
+      trialEndDate: company.trialEndDate?.toISOString() || null,
     }));
-
-    console.log(`[COMPANIES] Retornando ${formattedCompanies.length} empresas formatadas`);
-    return res.status(200).json(formattedCompanies);
-  } catch (error) {
-    console.error('[COMPANIES] Erro ao buscar empresas:', error);
     
-    // Verificar se é um erro de conexão com o banco
-    if (error instanceof Error) {
-      console.error(`[COMPANIES] Tipo de erro: ${error.name}`);
-      console.error(`[COMPANIES] Mensagem de erro: ${error.message}`);
-      
-      // Verificar problemas de case sensitivity
-      if (error.message.includes('column') && error.message.includes('does not exist')) {
-        console.error('[COMPANIES] ERRO DE CASE SENSITIVITY DETECTADO!');
-        console.error('[COMPANIES] Detalhes do erro:', error.message);
-      }
-      
-      // Verificar problemas de conexão
-      if (error.message.includes('connect') || error.message.includes('connection')) {
-        console.error('[COMPANIES] ERRO DE CONEXÃO COM O BANCO DETECTADO!');
-        console.error('[COMPANIES] Verifique o pool de conexões e limite de conexões.');
-      }
+    console.log(`[COMPANIES] Retornando ${formattedCompanies.length} empresas formatadas`);
+    
+    // Remover duplicatas antes de retornar
+    const uniqueCompanies = Array.from(
+      new Map(formattedCompanies.map(company => [company.id, company])).values()
+    );
+    
+    if (uniqueCompanies.length !== formattedCompanies.length) {
+      console.warn(`[COMPANIES] Removidas ${formattedCompanies.length - uniqueCompanies.length} empresas duplicadas`);
     }
     
-    return res.status(500).json({ message: 'Erro ao buscar empresas' });
+    res.status(200).json(uniqueCompanies);
+  } catch (error) {
+    console.error(`[COMPANIES] Erro ao buscar empresas:`, error);
+    res.status(500).json({ error: 'Erro ao buscar empresas' });
   } finally {
     console.log(`[COMPANIES] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
     await prisma.$disconnect();
@@ -150,7 +129,7 @@ async function createCompany(req: NextApiRequest, res: NextApiResponse) {
       console.log(`[COMPANIES] Verificando se já existe empresa com CNPJ: ${cnpj}`);
       const existingCompany = await prisma.company.findUnique({
         where: {
-          cnpj: cnpj
+          cnpj: normalizeCNPJ(cnpj)
         }
       });
 
@@ -165,7 +144,7 @@ async function createCompany(req: NextApiRequest, res: NextApiResponse) {
     const newCompany = await prisma.company.create({
       data: {
         name,
-        cnpj: cnpj || null,
+        cnpj: normalizeCNPJ(cnpj) || null,
         planType,
         isActive: isActive !== undefined ? isActive : true,
         maxUsers: maxUsers || 10,

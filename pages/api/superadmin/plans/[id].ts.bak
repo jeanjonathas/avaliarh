@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 
 
 
@@ -75,12 +75,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         updatedAt: plan.updatedAt,
       };
 
-      
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
-    return res.status(200).json(response);
+      return res.status(200).json(response);
     }
 
     // PUT - Atualizar um plano
@@ -137,12 +132,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         updatedAt: updatedPlan.updatedAt,
       };
 
-      
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
-    return res.status(200).json(response);
+      return res.status(200).json(response);
     }
 
     // DELETE - Excluir um plano
@@ -178,12 +168,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         where: { id },
       });
 
-      
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
-    return res.status(200).json({ message: 'Plano excluído com sucesso' });
+      return res.status(200).json({ message: 'Plano excluído com sucesso' });
     }
 
     // Método não permitido

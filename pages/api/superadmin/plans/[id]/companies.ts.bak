@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 
 
 
@@ -40,13 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // GET - Obter empresas de um plano específico
       if (req.method === 'GET') {
-        const companies = 
-    console.log(`[COMPANY] Iniciando busca de company (${new Date().toISOString()})`);
-    
-    // Forçar desconexão e reconexão para garantir dados frescos
-    await reconnectPrisma();
-    
-    await prisma.company.findMany({
+        const companies = await prisma.company.findMany({
           where: {
             planId: id,
           },
@@ -69,12 +63,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           subscriptionEndDate: company.subscription?.endDate || null,
         }));
 
-        
-    // Desconectar Prisma após a consulta
-    console.log(`[API] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
-    await prisma.$disconnect();
-    
-    return res.status(200).json(formattedCompanies);
+        return res.status(200).json(formattedCompanies);
       }
 
       // Método não permitido

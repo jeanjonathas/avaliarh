@@ -1,10 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
-import { prisma } from '@/lib/prisma';
+import { prisma, reconnectPrisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
-
-
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
@@ -27,7 +25,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 // GET - Listar todos os usuários
 async function getUsers(req: NextApiRequest, res: NextApiResponse) {
+  console.log(`[USERS] Iniciando busca de usuários (${new Date().toISOString()})`);
+  
   try {
+    console.log(`[USERS] Executando consulta Prisma para buscar usuários`);
+    
+    // Forçar desconexão e reconexão para garantir dados frescos
+    await reconnectPrisma();
+    
+    // Buscar usuários com ordenação por nome
     const users = await prisma.user.findMany({
       select: {
         id: true,
@@ -48,11 +54,55 @@ async function getUsers(req: NextApiRequest, res: NextApiResponse) {
         name: 'asc',
       },
     });
-
-    return res.status(200).json(users);
+    
+    console.log(`[USERS] Encontrados ${users.length} usuários`);
+    
+    // Verificar se há duplicatas nos IDs
+    const uniqueIds = new Set(users.map(user => user.id));
+    console.log(`[USERS] Número de IDs únicos: ${uniqueIds.size}`);
+    
+    if (uniqueIds.size !== users.length) {
+      console.warn(`[USERS] ALERTA: Foram encontrados usuários com IDs duplicados!`);
+    }
+    
+    // Verificar duplicatas por email
+    const emailMap = new Map();
+    users.forEach(user => {
+      if (user.email) {
+        if (emailMap.has(user.email.toLowerCase())) {
+          console.warn(`[USERS] ALERTA: Email duplicado encontrado: ${user.email}`);
+          console.warn(`[USERS] Usuários com mesmo email: ${emailMap.get(user.email.toLowerCase()).id} e ${user.id}`);
+        } else {
+          emailMap.set(user.email.toLowerCase(), user);
+        }
+      }
+    });
+    
+    // Formatar resultados para o frontend
+    console.log(`[USERS] Formatando resultados para o frontend`);
+    const formattedUsers = users.map(user => ({
+      ...user,
+      createdAt: user.createdAt?.toISOString() || null,
+      updatedAt: user.updatedAt?.toISOString() || null,
+    }));
+    
+    // Remover duplicatas antes de retornar
+    const uniqueUsers = Array.from(
+      new Map(formattedUsers.map(user => [user.id, user])).values()
+    );
+    
+    if (uniqueUsers.length !== formattedUsers.length) {
+      console.warn(`[USERS] Removidas ${formattedUsers.length - uniqueUsers.length} usuários duplicados`);
+    }
+    
+    console.log(`[USERS] Retornando ${uniqueUsers.length} usuários formatados`);
+    return res.status(200).json(uniqueUsers);
   } catch (error) {
-    console.error('Error fetching users:', error);
+    console.error(`[USERS] Erro ao buscar usuários:`, error);
     return res.status(500).json({ message: 'Erro ao buscar usuários' });
+  } finally {
+    console.log(`[USERS] Finalizando requisição, desconectando Prisma (${new Date().toISOString()})`);
+    await prisma.$disconnect();
   }
 }
 
