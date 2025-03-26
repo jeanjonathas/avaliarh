@@ -52,10 +52,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeSection: prop
     <div className="flex flex-col min-h-screen">
       <Navbar onSectionChange={handleSectionChange} />
       
-      <div className="flex flex-1">
-        <LeftBar activeSection={activeSection} />
+      <div className="flex flex-col md:flex-row flex-1">
+        <div className="md:block hidden">
+          <LeftBar activeSection={activeSection} />
+        </div>
         
-        <div className="flex-1 bg-gray-50">
+        <div className="flex-1 bg-gray-50 overflow-x-hidden">
           {children}
         </div>
       </div>

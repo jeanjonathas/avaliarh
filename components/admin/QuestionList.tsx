@@ -284,7 +284,7 @@ const QuestionList: React.FC<QuestionListProps> = ({
   return (
     <div className="bg-white shadow-md rounded-lg p-6">
       {/* Filtros */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div>
           <label htmlFor="filterType" className="block text-sm font-medium text-gray-700 mb-1">
             Tipo de Pergunta
@@ -377,23 +377,23 @@ const QuestionList: React.FC<QuestionListProps> = ({
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto -mx-6 md:mx-0">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Pergunta
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
                   Tipo
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
                   Dificuldade
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
                   Categoria
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-3 md:px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider text-center">
                   Ações
                 </th>
               </tr>
@@ -401,43 +401,64 @@ const QuestionList: React.FC<QuestionListProps> = ({
             <tbody className="bg-white divide-y divide-gray-200">
               {questions.map((question) => (
                 <tr key={question.id}>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 md:px-6 py-4">
                     <div 
-                      className="text-sm font-medium text-gray-900"
+                      className="text-sm font-medium text-gray-900 line-clamp-2"
                       dangerouslySetInnerHTML={{ __html: question.text }}
                     />
                     {question.stageName && (
                       <div className="text-xs text-gray-500">Etapa: {question.stageName}</div>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 md:px-6 py-4 hidden sm:table-cell">
                     {getTypeLabel(question.type)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 md:px-6 py-4 hidden sm:table-cell">
                     {getDifficultyLabel(question.difficulty)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 md:px-6 py-4 hidden md:table-cell">
                     <div className="text-sm text-gray-900">{question.categoryName || '-'}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      onClick={() => fetchQuestionDetails(question.id)}
-                      className="text-indigo-600 hover:text-indigo-900 mr-4"
-                    >
-                      Visualizar
-                    </button>
-                    <button
-                      onClick={() => handleEditQuestion(question.id)}
-                      className="text-primary-600 hover:text-primary-900 mr-4"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => handleDelete(question.id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      Excluir
-                    </button>
+                  <td className="px-3 md:px-6 py-4 text-center">
+                    <div className="flex flex-col sm:flex-row justify-center sm:justify-end gap-2 sm:gap-4">
+                      <button
+                        onClick={() => fetchQuestionDetails(question.id)}
+                        className="text-indigo-600 hover:text-indigo-900 text-sm"
+                        aria-label="Visualizar"
+                      >
+                        <span className="flex items-center justify-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                            <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                          </svg>
+                          <span className="hidden sm:inline">Visualizar</span>
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => handleEditQuestion(question.id)}
+                        className="text-primary-600 hover:text-primary-900 text-sm"
+                        aria-label="Editar"
+                      >
+                        <span className="flex items-center justify-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                          </svg>
+                          <span className="hidden sm:inline">Editar</span>
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => handleDelete(question.id)}
+                        className="text-red-600 hover:text-red-900 text-sm"
+                        aria-label="Excluir"
+                      >
+                        <span className="flex items-center justify-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                          <span className="hidden sm:inline">Excluir</span>
+                        </span>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
