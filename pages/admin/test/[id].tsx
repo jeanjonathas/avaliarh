@@ -631,6 +631,10 @@ const TestDetail: NextPage = () => {
     setSelectedStageId(stageId)
     setSelectedQuestions([])
     
+    // Resetar os filtros quando abrir o modal
+    setSelectedCategory('all')
+    setSelectedDifficulty('all')
+    
     // Encontrar a etapa selecionada para obter o tipo de pergunta
     const selectedTestStage = test?.testStages?.find(ts => ts.stage.id === stageId);
     if (selectedTestStage && selectedTestStage.stage.questionType) {
@@ -670,7 +674,7 @@ const TestDetail: NextPage = () => {
       setSelectedStageQuestionType(questionType);
       
       // Buscar todas as perguntas disponíveis
-      const response = await fetch(`/api/admin/questions`);
+      const response = await fetch(`/api/admin/questions?questionType=selection`);
       if (!response.ok) {
         throw new Error('Erro ao buscar perguntas disponíveis');
       }
@@ -678,12 +682,44 @@ const TestDetail: NextPage = () => {
       const data = await response.json();
       console.log(`[AddQuestions] Perguntas recebidas: ${data.length}`);
       
-      // Log detalhado das perguntas recebidas
-      data.forEach((question: any) => {
-        console.log(`[AddQuestions] Pergunta ID: ${question.id}, Tipo: ${question.type}, Dificuldade: ${question.difficulty}`);
+      // Processar perguntas para garantir que todas tenham a propriedade categories
+      const processedQuestions = data.map(question => {
+        // Se a pergunta não tem categories mas tem categoryId e categoryName
+        if ((!question.categories || question.categories.length === 0) && question.categoryId && question.categoryName) {
+          return {
+            ...question,
+            categories: [{
+              id: question.categoryId,
+              name: question.categoryName
+            }]
+          };
+        }
+        return question;
       });
       
-      setAvailableQuestions(data);
+      // Log detalhado das perguntas recebidas
+      processedQuestions.forEach((question) => {
+        console.log(`[AddQuestions] Pergunta ID: ${question.id}, Tipo: ${question.type}, Dificuldade: ${question.difficulty}`);
+        if (question.categories && question.categories.length > 0) {
+          console.log(`[AddQuestions] Categorias: ${question.categories.map(c => c.name).join(', ')}`);
+        } else if (question.categoryName) {
+          console.log(`[AddQuestions] Categoria: ${question.categoryName}`);
+        }
+      });
+      
+      setAvailableQuestions(processedQuestions);
+      
+      // Buscar todas as categorias
+      const categoriesResponse = await fetch('/api/admin/categories');
+      if (!categoriesResponse.ok) {
+        throw new Error('Erro ao carregar as categorias');
+      }
+      const categoriesData = await categoriesResponse.json();
+      console.log(`[AddQuestions] Categorias recebidas: ${categoriesData.length}`);
+      categoriesData.forEach(cat => {
+        console.log(`[AddQuestions] Categoria: ${cat.id} - ${cat.name}`);
+      });
+      setAvailableCategories(categoriesData);
     } catch (error) {
       console.error('Erro ao buscar perguntas disponíveis:', error);
       notify.showError('Erro ao buscar perguntas disponíveis');
@@ -716,9 +752,19 @@ const TestDetail: NextPage = () => {
     
     // Filtro por categoria
     if (selectedCategory !== 'all') {
-      if (!question.categories || !question.categories.some(cat => cat.id === selectedCategory)) {
-        console.log(`[Filter] Pergunta ${question.id} rejeitada: categoria não corresponde`);
-        return false;
+      // Verificar se a pergunta tem categorias
+      if (!question.categories || question.categories.length === 0) {
+        // Se a pergunta não tem categorias, verificar se tem categoryId
+        if (!question.categoryId || question.categoryId !== selectedCategory) {
+          console.log(`[Filter] Pergunta ${question.id} rejeitada: não tem a categoria selecionada`);
+          return false;
+        }
+      } else {
+        // Se a pergunta tem categorias, verificar se alguma corresponde ao filtro
+        if (!question.categories.some(cat => cat.id === selectedCategory)) {
+          console.log(`[Filter] Pergunta ${question.id} rejeitada: categoria não corresponde`);
+          return false;
+        }
       }
     }
     

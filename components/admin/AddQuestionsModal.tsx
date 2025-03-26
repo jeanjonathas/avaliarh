@@ -49,6 +49,33 @@ const AddQuestionsModal: React.FC<AddQuestionsModalProps> = ({
   filteredQuestions,
   onCreateNewQuestion
 }) => {
+  // Estado local para rastrear se o componente foi montado
+  const [isMounted, setIsMounted] = useState(false);
+  
+  // Efeito para marcar o componente como montado
+  useEffect(() => {
+    setIsMounted(true);
+    
+    // Log das categorias disponíveis quando o componente é montado
+    if (availableCategories && availableCategories.length > 0) {
+      console.log('[AddQuestionsModal] Categorias disponíveis:', availableCategories.map(c => `${c.id}: ${c.name}`).join(', '));
+    } else {
+      console.log('[AddQuestionsModal] Nenhuma categoria disponível');
+    }
+    
+    // Cleanup quando o componente for desmontado
+    return () => {
+      setIsMounted(false);
+    };
+  }, [availableCategories]);
+  
+  // Log quando o filtro de categoria é alterado
+  useEffect(() => {
+    if (isMounted) {
+      console.log('[AddQuestionsModal] Categoria selecionada alterada para:', selectedCategory);
+    }
+  }, [selectedCategory, isMounted]);
+  
   if (!isOpen) return null;
 
   return (
