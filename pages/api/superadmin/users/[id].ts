@@ -177,14 +177,22 @@ async function updateUser(req: NextApiRequest, res: NextApiResponse, id: string)
 // DELETE - Excluir um usuário
 async function deleteUser(req: NextApiRequest, res: NextApiResponse, id: string) {
   try {
+    console.log(`[API] Iniciando exclusão do usuário ${id}`);
+    
     // Verifica se o usuário existe
     const user = await prisma.user.findUnique({
       where: { id },
+      include: {
+        studentProfile: true
+      }
     });
 
     if (!user) {
+      console.log(`[API] Usuário ${id} não encontrado`);
       return res.status(404).json({ message: 'Usuário não encontrado' });
     }
+
+    console.log(`[API] Usuário ${id} encontrado, role: ${user.role}`);
 
     // Previne a exclusão do último SUPER_ADMIN
     if (user.role === 'SUPER_ADMIN') {
@@ -193,18 +201,98 @@ async function deleteUser(req: NextApiRequest, res: NextApiResponse, id: string)
       });
 
       if (superAdminCount <= 1) {
+        console.log(`[API] Tentativa de excluir o último Super Admin`);
         return res.status(400).json({ message: 'Não é possível excluir o último Super Admin' });
       }
     }
 
-    // Exclui o usuário
-    await prisma.user.delete({
-      where: { id },
+    // Usa uma transação para garantir que todas as operações sejam concluídas com sucesso
+    await prisma.$transaction(async (tx) => {
+      console.log(`[API] Iniciando transação para excluir usuário ${id} e seus relacionamentos`);
+      
+      // Exclui o perfil de estudante relacionado, se existir
+      if (user.studentProfile) {
+        const studentId = user.studentProfile.id;
+        console.log(`[API] Encontrado perfil de estudante (ID: ${studentId}) relacionado ao usuário ${id}`);
+        
+        // 1. Exclui as matrículas em cursos
+        const courseEnrollments = await tx.courseEnrollment.findMany({
+          where: { studentId }
+        });
+        if (courseEnrollments.length > 0) {
+          console.log(`[API] Excluindo ${courseEnrollments.length} matrículas em cursos do estudante ${studentId}`);
+          await tx.courseEnrollment.deleteMany({
+            where: { studentId }
+          });
+        }
+        
+        // 2. Exclui o progresso em lições
+        const lessonProgress = await tx.lessonProgress.findMany({
+          where: { studentId }
+        });
+        if (lessonProgress.length > 0) {
+          console.log(`[API] Excluindo ${lessonProgress.length} registros de progresso em lições do estudante ${studentId}`);
+          await tx.lessonProgress.deleteMany({
+            where: { studentId }
+          });
+        }
+        
+        // 3. Exclui as tentativas de teste
+        const testAttempts = await tx.testAttempt.findMany({
+          where: { studentId }
+        });
+        if (testAttempts.length > 0) {
+          console.log(`[API] Excluindo ${testAttempts.length} tentativas de teste do estudante ${studentId}`);
+          await tx.testAttempt.deleteMany({
+            where: { studentId }
+          });
+        }
+        
+        // 4. Exclui os logs de acesso
+        const accessLogs = await tx.trainingAccessLog.findMany({
+          where: { studentId }
+        });
+        if (accessLogs.length > 0) {
+          console.log(`[API] Excluindo ${accessLogs.length} logs de acesso do estudante ${studentId}`);
+          await tx.trainingAccessLog.deleteMany({
+            where: { studentId }
+          });
+        }
+        
+        // 5. Finalmente, exclui o perfil de estudante
+        console.log(`[API] Excluindo o perfil de estudante ${studentId}`);
+        await tx.student.delete({
+          where: { id: studentId }
+        });
+      }
+      
+      // Verifica CandidateProgress relacionados a este usuário
+      const candidateProgresses = await tx.candidateProgress.findMany({
+        where: { interviewerId: id }
+      });
+      
+      if (candidateProgresses.length > 0) {
+        console.log(`[API] Atualizando ${candidateProgresses.length} registros de CandidateProgress relacionados ao usuário ${id}`);
+        await tx.candidateProgress.updateMany({
+          where: { interviewerId: id },
+          data: { interviewerId: null }
+        });
+      }
+      
+      // Por fim, exclui o usuário
+      console.log(`[API] Excluindo o usuário ${id}`);
+      await tx.user.delete({
+        where: { id }
+      });
     });
 
+    console.log(`[API] Usuário ${id} excluído com sucesso`);
     return res.status(200).json({ message: 'Usuário excluído com sucesso' });
   } catch (error) {
     console.error('Error deleting user:', error);
-    return res.status(500).json({ message: 'Erro ao excluir usuário' });
+    return res.status(500).json({ 
+      message: 'Erro ao excluir usuário',
+      error: error.message
+    });
   }
 }
