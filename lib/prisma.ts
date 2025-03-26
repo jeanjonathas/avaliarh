@@ -5,10 +5,21 @@ declare global {
   var prisma: PrismaClient | undefined
 }
 
+// Importar o módulo de configuração do banco de dados
+let dbConfig: any;
+try {
+  // Usar require para evitar problemas com importações dinâmicas
+  dbConfig = require('./db-config');
+} catch (error) {
+  console.error('[PRISMA] Erro ao carregar módulo de configuração do banco de dados:', error);
+  // Configuração padrão se não conseguir carregar
+  dbConfig = {
+    getConfig: () => ({ postgresServiceName: 'postgres' })
+  };
+}
+
 // Importar o módulo de lock de banco de dados
 let dbLock: any;
-
-// Carregar o módulo de lock
 try {
   // Usar require para evitar problemas com importações dinâmicas
   dbLock = require('./db-lock');
@@ -20,23 +31,57 @@ try {
   };
 }
 
-// Função para obter a URL do banco de dados com IP fixo
+// Função para obter a URL do banco de dados com o serviço correto
 async function getDatabaseUrl() {
   const originalUrl = process.env.DATABASE_URL || '';
   console.log('[PRISMA] URL original do banco de dados: ' + originalUrl.replace(/:[^:@]+@/, ':****@'));
   
-  // Em produção, vamos bloquear o IP do PostgreSQL
-  if (process.env.NODE_ENV === 'production') {
-    try {
-      // Usar o módulo de lock para obter a URL com IP fixo
-      const lockedUrl = await dbLock.getDatabaseUrlWithLockedIP(originalUrl);
-      return lockedUrl;
-    } catch (error) {
-      console.error('[PRISMA] Erro ao obter URL com IP fixo:', error);
+  try {
+    // Obter a configuração atual
+    const config = dbConfig.getConfig();
+    const postgresServiceName = config.postgresServiceName || 'postgres';
+    
+    console.log(`[PRISMA] Nome do serviço PostgreSQL configurado: ${postgresServiceName}`);
+    
+    // Substituir o host na URL original
+    const urlParts = originalUrl.split('@');
+    if (urlParts.length !== 2) {
+      console.log('[PRISMA] Formato de URL inválido, usando original');
+      return originalUrl;
     }
+    
+    const credentials = urlParts[0]; // postgresql://usuario:senha
+    const hostAndDb = urlParts[1];   // host:porta/banco
+    
+    // Extrair o host da URL
+    const hostParts = hostAndDb.split('/');
+    const hostPort = hostParts[0].split(':');
+    const port = hostPort[1] || '5432';
+    
+    // Reconstruir a URL com o nome do serviço correto
+    const dbName = hostParts.slice(1).join('/');
+    const newUrl = `${credentials}@${postgresServiceName}:${port}/${dbName}`;
+    
+    // Log da URL (com senha ocultada)
+    console.log('[PRISMA] URL modificada com serviço correto: ' + newUrl.replace(/:[^:@]+@/, ':****@'));
+    
+    // Em produção, vamos bloquear o IP do PostgreSQL
+    if (process.env.NODE_ENV === 'production') {
+      try {
+        // Usar o módulo de lock para obter a URL com IP fixo
+        const lockedUrl = await dbLock.getDatabaseUrlWithLockedIP(newUrl);
+        return lockedUrl;
+      } catch (error) {
+        console.error('[PRISMA] Erro ao obter URL com IP fixo:', error);
+        return newUrl;
+      }
+    }
+    
+    return newUrl;
+  } catch (error) {
+    console.error('[PRISMA] Erro ao processar URL do banco de dados:', error);
+    return originalUrl;
   }
-  
-  return originalUrl;
 }
 
 // Configurações para evitar problemas de cache

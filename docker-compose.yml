@@ -4,7 +4,7 @@ services:
     image: node:18
     entrypoint: ["/bin/bash", "-c"]
     command: [
-      "git clone https://github.com/jeanjonathas/avaliarh.git /tmp/app && cd /tmp/app && npm install --no-fund --no-audit --legacy-peer-deps && npx prisma generate && npx prisma migrate deploy && cp /opt/avaliarh/.env /tmp/app/.env && npm run build && NODE_ENV=production npm run start"
+      "git clone https://github.com/jeanjonathas/avaliarh.git /tmp/app && cd /tmp/app && npm install --no-fund --no-audit --legacy-peer-deps && npx prisma generate && cp /opt/avaliarh/.env /tmp/app/.env && node scripts/setup-db-config.js && npx prisma migrate deploy && npx prisma db seed && npm run build && NODE_ENV=production npm run start"
     ]
     environment:
       - DATABASE_URL=postgresql://postgres:02e821629ceff274c853f24327a36132@postgres:5432/avaliacao_candidatos?schema=public
@@ -43,6 +43,7 @@ services:
 
   postgres:
     image: postgres:14
+    container_name: avaliarh_postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
