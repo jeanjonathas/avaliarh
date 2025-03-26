@@ -5,14 +5,38 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { GetServerSideProps } from 'next';
 import versionInfo from '@/src/version';
+import axios from 'axios';
 
 export default function SuperAdminLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isFirstAccess, setIsFirstAccess] = useState(false);
+  const [isCheckingFirstAccess, setIsCheckingFirstAccess] = useState(true);
   const router = useRouter();
   const { data: session, status } = useSession();
+  
+  // Verificar se é o primeiro acesso
+  useEffect(() => {
+    const checkFirstAccess = async () => {
+      try {
+        const response = await axios.get('/api/superadmin/check-first-access');
+        setIsFirstAccess(response.data.isFirstAccess);
+        console.log('[FIRST-ACCESS] Status de primeiro acesso:', response.data.isFirstAccess);
+      } catch (error) {
+        console.error('[FIRST-ACCESS] Erro ao verificar primeiro acesso:', error);
+        setIsFirstAccess(false);
+      } finally {
+        setIsCheckingFirstAccess(false);
+      }
+    };
+    
+    checkFirstAccess();
+  }, []);
   
   // Função para normalizar a URL de callback
   const normalizeCallbackUrl = (url: string | null | undefined): string => {
@@ -75,7 +99,8 @@ export default function SuperAdminLogin() {
     }
   }, [session, status, callbackUrl]);
   
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Handler para login
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
@@ -113,8 +138,56 @@ export default function SuperAdminLogin() {
     }
   };
   
-  // Se estiver carregando a sessão, mostre uma mensagem de carregamento
-  if (status === 'loading') {
+  // Handler para criar o primeiro admin
+  const handleCreateFirstAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccessMessage('');
+    setIsLoading(true);
+    
+    // Validações básicas
+    if (password !== confirmPassword) {
+      setError('As senhas não coincidem');
+      setIsLoading(false);
+      return;
+    }
+    
+    if (password.length < 8) {
+      setError('A senha deve ter pelo menos 8 caracteres');
+      setIsLoading(false);
+      return;
+    }
+    
+    try {
+      console.log('[FIRST-ACCESS] Criando primeiro superadmin:', { name, email });
+      
+      const response = await axios.post('/api/superadmin/create-first-admin', {
+        name,
+        email,
+        password
+      });
+      
+      console.log('[FIRST-ACCESS] Superadmin criado com sucesso:', response.data);
+      setSuccessMessage('Super Administrador criado com sucesso! Agora você pode fazer login.');
+      
+      // Limpar o formulário de cadastro e mostrar o formulário de login
+      setIsFirstAccess(false);
+      
+      // Limpar os campos
+      setName('');
+      setConfirmPassword('');
+      // Manter email e senha para facilitar o login
+      
+    } catch (error: any) {
+      console.error('[FIRST-ACCESS] Erro ao criar superadmin:', error);
+      setError(error.response?.data?.error || 'Ocorreu um erro ao criar o Super Administrador');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Se estiver carregando a sessão ou verificando primeiro acesso, mostre uma mensagem de carregamento
+  if (status === 'loading' || isCheckingFirstAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="p-8 bg-white rounded-lg shadow-md w-full max-w-md">
@@ -130,13 +203,19 @@ export default function SuperAdminLogin() {
   return (
     <>
       <Head>
-        <title>Super Admin Login | Admitto</title>
+        <title>Super Admin {isFirstAccess ? 'Cadastro' : 'Login'} | Admitto</title>
       </Head>
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="p-8 bg-white rounded-lg shadow-md w-full max-w-md">
           <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-gray-800">Login Super Administrador</h2>
-            <p className="text-gray-600">Acesso restrito a Super Administradores</p>
+            <h2 className="text-2xl font-bold text-gray-800">
+              {isFirstAccess ? 'Primeiro Acesso' : 'Login Super Administrador'}
+            </h2>
+            <p className="text-gray-600">
+              {isFirstAccess 
+                ? 'Crie o primeiro Super Administrador do sistema' 
+                : 'Acesso restrito a Super Administradores'}
+            </p>
             <div className="text-xs text-gray-400 mt-2 space-y-1">
               <p>Versão: {versionInfo.commitHash}</p>
               <p>Data/Hora: {versionInfo.commitDate} {versionInfo.commitTime}</p>
@@ -153,45 +232,125 @@ export default function SuperAdminLogin() {
             </div>
           )}
           
-          <form onSubmit={handleSubmit}>
-            <div className="mb-4">
-              <label htmlFor="email" className="block text-gray-700 font-medium mb-2">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
+          {successMessage && (
+            <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
+              {successMessage}
             </div>
-            
-            <div className="mb-6">
-              <label htmlFor="password" className="block text-gray-700 font-medium mb-2">
-                Senha
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            
-            <button
-              type="submit"
-              disabled={isLoading}
-              className={`w-full py-2 px-4 rounded-lg text-white font-medium ${
-                isLoading ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'
-              }`}
-            >
-              {isLoading ? 'Entrando...' : 'Entrar'}
-            </button>
-          </form>
+          )}
+          
+          {isFirstAccess ? (
+            // Formulário de primeiro acesso
+            <form onSubmit={handleCreateFirstAdmin}>
+              <div className="mb-4">
+                <label htmlFor="name" className="block text-gray-700 font-medium mb-2">
+                  Nome
+                </label>
+                <input
+                  id="name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label htmlFor="email" className="block text-gray-700 font-medium mb-2">
+                  Email
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label htmlFor="password" className="block text-gray-700 font-medium mb-2">
+                  Senha
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                  minLength={8}
+                />
+              </div>
+              
+              <div className="mb-6">
+                <label htmlFor="confirmPassword" className="block text-gray-700 font-medium mb-2">
+                  Confirmar Senha
+                </label>
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                  minLength={8}
+                />
+              </div>
+              
+              <button
+                type="submit"
+                disabled={isLoading}
+                className={`w-full py-2 px-4 rounded-lg text-white font-medium ${
+                  isLoading ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'
+                }`}
+              >
+                {isLoading ? 'Criando...' : 'Criar Super Administrador'}
+              </button>
+            </form>
+          ) : (
+            // Formulário de login
+            <form onSubmit={handleLogin}>
+              <div className="mb-4">
+                <label htmlFor="email" className="block text-gray-700 font-medium mb-2">
+                  Email
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              
+              <div className="mb-6">
+                <label htmlFor="password" className="block text-gray-700 font-medium mb-2">
+                  Senha
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              
+              <button
+                type="submit"
+                disabled={isLoading}
+                className={`w-full py-2 px-4 rounded-lg text-white font-medium ${
+                  isLoading ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'
+                }`}
+              >
+                {isLoading ? 'Entrando...' : 'Entrar'}
+              </button>
+            </form>
+          )}
           
           <div className="mt-6 text-center">
             <Link href="/" className="text-blue-600 hover:text-blue-800">
