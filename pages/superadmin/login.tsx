@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import { GetServerSideProps } from 'next';
+import versionInfo from '@/src/version';
 
 export default function SuperAdminLogin() {
   const [email, setEmail] = useState('');
@@ -136,6 +137,7 @@ export default function SuperAdminLogin() {
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold text-gray-800">Login Super Administrador</h2>
             <p className="text-gray-600">Acesso restrito a Super Administradores</p>
+            <p className="text-xs text-gray-400 mt-2">Versão: {versionInfo.commitHash} ({versionInfo.commitDate})</p>
           </div>
           
           {error && (

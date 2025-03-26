@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "generate-version": "node scripts/generate-version.js",
+    "build": "npm run generate-version && next build",
     "start": "next start",
     "lint": "next lint",
     "prisma:generate": "prisma generate",
