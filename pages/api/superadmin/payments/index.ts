@@ -1,25 +1,39 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getSession({ req });
+  try {
+    console.log(`[API] Recebida requisição ${req.method} para /api/superadmin/payments`);
+    
+    const session = await getServerSession(req, res, authOptions);
 
-  // Verifica se o usuário está autenticado e é um SUPER_ADMIN
-  if (!session || (session.user.role as string) !== 'SUPER_ADMIN') {
-    return res.status(401).json({ message: 'Não autorizado' });
-  }
+    // Verificar autenticação e permissão de superadmin
+    if (!session) {
+      console.log('[API] Erro: Usuário não autenticado');
+      return res.status(401).json({ message: 'Não autorizado' });
+    }
+    
+    if ((session.user.role as string) !== 'SUPER_ADMIN') {
+      console.log(`[API] Erro: Usuário não é SUPER_ADMIN (role: ${session.user.role})`);
+      return res.status(401).json({ message: 'Não autorizado' });
+    }
 
-  // Manipula diferentes métodos HTTP
-  switch (req.method) {
-    case 'GET':
-      return getPayments(req, res);
-    case 'POST':
-      return createPayment(req, res);
-    default:
-      return res.status(405).json({ message: 'Método não permitido' });
+    // Manipula diferentes métodos HTTP
+    switch (req.method) {
+      case 'GET':
+        return getPayments(req, res);
+      case 'POST':
+        return createPayment(req, res);
+      default:
+        return res.status(405).json({ message: 'Método não permitido' });
+    }
+  } catch (error) {
+    console.error('Error handling request:', error);
+    return res.status(500).json({ message: 'Erro ao processar requisição' });
   }
 }
 

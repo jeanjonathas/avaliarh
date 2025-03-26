@@ -1,11 +1,12 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import fs from 'fs';
 import path from 'path';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Verifica a autenticação
-  const session = await getSession({ req });
+  const session = await getServerSession(req, res, authOptions);
   if (!session || session.user.role !== 'SUPER_ADMIN') {
     return res.status(401).json({ message: 'Não autorizado' });
   }

@@ -1,24 +1,34 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getSession({ req });
-
-  // Verificar autenticação e permissão de superadmin
-  if (!session || (session.user.role as string) !== 'SUPER_ADMIN') {
-    return res.status(401).json({ message: 'Não autorizado' });
-  }
-
-  const { id } = req.query;
-
-  if (!id || typeof id !== 'string') {
-    return res.status(400).json({ message: 'ID da empresa é obrigatório' });
-  }
-
   try {
+    console.log(`[API] Recebida requisição ${req.method} para /api/superadmin/companies/${req.query.id}/subscription`);
+    
+    const session = await getServerSession(req, res, authOptions);
+
+    // Verificar autenticação e permissão de superadmin
+    if (!session) {
+      console.log('[API] Erro: Usuário não autenticado');
+      return res.status(401).json({ message: 'Não autorizado' });
+    }
+    
+    if ((session.user.role as string) !== 'SUPER_ADMIN') {
+      console.log(`[API] Erro: Usuário não é SUPER_ADMIN (role: ${session.user.role})`);
+      return res.status(401).json({ message: 'Não autorizado' });
+    }
+
+    const { id } = req.query;
+
+    if (!id || typeof id !== 'string') {
+      console.log(`[API] Erro: ID inválido (${id})`);
+      return res.status(400).json({ message: 'ID da empresa é obrigatório' });
+    }
+
     // Verificar se a empresa existe usando métodos nativos do Prisma
     const company = await prisma.company.findUnique({
       where: { id },
@@ -33,6 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     if (!company) {
+      console.log(`[API] Erro: Empresa não encontrada (ID: ${id})`);
       return res.status(404).json({ message: 'Empresa não encontrada' });
     }
 
@@ -85,6 +96,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } = req.body;
 
       if (!status) {
+        console.log('[API] Erro: Status da assinatura é obrigatório');
         return res.status(400).json({ message: 'Status da assinatura é obrigatório' });
       }
 
@@ -96,6 +108,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
         
         if (!plan) {
+          console.log(`[API] Erro: Plano não encontrado (ID: ${planId})`);
           return res.status(404).json({ message: 'Plano não encontrado' });
         }
       }
@@ -189,6 +202,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } else {
         // Verificar se o planId foi fornecido para criar uma nova assinatura
         if (!planId) {
+          console.log('[API] Erro: ID do plano é obrigatório para criar uma nova assinatura');
           return res.status(400).json({ message: 'ID do plano é obrigatório para criar uma nova assinatura' });
         }
 
@@ -280,6 +294,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Método não permitido
+    console.log(`[API] Erro: Método não permitido (${req.method})`);
     return res.status(405).json({ message: 'Método não permitido' });
   } catch (error) {
     console.error('Erro na API de assinatura:', error);

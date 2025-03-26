@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import { PrismaClient } from '@prisma/client';
 import { ReadStream } from 'fs';
 import { join } from 'path';
@@ -7,31 +8,52 @@ import { join } from 'path';
 const prisma = new PrismaClient();
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getSession({ req });
+  try {
+    console.log(`[API] Recebida requisição ${req.method} para /api/superadmin/companies/${req.query.id}`);
+    
+    const session = await getServerSession(req, res, authOptions);
 
-  // Verifica se o usuário está autenticado e é um SUPER_ADMIN
-  if (!session || (session.user.role as string) !== 'SUPER_ADMIN') {
-    return res.status(401).json({ message: 'Não autorizado' });
-  }
+    // Verifica se o usuário está autenticado e é um SUPER_ADMIN
+    if (!session) {
+      console.log('[API] Erro: Usuário não autenticado');
+      return res.status(401).json({ message: 'Não autorizado' });
+    }
+    
+    if ((session.user.role as string) !== 'SUPER_ADMIN') {
+      console.log(`[API] Erro: Usuário não é SUPER_ADMIN (role: ${session.user.role})`);
+      return res.status(401).json({ message: 'Não autorizado' });
+    }
 
-  const { id } = req.query;
+    const { id } = req.query;
 
-  if (!id || typeof id !== 'string') {
-    return res.status(400).json({ message: 'ID da empresa é obrigatório' });
-  }
+    if (!id || typeof id !== 'string') {
+      console.log(`[API] Erro: ID inválido (${id})`);
+      return res.status(400).json({ message: 'ID da empresa é obrigatório' });
+    }
 
-  // Manipula diferentes métodos HTTP
-  switch (req.method) {
-    case 'GET':
-      return getCompany(req, res, id);
-    case 'PUT':
-      return updateCompany(req, res, id);
-    case 'DELETE':
-      return deleteCompany(req, res, id);
-    case 'PATCH':
-      return deactivateCompany(req, res, id);
-    default:
-      return res.status(405).json({ message: 'Método não permitido' });
+    console.log(`[API] Processando requisição ${req.method} para empresa ${id}`);
+
+    // Manipula diferentes métodos HTTP
+    switch (req.method) {
+      case 'GET':
+        return getCompany(req, res, id);
+      case 'PUT':
+        return updateCompany(req, res, id);
+      case 'DELETE':
+        return deleteCompany(req, res, id);
+      case 'PATCH':
+        return deactivateCompany(req, res, id);
+      default:
+        console.log(`[API] Método não permitido: ${req.method}`);
+        return res.status(405).json({ message: 'Método não permitido' });
+    }
+  } catch (error) {
+    console.error('[API] Erro não tratado no handler principal:', error);
+    return res.status(500).json({ 
+      message: 'Erro interno do servidor', 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 }
 
@@ -155,7 +177,10 @@ async function updateCompany(req: NextApiRequest, res: NextApiResponse, id: stri
 // DELETE - Excluir uma empresa
 async function deleteCompany(req: NextApiRequest, res: NextApiResponse, id: string) {
   try {
+    console.log(`[DELETE] Iniciando exclusão da empresa ${id}`);
+    
     // Verifica se a empresa existe
+    console.log(`[DELETE] Verificando se a empresa ${id} existe`);
     const company = await prisma.company.findUnique({
       where: { id },
       include: {
@@ -166,71 +191,82 @@ async function deleteCompany(req: NextApiRequest, res: NextApiResponse, id: stri
     });
 
     if (!company) {
+      console.log(`[DELETE] Erro: Empresa ${id} não encontrada`);
       return res.status(404).json({ message: 'Empresa não encontrada' });
     }
 
+    console.log(`[DELETE] Empresa ${id} encontrada. Nome: ${company.name}`);
+
     // Exporta todos os dados relacionados à empresa antes da exclusão
+    console.log(`[DELETE] Exportando dados da empresa ${id}`);
     const exportData = await exportCompanyData(id);
     
-    // Salva os dados exportados em um arquivo JSON
+    // Gera um nome para o arquivo de exportação (apenas para referência)
     const exportFileName = `company_export_${id}_${Date.now()}.json`;
-    const exportPath = `/tmp/${exportFileName}`;
     
-    // Salva o arquivo localmente (em produção, você pode querer salvar em um serviço de armazenamento como S3)
-    const fs = require('fs');
-    fs.writeFileSync(exportPath, JSON.stringify(exportData, null, 2));
-    
-    console.log(`Dados da empresa exportados para: ${exportPath}`);
+    // Não salvamos mais no sistema de arquivos local
+    console.log(`[DELETE] Dados da empresa ${id} exportados com sucesso`);
 
     // Exclui todos os dados relacionados à empresa usando transação
-    await prisma.$transaction([
-      // Exclui os usuários associados à empresa
-      prisma.user.deleteMany({
-        where: { companyId: id }
-      }),
-      
-      // Exclui as assinaturas associadas à empresa
-      prisma.subscription.deleteMany({
-        where: { companyId: id }
-      }),
-      
-      // Exclui o histórico de pagamentos associado à empresa
-      prisma.paymentHistory.deleteMany({
-        where: { companyId: id }
-      }),
-      
-      // Exclui os processos seletivos associados à empresa
-      prisma.selectionProcess.deleteMany({
-        where: { companyId: id }
-      }),
-      
-      // Exclui os testes associados à empresa
-      prisma.test.deleteMany({
-        where: { companyId: id }
-      }),
-      
-      // Exclui os candidatos associados à empresa
-      prisma.candidate.deleteMany({
-        where: { companyId: id }
-      }),
-      
-      // Finalmente, exclui a empresa
-      prisma.company.delete({
-        where: { id }
-      })
-    ]);
+    console.log(`[DELETE] Iniciando transação para excluir dados da empresa ${id}`);
+    try {
+      await prisma.$transaction([
+        // Exclui os usuários associados à empresa
+        prisma.user.deleteMany({
+          where: { companyId: id }
+        }),
+        
+        // Exclui as assinaturas associadas à empresa
+        prisma.subscription.deleteMany({
+          where: { companyId: id }
+        }),
+        
+        // Exclui o histórico de pagamentos associado à empresa
+        prisma.paymentHistory.deleteMany({
+          where: { companyId: id }
+        }),
+        
+        // Exclui os processos seletivos associados à empresa
+        prisma.selectionProcess.deleteMany({
+          where: { companyId: id }
+        }),
+        
+        // Exclui os testes associados à empresa
+        prisma.test.deleteMany({
+          where: { companyId: id }
+        }),
+        
+        // Exclui os candidatos associados à empresa
+        prisma.candidate.deleteMany({
+          where: { companyId: id }
+        }),
+        
+        // Finalmente, exclui a empresa
+        prisma.company.delete({
+          where: { id }
+        })
+      ]);
+      console.log(`[DELETE] Transação concluída com sucesso. Empresa ${id} excluída.`);
+    } catch (transactionError) {
+      console.error(`[DELETE] Erro na transação:`, transactionError);
+      throw new Error(`Erro ao excluir dados relacionados: ${transactionError.message}`);
+    }
 
-    // Cria uma URL para download do arquivo de exportação
-    const downloadUrl = `/api/superadmin/companies/${id}/export-download?filename=${exportFileName}`;
-
+    // Retorna sucesso e os dados exportados diretamente na resposta
+    console.log(`[DELETE] Retornando resposta de sucesso para exclusão da empresa ${id}`);
     return res.status(200).json({ 
-      message: 'Empresa excluída com sucesso', 
-      exportPath,
-      downloadUrl 
+      message: 'Empresa excluída com sucesso',
+      exportData: JSON.stringify(exportData).length > 1000 ? 
+        { message: 'Dados exportados com sucesso (muito grandes para exibir)' } : 
+        exportData
     });
   } catch (error) {
-    console.error('Erro ao excluir empresa:', error);
-    return res.status(500).json({ message: 'Erro ao excluir empresa', error: error.message });
+    console.error(`[DELETE] Erro ao excluir empresa ${id}:`, error);
+    return res.status(500).json({ 
+      message: 'Erro ao excluir empresa', 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 }
 
