@@ -9,26 +9,14 @@ declare global {
 function getDatabaseUrl() {
   const originalUrl = process.env.DATABASE_URL || '';
   
-  // Em produção, precisamos especificar o contêiner correto
+  // Em produção, precisamos garantir que a conexão seja feita com o contêiner correto
   if (process.env.NODE_ENV === 'production') {
-    // Vamos modificar apenas o host, mantendo as credenciais originais
-    // Formato típico: postgresql://usuario:senha@host:porta/banco
-    const urlParts = originalUrl.split('@');
-    if (urlParts.length === 2) {
-      const credentials = urlParts[0]; // postgresql://usuario:senha
-      const hostAndDb = urlParts[1];   // host:porta/banco
-      
-      // Substituir apenas o host pelo nome específico do contêiner
-      const hostParts = hostAndDb.split('/');
-      if (hostParts.length >= 1) {
-        // Substituir 'postgres' por 'avaliarh_postgres.1' apenas no host
-        const newHost = 'avaliarh_postgres.1:5432';
-        const dbName = hostParts.slice(1).join('/');
-        return `${credentials}@${newHost}/${dbName}`;
-      }
-    }
+    // Vamos usar o nome 'postgres' que é o nome do serviço definido no docker-compose
+    // O Docker resolve esse nome para o IP correto dentro da rede interna
+    console.log('[PRISMA] Ambiente de produção detectado');
   }
   
+  console.log('[PRISMA] URL original do banco de dados: ' + originalUrl.replace(/:[^:@]+@/, ':****@'));
   return originalUrl;
 }
 
@@ -38,7 +26,7 @@ const prismaClientSingleton = () => {
   console.log('[PRISMA] Inicializando com URL: ' + dbUrl.replace(/:[^:@]+@/, ':****@'));
   
   return new PrismaClient({
-    log: ['error'],
+    log: ['error', 'query'],
     datasources: {
       db: {
         url: dbUrl,
@@ -57,19 +45,20 @@ globalThis.prisma = prisma
 // Função para forçar a reconexão do Prisma
 export async function reconnectPrisma() {
   try {
+    console.log('[PRISMA] Iniciando reconexão...');
     await prisma.$disconnect()
-    console.log('Prisma desconectado com sucesso')
+    console.log('[PRISMA] Desconectado com sucesso');
     
     // Pequena pausa para garantir desconexão completa
     await new Promise(resolve => setTimeout(resolve, 100))
     
     // Testar a conexão
     const result = await prisma.$queryRaw`SELECT 1 as test`
-    console.log('Prisma reconectado com sucesso')
+    console.log('[PRISMA] Reconectado com sucesso');
     
     return true
   } catch (error) {
-    console.error('Erro ao reconectar Prisma:', error)
+    console.error('[PRISMA] Erro ao reconectar:', error)
     return false
   }
 }
