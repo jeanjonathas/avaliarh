@@ -12,6 +12,7 @@ const validationSchema = (requestPhoto: boolean = true) => Yup.object({
   phone: Yup.string().required('Telefone é obrigatório'),
   position: Yup.string(), // Tornando o campo opcional
   instagram: Yup.string(), // Tornando o campo opcional
+  birthDate: Yup.date(), // Tornando o campo opcional
   photoConsent: requestPhoto 
     ? Yup.boolean().oneOf([true], 'Você precisa concordar com o uso da sua foto para identificação').required()
     : Yup.boolean(),
@@ -23,6 +24,7 @@ interface CandidateData {
   email: string;
   phone?: string;
   position?: string;
+  birthDate?: Date | string;
   testId?: string;
   instagram?: string;
   photoUrl?: string;
@@ -99,6 +101,7 @@ const Introducao: NextPage = () => {
         email: values.email,
         phone: values.phone,
         position: values.position || '',
+        birthDate: values.birthDate || '',
         instagram: values.instagram || '',
         photoUrl: values.photoUrl || '',
         testId: testData?.id || candidateData?.testId,
@@ -218,6 +221,7 @@ const Introducao: NextPage = () => {
     email: candidateData?.email || '',
     phone: candidateData?.phone || '',
     position: candidateData?.position || '',
+    birthDate: candidateData?.birthDate || '',
     instagram: candidateData?.instagram || '',
     photoUrl: candidateData?.photoUrl || '',
     photoConsent: false,
@@ -231,6 +235,7 @@ const Introducao: NextPage = () => {
         email: candidateData.email || '',
         phone: candidateData.phone || '',
         position: candidateData.position || '',
+        birthDate: candidateData.birthDate || '',
         instagram: candidateData.instagram || '',
         photoUrl: candidateData.photoUrl || '',
         photoConsent: false,
@@ -462,6 +467,20 @@ const Introducao: NextPage = () => {
                         placeholder="(00) 00000-0000"
                       />
                       <ErrorMessage name="phone" component="div" className="text-red-500 text-sm mt-1" />
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="birthDate" className="block text-sm font-medium text-secondary-700 mb-1">
+                        Data de Nascimento
+                      </label>
+                      <Field
+                        type="date"
+                        name="birthDate"
+                        id="birthDate"
+                        className="input-field"
+                        placeholder="DD/MM/AAAA"
+                      />
+                      <ErrorMessage name="birthDate" component="div" className="text-red-500 text-sm mt-1" />
                     </div>
                     
                     <div>

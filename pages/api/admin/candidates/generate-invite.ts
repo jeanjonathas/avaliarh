@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { prisma } from '@/lib/prisma';
+import { prisma, reconnectPrisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../../../../lib/auth';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import { sendInviteEmail } from '../../../../lib/email';
 import { generateUniqueInviteCode, saveUsedInviteCode } from '../../../../lib/invites';
 

@@ -31,6 +31,7 @@ const AddCandidatePage = () => {
     email: '',
     phone: '',
     position: '',
+    birthDate: '',
     instagram: '',
     resumeUrl: '',
     testId: '',
@@ -217,6 +218,18 @@ const AddCandidatePage = () => {
                     onChange={(e) => setNewCandidate({ ...newCandidate, position: e.target.value })}
                     className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     placeholder="Cargo ou posição"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-secondary-700 mb-1">
+                    Data de Nascimento
+                  </label>
+                  <input
+                    type="date"
+                    value={newCandidate.birthDate}
+                    onChange={(e) => setNewCandidate({ ...newCandidate, birthDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="DD/MM/AAAA"
                   />
                 </div>
                 <div>

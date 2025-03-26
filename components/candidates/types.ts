@@ -53,6 +53,7 @@ export interface Candidate {
   email: string
   phone?: string
   position?: string
+  birthDate?: string
   status: 'PENDING' | 'APPROVED' | 'REJECTED'
   testDate?: string
   interviewDate?: string

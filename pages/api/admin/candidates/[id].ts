@@ -1,8 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
-import { authOptions } from '../../../../lib/auth'
+import { authOptions } from '@/pages/api/auth/[...nextauth]'
 import { Candidate, Response, Test, Stage, Question, Status, SelectionProcess } from '@prisma/client'
-import { prisma } from '@/lib/prisma'
+import { prisma, reconnectPrisma } from '@/lib/prisma'
 import { generateUniqueInviteCode } from '../../../../lib/invites'
 
 // Função auxiliar para converter BigInt para Number
@@ -53,12 +53,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const session = await getServerSession(req, res, authOptions);
   
   if (!session) {
+    console.log('Erro de autenticação: Sessão não encontrada');
     return res.status(401).json({ error: 'Não autorizado' });
   }
   
-  
-  
   try {
+    // Garantir uma conexão fresca com o banco de dados
+    await reconnectPrisma();
+    
     const { id } = req.query;
     
     if (!id || typeof id !== 'string') {
@@ -119,6 +121,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         email,
         phone,
         position,
+        birthDate,
         status,
         observations,
         testId,
@@ -167,6 +170,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           email,
           phone,
           position,
+          birthDate: birthDate ? new Date(birthDate) : null,
           status: status as Status,
           observations,
           testId: testId || null,

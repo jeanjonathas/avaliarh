@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { format } from 'date-fns'
+import { format, differenceInYears } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Candidate } from '../types'
 import toast from 'react-hot-toast'
@@ -39,6 +39,7 @@ export const CandidateInfoTab = ({ candidate, onUpdate }: CandidateInfoTabProps)
     email: candidate.email || '',
     phone: candidate.phone || '',
     position: candidate.position || '',
+    birthDate: candidate.birthDate || '',
     status: candidate.status || 'PENDING',
     observations: candidate.observations || '',
     testId: candidate.testId || '',
@@ -246,6 +247,22 @@ export const CandidateInfoTab = ({ candidate, onUpdate }: CandidateInfoTabProps)
     setCurrentInviteCode(candidate?.inviteCode || '');
   }, [candidate?.inviteCode]);
 
+  // Função para calcular a idade com base na data de nascimento
+  const calculateAge = (birthDate: string | undefined): number | null => {
+    if (!birthDate) return null;
+    
+    try {
+      const birthDateObj = new Date(birthDate);
+      return differenceInYears(new Date(), birthDateObj);
+    } catch (error) {
+      console.error('Erro ao calcular idade:', error);
+      return null;
+    }
+  };
+
+  // Calcular a idade do candidato
+  const candidateAge = calculateAge(formData.birthDate);
+
   return (
     <div className="space-y-6">
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -301,6 +318,28 @@ export const CandidateInfoTab = ({ candidate, onUpdate }: CandidateInfoTabProps)
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-secondary-300 rounded-md"
               />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-secondary-700 mb-1">
+                Data de Nascimento
+              </label>
+              <input
+                type="date"
+                name="birthDate"
+                value={formData.birthDate}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-secondary-300 rounded-md"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-secondary-700 mb-1">
+                Idade
+              </label>
+              <p className="px-3 py-2 bg-gray-50 rounded-md text-secondary-700">
+                {candidateAge !== null ? candidateAge : 'Não informada'}
+              </p>
             </div>
             
             <div>

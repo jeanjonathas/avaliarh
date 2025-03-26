@@ -199,7 +199,7 @@ export default async function handler(
 
       return res.status(200).json(processedCandidates)
     } else if (req.method === 'POST') {
-      const { name, email, phone, position, testId, instagram } = req.body
+      const { name, email, phone, position, birthDate, testId, instagram } = req.body
 
       if (!name || !email || !testId) {
         return res.status(400).json({ error: 'Nome, email e ID do teste são obrigatórios' })
@@ -212,6 +212,7 @@ export default async function handler(
           email,
           phone: phone || null,
           position: position || null,
+          birthDate: birthDate ? new Date(birthDate) : null,
           instagram: instagram || null,
           company: {
             connect: { id: session.user.companyId }

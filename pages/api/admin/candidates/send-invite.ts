@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { prisma } from '@/lib/prisma';
+import { prisma, reconnectPrisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../../../../lib/auth';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import { sendInviteEmail } from '../../../../lib/email';
 
 
@@ -11,6 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const session = await getServerSession(req, res, authOptions);
   
   if (!session) {
+    console.log('Erro de autenticação: Sessão não encontrada');
     return res.status(401).json({ error: 'Não autorizado' });
   }
   
@@ -19,6 +20,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
   
   try {
+    // Garantir uma conexão fresca com o banco de dados
+    await reconnectPrisma();
+    
     const { candidateId } = req.body;
     
     if (!candidateId) {

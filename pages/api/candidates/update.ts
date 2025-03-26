@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { prisma } from '@/lib/prisma';
+import { prisma, reconnectPrisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next'
-import { authOptions } from '../../../lib/auth'
+import { authOptions } from '@/pages/api/auth/[...nextauth]'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'PUT') {
@@ -9,7 +9,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { id, name, email, phone, position, instagram, photoUrl, fromTest, testId } = req.body
+    // Garantir uma conexão fresca com o banco de dados
+    await reconnectPrisma();
+    
+    const { id, name, email, phone, position, birthDate, instagram, photoUrl, fromTest, testId } = req.body
 
     if (!id || !name || !email) {
       return res.status(400).json({ error: 'ID, nome e email são obrigatórios' })
@@ -19,6 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!fromTest) {
       const session = await getServerSession(req, res, authOptions)
       if (!session) {
+        console.log('Erro de autenticação: Sessão não encontrada');
         return res.status(401).json({ error: 'Não autorizado' })
       }
     }
@@ -40,6 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         email = ${email},
         phone = ${phone || null},
         position = ${position || null},
+        "birthDate" = ${birthDate ? new Date(birthDate) : null},
         instagram = ${instagram || null},
         "photoUrl" = ${photoUrl || null},
         "testId" = ${req.body.testId || existingCandidate.testId},

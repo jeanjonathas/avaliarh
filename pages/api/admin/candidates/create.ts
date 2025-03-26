@@ -1,8 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { Status } from '@prisma/client';
-import { authOptions } from '../../../../lib/auth';
-import { prisma } from '../../../../lib/prisma';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
+import { prisma, reconnectPrisma } from '@/lib/prisma';
 
 // Usar a instância global do Prisma para evitar múltiplas conexões
 
@@ -11,6 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const session = await getServerSession(req, res, authOptions);
   
   if (!session) {
+    console.log('Erro de autenticação: Sessão não encontrada');
     return res.status(401).json({ error: 'Não autorizado' });
   }
   
@@ -19,8 +20,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
   
   try {
+    // Garantir uma conexão fresca com o banco de dados
+    await reconnectPrisma();
+    
     console.log('Recebendo requisição para criar candidato:', req.body);
-    const { name, email, phone, position, instagram, resumeUrl, requestPhoto, showResults, processId, testId } = req.body;
+    const { name, email, phone, position, birthDate, instagram, resumeUrl, requestPhoto, showResults, processId, testId } = req.body;
     
     if (!name || !email) {
       console.error('Erro: Nome e email são obrigatórios');
@@ -49,6 +53,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       email,
       phone: phone || null,
       position: position || null,
+      birthDate: birthDate ? new Date(birthDate) : null,
       status: Status.PENDING, // Usar o enum Status do Prisma
       completed: false,
       inviteAttempts: 0,

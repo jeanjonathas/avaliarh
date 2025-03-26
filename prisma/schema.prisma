@@ -61,6 +61,7 @@ model Candidate {
   email          String
   phone          String?
   position       String?
+  birthDate      DateTime?           // Novo campo para data de nascimento
   testDate       DateTime?
   completed      Boolean             @default(false)
   createdAt      DateTime            @default(now())
