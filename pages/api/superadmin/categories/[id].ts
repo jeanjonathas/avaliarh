@@ -1,24 +1,33 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getSession({ req });
-
-  // Verificar autenticação e permissão de superadmin
-  if (!session || (session.user.role as string) !== 'SUPER_ADMIN') {
-    return res.status(401).json({ message: 'Não autorizado' });
-  }
-
-  const { id } = req.query;
-
-  if (!id || typeof id !== 'string') {
-    return res.status(400).json({ message: 'ID da categoria é obrigatório' });
-  }
-
   try {
+    console.log(`[API] Recebida requisição ${req.method} para /api/superadmin/categories/${req.query.id}`);
+    
+    const session = await getServerSession(req, res, authOptions);
+
+    // Verificar autenticação e permissão de superadmin
+    if (!session) {
+      console.log('[API] Erro: Usuário não autenticado');
+      return res.status(401).json({ message: 'Não autorizado' });
+    }
+    
+    if ((session.user.role as string) !== 'SUPER_ADMIN') {
+      console.log(`[API] Erro: Usuário não é SUPER_ADMIN (role: ${session.user.role})`);
+      return res.status(401).json({ message: 'Não autorizado' });
+    }
+
+    const { id } = req.query;
+
+    if (!id || typeof id !== 'string') {
+      return res.status(400).json({ message: 'ID da categoria é obrigatório' });
+    }
+
     // GET - Obter detalhes de uma categoria específica
     if (req.method === 'GET') {
       const category = await prisma.category.findUnique({
