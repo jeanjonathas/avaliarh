@@ -5,24 +5,43 @@ declare global {
   var prisma: PrismaClient | undefined
 }
 
-// Função para obter a URL do banco de dados correta
-function getDatabaseUrl() {
+// Importar o módulo de lock de banco de dados
+let dbLock: any;
+
+// Carregar o módulo de lock
+try {
+  // Usar require para evitar problemas com importações dinâmicas
+  dbLock = require('./db-lock');
+} catch (error) {
+  console.error('[PRISMA] Erro ao carregar módulo de lock do banco de dados:', error);
+  // Configuração padrão se não conseguir carregar
+  dbLock = {
+    getDatabaseUrlWithLockedIP: async (url: string) => url
+  };
+}
+
+// Função para obter a URL do banco de dados com IP fixo
+async function getDatabaseUrl() {
   const originalUrl = process.env.DATABASE_URL || '';
+  console.log('[PRISMA] URL original do banco de dados: ' + originalUrl.replace(/:[^:@]+@/, ':****@'));
   
-  // Em produção, precisamos garantir que a conexão seja feita com o contêiner correto
+  // Em produção, vamos bloquear o IP do PostgreSQL
   if (process.env.NODE_ENV === 'production') {
-    // Vamos usar o nome 'postgres' que é o nome do serviço definido no docker-compose
-    // O Docker resolve esse nome para o IP correto dentro da rede interna
-    console.log('[PRISMA] Ambiente de produção detectado');
+    try {
+      // Usar o módulo de lock para obter a URL com IP fixo
+      const lockedUrl = await dbLock.getDatabaseUrlWithLockedIP(originalUrl);
+      return lockedUrl;
+    } catch (error) {
+      console.error('[PRISMA] Erro ao obter URL com IP fixo:', error);
+    }
   }
   
-  console.log('[PRISMA] URL original do banco de dados: ' + originalUrl.replace(/:[^:@]+@/, ':****@'));
   return originalUrl;
 }
 
 // Configurações para evitar problemas de cache
-const prismaClientSingleton = () => {
-  const dbUrl = getDatabaseUrl();
+const prismaClientSingleton = async () => {
+  const dbUrl = await getDatabaseUrl();
   console.log('[PRISMA] Inicializando com URL: ' + dbUrl.replace(/:[^:@]+@/, ':****@'));
   
   return new PrismaClient({
@@ -35,14 +54,33 @@ const prismaClientSingleton = () => {
   })
 }
 
-// Usar variável global para garantir uma única instância
-// Funciona tanto em desenvolvimento quanto em produção
-export const prisma = globalThis.prisma || prismaClientSingleton()
+// Inicialização assíncrona do Prisma
+let prismaInstance: PrismaClient;
+
+async function initPrisma() {
+  if (!globalThis.prisma) {
+    console.log('[PRISMA] Inicializando instância do Prisma...');
+    prismaInstance = await prismaClientSingleton();
+    globalThis.prisma = prismaInstance;
+  } else {
+    console.log('[PRISMA] Usando instância global existente do Prisma');
+    prismaInstance = globalThis.prisma;
+  }
+  return prismaInstance;
+}
+
+// Inicialização imediata
+initPrisma().catch(e => {
+  console.error('[PRISMA] Erro na inicialização:', e);
+});
+
+// Exportar a instância do Prisma
+export const prisma = prismaInstance || globalThis.prisma || new PrismaClient();
 
 // Manter a instância global em qualquer ambiente
-globalThis.prisma = prisma
+globalThis.prisma = prisma;
 
-// Função para forçar a reconexão do Prisma
+// Função para forçar a reconexão do Prisma com IP fixo
 export async function reconnectPrisma() {
   try {
     console.log('[PRISMA] Iniciando reconexão...');
@@ -51,6 +89,17 @@ export async function reconnectPrisma() {
     
     // Pequena pausa para garantir desconexão completa
     await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Forçar a resolução do IP novamente
+    if (process.env.NODE_ENV === 'production') {
+      try {
+        const originalUrl = process.env.DATABASE_URL || '';
+        const hostName = originalUrl.split('@')[1]?.split('/')[0]?.split(':')[0] || 'postgres';
+        await dbLock.resolveAndLockPostgresIP(hostName);
+      } catch (error) {
+        console.error('[PRISMA] Erro ao resolver IP do PostgreSQL:', error);
+      }
+    }
     
     // Testar a conexão
     const result = await prisma.$queryRaw`SELECT 1 as test`
