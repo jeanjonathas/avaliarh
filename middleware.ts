@@ -91,6 +91,7 @@ export async function middleware(request: NextRequest) {
     '/api/responses/save-answers',
     '/api/candidates/validate-invite',
     '/teste/*',
+    '/test/*',
     '/api/teste/*',
     '/api/candidates/*',
     '/api/questions',
