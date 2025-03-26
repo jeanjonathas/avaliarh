@@ -72,8 +72,6 @@ declare module "next-auth/jwt" {
 }
 
 // Inicializando o cliente Prisma
-const prisma = new PrismaClient()
-
 // Verifica se o ambiente é de produção
 const isProduction = process.env.NODE_ENV === 'production'
 

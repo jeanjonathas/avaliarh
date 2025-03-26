@@ -55,7 +55,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ error: 'Não autorizado' });
   }
   
-  const prisma = new PrismaClient();
+  
   
   try {
     const { id } = req.query;

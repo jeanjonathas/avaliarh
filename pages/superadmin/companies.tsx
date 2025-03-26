@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { GetServerSideProps } from 'next';
 import { getSession } from 'next-auth/react';
 import SuperAdminLayout from '../../components/SuperAdminLayout';
@@ -54,6 +54,8 @@ const CompaniesPage: React.FC<CompaniesPageProps> = ({ initialCompanies }) => {
   const loadCompanies = async () => {
     setIsLoading(true);
     try {
+      console.log('[FRONTEND] Iniciando carregamento de empresas');
+      
       const response = await fetch('/api/superadmin/companies', {
         credentials: 'include',
         headers: {
@@ -62,15 +64,54 @@ const CompaniesPage: React.FC<CompaniesPageProps> = ({ initialCompanies }) => {
           'Expires': '0'
         },
       });
+      
       if (!response.ok) {
         throw new Error('Falha ao carregar empresas');
       }
+      
       const data = await response.json();
-      setCompanies(data);
+      console.log(`[FRONTEND] Recebidas ${data.length} empresas da API`);
+      
+      // Verificar se há duplicatas nos dados recebidos
+      const uniqueIds = new Set(data.map(company => company.id));
+      console.log(`[FRONTEND] Número de IDs únicos: ${uniqueIds.size}`);
+      
+      if (uniqueIds.size !== data.length) {
+        console.warn('[FRONTEND] ALERTA: Foram encontradas empresas com IDs duplicados!');
+        
+        // Identificar as duplicatas
+        const idCounts: Record<string, number> = {};
+        data.forEach(company => {
+          idCounts[company.id] = (idCounts[company.id] || 0) + 1;
+        });
+        
+        Object.entries(idCounts).forEach(([id, count]) => {
+          if (count as number > 1) {
+            console.warn(`[FRONTEND] ID duplicado: ${id} (${count} ocorrências)`);
+            
+            // Mostrar detalhes das empresas duplicadas
+            const duplicates = data.filter(company => company.id === id);
+            duplicates.forEach((dup, index) => {
+              console.warn(`[FRONTEND] Duplicata #${index + 1} - Nome: ${dup.name}, Plano: ${dup.planType}, Criado em: ${dup.createdAt}`);
+            });
+          }
+        });
+        
+        // Remover duplicatas antes de atualizar o estado
+        console.log('[FRONTEND] Removendo duplicatas antes de atualizar o estado');
+        const uniqueCompanies = Array.from(
+          new Map(data.map((company: CompanyWithRelations) => [company.id, company])).values()
+        ) as CompanyWithRelations[];
+        console.log(`[FRONTEND] Após remoção de duplicatas: ${uniqueCompanies.length} empresas`);
+        setCompanies(uniqueCompanies);
+      } else {
+        setCompanies(data);
+      }
+      
       setError(null);
     } catch (err) {
       setError('Erro ao carregar empresas. Por favor, tente novamente.');
-      console.error(err);
+      console.error('[FRONTEND] Erro ao carregar empresas:', err);
     } finally {
       setIsLoading(false);
     }
@@ -125,7 +166,31 @@ const CompaniesPage: React.FC<CompaniesPageProps> = ({ initialCompanies }) => {
 
   // Carregar empresas quando o componente for montado
   useEffect(() => {
-    loadCompanies();
+    // Limpar o cache do navegador antes de carregar as empresas
+    const clearCache = async () => {
+      console.log('[FRONTEND] Limpando cache antes de carregar empresas');
+      
+      // Limpar cache de API
+      if ('caches' in window) {
+        try {
+          const cacheNames = await window.caches.keys();
+          await Promise.all(
+            cacheNames.map(cacheName => {
+              console.log(`[FRONTEND] Excluindo cache: ${cacheName}`);
+              return window.caches.delete(cacheName);
+            })
+          );
+          console.log('[FRONTEND] Cache limpo com sucesso');
+        } catch (error) {
+          console.error('[FRONTEND] Erro ao limpar cache:', error);
+        }
+      }
+      
+      // Carregar empresas após limpar o cache
+      loadCompanies();
+    };
+    
+    clearCache();
   }, []);
 
   // Função para desativar uma empresa
@@ -247,6 +312,12 @@ const CompaniesPage: React.FC<CompaniesPageProps> = ({ initialCompanies }) => {
     setViewingCompany(null);
   };
 
+  // Função para atualizar a lista de empresas (usada para remover duplicatas)
+  const handleCompaniesUpdate = useCallback((updatedCompanies: CompanyWithRelations[]) => {
+    console.log(`[FRONTEND] Atualizando lista de empresas após remoção de duplicatas. Nova quantidade: ${updatedCompanies.length}`);
+    setCompanies(updatedCompanies);
+  }, []);
+
   return (
     <SuperAdminLayout>
       <div className="container mx-auto px-4">
@@ -298,6 +369,7 @@ const CompaniesPage: React.FC<CompaniesPageProps> = ({ initialCompanies }) => {
             onEdit={handleEditCompany}
             onDelete={handleDeleteClick}
             onView={handleViewCompany}
+            onCompaniesUpdate={handleCompaniesUpdate}
           />
         )}
       </div>

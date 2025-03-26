@@ -1,11 +1,11 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../../lib/auth';
 import { sendInviteEmail } from '../../../../lib/email';
 import { generateUniqueInviteCode, saveUsedInviteCode } from '../../../../lib/invites';
 
-const prisma = new PrismaClient();
+
 
 // Função para gerar código único alfanumérico (obsoleta, usar generateUniqueInviteCode do lib/invites.ts)
 // async function generateUniqueInviteCode(): Promise<string> {

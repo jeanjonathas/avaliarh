@@ -1,11 +1,9 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { ReadStream } from 'fs';
 import { join } from 'path';
-
-const prisma = new PrismaClient();
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -60,7 +58,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 // GET - Obter detalhes de uma empresa específica
 async function getCompany(req: NextApiRequest, res: NextApiResponse, id: string) {
   try {
+    console.log(`[COMPANY] Iniciando busca da empresa ${id} (${new Date().toISOString()})`);
+    
     // Usando métodos nativos do Prisma em vez de $queryRaw
+    console.log(`[COMPANY] Executando consulta Prisma para buscar empresa ${id}`);
     const company = await prisma.company.findUnique({
       where: { id },
       select: {
@@ -87,10 +88,15 @@ async function getCompany(req: NextApiRequest, res: NextApiResponse, id: string)
     });
 
     if (!company) {
+      console.log(`[COMPANY] Empresa ${id} não encontrada`);
       return res.status(404).json({ message: 'Empresa não encontrada' });
     }
 
+    console.log(`[COMPANY] Empresa ${id} encontrada. Nome: ${company.name}, Plano: ${company.planType}`);
+    console.log(`[COMPANY] Empresa ${id} - Contagens: Usuários=${company._count.users}, Candidatos=${company._count.candidates}`);
+
     // Serializar a empresa para o formato esperado pelo frontend
+    console.log(`[COMPANY] Serializando empresa ${id} para o frontend`);
     const serializedCompany = {
       ...company,
       userCount: company._count.users,
@@ -103,10 +109,32 @@ async function getCompany(req: NextApiRequest, res: NextApiResponse, id: string)
       trialEndDate: company.trialEndDate ? company.trialEndDate.toISOString() : null,
     };
 
+    console.log(`[COMPANY] Retornando empresa ${id} serializada`);
     return res.status(200).json(serializedCompany);
   } catch (error) {
-    console.error('Error fetching company:', error);
+    console.error(`[COMPANY] Erro ao buscar empresa ${id}:`, error);
+    
+    // Verificar se é um erro de conexão com o banco
+    if (error instanceof Error) {
+      console.error(`[COMPANY] Tipo de erro: ${error.name}`);
+      console.error(`[COMPANY] Mensagem de erro: ${error.message}`);
+      
+      // Verificar problemas de case sensitivity
+      if (error.message.includes('column') && error.message.includes('does not exist')) {
+        console.error('[COMPANY] ERRO DE CASE SENSITIVITY DETECTADO!');
+        console.error('[COMPANY] Detalhes do erro:', error.message);
+      }
+      
+      // Verificar problemas de conexão
+      if (error.message.includes('connect') || error.message.includes('connection')) {
+        console.error('[COMPANY] ERRO DE CONEXÃO COM O BANCO DETECTADO!');
+        console.error('[COMPANY] Verifique o pool de conexões e limite de conexões.');
+      }
+    }
+    
     return res.status(500).json({ message: 'Erro ao buscar empresa' });
+  } finally {
+    console.log(`[COMPANY] Finalizando requisição para empresa ${id}, desconectando Prisma (${new Date().toISOString()})`);
   }
 }
 

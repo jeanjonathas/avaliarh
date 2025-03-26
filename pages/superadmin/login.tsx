@@ -137,7 +137,14 @@ export default function SuperAdminLogin() {
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold text-gray-800">Login Super Administrador</h2>
             <p className="text-gray-600">Acesso restrito a Super Administradores</p>
-            <p className="text-xs text-gray-400 mt-2">Versão: {versionInfo.commitHash} ({versionInfo.commitDate})</p>
+            <div className="text-xs text-gray-400 mt-2 space-y-1">
+              <p>Versão: {versionInfo.commitHash}</p>
+              <p>Data/Hora: {versionInfo.commitDate} {versionInfo.commitTime}</p>
+              <p>Branch: {versionInfo.branch}</p>
+              <p>Mensagem: {versionInfo.commitMessage.length > 40 ? 
+                `${versionInfo.commitMessage.substring(0, 40)}...` : 
+                versionInfo.commitMessage}</p>
+            </div>
           </div>
           
           {error && (

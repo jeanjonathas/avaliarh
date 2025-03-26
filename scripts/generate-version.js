@@ -17,8 +17,11 @@ try {
   // Obter a branch atual
   const branch = execSync('git rev-parse --abbrev-ref HEAD').toString().trim();
   
-  // Obter a data do último commit
+  // Obter a data do último commit (apenas a data)
   const commitDate = execSync('git log -1 --format=%cd --date=short').toString().trim();
+  
+  // Obter a hora do último commit (formato HH:MM:SS)
+  const commitTime = execSync('git log -1 --format=%cd --date=format:%H:%M:%S').toString().trim();
   
   // Obter a mensagem do último commit
   const commitMessage = execSync('git log -1 --pretty=%B').toString().trim();
@@ -28,6 +31,7 @@ try {
     commitHash,
     branch,
     commitDate,
+    commitTime,
     commitMessage,
     buildDate: new Date().toISOString(),
   };
@@ -43,6 +47,7 @@ try {
   console.log(`Informações de versão geradas em: ${versionFilePath}`);
   console.log(`Commit: ${commitHash} (${branch})`);
   console.log(`Data: ${commitDate}`);
+  console.log(`Hora: ${commitTime}`);
   console.log(`Mensagem: ${commitMessage}`);
 } catch (error) {
   console.error('Erro ao gerar informações de versão:', error);
@@ -53,6 +58,7 @@ try {
     commitHash: 'desconhecido',
     branch: 'desconhecido',
     commitDate: new Date().toISOString().split('T')[0],
+    commitTime: new Date().toISOString().split('T')[1].split('.')[0],
     commitMessage: 'Informação não disponível',
     buildDate: new Date().toISOString(),
   };

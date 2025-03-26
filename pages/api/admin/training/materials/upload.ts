@@ -3,7 +3,7 @@ import { getSession } from 'next-auth/react';
 import { IncomingForm } from 'formidable';
 import fs from 'fs';
 import path from 'path';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 
 // Configuração para permitir upload de arquivos
 export const config = {
@@ -12,7 +12,7 @@ export const config = {
   },
 };
 
-const prisma = new PrismaClient();
+
 
 // Função para criar diretório se não existir
 const ensureDirectoryExists = (dirPath: string) => {

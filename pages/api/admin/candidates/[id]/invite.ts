@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../../lib/auth'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/prisma';
 import { generateUniqueInviteCode, saveUsedInviteCode } from '../../../../../lib/invites'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -11,7 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ error: 'Não autorizado' });
   }
   
-  const prisma = new PrismaClient();
+  
   
   try {
     const { id } = req.query;

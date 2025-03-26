@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // Definindo a interface Company localmente para evitar problemas de importação
 interface Company {
@@ -24,15 +24,52 @@ interface CompanyListProps {
   onEdit: (company: Company) => void;
   onDelete: (company: Company) => void;
   onView: (companyId: string) => void;
+  onCompaniesUpdate?: (companies: Company[]) => void;
 }
 
 const CompanyList: React.FC<CompanyListProps> = ({ 
   companies, 
   onEdit, 
   onDelete,
-  onView
+  onView,
+  onCompaniesUpdate
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  
+  useEffect(() => {
+    // Verificar se há empresas duplicadas no array de empresas
+    if (companies && companies.length > 0) {
+      console.log(`[FRONTEND] Verificando duplicatas em ${companies.length} empresas`);
+      
+      // Mapear IDs para detectar duplicatas
+      const idMap = new Map();
+      const duplicates = [];
+      
+      companies.forEach(company => {
+        if (idMap.has(company.id)) {
+          console.warn(`[FRONTEND] Empresa duplicada detectada: ${company.name} (ID: ${company.id})`);
+          duplicates.push(company);
+        } else {
+          idMap.set(company.id, company);
+        }
+      });
+      
+      if (duplicates.length > 0) {
+        console.error(`[FRONTEND] Total de empresas duplicadas: ${duplicates.length}`);
+        
+        // Remover duplicatas e atualizar o estado
+        const uniqueCompanies = Array.from(idMap.values());
+        console.log(`[FRONTEND] Removendo duplicatas. Total original: ${companies.length}, Total após remoção: ${uniqueCompanies.length}`);
+        
+        // Se o componente tiver uma função para atualizar empresas, chamar aqui
+        if (onCompaniesUpdate) {
+          onCompaniesUpdate(uniqueCompanies);
+        }
+      } else {
+        console.log(`[FRONTEND] Nenhuma empresa duplicada encontrada`);
+      }
+    }
+  }, [companies, onCompaniesUpdate]);
   
   const filteredCompanies = companies.filter(company => 
     company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -114,7 +151,7 @@ const CompanyList: React.FC<CompanyListProps> = ({
                     {company.candidateCount !== undefined ? company.candidateCount : 0}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(company.createdAt).toLocaleDateString()}
+                    {company.createdAt ? new Date(company.createdAt).toLocaleDateString() : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <button

@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../../lib/auth'
 import formidable from 'formidable'
@@ -11,8 +11,6 @@ export const config = {
     bodyParser: false,
   },
 }
-
-const prisma = new PrismaClient()
 
 // Função para salvar o arquivo
 const saveFile = async (file, candidateId) => {

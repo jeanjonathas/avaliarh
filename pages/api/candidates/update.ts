@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../lib/auth'
 
@@ -8,8 +8,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Método não permitido' })
   }
 
-  const prisma = new PrismaClient()
-  
   try {
     const { id, name, email, phone, position, instagram, photoUrl, fromTest, testId } = req.body
 
