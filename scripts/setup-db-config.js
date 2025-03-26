@@ -5,14 +5,45 @@ const util = require('util');
 const execPromise = util.promisify(exec);
 const dbConfig = require('../lib/db-config');
 
+async function getContainerId() {
+  try {
+    // Tentar obter o ID do contêiner usando o arquivo /proc/self/cgroup
+    if (fs.existsSync('/proc/self/cgroup')) {
+      const cgroupContent = fs.readFileSync('/proc/self/cgroup', 'utf8');
+      const lines = cgroupContent.split('\n');
+      
+      for (const line of lines) {
+        if (line.includes('docker')) {
+          const match = line.match(/[0-9a-f]{12,}/);
+          if (match) {
+            return match[0];
+          }
+        }
+      }
+    }
+    
+    // Método alternativo usando o hostname
+    const { stdout: hostname } = await execPromise('hostname');
+    return hostname.trim();
+  } catch (error) {
+    console.error('Erro ao obter ID do contêiner:', error);
+    return 'desconhecido';
+  }
+}
+
 async function setupDbConfig() {
   console.log('=== CONFIGURAÇÃO DO BANCO DE DADOS ===');
-  console.log('Detectando serviço PostgreSQL...');
   
   try {
+    // Obter e mostrar o ID do contêiner
+    const containerId = await getContainerId();
+    console.log(`ID do contêiner atual: ${containerId}`);
+    
     // Verificar se estamos em um contêiner Docker
     const isInDocker = fs.existsSync('/.dockerenv');
     console.log(`Executando em contêiner Docker: ${isInDocker}`);
+    
+    console.log('Detectando serviço PostgreSQL...');
     
     if (isInDocker) {
       // Dentro do contêiner, usar o nome fixo
