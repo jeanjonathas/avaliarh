@@ -100,6 +100,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           
           // Verificar se o candidato está associado a um processo seletivo e buscar a configuração showResults
           let showResultsToCandidate = candidate.showResults === true; // Valor padrão do candidato
+          let processShowResultsConfig = null; // Armazenar a configuração do processo seletivo
           
           if (candidate.processId) {
             // Buscar a configuração do processo seletivo
@@ -115,10 +116,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             if (process && process.stages.length > 0) {
               // Se qualquer etapa do processo tiver showResultsToCandidate como false, não mostrar resultados
               const allStagesShowResults = process.stages.every(stage => stage.showResultsToCandidate === true);
-              showResultsToCandidate = allStagesShowResults;
+              processShowResultsConfig = allStagesShowResults;
               
-              console.log(`Configuração showResultsToCandidate do processo: ${showResultsToCandidate}`);
+              // A configuração do processo seletivo é soberana
+              showResultsToCandidate = processShowResultsConfig;
+              
+              console.log(`Configuração showResultsToCandidate do processo: ${showResultsToCandidate} (soberana sobre a configuração do candidato)`);
             }
+          } else {
+            console.log(`Candidato não associado a processo seletivo. Usando configuração do candidato: ${showResultsToCandidate}`);
           }
           
           // Combinar os resultados
