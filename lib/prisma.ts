@@ -9,10 +9,24 @@ declare global {
 function getDatabaseUrl() {
   const originalUrl = process.env.DATABASE_URL || '';
   
-  // Em produção, substituir 'postgres' pelo nome específico do contêiner
+  // Em produção, precisamos especificar o contêiner correto
   if (process.env.NODE_ENV === 'production') {
-    // Usar o nome específico do contêiner PostgreSQL do AvaliaRH
-    return originalUrl.replace('postgres:', 'avaliarh_postgres.1:');
+    // Vamos modificar apenas o host, mantendo as credenciais originais
+    // Formato típico: postgresql://usuario:senha@host:porta/banco
+    const urlParts = originalUrl.split('@');
+    if (urlParts.length === 2) {
+      const credentials = urlParts[0]; // postgresql://usuario:senha
+      const hostAndDb = urlParts[1];   // host:porta/banco
+      
+      // Substituir apenas o host pelo nome específico do contêiner
+      const hostParts = hostAndDb.split('/');
+      if (hostParts.length >= 1) {
+        // Substituir 'postgres' por 'avaliarh_postgres.1' apenas no host
+        const newHost = 'avaliarh_postgres.1:5432';
+        const dbName = hostParts.slice(1).join('/');
+        return `${credentials}@${newHost}/${dbName}`;
+      }
+    }
   }
   
   return originalUrl;
@@ -21,7 +35,7 @@ function getDatabaseUrl() {
 // Configurações para evitar problemas de cache
 const prismaClientSingleton = () => {
   const dbUrl = getDatabaseUrl();
-  console.log(`[PRISMA] Inicializando com URL: ${dbUrl.replace(/:[^:@]+@/, ':****@')}`);
+  console.log('[PRISMA] Inicializando com URL: ' + dbUrl.replace(/:[^:@]+@/, ':****@'));
   
   return new PrismaClient({
     log: ['error'],
