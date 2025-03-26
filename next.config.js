@@ -59,6 +59,9 @@ const nextConfig = {
   },
   // Configuração para redirecionamentos
   async redirects() {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cookiePrefix = isProduction ? process.env.NEXT_PUBLIC_COOKIE_PREFIX || 'prod_' : process.env.NEXT_PUBLIC_COOKIE_PREFIX || 'dev_';
+    
     return [
       // Redirecionar para a página de dashboard após login
       {
@@ -66,18 +69,7 @@ const nextConfig = {
         has: [
           {
             type: 'cookie',
-            key: 'next-auth.session-token',
-          },
-        ],
-        destination: '/admin/dashboard',
-        permanent: false,
-      },
-      {
-        source: '/',
-        has: [
-          {
-            type: 'cookie',
-            key: '__Secure-next-auth.session-token',
+            key: `${cookiePrefix}next-auth.session-token`,
           },
         ],
         destination: '/admin/dashboard',
@@ -88,11 +80,21 @@ const nextConfig = {
         has: [
           {
             type: 'cookie',
-            key: 'role',
-            value: '(COMPANY_ADMIN|SUPER_ADMIN)',
+            key: `${cookiePrefix}next-auth.session-token`,
           },
         ],
         destination: '/admin/dashboard',
+        permanent: false,
+      },
+      {
+        source: '/superadmin',
+        has: [
+          {
+            type: 'cookie',
+            key: `${cookiePrefix}next-auth.session-token`,
+          },
+        ],
+        destination: '/superadmin/dashboard',
         permanent: false,
       },
     ]

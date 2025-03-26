@@ -116,10 +116,11 @@ export async function middleware(request: NextRequest) {
     // Obter informações do ambiente
     const host = request.headers.get('host') || 'desconhecido'
     const cookieHeader = request.headers.get('cookie')
-    const hasSecureCookie = cookieHeader?.includes('__Secure-next-auth.session-token')
-    const hasNormalCookie = cookieHeader?.includes('next-auth.session-token')
     const protocol = request.headers.get('x-forwarded-proto') || 'http'
     const isProduction = process.env.NODE_ENV === 'production'
+    const cookiePrefix = isProduction 
+      ? process.env.NEXT_PUBLIC_COOKIE_PREFIX || 'prod_' 
+      : process.env.NEXT_PUBLIC_COOKIE_PREFIX || 'dev_'
     const baseUrl = getBaseUrl(request)
     
     // Obter o token JWT da requisição
@@ -127,7 +128,7 @@ export async function middleware(request: NextRequest) {
       req: request,
       secret: process.env.NEXTAUTH_SECRET,
       secureCookie: isProduction,
-      cookieName: isProduction ? `__Secure-next-auth.session-token` : `next-auth.session-token`,
+      cookieName: `${cookiePrefix}next-auth.session-token`,
     })
     
     // Se o token não existir, redirecionar para a página de login
