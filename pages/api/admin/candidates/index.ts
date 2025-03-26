@@ -75,9 +75,18 @@ export default async function handler(
       // Adicionar filtro por companyId se disponível na sessão
       if (session.user?.companyId) {
         console.log(`[PRISMA] Filtrando candidatos para companyId: ${session.user.companyId}`);
-        whereClause.test = {
-          ...whereClause.test,
-          companyId: session.user.companyId
+        whereClause = {
+          ...whereClause,
+          OR: [
+            {
+              test: {
+                companyId: session.user.companyId
+              }
+            },
+            {
+              testId: null
+            }
+          ]
         }
       } else {
         console.log('[PRISMA] Aviso: companyId não encontrado na sessão');
