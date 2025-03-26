@@ -788,6 +788,23 @@ const TestDetail: NextPage = () => {
     }
   }
 
+  // Função para selecionar ou desmarcar múltiplas perguntas de uma vez
+  const toggleMultipleQuestions = (questionIds: string[], select: boolean) => {
+    if (select) {
+      // Adicionar todas as perguntas que ainda não estão selecionadas
+      const newSelectedQuestions = [...selectedQuestions];
+      questionIds.forEach(id => {
+        if (!newSelectedQuestions.includes(id)) {
+          newSelectedQuestions.push(id);
+        }
+      });
+      setSelectedQuestions(newSelectedQuestions);
+    } else {
+      // Remover todas as perguntas especificadas
+      setSelectedQuestions(selectedQuestions.filter(id => !questionIds.includes(id)));
+    }
+  }
+
   const addQuestionsToStage = async () => {
     if (!selectedStageId || selectedQuestions.length === 0) {
       notify.showError('Selecione pelo menos uma pergunta para adicionar à etapa')
@@ -1146,6 +1163,7 @@ const TestDetail: NextPage = () => {
         availableQuestions={availableQuestions}
         selectedQuestions={selectedQuestions}
         toggleQuestionSelection={toggleQuestionSelection}
+        toggleMultipleQuestions={toggleMultipleQuestions}
         questionLoading={questionLoading}
         availableCategories={availableCategories}
         selectedCategory={selectedCategory}
