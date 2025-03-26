@@ -61,12 +61,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // DELETE - Excluir uma categoria
     if (req.method === 'DELETE') {
-      // Verificar se a categoria está sendo usada em questões
-      const questionsCount = await prisma.$queryRaw`
-        SELECT COUNT(*) 
-        FROM "_CategoryToQuestion" 
-        WHERE "B" = ${id}
-      `.then(result => Number(result[0].count));
+      // Verificar se a categoria está sendo usada em questões usando métodos nativos do Prisma
+      const questionsCount = await prisma.category.findUnique({
+        where: { id },
+        select: {
+          _count: {
+            select: {
+              questions: true
+            }
+          }
+        }
+      }).then(result => result?._count.questions || 0);
 
       if (questionsCount > 0) {
         return res.status(400).json({ 

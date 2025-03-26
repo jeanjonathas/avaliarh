@@ -319,74 +319,59 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     };
   }
 
+  // Criando uma única instância do Prisma Client
   const prisma = new PrismaClient();
   
   try {
-    // Busca estatísticas de empresas
-    const totalCompanies = await prisma.$queryRaw`SELECT COUNT(*) FROM "Company"`.then(
-      (result) => Number(result[0].count)
-    );
-    const activeCompanies = await prisma.$queryRaw`SELECT COUNT(*) FROM "Company" WHERE "isActive" = true`.then(
-      (result) => Number(result[0].count)
-    );
-    const inactiveCompanies = await prisma.$queryRaw`SELECT COUNT(*) FROM "Company" WHERE "isActive" = false`.then(
-      (result) => Number(result[0].count)
-    );
+    // Busca estatísticas de empresas usando métodos nativos do Prisma
+    const totalCompanies = await prisma.company.count();
+    const activeCompanies = await prisma.company.count({
+      where: { isActive: true }
+    });
+    const inactiveCompanies = await prisma.company.count({
+      where: { isActive: false }
+    });
 
-    // Busca estatísticas de planos
-    const companiesByPlan = await prisma.$queryRaw`
-      SELECT "planType", COUNT(*) as count 
-      FROM "Company" 
-      GROUP BY "planType"
-    `.then((results) => 
-      Array.isArray(results) 
-        ? results.map((row: any) => ({ 
-            plan: row.planType, 
-            count: Number(row.count) 
-          }))
-        : []
-    );
+    // Busca estatísticas de planos usando métodos nativos do Prisma
+    const companiesByPlan = await prisma.company.groupBy({
+      by: ['planType'],
+      _count: {
+        planType: true
+      }
+    });
 
     // Converte os resultados para o formato esperado
-    const planStats = companiesByPlan.reduce((acc: Record<string, number>, curr: any) => {
-      acc[curr.plan] = curr.count;
+    const planStats = companiesByPlan.reduce((acc: Record<string, number>, curr) => {
+      acc[curr.planType] = curr._count.planType;
       return acc;
     }, {});
 
-    // Busca estatísticas de usuários
-    const totalUsers = await prisma.$queryRaw`SELECT COUNT(*) FROM "User"`.then(
-      (result) => Number(result[0].count)
-    );
-    const adminUsers = await prisma.$queryRaw`SELECT COUNT(*) FROM "User" WHERE "role" = 'COMPANY_ADMIN'`.then(
-      (result) => Number(result[0].count)
-    );
-    const instructorUsers = await prisma.$queryRaw`SELECT COUNT(*) FROM "User" WHERE "role" = 'INSTRUCTOR'`.then(
-      (result) => Number(result[0].count)
-    );
-    const regularUsers = await prisma.$queryRaw`SELECT COUNT(*) FROM "User" WHERE "role" = 'USER'`.then(
-      (result) => Number(result[0].count)
-    );
+    // Busca estatísticas de usuários usando métodos nativos do Prisma
+    const totalUsers = await prisma.user.count();
+    const adminUsers = await prisma.user.count({
+      where: { role: 'COMPANY_ADMIN' }
+    });
+    const instructorUsers = await prisma.user.count({
+      where: { role: 'INSTRUCTOR' }
+    });
+    const regularUsers = await prisma.user.count({
+      where: { role: 'USER' }
+    });
 
-    // Busca estatísticas de candidatos
-    const totalCandidates = await prisma.$queryRaw`SELECT COUNT(*) FROM "Candidate"`.then(
-      (result) => Number(result[0].count)
-    );
-    const completedCandidates = await prisma.$queryRaw`SELECT COUNT(*) FROM "Candidate" WHERE "completed" = true`.then(
-      (result) => Number(result[0].count)
-    );
-    const pendingCandidates = await prisma.$queryRaw`SELECT COUNT(*) FROM "Candidate" WHERE "completed" = false`.then(
-      (result) => Number(result[0].count)
-    );
+    // Busca estatísticas de candidatos usando métodos nativos do Prisma
+    const totalCandidates = await prisma.candidate.count();
+    const completedCandidates = await prisma.candidate.count({
+      where: { completed: true }
+    });
+    const pendingCandidates = await prisma.candidate.count({
+      where: { completed: false }
+    });
 
-    // Busca estatísticas de testes
-    const totalTests = await prisma.$queryRaw`SELECT COUNT(*) FROM "Test"`.then(
-      (result) => Number(result[0].count)
-    );
+    // Busca estatísticas de testes usando métodos nativos do Prisma
+    const totalTests = await prisma.test.count();
 
-    // Busca estatísticas de processos seletivos
-    const totalProcesses = await prisma.$queryRaw`SELECT COUNT(*) FROM "SelectionProcess"`.then(
-      (result) => Number(result[0].count)
-    );
+    // Busca estatísticas de processos seletivos usando métodos nativos do Prisma
+    const totalProcesses = await prisma.selectionProcess.count();
 
     const stats: DashboardStats = {
       companies: {

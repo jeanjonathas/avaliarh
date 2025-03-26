@@ -15,22 +15,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     // GET - Listar todas as categorias globais
     if (req.method === 'GET') {
-      // Buscar categorias globais com contagem de questões
-      const categories = await prisma.$queryRaw`
-        SELECT 
-          gc.id, 
-          gc.name, 
-          gc.description, 
-          gc."createdAt", 
-          gc."updatedAt",
-          COUNT(DISTINCT gcq."A") as "questionsCount"
-        FROM "GlobalCategory" gc
-        LEFT JOIN "_GlobalCategoryToGlobalQuestion" gcq ON gc.id = gcq."B"
-        GROUP BY gc.id
-        ORDER BY gc.name ASC
-      `;
+      // Buscar categorias globais com contagem de questões usando métodos nativos do Prisma
+      const categories = await prisma.globalCategory.findMany({
+        orderBy: {
+          name: 'asc'
+        },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          createdAt: true,
+          updatedAt: true,
+          _count: {
+            select: {
+              questions: true
+            }
+          }
+        }
+      });
 
-      return res.status(200).json(categories);
+      // Formatar a resposta para manter compatibilidade com o frontend
+      const formattedCategories = categories.map(category => ({
+        ...category,
+        questionsCount: category._count.questions
+      }));
+
+      return res.status(200).json(formattedCategories);
     }
 
     // POST - Criar uma nova categoria global
@@ -41,21 +51,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ message: 'Nome da categoria é obrigatório' });
       }
 
-      // Criar nova categoria global
-      await prisma.$executeRaw`
-        INSERT INTO "GlobalCategory" (id, name, description, "createdAt", "updatedAt")
-        VALUES (uuid_generate_v4(), ${name}, ${description || null}, NOW(), NOW())
-      `;
-      
-      // Buscar a categoria recém-criada
-      const newCategory = await prisma.$queryRaw`
-        SELECT * FROM "GlobalCategory" 
-        WHERE name = ${name}
-        ORDER BY "createdAt" DESC
-        LIMIT 1
-      `;
+      // Criar nova categoria global usando métodos nativos do Prisma
+      const newCategory = await prisma.globalCategory.create({
+        data: {
+          name,
+          description: description || null
+        }
+      });
 
-      return res.status(201).json(Array.isArray(newCategory) ? newCategory[0] : newCategory);
+      return res.status(201).json(newCategory);
     }
 
     // Método não permitido

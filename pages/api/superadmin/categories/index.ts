@@ -15,22 +15,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     // GET - Listar todas as categorias globais
     if (req.method === 'GET') {
-      // Buscar categorias com contagem de questões
-      const categories = await prisma.$queryRaw`
-        SELECT 
-          c.id, 
-          c.name, 
-          c.description, 
-          c."createdAt", 
-          c."updatedAt",
-          COUNT(DISTINCT qc."A") as "questionsCount"
-        FROM "Category" c
-        LEFT JOIN "_CategoryToQuestion" qc ON c.id = qc."B"
-        GROUP BY c.id
-        ORDER BY c.name ASC
-      `;
+      // Buscar categorias com contagem de questões usando métodos nativos do Prisma
+      const categories = await prisma.category.findMany({
+        orderBy: {
+          name: 'asc'
+        },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          createdAt: true,
+          updatedAt: true,
+          _count: {
+            select: {
+              questions: true
+            }
+          }
+        }
+      });
 
-      return res.status(200).json(categories);
+      // Formatar a resposta para manter compatibilidade com o frontend
+      const formattedCategories = categories.map(category => ({
+        ...category,
+        questionsCount: category._count.questions
+      }));
+
+      return res.status(200).json(formattedCategories);
     }
 
     // POST - Criar uma nova categoria global

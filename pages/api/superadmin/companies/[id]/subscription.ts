@@ -19,51 +19,52 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Verificar se a empresa existe
-    const companyResult = await prisma.$queryRaw`
-      SELECT c.*, 
-             s.id as subscription_id, s.status as subscription_status, 
-             s."startDate" as subscription_start_date, s."endDate" as subscription_end_date,
-             s."lastPaymentDate" as subscription_last_payment_date, s."nextPaymentDate" as subscription_next_payment_date,
-             s."planId" as subscription_plan_id,
-             p.id as plan_id, p.name as plan_name, p.price as plan_price
-      FROM "Company" c
-      LEFT JOIN "Subscription" s ON c.id = s."companyId"
-      LEFT JOIN "Plan" p ON s."planId" = p.id OR c."planId" = p.id
-      WHERE c.id = ${id}
-    `;
+    // Verificar se a empresa existe usando métodos nativos do Prisma
+    const company = await prisma.company.findUnique({
+      where: { id },
+      include: {
+        subscription: {
+          include: {
+            plan: true
+          }
+        },
+        plan: true
+      }
+    });
 
-    if (!companyResult || (Array.isArray(companyResult) && companyResult.length === 0)) {
+    if (!company) {
       return res.status(404).json({ message: 'Empresa não encontrada' });
     }
 
-    const company = Array.isArray(companyResult) ? companyResult[0] : companyResult;
-
     // GET - Obter detalhes da assinatura de uma empresa
     if (req.method === 'GET') {
-      // Buscar os pagamentos recentes
-      const recentPayments = await prisma.$queryRaw`
-        SELECT * FROM "PaymentHistory"
-        WHERE "subscriptionId" = ${company.subscription_id}
-        ORDER BY "paymentDate" DESC
-        LIMIT 5
-      `;
+      // Buscar os pagamentos recentes usando métodos nativos do Prisma
+      const recentPayments = await prisma.paymentHistory.findMany({
+        where: {
+          subscriptionId: company.subscription?.id
+        },
+        orderBy: {
+          paymentDate: 'desc'
+        },
+        take: 5
+      });
       
+      // Formatar a resposta para manter compatibilidade com o frontend
       return res.status(200).json({
-        id: company.subscription_id,
+        id: company.subscription?.id,
         companyId: company.id,
         companyName: company.name,
-        planId: company.subscription_plan_id || company.planId,
+        planId: company.subscription?.planId || company.planId,
         plan: {
-          id: company.plan_id,
-          name: company.plan_name,
-          price: company.plan_price
+          id: company.subscription?.plan?.id || company.plan?.id,
+          name: company.subscription?.plan?.name || company.plan?.name,
+          price: company.subscription?.plan?.price || company.plan?.price
         },
-        status: company.subscription_status || 'PENDING',
-        startDate: company.subscription_start_date || null,
-        endDate: company.subscription_end_date || null,
-        lastPaymentDate: company.subscription_last_payment_date || null,
-        nextPaymentDate: company.subscription_next_payment_date || null,
+        status: company.subscription?.status || 'PENDING',
+        startDate: company.subscription?.startDate || null,
+        endDate: company.subscription?.endDate || null,
+        lastPaymentDate: company.subscription?.lastPaymentDate || null,
+        nextPaymentDate: company.subscription?.nextPaymentDate || null,
         recentPayments: recentPayments || [],
       });
     }
@@ -90,90 +91,79 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Verificar se o plano existe, se fornecido
       let plan = null;
       if (planId) {
-        const planResult = await prisma.$queryRaw`
-          SELECT * FROM "Plan" WHERE id = ${planId}
-        `;
+        plan = await prisma.plan.findUnique({
+          where: { id: planId }
+        });
         
-        if (!planResult || (Array.isArray(planResult) && planResult.length === 0)) {
+        if (!plan) {
           return res.status(404).json({ message: 'Plano não encontrado' });
         }
-        
-        plan = Array.isArray(planResult) ? planResult[0] : planResult;
       }
 
       // Verificar se a empresa já tem uma assinatura
-      if (company.subscription_id) {
-        // Atualizar assinatura existente
-        await prisma.$executeRaw`
-          UPDATE "Subscription"
-          SET "planId" = ${planId || company.subscription_plan_id},
-              status = ${status},
-              "startDate" = ${startDate ? new Date(startDate) : company.subscription_start_date},
-              "endDate" = ${endDate ? new Date(endDate) : (status === 'EXPIRED' ? null : company.subscription_end_date)},
-              "lastPaymentDate" = ${lastPaymentDate ? new Date(lastPaymentDate) : company.subscription_last_payment_date},
-              "nextPaymentDate" = ${nextPaymentDate ? new Date(nextPaymentDate) : company.subscription_next_payment_date}
-          WHERE id = ${company.subscription_id}
-        `;
+      if (company.subscription) {
+        // Atualizar assinatura existente usando métodos nativos do Prisma
+        await prisma.subscription.update({
+          where: { id: company.subscription.id },
+          data: {
+            planId: planId || company.subscription.planId,
+            status: status,
+            startDate: startDate ? new Date(startDate) : company.subscription.startDate,
+            endDate: endDate ? new Date(endDate) : (status === 'EXPIRED' ? null : company.subscription.endDate),
+            lastPaymentDate: lastPaymentDate ? new Date(lastPaymentDate) : company.subscription.lastPaymentDate,
+            nextPaymentDate: nextPaymentDate ? new Date(nextPaymentDate) : company.subscription.nextPaymentDate
+          }
+        });
 
         // Registrar o histórico de pagamento se necessário
         if (lastPaymentDate && paymentAmount) {
-          await prisma.$executeRaw`
-            INSERT INTO "PaymentHistory" (
-              id, "companyId", "subscriptionId", amount, "paymentDate", "paymentMethod", status, notes, "createdAt", "updatedAt"
-            ) VALUES (
-              uuid_generate_v4(), ${company.id}, ${company.subscription_id}, 
-              ${parseFloat(paymentAmount) || plan?.price || 0}, 
-              ${new Date(lastPaymentDate)}, 
-              ${paymentMethod || 'MANUAL'}, 
-              ${paymentStatus || 'PAID'}, 
-              ${paymentNotes || `Pagamento registrado via API - ${new Date().toISOString()}`},
-              NOW(), NOW()
-            )
-          `;
+          await prisma.paymentHistory.create({
+            data: {
+              companyId: company.id,
+              subscriptionId: company.subscription.id,
+              amount: parseFloat(paymentAmount) || plan?.price || 0,
+              paymentDate: new Date(lastPaymentDate),
+              paymentMethod: paymentMethod || 'MANUAL',
+              status: paymentStatus || 'PAID',
+              notes: paymentNotes || `Pagamento registrado via API - ${new Date().toISOString()}`
+            }
+          });
         }
 
         // Atualizar a empresa com o novo plano, se fornecido
-        if (planId) {
-          await prisma.$executeRaw`
-            UPDATE "Company"
-            SET "planId" = ${planId},
-                "planType" = ${plan?.name || company.planType},
-                "isActive" = ${status === 'ACTIVE'},
-                "lastPaymentDate" = ${lastPaymentDate ? new Date(lastPaymentDate) : company.lastPaymentDate}
-            WHERE id = ${id}
-          `;
-        } else {
-          // Atualizar apenas o status da empresa
-          await prisma.$executeRaw`
-            UPDATE "Company"
-            SET "isActive" = ${status === 'ACTIVE'},
-                "lastPaymentDate" = ${lastPaymentDate ? new Date(lastPaymentDate) : company.lastPaymentDate}
-            WHERE id = ${id}
-          `;
-        }
+        await prisma.company.update({
+          where: { id },
+          data: {
+            planId: planId || company.planId,
+            planType: plan?.name || company.planType,
+            isActive: status === 'ACTIVE',
+            lastPaymentDate: lastPaymentDate ? new Date(lastPaymentDate) : company.lastPaymentDate
+          }
+        });
 
         // Buscar a empresa atualizada
-        const updatedCompanyResult = await prisma.$queryRaw`
-          SELECT c.*, 
-                 s.id as subscription_id, s.status as subscription_status, 
-                 s."startDate" as subscription_start_date, s."endDate" as subscription_end_date,
-                 s."lastPaymentDate" as subscription_last_payment_date, s."nextPaymentDate" as subscription_next_payment_date,
-                 p.id as plan_id, p.name as plan_name, p.price as plan_price
-          FROM "Company" c
-          LEFT JOIN "Subscription" s ON c.id = s."companyId"
-          LEFT JOIN "Plan" p ON s."planId" = p.id OR c."planId" = p.id
-          WHERE c.id = ${id}
-        `;
+        const updatedCompany = await prisma.company.findUnique({
+          where: { id },
+          include: {
+            subscription: {
+              include: {
+                plan: true
+              }
+            },
+            plan: true
+          }
+        });
 
-        const updatedCompany = Array.isArray(updatedCompanyResult) ? updatedCompanyResult[0] : updatedCompanyResult;
-        
         // Buscar os pagamentos recentes
-        const recentPayments = await prisma.$queryRaw`
-          SELECT * FROM "PaymentHistory"
-          WHERE "subscriptionId" = ${updatedCompany.subscription_id}
-          ORDER BY "paymentDate" DESC
-          LIMIT 5
-        `;
+        const recentPayments = await prisma.paymentHistory.findMany({
+          where: {
+            subscriptionId: updatedCompany.subscription?.id
+          },
+          orderBy: {
+            paymentDate: 'desc'
+          },
+          take: 5
+        });
 
         return res.status(200).json({
           id: updatedCompany.id,
@@ -181,18 +171,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           planType: updatedCompany.planType,
           planId: updatedCompany.planId,
           plan: {
-            id: updatedCompany.plan_id,
-            name: updatedCompany.plan_name,
-            price: updatedCompany.plan_price
+            id: updatedCompany.subscription?.plan?.id || updatedCompany.plan?.id,
+            name: updatedCompany.subscription?.plan?.name || updatedCompany.plan?.name,
+            price: updatedCompany.subscription?.plan?.price || updatedCompany.plan?.price
           },
           isActive: updatedCompany.isActive,
           subscription: {
-            id: updatedCompany.subscription_id,
-            status: updatedCompany.subscription_status,
-            startDate: updatedCompany.subscription_start_date,
-            endDate: updatedCompany.subscription_end_date,
-            lastPaymentDate: updatedCompany.subscription_last_payment_date,
-            nextPaymentDate: updatedCompany.subscription_next_payment_date,
+            id: updatedCompany.subscription?.id,
+            status: updatedCompany.subscription?.status,
+            startDate: updatedCompany.subscription?.startDate,
+            endDate: updatedCompany.subscription?.endDate,
+            lastPaymentDate: updatedCompany.subscription?.lastPaymentDate,
+            nextPaymentDate: updatedCompany.subscription?.nextPaymentDate,
             paymentHistory: recentPayments
           },
         });
@@ -202,82 +192,68 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return res.status(400).json({ message: 'ID do plano é obrigatório para criar uma nova assinatura' });
         }
 
-        // Criar nova assinatura
-        await prisma.$executeRaw`
-          INSERT INTO "Subscription" (
-            id, "companyId", "planId", status, "startDate", "endDate", "lastPaymentDate", "nextPaymentDate", "createdAt", "updatedAt"
-          ) VALUES (
-            uuid_generate_v4(), ${id}, ${planId}, 
-            ${status}, 
-            ${startDate ? new Date(startDate) : new Date()}, 
-            ${endDate ? new Date(endDate) : null}, 
-            ${lastPaymentDate ? new Date(lastPaymentDate) : null}, 
-            ${nextPaymentDate ? new Date(nextPaymentDate) : null},
-            NOW(), NOW()
-          )
-        `;
-
-        // Obter o ID da nova assinatura
-        const newSubscriptionIdResult = await prisma.$queryRaw`
-          SELECT id FROM "Subscription" 
-          WHERE "companyId" = ${id} 
-          ORDER BY "createdAt" DESC 
-          LIMIT 1
-        `;
-        
-        const newSubscriptionId = Array.isArray(newSubscriptionIdResult) && newSubscriptionIdResult.length > 0 
-          ? newSubscriptionIdResult[0].id 
-          : null;
+        // Criar nova assinatura usando métodos nativos do Prisma
+        const newSubscription = await prisma.subscription.create({
+          data: {
+            companyId: id,
+            planId: planId,
+            status: status,
+            startDate: startDate ? new Date(startDate) : new Date(),
+            endDate: endDate ? new Date(endDate) : null,
+            lastPaymentDate: lastPaymentDate ? new Date(lastPaymentDate) : null,
+            nextPaymentDate: nextPaymentDate ? new Date(nextPaymentDate) : null
+          }
+        });
 
         // Registrar o histórico de pagamento se necessário
-        if (lastPaymentDate && paymentAmount && newSubscriptionId) {
-          await prisma.$executeRaw`
-            INSERT INTO "PaymentHistory" (
-              id, "companyId", "subscriptionId", amount, "paymentDate", "paymentMethod", status, notes, "createdAt", "updatedAt"
-            ) VALUES (
-              uuid_generate_v4(), ${id}, ${newSubscriptionId}, 
-              ${parseFloat(paymentAmount) || plan?.price || 0}, 
-              ${new Date(lastPaymentDate)}, 
-              ${paymentMethod || 'MANUAL'}, 
-              ${paymentStatus || 'PAID'}, 
-              ${paymentNotes || `Pagamento inicial registrado via API - ${new Date().toISOString()}`},
-              NOW(), NOW()
-            )
-          `;
+        if (lastPaymentDate && paymentAmount && newSubscription.id) {
+          await prisma.paymentHistory.create({
+            data: {
+              companyId: id,
+              subscriptionId: newSubscription.id,
+              amount: parseFloat(paymentAmount) || plan?.price || 0,
+              paymentDate: new Date(lastPaymentDate),
+              paymentMethod: paymentMethod || 'MANUAL',
+              status: paymentStatus || 'PAID',
+              notes: paymentNotes || `Pagamento inicial registrado via API - ${new Date().toISOString()}`
+            }
+          });
         }
 
         // Atualizar a empresa com o novo plano
-        await prisma.$executeRaw`
-          UPDATE "Company"
-          SET "planId" = ${planId},
-              "planType" = ${plan?.name || company.planType},
-              "isActive" = ${status === 'ACTIVE'},
-              "lastPaymentDate" = ${lastPaymentDate ? new Date(lastPaymentDate) : company.lastPaymentDate}
-          WHERE id = ${id}
-        `;
+        await prisma.company.update({
+          where: { id },
+          data: {
+            planId: planId,
+            planType: plan?.name || company.planType,
+            isActive: status === 'ACTIVE',
+            lastPaymentDate: lastPaymentDate ? new Date(lastPaymentDate) : company.lastPaymentDate
+          }
+        });
 
         // Buscar a empresa atualizada
-        const updatedCompanyResult = await prisma.$queryRaw`
-          SELECT c.*, 
-                 s.id as subscription_id, s.status as subscription_status, 
-                 s."startDate" as subscription_start_date, s."endDate" as subscription_end_date,
-                 s."lastPaymentDate" as subscription_last_payment_date, s."nextPaymentDate" as subscription_next_payment_date,
-                 p.id as plan_id, p.name as plan_name, p.price as plan_price
-          FROM "Company" c
-          LEFT JOIN "Subscription" s ON c.id = s."companyId"
-          LEFT JOIN "Plan" p ON s."planId" = p.id OR c."planId" = p.id
-          WHERE c.id = ${id}
-        `;
+        const updatedCompany = await prisma.company.findUnique({
+          where: { id },
+          include: {
+            subscription: {
+              include: {
+                plan: true
+              }
+            },
+            plan: true
+          }
+        });
 
-        const updatedCompany = Array.isArray(updatedCompanyResult) ? updatedCompanyResult[0] : updatedCompanyResult;
-        
         // Buscar os pagamentos recentes
-        const recentPayments = await prisma.$queryRaw`
-          SELECT * FROM "PaymentHistory"
-          WHERE "subscriptionId" = ${updatedCompany.subscription_id}
-          ORDER BY "paymentDate" DESC
-          LIMIT 5
-        `;
+        const recentPayments = await prisma.paymentHistory.findMany({
+          where: {
+            subscriptionId: updatedCompany.subscription?.id
+          },
+          orderBy: {
+            paymentDate: 'desc'
+          },
+          take: 5
+        });
 
         return res.status(200).json({
           id: updatedCompany.id,
@@ -285,18 +261,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           planType: updatedCompany.planType,
           planId: updatedCompany.planId,
           plan: {
-            id: updatedCompany.plan_id,
-            name: updatedCompany.plan_name,
-            price: updatedCompany.plan_price
+            id: updatedCompany.subscription?.plan?.id || updatedCompany.plan?.id,
+            name: updatedCompany.subscription?.plan?.name || updatedCompany.plan?.name,
+            price: updatedCompany.subscription?.plan?.price || updatedCompany.plan?.price
           },
           isActive: updatedCompany.isActive,
           subscription: {
-            id: updatedCompany.subscription_id,
-            status: updatedCompany.subscription_status,
-            startDate: updatedCompany.subscription_start_date,
-            endDate: updatedCompany.subscription_end_date,
-            lastPaymentDate: updatedCompany.subscription_last_payment_date,
-            nextPaymentDate: updatedCompany.subscription_next_payment_date,
+            id: updatedCompany.subscription?.id,
+            status: updatedCompany.subscription?.status,
+            startDate: updatedCompany.subscription?.startDate,
+            endDate: updatedCompany.subscription?.endDate,
+            lastPaymentDate: updatedCompany.subscription?.lastPaymentDate,
+            nextPaymentDate: updatedCompany.subscription?.nextPaymentDate,
             paymentHistory: recentPayments
           },
         });

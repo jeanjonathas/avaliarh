@@ -322,30 +322,47 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   const prisma = new PrismaClient();
   
   try {
-    // Usando $queryRaw para evitar problemas com o modelo Company no Prisma
-    const companies = await prisma.$queryRaw`
-      SELECT c.*, 
-        (SELECT COUNT(*) FROM "User" WHERE "companyId" = c.id) as "userCount",
-        (SELECT COUNT(*) FROM "Candidate" WHERE "companyId" = c.id) as "candidateCount",
-        (SELECT COUNT(*) FROM "Test" WHERE "companyId" = c.id) as "testCount",
-        (SELECT COUNT(*) FROM "SelectionProcess" WHERE "companyId" = c.id) as "processCount"
-      FROM "Company" c
-      ORDER BY c.name ASC
-    `;
+    // Usando métodos nativos do Prisma em vez de $queryRaw
+    const companies = await prisma.company.findMany({
+      orderBy: {
+        name: 'asc'
+      },
+      select: {
+        id: true,
+        name: true,
+        cnpj: true,
+        planType: true,
+        isActive: true,
+        maxUsers: true,
+        maxCandidates: true,
+        lastPaymentDate: true,
+        trialEndDate: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: {
+          select: {
+            users: true,
+            candidates: true,
+            questions: true, // Usamos questions como proxy para testes
+            processes: true
+          }
+        }
+      }
+    });
 
-    // Serializa as datas para JSON
-    const serializedCompanies = Array.isArray(companies) ? companies.map(company => ({
+    // Serializa as datas para JSON e mapeia os resultados
+    const serializedCompanies = companies.map(company => ({
       ...company,
-      createdAt: company.createdAt ? company.createdAt.toISOString() : null,
-      updatedAt: company.updatedAt ? company.updatedAt.toISOString() : null,
+      createdAt: company.createdAt.toISOString(),
+      updatedAt: company.updatedAt.toISOString(),
       lastPaymentDate: company.lastPaymentDate ? company.lastPaymentDate.toISOString() : null,
       trialEndDate: company.trialEndDate ? company.trialEndDate.toISOString() : null,
-      // Converter valores bigint para number
-      userCount: company.userCount ? Number(company.userCount) : 0,
-      candidateCount: company.candidateCount ? Number(company.candidateCount) : 0,
-      testCount: company.testCount ? Number(company.testCount) : 0,
-      processCount: company.processCount ? Number(company.processCount) : 0
-    })) : [];
+      // Mapear contagens para os nomes esperados pelo componente
+      userCount: company._count.users,
+      candidateCount: company._count.candidates,
+      testCount: company._count.questions, // Usamos questions como proxy para testes
+      processCount: company._count.processes
+    }));
 
     return {
       props: {

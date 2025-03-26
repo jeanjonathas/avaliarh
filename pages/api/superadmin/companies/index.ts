@@ -23,25 +23,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 // GET - Listar todas as empresas
 async function getCompanies(req: NextApiRequest, res: NextApiResponse) {
   try {
-    // Usando $queryRaw para evitar problemas com o modelo Company no Prisma
-    const companies = await prisma.$queryRaw`
-      SELECT c.*, 
-        COALESCE((SELECT COUNT(*) FROM "User" WHERE "companyId" = c.id), 0) as "userCount",
-        COALESCE((SELECT COUNT(*) FROM "Candidate" WHERE "companyId" = c.id), 0) as "candidateCount",
-        COALESCE((SELECT COUNT(*) FROM "Test" WHERE "companyId" = c.id), 0) as "testCount",
-        COALESCE((SELECT COUNT(*) FROM "SelectionProcess" WHERE "companyId" = c.id), 0) as "processCount"
-      FROM "Company" c
-      ORDER BY c.name ASC
-    `;
+    // Usando métodos nativos do Prisma em vez de $queryRaw
+    const companies = await prisma.company.findMany({
+      orderBy: {
+        name: 'asc'
+      },
+      select: {
+        id: true,
+        name: true,
+        cnpj: true,
+        planType: true,
+        isActive: true,
+        maxUsers: true,
+        maxCandidates: true,
+        lastPaymentDate: true,
+        trialEndDate: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: {
+          select: {
+            users: true,
+            candidates: true,
+            questions: true, // Usamos questions como proxy para testes
+            processes: true
+          }
+        }
+      }
+    });
 
-    // Garantir que os valores sejam convertidos para números
-    const formattedCompanies = Array.isArray(companies) ? companies.map(company => ({
+    // Mapear os resultados para o formato esperado pelo frontend
+    const formattedCompanies = companies.map(company => ({
       ...company,
-      userCount: Number(company.userCount || 0),
-      candidateCount: Number(company.candidateCount || 0),
-      testCount: Number(company.testCount || 0),
-      processCount: Number(company.processCount || 0)
-    })) : [];
+      userCount: company._count.users,
+      candidateCount: company._count.candidates,
+      testCount: company._count.questions, // Usamos questions como proxy para testes
+      processCount: company._count.processes
+    }));
 
     return res.status(200).json(formattedCompanies);
   } catch (error) {

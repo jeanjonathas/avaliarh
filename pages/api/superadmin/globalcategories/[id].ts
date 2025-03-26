@@ -21,15 +21,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     // GET - Obter detalhes de uma categoria global específica
     if (req.method === 'GET') {
-      const category = await prisma.$queryRaw`
-        SELECT * FROM "GlobalCategory" WHERE id = ${id}
-      `;
+      const category = await prisma.globalCategory.findUnique({
+        where: { id }
+      });
 
-      if (!category || (Array.isArray(category) && category.length === 0)) {
+      if (!category) {
         return res.status(404).json({ message: 'Categoria global não encontrada' });
       }
 
-      return res.status(200).json(Array.isArray(category) ? category[0] : category);
+      return res.status(200).json(category);
     }
 
     // PUT - Atualizar uma categoria global
@@ -41,29 +41,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         json({ message: 'Nome da categoria é obrigatório' });
       }
 
-      const updatedCategory = await prisma.$executeRaw`
-        UPDATE "GlobalCategory"
-        SET name = ${name}, description = ${description || null}, "updatedAt" = NOW()
-        WHERE id = ${id}
-        RETURNING *
-      `;
+      const updatedCategory = await prisma.globalCategory.update({
+        where: { id },
+        data: {
+          name,
+          description: description || null
+        }
+      });
 
-      // Buscar a categoria atualizada
-      const category = await prisma.$queryRaw`
-        SELECT * FROM "GlobalCategory" WHERE id = ${id}
-      `;
-
-      return res.status(200).json(Array.isArray(category) ? category[0] : category);
+      return res.status(200).json(updatedCategory);
     }
 
     // DELETE - Excluir uma categoria global
     if (req.method === 'DELETE') {
       // Verificar se a categoria está sendo usada em questões globais
-      const questionsCount = await prisma.$queryRaw`
-        SELECT COUNT(*) 
-        FROM "_GlobalCategoryToGlobalQuestion" 
-        WHERE "B" = ${id}
-      `.then(result => Number(result[0].count));
+      const categoryWithCount = await prisma.globalCategory.findUnique({
+        where: { id },
+        select: {
+          _count: {
+            select: {
+              questions: true
+            }
+          }
+        }
+      });
+
+      const questionsCount = categoryWithCount?._count?.questions || 0;
 
       if (questionsCount > 0) {
         return res.status(400).json({ 
@@ -72,9 +75,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Excluir a categoria
-      await prisma.$executeRaw`
-        DELETE FROM "GlobalCategory" WHERE id = ${id}
-      `;
+      await prisma.globalCategory.delete({
+        where: { id }
+      });
 
       return res.status(204).send('');
     }
