@@ -19,7 +19,7 @@ services:
     networks:
       - avaliarh_network
     depends_on:
-      - postgres
+      - avaliarh_postgres
     deploy:
       mode: replicated
       replicas: 1
