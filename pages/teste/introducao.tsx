@@ -230,12 +230,33 @@ const Introducao: NextPage = () => {
   // Atualizar os valores do formulário quando os dados do candidato mudarem
   useEffect(() => {
     if (candidateData) {
+      // Formatar a data de nascimento se estiver em formato de objeto Date
+      let formattedBirthDate = candidateData.birthDate || '';
+      
+      // Verificar se a data de nascimento existe e convertê-la para o formato correto para input type="date"
+      if (candidateData.birthDate) {
+        if (typeof candidateData.birthDate === 'string') {
+          // Se for uma string ISO, converter para o formato YYYY-MM-DD
+          const dateObj = new Date(candidateData.birthDate);
+          if (!isNaN(dateObj.getTime())) {
+            formattedBirthDate = dateObj.toISOString().split('T')[0];
+          } else {
+            formattedBirthDate = candidateData.birthDate;
+          }
+        } else if (candidateData.birthDate instanceof Date) {
+          // Se for um objeto Date, converter para o formato YYYY-MM-DD
+          formattedBirthDate = candidateData.birthDate.toISOString().split('T')[0];
+        }
+      }
+      
+      console.log('Data de nascimento formatada:', formattedBirthDate);
+      
       setFormValues({
         name: candidateData.name || '',
         email: candidateData.email || '',
         phone: candidateData.phone || '',
         position: candidateData.position || '',
-        birthDate: candidateData.birthDate || '',
+        birthDate: formattedBirthDate,
         instagram: candidateData.instagram || '',
         photoUrl: candidateData.photoUrl || '',
         photoConsent: false,
@@ -368,6 +389,28 @@ const Introducao: NextPage = () => {
                 <p>
                   Bem-vindo ao nosso sistema de avaliação de candidatos. Este teste foi desenvolvido para avaliar suas habilidades e competências de forma objetiva e transparente.
                 </p>
+                
+                {/* Mensagem destacada sobre honestidade */}
+                <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 my-6">
+                  <div className="flex items-center mb-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <h2 className="text-xl font-bold text-yellow-800">Compromisso com a Honestidade</h2>
+                  </div>
+                  <p className="text-yellow-700 font-medium mb-2">
+                    Este é um exame de perfil e conhecimentos que deve ser realizado com total honestidade e sem auxílio externo.
+                  </p>
+                  <ul className="list-disc pl-6 text-yellow-700 space-y-1">
+                    <li><strong>Não solicite ajuda</strong> de outras pessoas durante o teste.</li>
+                    <li><strong>Não utilize o Google</strong> ou qualquer outra ferramenta de pesquisa.</li>
+                    <li><strong>Não consulte materiais externos</strong> durante a avaliação.</li>
+                    <li><strong>Responda com sinceridade</strong> - o objetivo é avaliar seu perfil real para garantir a melhor adequação à vaga.</li>
+                  </ul>
+                  <p className="text-yellow-700 mt-2 font-medium">
+                    Lembre-se: respostas honestas resultam em melhores decisões para você e para a empresa.
+                  </p>
+                </div>
                 
                 <h2 className="text-xl font-semibold text-secondary-800">Como funciona:</h2>
                 <ul className="list-disc pl-6 space-y-2">
@@ -536,7 +579,7 @@ const Introducao: NextPage = () => {
                                   }}
                                   className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
                                 >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" stroke="currentColor">
                                     <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                                   </svg>
                                 </button>

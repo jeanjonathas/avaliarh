@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import AdminLayout from '../../components/admin/AdminLayout'
 import { CandidatesTable } from '../../components/candidates'
 import { Candidate } from '../../components/candidates/types'
+import EmptyInviteButton from '../../components/admin/EmptyInviteButton'
 
 const CandidatesPage: NextPage = () => {
   const { data: session, status } = useSession()
@@ -105,15 +106,18 @@ const CandidatesPage: NextPage = () => {
             <h1 className="text-2xl font-bold text-secondary-900">Gerenciar Candidatos</h1>
             <p className="text-secondary-600">Visualize, adicione e gerencie candidatos no sistema</p>
           </div>
-          <button 
-            onClick={handleAddCandidate}
-            className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors flex items-center"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-            </svg>
-            Adicionar Candidato
-          </button>
+          <div className="flex space-x-3">
+            <EmptyInviteButton className="mr-2" />
+            <button 
+              onClick={handleAddCandidate}
+              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors flex items-center"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+              </svg>
+              Adicionar Candidato
+            </button>
+          </div>
         </div>
         
         <div className="bg-white rounded-lg shadow-md p-6">

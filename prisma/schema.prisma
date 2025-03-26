@@ -62,6 +62,7 @@ model Candidate {
   phone          String?
   position       String?
   birthDate      DateTime?           // Novo campo para data de nascimento
+  gender         String?             // Campo para armazenar o sexo do candidato
   testDate       DateTime?
   completed      Boolean             @default(false)
   createdAt      DateTime            @default(now())
@@ -84,6 +85,7 @@ model Candidate {
   score          Int?                @default(0)
   requestPhoto   Boolean             @default(true)
   showResults    Boolean             @default(true)
+  requiresProfileCompletion Boolean  @default(false)  // Indica se o candidato precisa completar o perfil
   instagram      String?
   companyId      String
   overallStatus  ApprovalStatus      @default(PENDING_EVALUATION)

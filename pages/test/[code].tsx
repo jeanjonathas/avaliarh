@@ -48,6 +48,20 @@ export default function TestInviteRedirect() {
           return;
         }
 
+        // Verificar se o candidato precisa completar o perfil
+        if (data.candidate && data.candidate.requiresProfileCompletion) {
+          console.log('Candidato precisa completar o perfil');
+          sessionStorage.setItem('candidateData', JSON.stringify(data.candidate));
+          setStatus('sucesso');
+          setMessage('Código válido! Redirecionando para completar seu perfil...');
+          
+          // Redirecionar para a página de preenchimento de perfil
+          setTimeout(() => {
+            router.push(`/register/${code}`);
+          }, 800);
+          return;
+        }
+
         // Armazenar os dados do candidato na sessão
         sessionStorage.setItem('candidateData', JSON.stringify(data.candidate));
         

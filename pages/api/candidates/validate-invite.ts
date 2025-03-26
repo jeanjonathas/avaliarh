@@ -47,7 +47,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           score,
           "showResults",
           "requestPhoto",
-          "photoUrl"
+          "photoUrl",
+          "requiresProfileCompletion",
+          "birthDate",
+          "gender"
         FROM "Candidate"
         WHERE "inviteCode" = ${inviteCode}
       `;
@@ -415,7 +418,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           score: candidate.score,
           showResults: showResultsToCandidate, // Usar a configuração da etapa do processo
           requestPhoto: requestCandidatePhoto, // Usar a configuração da etapa do processo
-          photoUrl: candidate.photoUrl
+          photoUrl: candidate.photoUrl,
+          requiresProfileCompletion: candidate.requiresProfileCompletion,
+          birthDate: candidate.birthDate,
+          gender: candidate.gender
         },
         test: test,
         securityToken: candidateSecurityToken
