@@ -25,7 +25,6 @@ const AddStageModal: React.FC<AddStageModalProps> = ({ isOpen, onClose, onAdd })
     }
 
     onAdd(newStageName, newStageDescription, newStageQuestionType);
-    resetForm();
   };
 
   const resetForm = () => {

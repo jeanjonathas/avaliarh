@@ -544,29 +544,26 @@ const TestDetail: NextPage = () => {
   };
 
   // Função para adicionar uma etapa ao teste
-  const handleAddStage = async () => {
-    if (!newStageName.trim()) {
+  const handleAddStage = async (name: string, description: string, questionType: string) => {
+    if (!name.trim()) {
       notify.showError('O nome da etapa é obrigatório');
       return;
     }
     
-    if (!newStageQuestionType) {
+    if (!questionType) {
       notify.showError('O tipo de pergunta é obrigatório');
       return;
     }
 
     try {
       await addStage({
-        title: newStageName,
-        description: newStageDescription,
+        title: name,
+        description: description,
         testId: id as string,
-        questionType: newStageQuestionType
+        questionType: questionType
       });
 
-      // Limpar os campos
-      setNewStageName('');
-      setNewStageDescription('');
-      setNewStageQuestionType('');
+      // Fechar o modal
       setShowAddStageModal(false);
 
       // Recarregar os dados do teste
