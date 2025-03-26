@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { getToken } from 'next-auth/jwt'
-import { prisma } from '../../../lib/prisma'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/pages/api/auth/[...nextauth]'
+import { prisma, reconnectPrisma } from '@/lib/prisma'
 
 // Função auxiliar para converter BigInt para Number
 function convertBigIntToNumber(obj: any): any {
@@ -32,20 +33,31 @@ export default async function handler(
   res: NextApiResponse
 ) {
   // Verificar autenticação usando o middleware centralizado
-  const token = await getToken({ req })
-  if (!token) {
+  const session = await getServerSession(req, res, authOptions)
+  
+  // Log para depuração
+  console.log('[PRISMA] Verificando sessão em statistics:', session ? 'Autenticado' : 'Não autenticado');
+  
+  if (!session) {
+    console.log('[PRISMA] Erro de autenticação: Sessão não encontrada');
     return res.status(401).json({ error: 'Não autorizado' })
   }
 
   // Verificar se o usuário tem permissão (COMPANY_ADMIN ou SUPER_ADMIN)
-  if (!['COMPANY_ADMIN', 'SUPER_ADMIN'].includes(token.role as string)) {
+  if (!['COMPANY_ADMIN', 'SUPER_ADMIN'].includes(session.user.role as string)) {
+    console.log(`[PRISMA] Permissão negada: Papel do usuário ${session.user.role} não tem acesso`);
     return res.status(403).json({ error: 'Permissão negada' })
   }
+
+  // Garantir que temos uma conexão fresca com o banco de dados
+  console.log('[PRISMA] Forçando reconexão do Prisma antes de buscar estatísticas');
+  await reconnectPrisma();
 
   if (req.method === 'GET') {
     try {
       // Obter o ID da empresa do token
-      const companyId = token.companyId as string
+      const companyId = session.user.companyId as string
+      console.log(`[PRISMA] Buscando estatísticas para companyId: ${companyId}`);
 
       // Buscar estatísticas de etapas
       const stageStats = await prisma.$queryRaw`

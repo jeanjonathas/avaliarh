@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
-import { authOptions } from '../../../../lib/auth'
-import { prisma } from '@/lib/prisma';
+import { authOptions } from '@/pages/api/auth/[...nextauth]'
+import { prisma, reconnectPrisma } from '@/lib/prisma';
 
 // Definindo a interface para o tipo Response com os campos adicionais
 interface ResponseWithSnapshot {
@@ -52,9 +52,18 @@ export default async function handler(
 ) {
   // Verificar autenticação
   const session = await getServerSession(req, res, authOptions)
+  
+  // Log para depuração
+  console.log('[PRISMA] Verificando sessão:', session ? 'Autenticado' : 'Não autenticado');
+  
   if (!session) {
+    console.log('[PRISMA] Erro de autenticação: Sessão não encontrada');
     return res.status(401).json({ error: 'Não autorizado' })
   }
+
+  // Garantir que temos uma conexão fresca com o banco de dados
+  console.log('[PRISMA] Forçando reconexão do Prisma antes de buscar candidatos');
+  await reconnectPrisma();
 
   try {
     if (req.method === 'GET') {
@@ -62,6 +71,17 @@ export default async function handler(
 
       // Construir o filtro base
       let whereClause: any = {}
+
+      // Adicionar filtro por companyId se disponível na sessão
+      if (session.user?.companyId) {
+        console.log(`[PRISMA] Filtrando candidatos para companyId: ${session.user.companyId}`);
+        whereClause.test = {
+          ...whereClause.test,
+          companyId: session.user.companyId
+        }
+      } else {
+        console.log('[PRISMA] Aviso: companyId não encontrado na sessão');
+      }
 
       // Adicionar filtro por status, se fornecido
       if (status && status !== 'all') {
@@ -76,6 +96,7 @@ export default async function handler(
       // Filtrar apenas candidatos de testes ativos, se solicitado
       if (activeOnly === 'true') {
         whereClause.test = {
+          ...whereClause.test,
           active: true
         }
       }

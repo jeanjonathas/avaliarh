@@ -1,8 +1,8 @@
 /// <reference types="next" />
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
-import { authOptions } from '../../../../lib/auth'
-import { prisma } from '../../../../lib/prisma'
+import { authOptions } from '@/pages/api/auth/[...nextauth]'
+import { prisma, reconnectPrisma } from '@/lib/prisma'
 import crypto from 'crypto';
 
 export default async function handler(
@@ -11,9 +11,18 @@ export default async function handler(
 ) {
   // Verificar autenticação
   const session = await getServerSession(req, res, authOptions)
+  
+  // Log para depuração
+  console.log('[PRISMA] Verificando sessão em questions:', session ? 'Autenticado' : 'Não autenticado');
+  
   if (!session) {
+    console.log('[PRISMA] Erro de autenticação: Sessão não encontrada');
     return res.status(401).json({ error: 'Não autorizado' })
   }
+
+  // Garantir que temos uma conexão fresca com o banco de dados
+  console.log('[PRISMA] Forçando reconexão do Prisma antes de buscar questões');
+  await reconnectPrisma();
 
   if (req.method === 'GET') {
     try {

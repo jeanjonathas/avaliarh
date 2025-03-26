@@ -1,29 +1,41 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getToken } from 'next-auth/jwt';
-import { prisma } from '../../../../lib/prisma';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
+import { prisma, reconnectPrisma } from '@/lib/prisma';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Verificar o token JWT (essa verificação é redundante devido ao middleware, mas mantida por segurança)
-  const token = await getToken({ req });
-  if (!token) {
+  // Verificar autenticação usando o middleware centralizado
+  const session = await getServerSession(req, res, authOptions);
+  
+  // Log para depuração
+  console.log('[PRISMA] Verificando sessão em permissions:', session ? 'Autenticado' : 'Não autenticado');
+  
+  if (!session) {
+    console.log('[PRISMA] Erro de autenticação: Sessão não encontrada');
     return res.status(401).json({ error: 'Não autenticado' });
   }
 
   // Verificar se o usuário tem permissão (COMPANY_ADMIN ou SUPER_ADMIN)
-  const userRole = token.role as string;
+  const userRole = session.user.role as string;
   if (!['COMPANY_ADMIN', 'SUPER_ADMIN'].includes(userRole)) {
+    console.log(`[PRISMA] Permissão negada: Papel do usuário ${userRole} não tem acesso`);
     return res.status(403).json({ error: 'Sem permissão para acessar este recurso' });
   }
 
-  // Obter o ID da empresa do token
-  const companyId = token.companyId as string;
-  // Como o token pode não ter o companyId, vamos buscar o usuário no banco para obter o companyId
+  // Garantir que temos uma conexão fresca com o banco de dados
+  console.log('[PRISMA] Forçando reconexão do Prisma antes de buscar permissões');
+  await reconnectPrisma();
+
+  // Obter o ID da empresa da sessão
+  const companyId = session.user.companyId as string;
+  // Como a sessão pode não ter o companyId, vamos buscar o usuário no banco para obter o companyId
   let effectiveCompanyId = companyId;
   
-  if (!effectiveCompanyId && token.email) {
+  if (!effectiveCompanyId && session.user.email) {
     try {
+      console.log(`[PRISMA] CompanyId não encontrado na sessão, buscando pelo email: ${session.user.email}`);
       const user = await prisma.user.findUnique({
-        where: { email: token.email as string },
+        where: { email: session.user.email as string },
         select: { companyId: true }
       });
       

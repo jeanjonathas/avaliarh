@@ -9,7 +9,7 @@ import DeleteConfirmationAlerts from '../../components/superadmin/DeleteConfirma
 import { PrismaClient } from '@prisma/client';
 
 // Definir interfaces localmente em vez de importar diretamente do Prisma
-interface Company {
+export interface Company {
   id: string;
   name: string;
   cnpj: string | null;
@@ -24,20 +24,33 @@ interface Company {
   updatedAt: Date;
 }
 
-interface CompanyWithRelations extends Company {
+// Interface para o tipo de usuário
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export interface CompanyWithRelations extends Company {
   _count?: {
     users: number;
     candidates: number;
     tests: number;
     processes: number;
   };
+  // Campos para contagens relacionadas
+  users?: User[];
+  // Campos para contagens calculadas pelo frontend
   userCount?: number;
   candidateCount?: number;
   testCount?: number;
   processCount?: number;
+  // Novos campos de contagem direta do backend
+  _userCount?: number;
+  _candidateCount?: number;
 }
 
-interface CompaniesPageProps {
+export interface CompaniesPageProps {
   initialCompanies: CompanyWithRelations[];
 }
 
@@ -348,62 +361,33 @@ const CompaniesPage: React.FC<CompaniesPageProps> = ({ initialCompanies }) => {
 };
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
-  const session = await getSession(context);
-
-  // Verifica se o usuário está autenticado e é um SUPER_ADMIN
-  if (!session || (session.user.role as string) !== 'SUPER_ADMIN') {
-    return {
-      redirect: {
-        destination: '/admin/login',
-        permanent: false,
-      },
-    };
-  }
-
-  // Busca as empresas do banco de dados
-  const prisma = new PrismaClient();
-  
   try {
-    // Usando métodos nativos do Prisma em vez de $queryRaw
-    const companies = await prisma.company.findMany({
-      orderBy: {
-        name: 'asc'
-      },
-      select: {
-        id: true,
-        name: true,
-        cnpj: true,
-        planType: true,
-        isActive: true,
-        maxUsers: true,
-        maxCandidates: true,
-        lastPaymentDate: true,
-        trialEndDate: true,
-        createdAt: true,
-        updatedAt: true,
-        _count: {
-          select: {
-            users: true,
-            candidates: true,
-            questions: true, // Usamos questions como proxy para testes
-            processes: true
-          }
-        }
-      }
-    });
+    const session = await getSession(context);
+    
+    // Verificar autenticação
+    if (!session || !session.user || session.user.role !== 'SUPER_ADMIN') {
+      return {
+        redirect: {
+          destination: '/login',
+          permanent: false,
+        },
+      };
+    }
 
-    // Serializa as datas para JSON e mapeia os resultados
+    // Buscar todas as empresas com contagens relacionadas
+    const response = await fetch(`${process.env.NEXTAUTH_URL}/api/superadmin/companies`);
+    const companies = await response.json();
+
+    // Mapear os resultados para garantir compatibilidade com a interface
     const serializedCompanies = companies.map(company => ({
       ...company,
-      createdAt: company.createdAt.toISOString(),
-      updatedAt: company.updatedAt.toISOString(),
-      lastPaymentDate: company.lastPaymentDate ? company.lastPaymentDate.toISOString() : null,
-      trialEndDate: company.trialEndDate ? company.trialEndDate.toISOString() : null,
-      // Mapear contagens para os nomes esperados pelo componente
-      userCount: company._count.users,
-      candidateCount: company._count.candidates,
-      testCount: company._count.questions, // Usamos questions como proxy para testes
-      processCount: company._count.processes
+      // Usar os novos campos de contagem se disponíveis, caso contrário usar os antigos
+      userCount: company._userCount !== undefined ? company._userCount : 
+                (company._count?.users !== undefined ? company._count.users : 0),
+      candidateCount: company._candidateCount !== undefined ? company._candidateCount : 
+                     (company._count?.candidates !== undefined ? company._count.candidates : 0),
+      testCount: company._count?.questions || 0, // Usamos questions como proxy para testes
+      processCount: company._count?.processes || 0
     }));
 
     return {
@@ -418,8 +402,6 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
         initialCompanies: [],
       },
     };
-  } finally {
-    await prisma.$disconnect();
   }
 };
 

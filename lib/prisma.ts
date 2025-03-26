@@ -1,10 +1,24 @@
 import { PrismaClient } from '@prisma/client'
+import fs from 'fs'
+import { exec } from 'child_process'
 import { getConfig } from './db-config'
-import * as fs from 'fs'
+import * as util from 'util'
 
 // Declarar variável global para o Prisma
 declare global {
   var prisma: PrismaClient | undefined
+}
+
+// Função para verificar se estamos rodando dentro do Docker
+async function isRunningInsideDocker() {
+  try {
+    // Verificar se estamos em um contêiner Docker
+    const isInDocker = fs.existsSync('/.dockerenv')
+    return isInDocker
+  } catch (error) {
+    console.error('[PRISMA] Erro ao verificar se estamos dentro do Docker:', error)
+    return false
+  }
 }
 
 // Função para obter o ID do contêiner
@@ -32,8 +46,6 @@ async function getContainerId() {
     }
     
     // Método alternativo usando o hostname
-    const { exec } = require('child_process')
-    const util = require('util')
     const execPromise = util.promisify(exec)
     const { stdout: hostname } = await execPromise('hostname')
     return hostname.trim()
@@ -54,8 +66,32 @@ async function getDatabaseUrl() {
   const postgresServiceName = config.postgresServiceName
   console.log('[PRISMA] Nome do serviço PostgreSQL configurado:', postgresServiceName)
   
+  // Verificar se estamos em ambiente de desenvolvimento
+  const isDevelopment = process.env.NODE_ENV === 'development'
+  
+  // Verificar se estamos rodando dentro do Docker ou diretamente no host
+  const isRunningInDocker = await isRunningInsideDocker()
+  console.log('[PRISMA] Rodando dentro do Docker:', isRunningInDocker ? 'Sim' : 'Não')
+  
   // Substituir o host na URL pelo nome do serviço configurado
-  const modifiedUrl = originalUrl.replace(/@([^:]+):/, `@${postgresServiceName}:`)
+  let modifiedUrl = originalUrl
+  
+  if (isDevelopment) {
+    if (isRunningInDocker) {
+      // Em desenvolvimento dentro do Docker, usar o nome do serviço
+      modifiedUrl = originalUrl.replace(/@([^:]+):/, `@${postgresServiceName}:`)
+      console.log('[PRISMA] Ambiente de desenvolvimento dentro do Docker, usando serviço:', postgresServiceName)
+    } else {
+      // Em desenvolvimento fora do Docker, usar localhost
+      modifiedUrl = originalUrl.replace(/@([^:]+):/, `@localhost:`)
+      console.log('[PRISMA] Ambiente de desenvolvimento fora do Docker, usando localhost')
+    }
+  } else {
+    // Em produção, usar o nome do serviço fixo
+    modifiedUrl = originalUrl.replace(/@([^:]+):/, `@avaliarh_postgres:`)
+    console.log('[PRISMA] Ambiente de produção detectado, usando serviço: avaliarh_postgres')
+  }
+  
   console.log('[PRISMA] URL modificada com serviço correto:', modifiedUrl.replace(/:([^:@]+)@/, ':****@'))
   
   // Verificar se estamos em um contêiner Docker
@@ -67,12 +103,13 @@ async function getDatabaseUrl() {
       const containerId = await getContainerId()
       console.log('[DB-LOCK] ID do contêiner atual:', containerId)
       
-      const { exec } = require('child_process')
-      const util = require('util')
       const execPromise = util.promisify(exec)
       
-      console.log('[DB-LOCK] Resolvendo IP para o host:', postgresServiceName)
-      const { stdout: hostIp } = await execPromise(`getent hosts ${postgresServiceName}`)
+      // Usar o nome do serviço correto baseado no ambiente
+      const serviceNameToResolve = isDevelopment ? postgresServiceName : 'avaliarh_postgres'
+      console.log('[DB-LOCK] Resolvendo IP para o host:', serviceNameToResolve)
+      
+      const { stdout: hostIp } = await execPromise(`getent hosts ${serviceNameToResolve}`)
       
       if (hostIp && hostIp.trim()) {
         const ip = hostIp.trim().split(/\s+/)[0]
@@ -93,9 +130,16 @@ async function getDatabaseUrl() {
   return modifiedUrl
 }
 
-// Configurações para evitar problemas de cache
-const prismaClientSingleton = async () => {
+/**
+ * Versão melhorada do singleton do Prisma Client
+ * - Evita múltiplas instâncias
+ * - Controle mais preciso do ciclo de vida
+ * - Melhor manipulação do cache
+ */
+const createPrismaClient = async (): Promise<PrismaClient> => {
+  console.log('[PRISMA] Criando nova instância do Prisma Client')
   const dbUrl = await getDatabaseUrl()
+  
   return new PrismaClient({
     log: ['error', 'query'],
     datasources: {
@@ -106,51 +150,131 @@ const prismaClientSingleton = async () => {
   })
 }
 
-// Inicialização do Prisma com padrão singleton
-let prismaInstance: PrismaClient | undefined = undefined
+// Variável local para o singleton
+let prismaInstance: PrismaClient | undefined
 
-// Função para inicializar o Prisma
-async function initPrisma() {
-  if (!globalThis.prisma) {
-    console.log('[PRISMA] Inicializando instância do Prisma...')
-    prismaInstance = await prismaClientSingleton()
-    globalThis.prisma = prismaInstance
-  } else {
-    console.log('[PRISMA] Usando instância global existente do Prisma')
-    prismaInstance = globalThis.prisma
+/**
+ * Obtém a instância atual do Prisma ou cria uma nova se necessário
+ * Esta função não deve ser chamada diretamente - use a exportação 'prisma'
+ */
+export const getPrismaClient = async (): Promise<PrismaClient> => {
+  // Se já temos uma instância local, retorná-la
+  if (prismaInstance) {
+    return prismaInstance
   }
-  return prismaInstance
+  
+  // Se existe uma instância global, usá-la
+  if (globalThis.prisma) {
+    console.log('[PRISMA] Usando instância global existente')
+    prismaInstance = globalThis.prisma
+    return prismaInstance
+  }
+  
+  // Criar nova instância
+  const newInstance = await createPrismaClient()
+  
+  // Armazenar localmente e globalmente
+  prismaInstance = newInstance
+  globalThis.prisma = newInstance
+  
+  return newInstance
 }
 
-// Inicializar o Prisma
-initPrisma().catch(e => {
-  console.error('[PRISMA] Erro na inicialização:', e)
-})
+// Inicializar o Prisma de forma assíncrona
+const prismaClientPromise = getPrismaClient()
 
-// Exportar a instância do Prisma
-export const prisma = globalThis.prisma || prismaInstance || new PrismaClient()
+// Exportar o cliente na forma que pode ser importado sem async/await
+export const prisma = globalThis.prisma || 
+  // Fallback para uma instância nova se necessário, embora isso não deva acontecer
+  // se o código estiver sendo executado corretamente
+  new PrismaClient({
+    log: ['error'],
+    datasources: {
+      db: {
+        url: process.env.NODE_ENV === 'development' 
+          ? `postgresql://postgres:postgres@localhost:5432/avaliarh`
+          : process.env.DATABASE_URL,
+      },
+    },
+  })
 
-// Manter a instância global em qualquer ambiente
+// Garantir que a variável global seja sempre atualizada
 globalThis.prisma = prisma
 
-// Função para forçar a reconexão do Prisma
+/**
+ * Força a reconexão do Prisma Client, limpando o cache
+ * Use esta função quando precisar de dados frescos do banco
+ */
 export async function reconnectPrisma() {
   try {
+    console.log('[PRISMA] Iniciando reconexão para limpar cache...')
+    
+    // Desconectar o cliente Prisma
     await prisma.$disconnect()
-    console.log('[PRISMA] Prisma desconectado com sucesso')
+    console.log('[PRISMA] Desconectado com sucesso')
     
     // Pequena pausa para garantir desconexão completa
     await new Promise(resolve => setTimeout(resolve, 100))
     
-    // Testar a conexão
-    const result = await prisma.$queryRaw`SELECT 1 as test`
-    console.log('[PRISMA] Prisma reconectado com sucesso')
-    
-    return true
+    // Forçar a conexão com uma consulta simples
+    // Usar localhost em ambiente de desenvolvimento
+    if (process.env.NODE_ENV === 'development') {
+      // Criar uma nova instância do Prisma com a URL correta
+      const tempPrisma = new PrismaClient({
+        datasources: {
+          db: {
+            url: `postgresql://postgres:postgres@localhost:5432/avaliarh`
+          }
+        }
+      })
+      
+      // Testar a conexão
+      const result = await tempPrisma.$queryRaw`SELECT 1 as test`
+      console.log('[PRISMA] Reconectado com sucesso usando localhost')
+      
+      // Desconectar a instância temporária
+      await tempPrisma.$disconnect()
+      
+      return true
+    } else {
+      // Em produção, usar a instância global
+      const result = await prisma.$queryRaw`SELECT 1 as test`
+      console.log('[PRISMA] Reconectado com sucesso')
+      
+      return true
+    }
   } catch (error) {
     console.error('[PRISMA] Erro ao reconectar Prisma:', error)
     return false
   }
 }
 
+/**
+ * Função utilitária para executar uma operação com cache limpo
+ * Use quando precisar garantir dados frescos do banco
+ */
+export async function withFreshCache<T>(operation: (client: PrismaClient) => Promise<T>): Promise<T> {
+  try {
+    // Forçar reconexão para limpar cache
+    await reconnectPrisma()
+    
+    // Executar a operação
+    return await operation(prisma)
+  } catch (error) {
+    console.error('[PRISMA] Erro em operação com cache limpo:', error)
+    throw error
+  }
+}
+
+/**
+ * Executa uma consulta SQL direta, evitando o cache do Prisma
+ * Ideal para operações de contagem e outras consultas propensas a problemas de cache
+ */
+export async function directQuery<T>(sql: string, ...params: any[]): Promise<T> {
+  return withFreshCache(async (client) => {
+    return client.$queryRawUnsafe(sql, ...params) as Promise<T>
+  })
+}
+
+// Exportar singleton como default
 export default prisma

@@ -1,9 +1,8 @@
 import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import { PrismaClient, Role } from '@prisma/client'
+import { Role } from '@prisma/client'
+import { prisma } from './prisma'
 import * as bcrypt from 'bcryptjs'
-
-const prisma = new PrismaClient()
 
 // Exportar as opções de autenticação para uso em toda a aplicação
 export const authOptions: NextAuthOptions = {

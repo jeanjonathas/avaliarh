@@ -1,9 +1,10 @@
 import NextAuth, { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { Role } from '@prisma/client'
-import { prisma } from '@/lib/prisma'
+import { prisma, reconnectPrisma } from '@/lib/prisma'
 import * as bcrypt from 'bcryptjs'
 import { NextApiRequest, NextApiResponse } from 'next'
+import { PrismaClient } from '@prisma/client'
 
 // Interface para a empresa
 interface CompanyData {
@@ -148,12 +149,32 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
+        let userPrisma: PrismaClient; // Declaração da variável userPrisma com escopo de bloco
+
         try {
           console.log(`[AUTH INFO] Tentativa de login para: ${credentials.email}`);
           
+          // Forçar reconexão do Prisma para garantir uma conexão fresca
+          console.log(`[AUTH DEBUG] Forçando reconexão do Prisma antes de buscar usuário`);
+          
+          // Em desenvolvimento, criar uma instância temporária com conexão direta para localhost
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`[AUTH DEBUG] Ambiente de desenvolvimento detectado, usando conexão direta com localhost`);
+            userPrisma = new PrismaClient({
+              datasources: {
+                db: {
+                  url: `postgresql://postgres:postgres@localhost:5432/avaliarh`
+                }
+              }
+            });
+          } else {
+            await reconnectPrisma();
+            userPrisma = prisma;
+          }
+          
           // Primeiro, busca o usuário pelo email
           console.log(`[AUTH DEBUG] Buscando usuário com email: ${credentials.email}`);
-          const user = await prisma.user.findUnique({
+          const user = await userPrisma.user.findUnique({
             where: {
               email: credentials.email,
             },
@@ -164,6 +185,7 @@ export const authOptions: NextAuthOptions = {
 
           if (!user) {
             console.error(`[AUTH DEBUG] Usuário não encontrado com email: ${credentials.email}`);
+            
             return null
           }
           
@@ -174,16 +196,16 @@ export const authOptions: NextAuthOptions = {
 
           if (!isPasswordValid) {
             console.error(`[AUTH DEBUG] Senha inválida para usuário: ${user.id}`);
+            
             return null
           }
-          
-          console.log(`[AUTH DEBUG] Senha válida para usuário: ${user.id}`);
 
           // Verifica se a empresa está ativa (para usuários vinculados a empresas)
           if (user.companyId && user.company) {
             console.log(`[AUTH DEBUG] Verificando status da empresa: ${user.company.id}`);
             if (!user.company.isActive) {
               console.error(`[AUTH DEBUG] Empresa inativa: ${user.company.id}`);
+              
               return null
             }
             console.log(`[AUTH DEBUG] Empresa ativa: ${user.company.id}`);
@@ -233,7 +255,14 @@ export const authOptions: NextAuthOptions = {
           
           return null
         } finally {
-          // Não é necessário desconectar o cliente Prisma aqui, pois ele é reutilizado
+          try {
+            // Desconectar a instância temporária se estiver em desenvolvimento
+            if (process.env.NODE_ENV === 'development' && userPrisma !== prisma) {
+              await userPrisma.$disconnect();
+            }
+          } catch (error) {
+            console.error('[AUTH ERROR] Erro ao desconectar Prisma temporário:', error)
+          }
         }
       },
     }),

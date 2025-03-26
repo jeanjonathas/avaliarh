@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { countUsersForCompany } from '@/lib/user-counter';
 
 // Função para normalizar CNPJ (remover formatação)
 function normalizeCNPJ(cnpj: string | null | undefined): string | null {
@@ -76,12 +77,29 @@ async function getCompanies(req: NextApiRequest, res: NextApiResponse) {
     
     // Formatar resultados para o frontend
     console.log(`[COMPANIES] Formatando resultados para o frontend`);
-    const formattedCompanies = companies.map(company => ({
-      ...company,
-      createdAt: company.createdAt?.toISOString() || null,
-      updatedAt: company.updatedAt?.toISOString() || null,
-      lastPaymentDate: company.lastPaymentDate?.toISOString() || null,
-      trialEndDate: company.trialEndDate?.toISOString() || null,
+    
+    // Buscar contagem de usuários para cada empresa usando o contador dedicado
+    const formattedCompanies = await Promise.all(companies.map(async company => {
+      // Usar o contador dedicado para obter o número de usuários
+      const userCount = await countUsersForCompany(company.id);
+      
+      // Contar candidatos usando query raw para evitar problemas de cache
+      const candidateResult = await prisma.$queryRaw`
+        SELECT COUNT(*) as count 
+        FROM "Candidate" 
+        WHERE "companyId" = ${company.id}::uuid
+      `;
+      const candidateCount = parseInt(candidateResult[0].count, 10);
+      
+      return {
+        ...company,
+        createdAt: company.createdAt?.toISOString() || null,
+        updatedAt: company.updatedAt?.toISOString() || null,
+        lastPaymentDate: company.lastPaymentDate?.toISOString() || null,
+        trialEndDate: company.trialEndDate?.toISOString() || null,
+        _userCount: userCount,
+        _candidateCount: candidateCount
+      };
     }));
     
     console.log(`[COMPANIES] Retornando ${formattedCompanies.length} empresas formatadas`);
