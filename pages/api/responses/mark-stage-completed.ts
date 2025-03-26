@@ -146,8 +146,7 @@ export default async function handler(
       }
     });
     
-    // Para cada questão que ainda não tem resposta, criar uma resposta "automática"
-    // com a primeira opção (isso é apenas para marcar como concluído)
+    // Verificar se todas as questões já foram respondidas
     for (const question of questions) {
       // Verificar se já existe uma resposta para esta questão
       const existingResponse = await prisma.response.findFirst({
@@ -157,33 +156,9 @@ export default async function handler(
         }
       });
       
-      // Se não existir resposta e a questão tiver opções, criar uma resposta automática
-      if (!existingResponse && question.options.length > 0) {
-        const selectedOption = question.options[0];
-        
-        try {
-          // Criar a resposta usando o modelo correto do Prisma
-          await prisma.response.create({
-            data: {
-              candidateId: candidateId,
-              questionId: question.id,
-              optionId: selectedOption.id,
-              questionText: question.text || "",
-              optionText: selectedOption.text || "",
-              isCorrect: selectedOption.isCorrect || false,
-              companyId: question.companyId || (await prisma.candidate.findUnique({
-                where: { id: candidateId },
-                select: { companyId: true }
-              })).companyId,
-              stageId: stageUUID,
-              stageName: stageName || ""
-            }
-          });
-          
-          console.log(`Resposta automática criada para a questão ${question.id}`);
-        } catch (error) {
-          console.error('Erro ao criar resposta automática:', error);
-        }
+      // Se não existir resposta, registrar no log mas não criar resposta automática
+      if (!existingResponse) {
+        console.log(`Questão ${question.id} não foi respondida pelo candidato ${candidateId}`);
       }
     }
     

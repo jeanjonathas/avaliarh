@@ -1,5 +1,5 @@
 import { NextPage } from 'next'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -134,6 +134,54 @@ const Conclusao: NextPage = () => {
   const [testMarkedAsCompleted, setTestMarkedAsCompleted] = useState(false)
   const [completionError, setCompletionError] = useState(false)
   
+  // Buscar dados do candidato diretamente do banco de dados
+  const fetchCandidateData = useCallback(async () => {
+    if (candidateId) {
+      try {
+        console.log(`Buscando dados atualizados do candidato ${candidateId}...`);
+        
+        const response = await fetch(`/api/candidates/${candidateId}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Dados do candidato obtidos da API:', data.candidate);
+          
+          if (data.candidate) {
+            // Formatar os dados do candidato antes de atualizar o estado
+            const formattedData = formatCandidateData(data.candidate);
+            console.log('Dados formatados do candidato:', formattedData);
+            
+            // Atualizar os dados do candidato no estado e na sessão
+            setCandidateData(formattedData);
+            
+            // Inicializar o formulário com os dados formatados
+            setFormData({
+              name: formattedData.name || '',
+              email: formattedData.email || '',
+              phone: formattedData.phone || '',
+              position: formattedData.position || '',
+              instagram: formattedData.instagram || ''
+            });
+            
+            // Atualizar os dados na sessão
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem('candidateData', JSON.stringify(formattedData));
+            }
+          }
+        } else {
+          console.error('Erro ao buscar dados do candidato:', await response.text());
+        }
+      } catch (error) {
+        console.error('Erro ao buscar dados do candidato:', error);
+      }
+    }
+  }, [candidateId]);
+  
+  // Buscar dados do candidato quando a página carrega
+  useEffect(() => {
+    fetchCandidateData();
+  }, [fetchCandidateData]);
+
   // Marcar o teste como concluído no banco de dados
   useEffect(() => {
     const markTestAsCompleted = async () => {
@@ -175,6 +223,9 @@ const Conclusao: NextPage = () => {
             if (typeof window !== 'undefined') {
               sessionStorage.setItem('candidateData', JSON.stringify(updatedCandidateData));
             }
+            
+            // Buscar dados atualizados do candidato para garantir que temos os dados mais recentes
+            fetchCandidateData();
           }
           
           // Limpar dados de sessão para evitar acesso posterior
@@ -210,7 +261,7 @@ const Conclusao: NextPage = () => {
     if (candidateId && !testMarkedAsCompleted) {
       markTestAsCompleted()
     }
-  }, [candidateId, testMarkedAsCompleted, candidateData])
+  }, [candidateId, testMarkedAsCompleted, candidateData, fetchCandidateData])
 
   // Reinicializar formData quando o modo de edição é alterado
   useEffect(() => {
@@ -225,53 +276,6 @@ const Conclusao: NextPage = () => {
       });
     }
   }, [isEditMode, candidateData]);
-
-  // Buscar dados do candidato diretamente do banco de dados
-  useEffect(() => {
-    const fetchCandidateData = async () => {
-      if (candidateId) {
-        try {
-          console.log(`Buscando dados atualizados do candidato ${candidateId}...`);
-          
-          const response = await fetch(`/api/candidates/${candidateId}`);
-          
-          if (response.ok) {
-            const data = await response.json();
-            console.log('Dados do candidato obtidos da API:', data.candidate);
-            
-            if (data.candidate) {
-              // Formatar os dados do candidato antes de atualizar o estado
-              const formattedData = formatCandidateData(data.candidate);
-              console.log('Dados formatados do candidato:', formattedData);
-              
-              // Atualizar os dados do candidato no estado e na sessão
-              setCandidateData(formattedData);
-              
-              // Inicializar o formulário com os dados formatados
-              setFormData({
-                name: formattedData.name || '',
-                email: formattedData.email || '',
-                phone: formattedData.phone || '',
-                position: formattedData.position || '',
-                instagram: formattedData.instagram || ''
-              });
-              
-              // Atualizar os dados na sessão
-              if (typeof window !== 'undefined') {
-                sessionStorage.setItem('candidateData', JSON.stringify(formattedData));
-              }
-            }
-          } else {
-            console.error('Erro ao buscar dados do candidato:', await response.text());
-          }
-        } catch (error) {
-          console.error('Erro ao buscar dados do candidato:', error);
-        }
-      }
-    };
-    
-    fetchCandidateData();
-  }, [candidateId]);
 
   // Função para manipular a mudança nos campos do formulário
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -426,15 +430,15 @@ const Conclusao: NextPage = () => {
                             a 15.9155 15.9155 0 0 1 0 31.831
                             a 15.9155 15.9155 0 0 1 0 -31.831"
                           fill="none"
-                          stroke={formatCandidateData(candidateData)?.accuracyRate >= 80 ? "#10b981" : 
-                                  formatCandidateData(candidateData)?.accuracyRate >= 60 ? "#f59e0b" : "#ef4444"}
+                          stroke={candidateData?.accuracyRate >= 80 ? "#10b981" : 
+                                  candidateData?.accuracyRate >= 60 ? "#f59e0b" : "#ef4444"}
                           strokeWidth="3"
-                          strokeDasharray={`${(formatCandidateData(candidateData)?.accuracyRate || 0).toFixed(1)}, 100`}
+                          strokeDasharray={`${(candidateData?.accuracyRate || 0).toFixed(1)}, 100`}
                         />
                       </svg>
                       <div className="absolute inset-0 flex items-center justify-center">
                         <div className="text-center">
-                          <span className="text-3xl font-bold">{(formatCandidateData(candidateData)?.accuracyRate || 0).toFixed(1)}%</span>
+                          <span className="text-3xl font-bold">{(candidateData?.accuracyRate || 0).toFixed(1)}%</span>
                           <p className="text-sm text-gray-500">Acertos</p>
                         </div>
                       </div>
@@ -442,11 +446,11 @@ const Conclusao: NextPage = () => {
                     
                     <div className="text-center">
                       <p className="text-sm text-gray-600 mb-1">
-                        Você acertou <span className="font-semibold">{Math.round((formatCandidateData(candidateData)?.accuracyRate || 0) * (formatCandidateData(candidateData)?.multipleChoiceQuestions || 0) / 100)}</span> de <span className="font-semibold">{formatCandidateData(candidateData)?.multipleChoiceQuestions || 0}</span> questões de múltipla escolha
+                        Você acertou <span className="font-semibold">{Math.round((candidateData?.accuracyRate || 0) * (candidateData?.multipleChoiceQuestions || 0) / 100)}</span> de <span className="font-semibold">{candidateData?.multipleChoiceQuestions || 0}</span> questões de múltipla escolha
                       </p>
-                      {formatCandidateData(candidateData)?.opinionQuestions > 0 && (
+                      {candidateData?.opinionQuestions > 0 && (
                         <p className="text-sm text-gray-600 mb-1">
-                          Você também respondeu <span className="font-semibold">{formatCandidateData(candidateData)?.opinionQuestions || 0}</span> questões opinativas
+                          Você também respondeu <span className="font-semibold">{candidateData?.opinionQuestions || 0}</span> questões opinativas
                         </p>
                       )}
                       <p className="text-sm text-gray-500">
@@ -592,34 +596,34 @@ const Conclusao: NextPage = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-gray-500">Nome</p>
-                      <p className="font-medium">{formatCandidateData(candidateData)?.name}</p>
+                      <p className="font-medium">{candidateData?.name}</p>
                     </div>
                     
                     <div>
                       <p className="text-sm text-gray-500">Email</p>
-                      <p className="font-medium">{formatCandidateData(candidateData)?.email}</p>
+                      <p className="font-medium">{candidateData?.email}</p>
                     </div>
                     
                     <div>
                       <p className="text-sm text-gray-500">Telefone</p>
-                      <p className="font-medium">{formatCandidateData(candidateData)?.phone}</p>
+                      <p className="font-medium">{candidateData?.phone}</p>
                     </div>
                     
                     <div>
                       <p className="text-sm text-gray-500">Cargo</p>
-                      <p className="font-medium">{formatCandidateData(candidateData)?.position}</p>
+                      <p className="font-medium">{candidateData?.position}</p>
                     </div>
                     
                     <div>
                       <p className="text-sm text-gray-500">Instagram</p>
-                      {formatCandidateData(candidateData)?.instagram && formatCandidateData(candidateData)?.instagram !== 'Não informado' ? (
+                      {candidateData?.instagram && candidateData?.instagram !== 'Não informado' ? (
                         <a 
-                          href={`https://instagram.com/${formatCandidateData(candidateData)?.instagram.replace('@', '')}`} 
+                          href={`https://instagram.com/${candidateData?.instagram.replace('@', '')}`} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           className="text-primary-600 hover:underline font-medium"
                         >
-                          {formatCandidateData(candidateData)?.instagram}
+                          {candidateData?.instagram}
                         </a>
                       ) : (
                         <p className="font-medium">Não informado</p>

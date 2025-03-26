@@ -50,7 +50,7 @@ export default async function handler(
 
     // Se o stageId for um número (como "1"), buscar a etapa com essa ordem
     if (/^\d+$/.test(stageId as string)) {
-      const order = parseInt(stageId as string, 10) - 1; // Converter para base 0
+      const order = parseInt(stageId as string, 10);
       console.log(`Buscando etapa com ordem ${order}`);
       
       const stageWithOrder = testStages.find(ts => ts.order === order);

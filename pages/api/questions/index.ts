@@ -135,8 +135,11 @@ export default async function handler(
         
         if (isOrderNumber) {
           // Se stageId é um número, encontrar a etapa correspondente à ordem no teste
-          const order = parseInt(stageId);
-          console.log(`Buscando etapa com ordem ${order} no teste ${testId}`);
+          // Ajustar o ID da etapa para corresponder à ordem no banco de dados
+          // Se o ID for um número (como "1"), precisamos ajustar para buscar a etapa com ordem (n-1)
+          const originalOrder = parseInt(stageId);
+          const order = originalOrder - 1;
+          console.log(`Buscando etapa com ordem ${order} no teste ${testId} (ID original: ${originalOrder})`);
           
           // Verificar se a ordem está dentro do intervalo válido
           if (order <= 0 || order > testStages.length) {
@@ -201,7 +204,12 @@ export default async function handler(
         console.log(`Fallback: buscando etapa diretamente ${isOrderNumber ? `com ordem ${stageId}` : `com ID ${stageId}`}`);
         
         if (isOrderNumber) {
-          const order = parseInt(stageId);
+          // Ajustar o ID da etapa para corresponder à ordem no banco de dados
+          // Se o ID for um número (como "1"), precisamos ajustar para buscar a etapa com ordem (n-1)
+          const originalOrder = parseInt(stageId);
+          const order = originalOrder - 1;
+          console.log(`Resultado da busca direta por ordem ${order} (ID original: ${originalOrder})`);
+          
           stage = await prisma.stage.findFirst({
             where: { order },
           });

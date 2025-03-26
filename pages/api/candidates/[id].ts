@@ -33,7 +33,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         "photoUrl",
         "requestPhoto",
         "showResults",
-        score
+        score,
+        score as "accuracyRate"
       FROM "Candidate"
       WHERE id = ${id}
     `;
@@ -44,9 +45,51 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'Candidato não encontrado' });
     }
     
+    // Buscar as respostas do candidato para contar o número de questões
+    const responses = await prisma.response.findMany({
+      where: { candidateId: id },
+      select: {
+        id: true,
+        questionId: true,
+        questionType: true,
+        question: {
+          select: {
+            id: true,
+            type: true
+          }
+        }
+      }
+    });
+    
+    // Separar as respostas por tipo de questão
+    const multipleChoiceResponses = responses.filter(r => {
+      // Verificar primeiro no questionType
+      if (r.questionType) {
+        return r.questionType === 'MULTIPLE_CHOICE';
+      }
+      // Por último, verificar na relação question
+      return r.question?.type === 'MULTIPLE_CHOICE';
+    });
+    
+    const opinionResponses = responses.filter(r => {
+      // Verificar primeiro no questionType
+      if (r.questionType) {
+        return r.questionType === 'OPINION_MULTIPLE';
+      }
+      // Por último, verificar na relação question
+      return r.question?.type === 'OPINION_MULTIPLE';
+    });
+    
+    // Adicionar informações adicionais ao candidato
+    const candidateWithDetails = {
+      ...candidate,
+      multipleChoiceQuestions: multipleChoiceResponses.length,
+      opinionQuestions: opinionResponses.length
+    };
+    
     return res.status(200).json({ 
       success: true,
-      candidate
+      candidate: candidateWithDetails
     });
   } catch (error) {
     console.error('Erro ao buscar candidato:', error);
