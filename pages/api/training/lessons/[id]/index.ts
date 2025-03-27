@@ -32,6 +32,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const userId = session.user.id;
 
     // Verificar se o usuário é um estudante
+    // Garantir que a conexão com o banco de dados esteja ativa
+    await reconnectPrisma();
     const student = await prisma.student.findUnique({
       where: { userId }
     });

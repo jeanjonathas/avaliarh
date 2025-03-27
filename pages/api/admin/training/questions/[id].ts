@@ -43,6 +43,8 @@ export default async function handler(
       console.log('Buscando pergunta de treinamento com SQL raw');
       
       // Buscar a pergunta pelo ID
+      // Garantir que a conexão com o banco de dados esteja ativa
+      await reconnectPrisma();
       const questionResult = await prisma.$queryRaw`
         SELECT q.* FROM "Question" q
         WHERE q.id = ${id}

@@ -254,10 +254,8 @@ const GlobalQuestions: NextPage = () => {
         
         <div className="mb-6 flex justify-between items-center">
           <div>
-            <Link href="/superadmin/categories">
-              <a className="text-indigo-600 hover:text-indigo-900">
-                Gerenciar Categorias
-              </a>
+            <Link href="/superadmin/categories" className="text-indigo-600 hover:text-indigo-900">
+              Gerenciar Categorias
             </Link>
           </div>
         </div>

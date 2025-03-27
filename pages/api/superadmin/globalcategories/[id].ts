@@ -31,6 +31,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // GET - Obter detalhes de uma categoria global específica
     if (req.method === 'GET') {
+    // Garantir que a conexão com o banco de dados esteja ativa
+    await reconnectPrisma();
       const category = await prisma.globalCategory.findUnique({
         where: { id }
       });

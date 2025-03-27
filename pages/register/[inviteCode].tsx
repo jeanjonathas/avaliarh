@@ -112,10 +112,8 @@ export default function RegisterPage() {
             </div>
             <h1 className="text-2xl font-bold text-gray-800 mb-4">Convite Inválido</h1>
             <p className="text-gray-600 mb-6">{error}</p>
-            <Link href="/">
-              <a className="inline-block bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600 transition-colors">
-                Voltar para o início
-              </a>
+            <Link href="/" className="inline-block bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600 transition-colors">
+              Voltar para o início
             </Link>
           </div>
         </div>

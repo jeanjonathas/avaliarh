@@ -49,6 +49,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 async function getPayment(req: NextApiRequest, res: NextApiResponse, id: string) {
   try {
     // Usar métodos nativos do Prisma
+    // Garantir que a conexão com o banco de dados esteja ativa
+    await reconnectPrisma();
     const payment = await prisma.paymentHistory.findUnique({
       where: { id },
       include: {

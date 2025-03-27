@@ -30,6 +30,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // GET - Obter detalhes de um plano específico
     if (req.method === 'GET') {
+    // Garantir que a conexão com o banco de dados esteja ativa
+    await reconnectPrisma();
       const plan = await prisma.plan.findUnique({
         where: { id },
         include: {

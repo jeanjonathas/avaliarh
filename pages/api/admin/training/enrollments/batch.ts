@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { prisma, reconnectPrisma } from '@/lib/prisma';
-import { authOptions } from '@/pages/api/auth/[...nextauth]'/
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Only allow POST method
@@ -16,6 +16,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   // Get user and check if they are an admin
+  // Garantir que a conexão com o banco de dados esteja ativa
+  await reconnectPrisma();
   const user = await prisma.$queryRaw`
     SELECT u.id, u."companyId", r.name as role
     FROM "User" u

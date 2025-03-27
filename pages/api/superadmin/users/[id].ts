@@ -36,6 +36,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 // GET - Obter um usuário específico
 async function getUser(req: NextApiRequest, res: NextApiResponse, id: string) {
   try {
+  // Garantir que a conexão com o banco de dados esteja ativa
+  await reconnectPrisma();
     const user = await prisma.user.findUnique({
       where: { id },
       select: {

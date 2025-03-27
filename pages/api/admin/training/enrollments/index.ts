@@ -13,6 +13,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // Get user and check if they are an admin
+    // Garantir que a conexão com o banco de dados esteja ativa
+    await reconnectPrisma();
     const user = await prisma.$queryRaw`
       SELECT * FROM "User" 
       WHERE id = ${session.user.id}

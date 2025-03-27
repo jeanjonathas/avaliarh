@@ -1,9 +1,9 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { prisma, reconnectPrisma } from '@/lib/prisma';
-import { authOptions } from '@/pages/api/auth/[...nextauth]'/
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import { TrainingQuestionType } from '@prisma/client';
-import { authOptions } from '@/pages/api/auth/[...nextauth]'/
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Verificar se o método é POST
@@ -34,6 +34,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Verificar se o usuário é um estudante
+    // Garantir que a conexão com o banco de dados esteja ativa
+    await reconnectPrisma();
     const student = await prisma.student.findUnique({
       where: { userId }
     });

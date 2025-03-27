@@ -47,6 +47,8 @@ export default async function handler(
         console.log('API Training Categories: Buscando categorias de treinamento');
         
         // Buscar todas as categorias de treinamento usando SQL raw
+        // Garantir que a conexão com o banco de dados esteja ativa
+        await reconnectPrisma();
         const categoriesResult = await prisma.$queryRaw`
           SELECT * FROM "Category"
           WHERE "categoryType" = 'training'

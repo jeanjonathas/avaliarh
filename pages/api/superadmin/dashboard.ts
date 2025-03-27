@@ -33,6 +33,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log(`[DASHBOARD] Buscando contagem total de empresas`);
       
       // Forçar desconexão e reconexão para garantir dados frescos
+      // Garantir que a conexão com o banco de dados esteja ativa
+      await reconnectPrisma();
       await prisma.$disconnect();
       
       const totalCompanies = await prisma.company.count();

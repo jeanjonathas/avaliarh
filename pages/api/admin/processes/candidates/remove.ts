@@ -28,6 +28,8 @@ export default async function handler(
     }
 
     // Verificar se o candidato está no processo
+    // Garantir que a conexão com o banco de dados esteja ativa
+    await reconnectPrisma();
     const candidate = await prisma.candidate.findFirst({
       where: {
         id: candidateId,

@@ -288,15 +288,11 @@ const GlobalTests: NextPage = () => {
         
         <div className="mb-6 flex justify-between items-center">
           <div className="space-x-4">
-            <Link href="/superadmin/categories">
-              <a className="text-indigo-600 hover:text-indigo-900">
-                Gerenciar Categorias
-              </a>
+            <Link href="/superadmin/categories" className="text-indigo-600 hover:text-indigo-900">
+              Gerenciar Categorias
             </Link>
-            <Link href="/superadmin/questions">
-              <a className="text-indigo-600 hover:text-indigo-900">
-                Gerenciar Perguntas
-              </a>
+            <Link href="/superadmin/questions" className="text-indigo-600 hover:text-indigo-900">
+              Gerenciar Perguntas
             </Link>
           </div>
         </div>

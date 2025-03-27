@@ -17,6 +17,8 @@ export default async function handler(
   }
 
   // Get user and check if they are an admin
+  // Garantir que a conexão com o banco de dados esteja ativa
+  await reconnectPrisma();
   const user = await prisma.$queryRaw`
     SELECT u.id, u."companyId", u.role
     FROM "User" u

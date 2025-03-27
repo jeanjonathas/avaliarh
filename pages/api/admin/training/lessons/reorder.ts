@@ -19,6 +19,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   // Get user from database to check role and company
+  // Garantir que a conexão com o banco de dados esteja ativa
+  await reconnectPrisma();
   const user = await prisma.user.findUnique({
     where: { email: userEmail },
   });

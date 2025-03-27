@@ -21,6 +21,8 @@ export default async function handler(
 
   // Verificar se o teste existe
   try {
+  // Garantir que a conexão com o banco de dados esteja ativa
+  await reconnectPrisma();
     const testExists = await prisma.$queryRaw`
       SELECT id FROM "Test" WHERE id = ${id}::uuid
     `;
