@@ -1,9 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
-import { prisma, reconnectPrisma } from '@/lib/prisma';;
-import { authOptions } from '@/pages/api/auth/[...nextauth]'/
+import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import { Role } from '@prisma/client';
-import { authOptions } from '@/pages/api/auth/[...nextauth]'/
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   await reconnectPrisma()

@@ -4,7 +4,7 @@ import { IncomingForm } from 'formidable';
 import fs from 'fs';
 import path from 'path';
 import { prisma, reconnectPrisma } from '@/lib/prisma';
-import { authOptions } from '@/pages/api/auth/[...nextauth]'/
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 
 // Configuração para permitir upload de arquivos
 export const config = {
@@ -12,8 +12,6 @@ export const config = {
     bodyParser: false,
   },
 };
-
-
 
 // Função para criar diretório se não existir
 const ensureDirectoryExists = (dirPath: string) => {
@@ -31,7 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     // Verificar a sessão do usuário
     await reconnectPrisma()
-  const session = await getServerSession(req, res, authOptions);
+    const session = await getServerSession(req, res, authOptions);
     if (!session || !session.user) {
       return res.status(401).json({ error: 'Não autorizado' });
     }

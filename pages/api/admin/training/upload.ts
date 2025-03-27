@@ -4,8 +4,8 @@ import formidable from 'formidable';
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { prisma, reconnectPrisma } from '@/lib/prisma';;
-import { authOptions } from '@/pages/api/auth/[...nextauth]'/
+import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 
 // Disable the default body parser to handle file uploads
 export const config = {

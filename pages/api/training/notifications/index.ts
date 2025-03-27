@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
-import { prisma, reconnectPrisma } from '@/lib/prisma';;
-import { authOptions } from '@/pages/api/auth/[...nextauth]'/
+import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Verificar se o método é GET
@@ -12,7 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     // Verificar autenticação
     await reconnectPrisma()
-  const session = await getServerSession(req, res, authOptions);
+    const session = await getServerSession(req, res, authOptions);
     if (!session) {
       return res.status(401).json({ success: false, message: 'Não autenticado' });
     }
