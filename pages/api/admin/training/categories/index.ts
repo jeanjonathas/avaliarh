@@ -1,10 +1,10 @@
 /// <reference types="next" />
 
-import { NextApiRequest, NextApiResponse } from 'next'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '../../../auth/[...nextauth]'
-import { prisma, reconnectPrisma } from '@/lib/prisma'
-import { Prisma } from '@prisma/client'
+import { NextApiRequest, NextApiResponse } from 'next';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '../../../auth/[...nextauth]';
+import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 
 // Definição dos papéis de usuário conforme o schema
 type Role = 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'INSTRUCTOR' | 'STUDENT' | 'USER';

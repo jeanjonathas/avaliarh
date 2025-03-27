@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { GetServerSideProps } from 'next';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import { prisma } from '../../../lib/prisma';
 import AdminLayout from '../../../components/admin/AdminLayout';
 import EnrollmentInterface from '../../../components/admin/training/EnrollmentInterface';
@@ -113,7 +114,7 @@ export default function StudentManagement({ courses }: StudentManagementProps) {
 }
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
-  const session = await getSession(context);
+  const session = await getServerSession(context.req, context.res, authOptions);
 
   if (!session) {
     return {

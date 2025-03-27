@@ -1,9 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import { prisma } from '@/lib/prisma';
-import { Role } from '@prisma/client';
-import { Prisma } from '@prisma/client';
+import { Role, Prisma } from '@prisma/client';
 
 export default async function handler(
   req: NextApiRequest,

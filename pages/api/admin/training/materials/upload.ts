@@ -1,9 +1,10 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
 import { IncomingForm } from 'formidable';
 import fs from 'fs';
 import path from 'path';
-import { prisma } from '@/lib/prisma';
+import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { authOptions } from '@/pages/api/auth/[...nextauth]'/
 
 // Configuração para permitir upload de arquivos
 export const config = {
@@ -29,7 +30,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // Verificar a sessão do usuário
-    const session = await getSession({ req });
+    await reconnectPrisma()
+  const session = await getServerSession(req, res, authOptions);
     if (!session || !session.user) {
       return res.status(401).json({ error: 'Não autorizado' });
     }

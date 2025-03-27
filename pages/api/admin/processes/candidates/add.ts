@@ -25,6 +25,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'ID do processo é obrigatório' });
     }
 
+    // Garantir que a conexão com o banco de dados esteja ativa
+    await reconnectPrisma();
+
     // Buscar o processo seletivo para verificar se existe
     const process = await prisma.selectionProcess.findUnique({
       where: { id: processId },

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
+import { useSession } from 'next-auth/react';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import Head from 'next/head';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -70,6 +72,7 @@ interface Lesson {
 export default function CourseDetails() {
   const router = useRouter();
   const { id } = router.query;
+  const { data: session, status } = useSession();
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
@@ -82,7 +85,6 @@ export default function CourseDetails() {
       if (!id) return;
 
       try {
-        const session = await getSession();
         if (!session) {
           router.push('/');
           return;
@@ -121,7 +123,7 @@ export default function CourseDetails() {
     };
 
     fetchCourseData();
-  }, [id, router]);
+  }, [id, router, session]);
 
   // Alternar expansão do módulo
   const toggleModule = (moduleId: string) => {
@@ -534,7 +536,7 @@ export default function CourseDetails() {
 
 // Garantir que o usuário esteja autenticado
 export async function getServerSideProps(context) {
-  const session = await getSession(context);
+  const session = await getServerSession(context.req, context.res, authOptions);
   
   if (!session) {
     return {

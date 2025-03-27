@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
 import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { authOptions } from '@/pages/api/auth/[...nextauth]'/
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Only allow GET method
@@ -9,7 +10,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   // Check authentication
-  const session = await getSession({ req });
+  const session = await getServerSession(req, res, authOptions);
   if (!session || !session.user) {
     return res.status(401).json({ error: 'Não autorizado' });
   }

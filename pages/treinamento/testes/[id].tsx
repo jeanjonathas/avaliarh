@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
+import { useSession } from 'next-auth/react';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import Head from 'next/head';
 import Link from 'next/link';
 import { 
@@ -46,6 +48,7 @@ interface Test {
 export default function TestView() {
   const router = useRouter();
   const { id } = router.query;
+  const { data: session, status } = useSession();
   const [test, setTest] = useState<Test | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -68,7 +71,6 @@ export default function TestView() {
       if (!id) return;
 
       try {
-        const session = await getSession();
         if (!session) {
           router.push('/');
           return;
@@ -112,7 +114,7 @@ export default function TestView() {
     };
 
     fetchTestData();
-  }, [id, router]);
+  }, [id, router, session]);
 
   // Função para embaralhar array
   const shuffleArray = <T,>(array: T[]): T[] => {
@@ -532,7 +534,7 @@ export default function TestView() {
 
 // Garantir que o usuário esteja autenticado
 export async function getServerSideProps(context) {
-  const session = await getSession(context);
+  const session = await getServerSession(context.req, context.res, authOptions);
   
   if (!session) {
     return {

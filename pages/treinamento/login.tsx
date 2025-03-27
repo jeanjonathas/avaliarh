@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { signIn, getSession } from 'next-auth/react';
+import { signIn } from 'next-auth/react'
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -181,7 +183,7 @@ export default function TrainingLogin() {
 
 // Verificar se o usuário já está autenticado
 export async function getServerSideProps(context) {
-  const session = await getSession(context);
+  const session = await getServerSession(context.req, context.res, authOptions);
   
   // Se já estiver autenticado, redirecionar para a página de treinamento
   if (session) {

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { signIn, useSession, getSession } from 'next-auth/react';
+import { signIn, useSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -364,7 +366,7 @@ export default function SuperAdminLogin() {
 }
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
-  const session = await getSession(context);
+  const session = await getServerSession(context.req, context.res, authOptions);
 
   // Se já estiver autenticado e for um SUPER_ADMIN, redireciona para o dashboard
   if (session && (session.user.role as string) === 'SUPER_ADMIN') {

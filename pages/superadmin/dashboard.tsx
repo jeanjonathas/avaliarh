@@ -1,5 +1,6 @@
 import { GetServerSideProps } from 'next';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import SuperAdminLayout from '../../components/SuperAdminLayout';
 import { useState } from 'react';
 import Link from 'next/link';
@@ -306,7 +307,7 @@ export default function SuperAdminDashboard({ stats }: { stats: DashboardStats }
 }
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
-  const session = await getSession(context);
+  const session = await getServerSession(context.req, context.res, authOptions);
 
   // Verifica se o usuário está autenticado e é um SUPER_ADMIN
   // Usamos type assertion para evitar o erro de tipagem

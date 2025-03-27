@@ -1,10 +1,11 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
 import formidable from 'formidable';
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { prisma } from '@/lib/prisma';;
+import { prisma, reconnectPrisma } from '@/lib/prisma';;
+import { authOptions } from '@/pages/api/auth/[...nextauth]'/
 
 // Disable the default body parser to handle file uploads
 export const config = {
@@ -25,7 +26,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   // Check authentication
-  const session = await getSession({ req });
+  await reconnectPrisma()
+  const session = await getServerSession(req, res, authOptions);
   if (!session || !session.user) {
     return res.status(401).json({ error: 'Não autorizado' });
   }

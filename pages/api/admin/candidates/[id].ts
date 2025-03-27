@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/pages/api/auth/[...nextauth]'
-import { Candidate, Response, Test, Stage, Question, Status, SelectionProcess } from '@prisma/client'
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
+import { Candidate, Response, Test, Stage, Question, Status, SelectionProcess } from '@prisma/client';
 import { prisma, reconnectPrisma } from '@/lib/prisma'
 import { generateUniqueInviteCode } from '../../../../lib/invites'
 

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { GetServerSideProps } from 'next';
-import { getSession, useSession, signOut } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react'
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import Head from 'next/head';
 import { 
   FiUser, 
@@ -321,7 +323,7 @@ export default function Profile({ initialUserData }: ProfileProps) {
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
   // Verificar autenticação no servidor
-  const session = await getSession(context);
+  const session = await getServerSession(context.req, context.res, authOptions);
   if (!session) {
     return {
       redirect: {

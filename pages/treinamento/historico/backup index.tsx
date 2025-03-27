@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { GetServerSideProps } from 'next';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import Head from 'next/head';
 import Link from 'next/link';
 import { 
@@ -365,7 +366,7 @@ export default function History({ initialData, initialPagination }: HistoryProps
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
   // Verificar autenticação no servidor
-  const session = await getSession(context);
+  const session = await getServerSession(context.req, context.res, authOptions);
   if (!session) {
     return {
       redirect: {

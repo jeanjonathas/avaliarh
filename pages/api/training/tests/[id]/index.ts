@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
 import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Verificar se o método é GET
@@ -10,7 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // Verificar autenticação
-    const session = await getSession({ req });
+    const session = await getServerSession(req, res, authOptions);
     if (!session) {
       return res.status(401).json({ success: false, message: 'Não autenticado' });
     }
@@ -35,6 +36,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         message: 'Usuário não é um estudante' 
       });
     }
+
+    // Reconnect Prisma
+    await reconnectPrisma();
 
     // Buscar detalhes do teste
     const test = await prisma.trainingTest.findUnique({

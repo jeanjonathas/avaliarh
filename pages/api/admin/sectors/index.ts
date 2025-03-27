@@ -1,10 +1,13 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
-import { prisma } from '@/lib/prisma';;
+import { getServerSession } from 'next-auth/next';
+import { prisma, reconnectPrisma } from '@/lib/prisma';;
+import { authOptions } from '@/pages/api/auth/[...nextauth]'/
 import { Role } from '@prisma/client';
+import { authOptions } from '@/pages/api/auth/[...nextauth]'/
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getSession({ req });
+  await reconnectPrisma()
+  const session = await getServerSession(req, res, authOptions);
 
   if (!session) {
     return res.status(401).json({ error: 'Não autorizado' });

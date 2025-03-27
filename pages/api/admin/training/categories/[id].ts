@@ -1,7 +1,7 @@
-import { NextApiRequest, NextApiResponse } from 'next'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '../../../auth/[...nextauth]'
-import { prisma, reconnectPrisma } from '@/lib/prisma'
+import { NextApiRequest, NextApiResponse } from 'next';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '../../../auth/[...nextauth]';
+import { prisma, reconnectPrisma } from '@/lib/prisma';
 
 // Definição dos papéis de usuário conforme o schema
 type Role = 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'INSTRUCTOR' | 'STUDENT' | 'USER';
@@ -36,7 +36,10 @@ export default async function handler(
         message: `Não autorizado - Apenas ${rolesMessage} podem acessar este recurso` 
       });
     }
-
+    
+    // Garantir que a conexão com o banco de dados esteja ativa
+    await reconnectPrisma();
+    
     const { id } = req.query;
     
     if (typeof id !== 'string') {

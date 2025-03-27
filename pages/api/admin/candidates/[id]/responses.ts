@@ -1,6 +1,7 @@
-import { NextApiRequest, NextApiResponse } from 'next'
-import { getSession } from 'next-auth/react'
-import { prisma, reconnectPrisma } from '@/lib/prisma'
+import { NextApiRequest, NextApiResponse } from 'next';
+import { getServerSession } from 'next-auth/next';
+import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 
 // Definir interfaces para tipar corretamente os dados
 interface ResponseOption {
@@ -66,8 +67,10 @@ interface PrismaResponse {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const session = await getSession({ req })
+    await reconnectPrisma()
+    const session = await getServerSession(req, res, authOptions)
     if (!session || !['ADMIN', 'SUPER_ADMIN', 'COMPANY_ADMIN'].includes(session.user?.role as string)) {
+      console.log('[AUTH ERROR] Não autenticado na API de respostas')
       return res.status(401).json({ message: 'Não autenticado' })
     }
 

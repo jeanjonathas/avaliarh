@@ -1,6 +1,7 @@
 import React from 'react';
 import { GetServerSideProps } from 'next';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import SuperAdminLayout from '../../components/SuperAdminLayout';
 
 const StagesPage: React.FC = () => {
@@ -45,7 +46,7 @@ const StagesPage: React.FC = () => {
 };
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
-  const session = await getSession(context);
+  const session = await getServerSession(context.req, context.res, authOptions);
 
   // Verifica se o usuário está autenticado e é um SUPER_ADMIN
   if (!session || (session.user.role as string) !== 'SUPER_ADMIN') {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { GetServerSideProps } from 'next';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import SuperAdminLayout from '../../components/SuperAdminLayout';
 import CompanyList from '../../components/superadmin/CompanyList';
 import CompanyForm from '../../components/superadmin/CompanyForm';
@@ -362,7 +363,7 @@ const CompaniesPage: React.FC<CompaniesPageProps> = ({ initialCompanies }) => {
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
   try {
-    const session = await getSession(context);
+    const session = await getServerSession(context.req, context.res, authOptions);
     
     // Verificar autenticação
     if (!session || !session.user || session.user.role !== 'SUPER_ADMIN') {

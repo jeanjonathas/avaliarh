@@ -1,8 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
-import { prisma } from '@/lib/prisma';;
-import { Prisma } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 
 // Tipo estendido para incluir personalityConfig
 interface CustomProcessStageData {

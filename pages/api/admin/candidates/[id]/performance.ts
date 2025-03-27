@@ -1,7 +1,7 @@
-import { NextApiRequest, NextApiResponse } from 'next'
-import { getSession } from 'next-auth/react'
-import { prisma, reconnectPrisma } from '@/lib/prisma'
-import { Prisma } from '@prisma/client'
+import { NextApiRequest, NextApiResponse } from 'next';
+import { getServerSession } from 'next-auth/next';
+import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 
 // Tipo estendido para o candidato com as propriedades necessárias
 interface ExtendedCandidate {
@@ -22,8 +22,10 @@ interface ExtendedCandidate {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const session = await getSession({ req })
+    await reconnectPrisma()
+    const session = await getServerSession(req, res, authOptions)
     if (!session || !['ADMIN', 'SUPER_ADMIN', 'COMPANY_ADMIN'].includes(session.user?.role as string)) {
+      console.log('[AUTH ERROR] Não autenticado na API de performance')
       return res.status(401).json({ message: 'Não autenticado' })
     }
 
