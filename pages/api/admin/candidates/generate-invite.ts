@@ -32,8 +32,8 @@ import { generateUniqueInviteCode, saveUsedInviteCode } from '../../../../lib/in
 //     inviteCode = `${code}${hash}`;
     
 //     // Verificar se o código já está em uso por algum candidato (em qualquer empresa)
-// Garantir que a conexão com o banco de dados esteja ativa
-await reconnectPrisma();
+//     // Garantir que a conexão com o banco de dados esteja ativa
+//     // await reconnectPrisma();
 //     const existingCandidate = await prisma.candidate.findFirst({
 //       where: {
 //         inviteCode: inviteCode
