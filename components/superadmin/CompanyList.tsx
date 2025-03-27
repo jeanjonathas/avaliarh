@@ -17,6 +17,8 @@ interface Company {
   candidateCount?: number;
   testCount?: number;
   processCount?: number;
+  _userCount?: number;
+  _candidateCount?: number;
 }
 
 interface CompanyListProps {
@@ -145,10 +147,20 @@ const CompanyList: React.FC<CompanyListProps> = ({
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {company.userCount !== undefined ? company.userCount : 0}
+                    {company._userCount !== undefined 
+                      ? company._userCount 
+                      : (company.userCount !== undefined 
+                          ? company.userCount 
+                          : 0)
+                    }
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {company.candidateCount !== undefined ? company.candidateCount : 0}
+                    {company._candidateCount !== undefined 
+                      ? company._candidateCount 
+                      : (company.candidateCount !== undefined 
+                          ? company.candidateCount 
+                          : 0)
+                    }
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {company.createdAt ? new Date(company.createdAt).toLocaleDateString() : '-'}

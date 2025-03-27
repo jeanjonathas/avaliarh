@@ -378,18 +378,26 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     // Buscar todas as empresas com contagens relacionadas
     const response = await fetch(`${process.env.NEXTAUTH_URL}/api/superadmin/companies`);
     const companies = await response.json();
+    
+    console.log('Dados brutos recebidos da API:', JSON.stringify(companies, null, 2));
 
     // Mapear os resultados para garantir compatibilidade com a interface
-    const serializedCompanies = companies.map(company => ({
-      ...company,
-      // Usar os novos campos de contagem se disponíveis, caso contrário usar os antigos
-      userCount: company._userCount !== undefined ? company._userCount : 
-                (company._count?.users !== undefined ? company._count.users : 0),
-      candidateCount: company._candidateCount !== undefined ? company._candidateCount : 
-                     (company._count?.candidates !== undefined ? company._count.candidates : 0),
-      testCount: company._count?.questions || 0, // Usamos questions como proxy para testes
-      processCount: company._count?.processes || 0
-    }));
+    const serializedCompanies = companies.map(company => {
+      console.log(`Processando empresa ${company.name}, _userCount:`, company._userCount);
+      
+      return {
+        ...company,
+        // Usar os novos campos de contagem se disponíveis, caso contrário usar os antigos
+        userCount: typeof company._userCount === 'number' ? company._userCount : 
+                  (company._count?.users !== undefined ? company._count.users : 0),
+        candidateCount: typeof company._candidateCount === 'number' ? company._candidateCount : 
+                       (company._count?.candidates !== undefined ? company._count.candidates : 0),
+        testCount: company._count?.questions || 0, // Usamos questions como proxy para testes
+        processCount: company._count?.processes || 0
+      };
+    });
+    
+    console.log('Dados processados para o frontend:', JSON.stringify(serializedCompanies, null, 2));
 
     return {
       props: {

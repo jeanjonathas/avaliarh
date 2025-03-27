@@ -83,13 +83,12 @@ async function getCompanies(req: NextApiRequest, res: NextApiResponse) {
       // Usar o contador dedicado para obter o número de usuários
       const userCount = await countUsersForCompany(company.id);
       
-      // Contar candidatos usando query raw para evitar problemas de cache
-      const candidateResult = await prisma.$queryRaw`
-        SELECT COUNT(*) as count 
-        FROM "Candidate" 
-        WHERE "companyId" = ${company.id}
-      `;
-      const candidateCount = parseInt(candidateResult[0].count, 10);
+      // Contar candidatos usando o método nativo do Prisma em vez de query raw
+      const candidateCount = await prisma.candidate.count({
+        where: {
+          companyId: company.id
+        }
+      });
       
       return {
         ...company,
@@ -103,6 +102,11 @@ async function getCompanies(req: NextApiRequest, res: NextApiResponse) {
     }));
     
     console.log(`[COMPANIES] Retornando ${formattedCompanies.length} empresas formatadas`);
+    
+    // Verificar se os dados estão sendo formatados corretamente
+    formattedCompanies.forEach(company => {
+      console.log(`[COMPANIES] Empresa ${company.name}: _userCount=${company._userCount}, _candidateCount=${company._candidateCount}`);
+    });
     
     // Remover duplicatas antes de retornar
     const uniqueCompanies = Array.from(

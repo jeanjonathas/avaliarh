@@ -24,7 +24,7 @@ export default async function handler(
   // Garantir que a conexão com o banco de dados esteja ativa
   await reconnectPrisma();
     const testExists = await prisma.$queryRaw`
-      SELECT id FROM "Test" WHERE id = ${id}::uuid
+      SELECT id FROM "Test" WHERE id = CAST(${id} AS uuid)
     `;
 
     if (!Array.isArray(testExists) || testExists.length === 0) {
@@ -49,7 +49,7 @@ export default async function handler(
 
       // Verificar se o estágio existe
       const stageExists = await prisma.$queryRaw`
-        SELECT id FROM "Stage" WHERE id = ${stageId}::uuid
+        SELECT id FROM "Stage" WHERE id = CAST(${stageId} AS uuid)
       `;
 
       if (!Array.isArray(stageExists) || stageExists.length === 0) {
@@ -77,7 +77,7 @@ export default async function handler(
       // Verificar se a relação já existe
       const existingRelation = await prisma.$queryRaw`
         SELECT * FROM "TestStage" 
-        WHERE "testId" = ${id}::uuid AND "stageId" = ${stageId}::uuid
+        WHERE "testId" = CAST(${id} AS uuid) AND "stageId" = CAST(${stageId} AS uuid)
       `;
 
       if (Array.isArray(existingRelation) && existingRelation.length > 0) {
@@ -89,8 +89,8 @@ export default async function handler(
         INSERT INTO "TestStage" (id, "testId", "stageId", "order", "createdAt", "updatedAt")
         VALUES (
           uuid_generate_v4(),
-          ${id}::uuid, 
-          ${stageId}::uuid, 
+          CAST(${id} AS uuid), 
+          CAST(${stageId} AS uuid), 
           ${order || 0}, 
           NOW(), 
           NOW()
@@ -119,7 +119,7 @@ export default async function handler(
             s.description
           FROM "TestStage" ts
           JOIN "Stage" s ON ts."stageId" = s.id
-          WHERE ts."testId" = ${id}::uuid
+          WHERE ts."testId" = CAST(${id} AS uuid)
           ORDER BY ts."order" ASC
         `;
       } catch (error) {
