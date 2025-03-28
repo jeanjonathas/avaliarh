@@ -13,6 +13,7 @@ import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import Button from '@mui/material/Button';
 import { useNotificationSystem } from '../../hooks/useNotificationSystem';
+import QuestionExportImport from '../../components/QuestionExportImport';
 
 interface Category {
   id: string
@@ -258,6 +259,14 @@ const GlobalQuestions: NextPage = () => {
               Gerenciar Categorias
             </Link>
           </div>
+          <QuestionExportImport 
+            questions={questions} 
+            categories={categories} 
+            onImportSuccess={(newQuestions) => {
+              setQuestions([...questions, ...(newQuestions as any)]);
+              notify.showSuccess(`${newQuestions.length} perguntas importadas com sucesso!`);
+            }} 
+          />
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

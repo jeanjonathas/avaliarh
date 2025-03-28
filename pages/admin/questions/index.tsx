@@ -6,12 +6,15 @@ import QuestionList from '../../../components/admin/QuestionList';
 import { Button } from '../../../components/ui/Button';
 import { QuestionType } from '../../../types/questions';
 import Modal from '../../../components/ui/Modal';
+import QuestionExportImport from '../../../components/QuestionExportImport';
 
 const QuestionsPage = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [questions, setQuestions] = useState([]);
+  const [categories, setCategories] = useState([]);
 
   useEffect(() => {
     // Verificar autenticação
@@ -19,6 +22,38 @@ const QuestionsPage = () => {
       router.push('/login');
     } else if (status === 'authenticated') {
       setLoading(false);
+      // Carregar perguntas e categorias para exportação
+      const fetchData = async () => {
+        try {
+          const questionsRes = await fetch('/api/admin/questions');
+          const categoriesRes = await fetch('/api/admin/categories');
+          
+          if (questionsRes.ok && categoriesRes.ok) {
+            const questionsData = await questionsRes.json();
+            const categoriesData = await categoriesRes.json();
+            
+            console.log('Dados de questões recebidos:', questionsData);
+            
+            // Verificar a estrutura dos dados recebidos
+            let formattedQuestions = [];
+            if (Array.isArray(questionsData)) {
+              formattedQuestions = questionsData;
+            } else if (questionsData.questions && Array.isArray(questionsData.questions)) {
+              formattedQuestions = questionsData.questions;
+            } else if (typeof questionsData === 'object') {
+              formattedQuestions = [questionsData];
+            }
+            
+            console.log('Questões formatadas:', formattedQuestions);
+            setQuestions(formattedQuestions);
+            setCategories(categoriesData);
+          }
+        } catch (error) {
+          console.error('Erro ao carregar dados:', error);
+        }
+      };
+      
+      fetchData();
     }
   }, [status, router]);
 
@@ -46,16 +81,25 @@ const QuestionsPage = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <h1 className="text-2xl font-bold text-gray-800">Gerenciar Perguntas</h1>
-          <Button 
-            variant="primary" 
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center w-full sm:w-auto justify-center"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-            </svg>
-            Adicionar Pergunta
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <QuestionExportImport
+              questions={questions}
+              categories={categories}
+              onImportSuccess={(newQuestions) => {
+                setQuestions([...questions, ...newQuestions]);
+              }}
+            />
+            <Button 
+              variant="primary" 
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center w-full sm:w-auto justify-center"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+              </svg>
+              Adicionar Pergunta
+            </Button>
+          </div>
         </div>
 
         {/* Lista de perguntas com filtros */}

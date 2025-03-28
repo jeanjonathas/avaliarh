@@ -35,7 +35,10 @@ export default async function handler(
       
       try {
         // Base where condition
-        let whereCondition: any = {};
+        let whereCondition: any = {
+          // Filtrar perguntas excluídas (marcadas com showResults = false)
+          showResults: true
+        };
         
         // Determinar o tipo de questão com base no referer ou query parameter
         const referer = req.headers.referer || '';

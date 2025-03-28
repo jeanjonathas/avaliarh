@@ -246,6 +246,7 @@ model Question {
   difficulty       DifficultyLevel @default(MEDIUM)
   globalQuestionId String?
   showResults      Boolean         @default(true)
+  deleted          Boolean         @default(false)
   type             QuestionType    @default(MULTIPLE_CHOICE)
   categoryId       String?         @db.Uuid
   emotionGroupId   String?
@@ -281,7 +282,7 @@ model Option {
 model Response {
   id                   String    @id @default(uuid())
   candidateId          String
-  questionId           String
+  questionId           String?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
   questionText         String
@@ -301,7 +302,7 @@ model Response {
   stageName            String?
   candidate            Candidate @relation(fields: [candidateId], references: [id])
   company              Company   @relation(fields: [companyId], references: [id])
-  question             Question  @relation(fields: [questionId], references: [id])
+  question             Question? @relation(fields: [questionId], references: [id])
 
   @@unique([candidateId, questionId])
 }

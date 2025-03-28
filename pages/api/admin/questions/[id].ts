@@ -254,35 +254,75 @@ export default async function handler(
     try {
       console.log(`Excluindo pergunta com ID: ${id}`);
       
-      // 1. Excluir as opções relacionadas à pergunta
-      await prisma.option.deleteMany({
+      // 1. Verificar se existem respostas para esta pergunta
+      const responsesCount = await prisma.response.count({
         where: { questionId: id }
       });
       
-      // 2. Desconectar a pergunta de suas categorias usando Prisma em vez de SQL raw
-      await prisma.question.update({
-        where: { id },
-        data: {
-          categories: {
-            set: [] // Desconecta todas as categorias
+      if (responsesCount > 0) {
+        console.log(`A pergunta possui ${responsesCount} respostas associadas. Usando abordagem de soft delete.`);
+        
+        // Implementar um soft delete para a pergunta
+        const updatedQuestion = await prisma.question.update({
+          where: { id },
+          data: {
+            // Adicionar um prefixo ao texto para indicar que foi excluída
+            text: `[EXCLUÍDA] ${(await prisma.question.findUnique({ where: { id } }))?.text || ''}`,
+            // Desativar a pergunta para que não apareça mais nas listagens normais
+            showResults: false
           }
-        }
-      });
-      
-      // 3. Excluir a pergunta
-      await prisma.question.delete({
-        where: { id }
-      });
-      
-      return res.status(200).json({ 
-        success: true, 
-        message: 'Pergunta excluída com sucesso' 
-      });
+        });
+        
+        console.log(`Pergunta marcada como excluída: ${updatedQuestion.id}`);
+        
+        return res.status(200).json({ 
+          success: true, 
+          message: 'Pergunta marcada como excluída. Não foi possível excluí-la completamente pois existem respostas associadas a ela.',
+          softDeleted: true
+        });
+      } else {
+        // Se não houver respostas, podemos excluir normalmente
+        console.log('Nenhuma resposta associada. Excluindo pergunta completamente.');
+        
+        // 2. Excluir as opções relacionadas à pergunta
+        const deletedOptions = await prisma.option.deleteMany({
+          where: { questionId: id }
+        });
+        
+        console.log(`${deletedOptions.count} opções excluídas.`);
+        
+        // 3. Desconectar a pergunta de suas categorias
+        await prisma.question.update({
+          where: { id },
+          data: {
+            categories: {
+              set: [] // Desconecta todas as categorias
+            }
+          }
+        });
+        
+        console.log('Categorias desconectadas.');
+        
+        // 4. Excluir a pergunta
+        const deletedQuestion = await prisma.question.delete({
+          where: { id }
+        });
+        
+        console.log(`Pergunta excluída: ${deletedQuestion.id}`);
+        
+        return res.status(200).json({ 
+          success: true, 
+          message: 'Pergunta excluída com sucesso',
+          softDeleted: false
+        });
+      }
     } catch (error) {
       console.error('Erro ao excluir pergunta:', error);
+      
       return res.status(500).json({ 
         error: 'Erro ao excluir a pergunta',
-        message: 'Ocorreu um erro ao tentar excluir a pergunta. Por favor, tente novamente.'
+        message: 'Ocorreu um erro ao tentar excluir a pergunta. Por favor, tente novamente.',
+        technicalDetails: error.message
       });
     }
   } else if (req.method === 'GET') {
