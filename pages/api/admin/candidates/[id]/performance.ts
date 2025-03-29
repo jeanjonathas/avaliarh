@@ -129,7 +129,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }).filter(stage => stage !== null) || [] 
 
-      const personalityAnalysis = analyzePersonalitiesWithWeights(opinionResponses, candidate.process?.stages);
+      const personalityAnalysis = await analyzePersonalitiesWithWeights(opinionResponses, candidate.process?.stages);
       
       console.log('Análise de Personalidade:', JSON.stringify(personalityAnalysis, null, 2));
       console.log('Número de perguntas opinativas:', opinionResponses.length);
@@ -270,7 +270,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
-function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?: any[]) {
+async function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?: any[]) {
   // Mapa para contar traços de personalidade
   const personalityCount: Record<string, number> = {};
   // Mapa para armazenar UUIDs dos traços
@@ -321,30 +321,112 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
   
   // Tente identificar os grupos a partir da configuração do processo
   if (processStages && processStages.length > 0) {
+    let processId = '';
+    
+    // Tentar obter o ID do processo a partir das etapas
     for (let i = 0; i < processStages.length; i++) {
-      const stage = processStages[i];
-      if (stage.personalityConfig && stage.personalityConfig.traitGroups) {
-        // Se o processo tem grupos de traços definidos, use-os
-        for (let j = 0; j < stage.personalityConfig.traitGroups.length; j++) {
-          const group = stage.personalityConfig.traitGroups[j];
-          if (group.id && group.name) {
+      if (processStages[i].processId) {
+        processId = processStages[i].processId;
+        break;
+      }
+    }
+    
+    if (processId) {
+      try {
+        // Buscar grupos de personalidade da API
+        console.log(`Buscando grupos de personalidade para o processo ${processId}`);
+        
+        // Fazer uma chamada para o endpoint de grupos de personalidade
+        const response = await fetch(`${process.env.NEXTAUTH_URL}/api/admin/personality-groups?processId=${processId}`);
+        
+        if (response.ok) {
+          const groups = await response.json();
+          console.log(`Recebidos ${groups.length} grupos de personalidade da API`);
+          
+          // Processar os grupos recebidos
+          groups.forEach((group: any) => {
             personalityGroups[group.id] = {
               id: group.id,
               name: group.name,
-              traits: group.traits || []
+              traits: group.traits.map((t: any) => t.name)
+            };
+            
+            // Adicionar os pesos dos traços, se não estiverem definidos
+            group.traits.forEach((trait: any) => {
+              const traitNameLower = trait.name.toLowerCase();
+              if (!traitWeights[traitNameLower] && trait.weight) {
+                traitWeights[traitNameLower] = trait.weight;
+                hasTraitWeights = true;
+              }
+            });
+          });
+        } else {
+          console.error(`Erro ao buscar grupos de personalidade: ${response.statusText}`);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar grupos de personalidade:', error);
+      }
+    }
+    
+    // Se não conseguimos obter os grupos da API, tentar extrair da configuração do processo
+    if (Object.keys(personalityGroups).length === 0) {
+      for (let i = 0; i < processStages.length; i++) {
+        const stage = processStages[i];
+        if (stage.personalityConfig && stage.personalityConfig.traitGroups) {
+          // Se o processo tem grupos de traços definidos, use-os
+          for (let j = 0; j < stage.personalityConfig.traitGroups.length; j++) {
+            const group = stage.personalityConfig.traitGroups[j];
+            if (group.id && group.name) {
+              personalityGroups[group.id] = {
+                id: group.id,
+                name: group.name,
+                traits: group.traits || []
+              };
+            }
+          }
+        } else if (stage.personalityConfig && stage.personalityConfig.traitWeights) {
+          // Tente criar grupos a partir dos pesos de traços
+          // Separar os traços em grupos técnicos e comportamentais
+          const technicalTraits: string[] = [];
+          const behavioralTraits: string[] = [];
+          
+          // Palavras-chave para identificar traços técnicos
+          const technicalKeywords = [
+            'técnic', 'conhecimento', 'habilidade', 'resolução', 'agilidade', 
+            'organização', 'atenção', 'detalhe', 'análise', 'planejamento'
+          ];
+          
+          stage.personalityConfig.traitWeights.forEach((trait: any) => {
+            const traitName = trait.traitName;
+            // Verificar se o nome do traço contém alguma palavra-chave técnica
+            const isTechnical = technicalKeywords.some(keyword => 
+              traitName.toLowerCase().includes(keyword)
+            );
+            
+            if (isTechnical) {
+              technicalTraits.push(traitName);
+            } else {
+              behavioralTraits.push(traitName);
+            }
+          });
+          
+          // Criar grupos técnicos e comportamentais
+          if (technicalTraits.length > 0) {
+            personalityGroups['technical-group'] = {
+              id: 'technical-group',
+              name: 'Competências Técnicas',
+              traits: technicalTraits
+            };
+          }
+          
+          if (behavioralTraits.length > 0) {
+            personalityGroups['behavioral-group'] = {
+              id: 'behavioral-group',
+              name: 'Competências Comportamentais',
+              traits: behavioralTraits
             };
           }
         }
-      } else if (stage.personalityConfig && stage.personalityConfig.traitWeights) {
-        // Tente criar grupos a partir dos pesos de traços
-        // Agrupar os traços em um grupo padrão para testes que não têm grupos definidos
-        const defaultGroup = {
-          id: 'default-group',
-          name: 'Perfil de Personalidade',
-          traits: stage.personalityConfig.traitWeights.map((t: any) => t.traitName)
-        };
-        
-        personalityGroups[defaultGroup.id] = defaultGroup;
       }
     }
   }
@@ -538,28 +620,29 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
         }
         
         // Incrementar contagem global, considerando o peso ajustado
-        personalityCount[personality] = (personalityCount[personality] || 0) + adjustedWeight;
+        const traitLower = personality.toLowerCase();
+        personalityCount[traitLower] = (personalityCount[traitLower] || 0) + 1; // Contagem sem peso
         
         // Armazenar o UUID associado a este traço de personalidade
-        if (categoryNameUuid && !personalityUuids[personality]) {
-          personalityUuids[personality] = categoryNameUuid;
+        if (categoryNameUuid && !personalityUuids[traitLower]) {
+          personalityUuids[traitLower] = categoryNameUuid;
         }
         
         // Armazenar o ID do grupo associado a este traço
-        if (groupId && !personalityGroupIds[personality]) {
-          personalityGroupIds[personality] = groupId;
+        if (groupId && !personalityGroupIds[traitLower]) {
+          personalityGroupIds[traitLower] = groupId;
         }
         
-        // Agrupar por grupo de personalidade, considerando o peso ajustado
+        // Agrupar por grupo de personalidade, sem considerar o peso ajustado para contagem
         if (!personalityByGroup[groupId]) {
           personalityByGroup[groupId] = {};
           responseCountByGroup[groupId] = 0;
         }
         
-        personalityByGroup[groupId][personality] = (personalityByGroup[groupId][personality] || 0) + adjustedWeight;
-        responseCountByGroup[groupId] += adjustedWeight;
+        personalityByGroup[groupId][traitLower] = (personalityByGroup[groupId][traitLower] || 0) + 1; // Contagem sem peso
+        responseCountByGroup[groupId] += 1; // Contagem sem peso
         
-        totalPersonalityResponses += adjustedWeight;
+        totalPersonalityResponses += 1; // Contagem sem peso
       }
     }
   }
@@ -615,14 +698,17 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
       for (let i = 0; i < groupDetails[groupId].length; i++) {
         const trait = groupDetails[groupId][i];
         // Calcular a compatibilidade para este traço
-        // Compatibilidade (%) = (Peso / 5) × 100
         const traitCompatibility = (trait.count / totalPersonalityResponses) * 100;
         
-        console.log(`  - Traço "${trait.trait}": ${traitCompatibility.toFixed(1)}% (${trait.count} respostas, peso ${trait.weight})`);
+        // Obter o peso correto do traço
+        const traitLower = trait.trait.toLowerCase();
+        const traitWeight = traitWeights[traitLower] || 1;
         
-        // Ponderar a compatibilidade pelo número de respostas deste traço
-        totalWeightedCompatibility += traitCompatibility * trait.count;
-        totalTraitResponses += trait.count;
+        console.log(`  - Traço "${trait.trait}": ${traitCompatibility.toFixed(1)}% (${trait.count} respostas, peso ${traitWeight})`);
+        
+        // Ponderar a compatibilidade pelo peso do traço e pelo número de respostas
+        totalWeightedCompatibility += traitCompatibility * trait.count * traitWeight;
+        totalTraitResponses += trait.count * traitWeight;
       }
       
       // Calcular a compatibilidade média ponderada para este grupo
@@ -673,8 +759,8 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
       percentage,
       weight,
       weightedScore,
-      categoryNameUuid: personalityUuids[trait] || null,
-      groupId: personalityGroupIds[trait] || null // Adicionar o ID do grupo
+      categoryNameUuid: personalityUuids[traitLower] || null,
+      groupId: personalityGroupIds[traitLower] || null // Adicionar o ID do grupo
     };
   }).sort((a, b) => b.percentage - a.percentage);
 
