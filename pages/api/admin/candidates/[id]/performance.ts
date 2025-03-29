@@ -209,7 +209,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (totalQuestions > 0 && opinionResponses.length > 0) {
         // Se temos ambos os tipos de questões, usar os pesos
         overallScore = (multipleChoiceScore * multipleChoiceWeight) + (opinionScore * opinionWeight);
-        console.log(`Pontuação geral: (${multipleChoiceScore} * ${multipleChoiceWeight}) + (${opinionScore} * ${opinionWeight}) = ${overallScore}`);
+        console.log(`Pontuação geral: (${multipleChoiceScore.toFixed(2)} * ${multipleChoiceWeight}) + (${opinionScore.toFixed(2)} * ${opinionWeight}) = ${overallScore.toFixed(2)}`);
         
         // Verificar se a pontuação geral é consistente com as pontuações individuais
         const expectedMinScore = Math.min(multipleChoiceScore, opinionScore);
@@ -217,22 +217,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         // Se a pontuação geral estiver fora do intervalo esperado, ajustar para a média simples
         if (overallScore < expectedMinScore * 0.9 || overallScore > expectedMaxScore * 1.1) {
-          console.log(`Pontuação geral inconsistente (${overallScore}). Ajustando para média ponderada fixa.`);
+          console.log(`Pontuação geral inconsistente (${overallScore.toFixed(2)}). Ajustando para média ponderada fixa.`);
           
           // Usar uma média ponderada fixa (60% múltipla escolha, 40% perfil de personalidade)
           // Isso garante que a pontuação geral fique entre as pontuações individuais
           overallScore = (multipleChoiceScore * 0.6) + (opinionScore * 0.4);
           
-          console.log(`Nova pontuação geral: (${multipleChoiceScore} * 0.6) + (${opinionScore} * 0.4) = ${overallScore}`);
+          console.log(`Nova pontuação geral: (${multipleChoiceScore.toFixed(2)} * 0.6) + (${opinionScore.toFixed(2)} * 0.4) = ${overallScore.toFixed(2)}`);
         }
       } else if (totalQuestions > 0) {
         // Se só temos questões de múltipla escolha
         overallScore = multipleChoiceScore;
-        console.log(`Pontuação geral (apenas múltipla escolha): ${overallScore}`);
+        console.log(`Pontuação geral (apenas múltipla escolha): ${overallScore.toFixed(2)}`);
       } else if (opinionResponses.length > 0) {
         // Se só temos questões opinativas
         overallScore = opinionScore;
-        console.log(`Pontuação geral (apenas opinativas): ${overallScore}`);
+        console.log(`Pontuação geral (apenas opinativas): ${overallScore.toFixed(2)}`);
       }
 
       // Calcular a data de término com base na data de início e no tempo real gasto
@@ -383,35 +383,47 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
   const groupScores: Record<string, number> = {};
   
   Object.entries(traitsByGroup).forEach(([groupId, traits]) => {
-    // Calcular a compatibilidade apenas para os traços deste grupo
-    let totalWeightedScore = 0;
-    let maxPossibleScore = 0;
-    
-    traits.forEach(trait => {
-      if (trait.weight && trait.weight > 0) {
-        const score = trait.score || 0;
-        totalWeightedScore += score * trait.weight;
-        maxPossibleScore += 100 * trait.weight; // Pontuação máxima possível é 100
-      }
-    });
-    
-    // Calcular a pontuação ponderada para este grupo
-    const groupWeightedScore = maxPossibleScore > 0 ? (totalWeightedScore / maxPossibleScore) * 100 : 0;
-    groupScores[groupId] = groupWeightedScore;
-  });
-  
-  // Adicionar logs detalhados para depuração
-  console.log('Pontuações por grupo:');
-  Object.keys(groupScores).forEach(groupId => {
-    const traitsCount = groupDetails[groupId].length;
-    console.log(`- Grupo ${groupId.substring(0, 6)}: ${groupScores[groupId].toFixed(1)}% (${traitsCount} traços)`);
+    // Verificar se o grupo tem apenas um traço
+    if (traits.length === 1) {
+      // Se o grupo tem apenas um traço, usar a porcentagem desse traço
+      const trait = traits[0];
+      const groupResponseCount = responseCountByGroup[groupId] || 1;
+      const totalResponses = totalPersonalityResponses || 1;
+      
+      // Calcular a pontuação como a proporção das respostas deste traço em relação ao total
+      const percentage = (trait.count / totalResponses) * 100;
+      groupScores[groupId] = percentage;
+      
+      console.log(`Grupo ${groupId.substring(0, 6)} tem apenas um traço (${trait.trait}): ${percentage.toFixed(1)}% (${trait.count}/${totalResponses} respostas)`);
+    } else {
+      // Se o grupo tem múltiplos traços, calcular a média ponderada
+      let totalWeightedScore = 0;
+      let maxPossibleScore = 0;
+      
+      traits.forEach(trait => {
+        if (trait.weight && trait.weight > 0) {
+          // Usar a porcentagem global do traço, não a porcentagem dentro do grupo
+          const totalResponses = totalPersonalityResponses || 1;
+          const percentage = (trait.count / totalResponses) * 100;
+          
+          totalWeightedScore += percentage * trait.weight;
+          maxPossibleScore += 100 * trait.weight; // Pontuação máxima possível é 100
+        }
+      });
+      
+      // Calcular a pontuação ponderada para este grupo
+      const groupWeightedScore = maxPossibleScore > 0 ? (totalWeightedScore / maxPossibleScore) * 100 : 0;
+      groupScores[groupId] = groupWeightedScore;
+      
+      console.log(`Grupo ${groupId.substring(0, 6)} tem ${traits.length} traços: ${groupWeightedScore.toFixed(1)}%`);
+    }
   });
   
   // Calcular a média das pontuações de todos os grupos
   const groupIds = Object.keys(groupScores);
   
   // Adicionar logs detalhados para depuração
-  console.log('Pontuações por grupo:');
+  console.log('Resumo das pontuações por grupo:');
   groupIds.forEach(groupId => {
     const traitsCount = groupDetails[groupId].length;
     console.log(`- Grupo ${groupId.substring(0, 6)}: ${groupScores[groupId].toFixed(1)}% (${traitsCount} traços)`);
