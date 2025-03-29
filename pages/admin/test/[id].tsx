@@ -17,7 +17,7 @@ import TestStagesList from '../../../components/admin/TestStagesList'
 import DeletedQuestionsHandler from '../../../components/admin/DeletedQuestionsHandler'
 import { useNotification } from '../../../contexts/NotificationContext'
 import { useNotificationSystem } from '../../../hooks/useNotificationSystem'
-import { Question, TestStage } from '../../types/questions'
+import { Question, TestStage, QuestionType, QuestionDifficulty } from '@/types/questions'
 
 interface Test {
   id: string

@@ -21,15 +21,48 @@ export interface QuestionOption {
 
 // Interface para perguntas
 export interface Question {
-  id?: string;
+  id: string;
   text: string;
   stageId?: string;
   stageName?: string;
+  categoryId?: string;
   categoryUuid?: string;
   categoryName?: string;
+  categories?: { id: string; name: string }[];
   type: QuestionType;
   difficulty: QuestionDifficulty;
   showResults?: boolean;
   initialExplanation?: string;
   options: QuestionOption[];
+}
+
+// Interface para estágios de teste
+export interface TestStage {
+  id: string;
+  testId: string;
+  stageId: string;
+  order: number;
+  stage: Stage;
+}
+
+// Interface para QuestionStage (relação entre Stage e Question)
+export interface QuestionStage {
+  id: string;
+  questionId: string;
+  stageId: string;
+  order: number;
+  question: Question;
+}
+
+// Interface para Stage
+export interface Stage {
+  id: string;
+  title: string;
+  description: string | null;
+  order: number;
+  testId?: string;
+  questionType?: string;
+  questions: Question[];
+  questionStages?: QuestionStage[];
+  requestPhoto?: boolean;
 }

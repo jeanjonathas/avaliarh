@@ -18,7 +18,7 @@ export default async function handler(
   }
   
   // Verificar se o usuário é administrador
-  if (session.user.role !== 'ADMIN') {
+  if (session.user.role !== 'COMPANY_ADMIN') {
     return res.status(403).json({ 
       success: false, 
       error: 'Acesso negado. Apenas administradores podem executar esta operação.' 
@@ -79,22 +79,25 @@ export default async function handler(
       
       console.log(`Removendo ${questionIds.length} perguntas da etapa ${stageId} do teste ${id}`);
       
-      // Remover as relações entre perguntas e etapa
-      const deleteResult = await prisma.questionStage.deleteMany({
+      // Atualizar as perguntas para remover a associação com a etapa
+      const updateResult = await prisma.question.updateMany({
         where: {
           stageId: stageId as string,
-          questionId: {
+          id: {
             in: questionIds
           }
+        },
+        data: {
+          stageId: null
         }
       });
       
-      console.log(`Removidas ${deleteResult.count} relações entre perguntas e etapa`);
+      console.log(`Removidas ${updateResult.count} associações entre perguntas e etapa`);
       
       return res.status(200).json({
         success: true,
-        message: `${deleteResult.count} perguntas foram removidas da etapa com sucesso.`,
-        removedCount: deleteResult.count
+        message: `${updateResult.count} perguntas foram removidas da etapa com sucesso.`,
+        removedCount: updateResult.count
       });
     } catch (error) {
       console.error('Erro ao remover perguntas da etapa:', error);

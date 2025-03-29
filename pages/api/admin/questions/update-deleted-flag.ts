@@ -23,7 +23,7 @@ export default async function handler(
     }
     
     // Verificar se o usuário é administrador
-    if (session.user.role !== 'ADMIN') {
+    if (session.user.role !== 'COMPANY_ADMIN') {
       return res.status(403).json({ 
         success: false, 
         error: 'Acesso negado. Apenas administradores podem executar esta operação.' 
