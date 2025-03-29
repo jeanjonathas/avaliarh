@@ -91,7 +91,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       include: {
         stages: {
           include: {
-            questions: true
+            questions: true // Incluir todas as perguntas para verificação
           }
         }
       }
@@ -105,9 +105,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     
     // Verificar se o teste possui perguntas excluídas
+    console.log('Verificando perguntas excluídas no teste:', testId);
+    
+    // Depurar a estrutura das perguntas para verificar o campo deleted
+    let deletedQuestionsFound = 0;
+    testExists.stages.forEach((stage, stageIndex) => {
+      console.log(`Estágio ${stageIndex + 1} (${stage.id}): ${stage.questions.length} perguntas`);
+      stage.questions.forEach((question: any, questionIndex) => {
+        console.log(`  Pergunta ${questionIndex + 1} (${question.id}): deleted=${question.deleted}, showResults=${question.showResults}, text="${question.text?.substring(0, 30)}..."`);
+      });
+    });
+    
     const hasDeletedQuestions = testExists.stages.some(stage => 
-      stage.questions.some(question => (question as any).deleted === true)
+      stage.questions.some(question => {
+        // Usar type casting para acessar o campo deleted
+        const questionWithDeleted = question as any;
+        
+        // Uma pergunta é considerada excluída se:
+        // 1. O campo deleted é true, OU
+        // 2. O campo showResults é false, OU
+        // 3. O texto da pergunta começa com "[EXCLUÍDA]"
+        const isDeleted = 
+          questionWithDeleted.deleted === true || 
+          questionWithDeleted.showResults === false ||
+          (typeof questionWithDeleted.text === 'string' && questionWithDeleted.text.startsWith('[EXCLUÍDA]'));
+        
+        if (isDeleted) {
+          deletedQuestionsFound++;
+          console.log(`Pergunta excluída encontrada: ID=${questionWithDeleted.id}, deleted=${questionWithDeleted.deleted}, showResults=${questionWithDeleted.showResults}, text="${questionWithDeleted.text?.substring(0, 30)}..."`);
+        }
+        
+        return isDeleted;
+      })
     );
+    
+    console.log(`Total de perguntas excluídas encontradas: ${deletedQuestionsFound}`);
     
     if (hasDeletedQuestions) {
       return res.status(400).json({

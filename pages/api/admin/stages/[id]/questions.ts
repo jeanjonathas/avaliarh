@@ -168,6 +168,8 @@ export default async function handler(
         return res.status(400).json({ error: 'ID da questão inválido' });
       }
 
+      console.log(`[API] Removendo questão ${questionId} do estágio ${id}`);
+
       // Verificar se a questão está associada ao estágio
       const stage = await prisma.stage.findUnique({
         where: { id },
@@ -184,20 +186,26 @@ export default async function handler(
         return res.status(404).json({ error: 'Questão não encontrada neste estágio' });
       }
 
-      // Desconectar a questão do estágio
-      await prisma.stage.update({
-        where: { id },
+      // Agora que a relação é opcional, podemos simplesmente definir stageId como null
+      await prisma.question.update({
+        where: { id: questionId },
         data: {
-          questions: {
-            disconnect: { id: questionId }
-          }
+          stageId: null
         }
       });
+      
+      console.log(`[API] Questão ${questionId} removida do estágio ${id}`);
 
-      return res.status(200).json({ success: true, message: 'Questão removida do estágio com sucesso' });
+      return res.status(200).json({ 
+        success: true, 
+        message: 'Questão removida do estágio com sucesso' 
+      });
     } catch (error) {
       console.error('Erro ao remover questão do estágio:', error);
-      return res.status(500).json({ error: 'Erro ao remover questão do estágio' });
+      return res.status(500).json({ 
+        error: 'Erro ao remover questão do estágio',
+        details: error.message
+      });
     }
   }
   // Método não permitido

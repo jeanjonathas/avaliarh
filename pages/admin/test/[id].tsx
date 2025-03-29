@@ -14,6 +14,7 @@ import QuestionTypeModal from '../../../components/admin/QuestionTypeModal'
 import NewQuestionModal from '../../../components/admin/NewQuestionModal'
 import LoadingOverlay from '../../../components/common/LoadingOverlay'
 import TestStagesList from '../../../components/admin/TestStagesList'
+import DeletedQuestionsHandler from '../../../components/admin/DeletedQuestionsHandler'
 import { useNotification } from '../../../contexts/NotificationContext'
 import { useNotificationSystem } from '../../../hooks/useNotificationSystem'
 import { QuestionType } from '../../../types/questions'
@@ -126,52 +127,9 @@ const TestDetail: NextPage = () => {
   // Ref para controlar se já carregamos os dados
   const hasLoadedDataRef = useRef(false);
   
-  // Verificar se o teste tem perguntas excluídas
-  const [hasDeletedQuestions, setHasDeletedQuestions] = useState(false);
+  // Remover os estados e funções relacionados à verificação antiga de perguntas excluídas
+  // que agora será feita pelo componente DeletedQuestionsHandler
   
-  // Função para verificar perguntas excluídas
-  const checkForDeletedQuestions = useCallback(async () => {
-    if (!test || !test.testStages) return;
-    
-    try {
-      // Para cada etapa do teste, verificar se há perguntas excluídas
-      let foundDeletedQuestions = false;
-      
-      for (const testStage of test.testStages) {
-        if (!testStage.stage.questionStages) continue;
-        
-        // Obter todos os IDs de perguntas desta etapa
-        const questionIds = testStage.stage.questionStages.map(qs => qs.questionId);
-        if (questionIds.length === 0) continue;
-        
-        // Buscar detalhes das perguntas para verificar se alguma está excluída
-        const response = await fetch(`/api/admin/questions?ids=${questionIds.join(',')}&includeDeleted=true`);
-        if (!response.ok) continue;
-        
-        const questions = await response.json();
-        
-        // Verificar se alguma pergunta está marcada como excluída
-        const deletedQuestions = questions.filter((q: any) => q.deleted === true);
-        if (deletedQuestions.length > 0) {
-          console.log(`Encontradas ${deletedQuestions.length} perguntas excluídas na etapa ${testStage.stage.id}`);
-          foundDeletedQuestions = true;
-          break;
-        }
-      }
-      
-      setHasDeletedQuestions(foundDeletedQuestions);
-    } catch (error) {
-      console.error('Erro ao verificar perguntas excluídas:', error);
-    }
-  }, [test]);
-  
-  // Verificar perguntas excluídas quando o teste for carregado
-  useEffect(() => {
-    if (test && test.testStages) {
-      checkForDeletedQuestions();
-    }
-  }, [test, checkForDeletedQuestions]);
-
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/admin/login')
@@ -304,20 +262,20 @@ const TestDetail: NextPage = () => {
   }, [id, status, notify])
 
   // Função para recarregar os dados do teste
-  const reloadTestData = async () => {
-    if (!id || typeof id !== 'string') return
+  const reloadTestData = useCallback(async () => {
+    if (!id || typeof id !== 'string') return;
 
     try {
       console.log('Iniciando recarregamento de dados...');
-      setTestDataLoading(true)
+      setTestDataLoading(true);
       
       // Buscar dados do teste
       console.log('Fazendo requisição para:', `/api/admin/tests/${id}`);
-      const testResponse = await fetch(`/api/admin/tests/${id}`)
+      const testResponse = await fetch(`/api/admin/tests/${id}`);
       if (!testResponse.ok) {
-        throw new Error('Erro ao carregar os dados do teste')
+        throw new Error('Erro ao carregar os dados do teste');
       }
-      const testData = await testResponse.json()
+      const testData = await testResponse.json();
       console.log('Dados recebidos da API:', testData);
       
       if (testData.stages && testData.stages.length > 0) {
@@ -350,18 +308,24 @@ const TestDetail: NextPage = () => {
             })) : []
           }
         }))
-      }
+      };
       
       console.log('Adaptação concluída, atualizando estado...');
-      setTest(adaptedTest)
+      setTest(adaptedTest);
       console.log('Estado atualizado com sucesso');
     } catch (error) {
-      console.error('Erro ao recarregar dados:', error)
-      notify.showError('Não foi possível recarregar os dados do teste. Por favor, tente novamente.')
+      console.error('Erro ao recarregar dados:', error);
+      notify.showError('Não foi possível recarregar os dados do teste. Por favor, tente novamente.');
     } finally {
-      setTestDataLoading(false)
+      setTestDataLoading(false);
     }
-  }
+  }, [id, notify]);
+  
+  // Função para ser chamada após a remoção de perguntas excluídas
+  const handleDeletedQuestionsRemoved = useCallback(() => {
+    reloadTestData();
+    notify.showSuccess('Perguntas excluídas removidas com sucesso. O teste foi atualizado.');
+  }, [reloadTestData, notify]);
 
   // Função para atualizar a ordem de uma etapa
   const updateStageOrder = async (stageId: string, newOrder: number) => {
@@ -941,21 +905,50 @@ const TestDetail: NextPage = () => {
       'Tem certeza que deseja remover esta pergunta da etapa? Esta ação não pode ser desfeita.',
       async () => {
         try {
-          console.log(`[Frontend] Enviando requisição DELETE para /api/admin/stages/${stageId}/questions/${questionId}`);
-          const response = await fetch(`/api/admin/stages/${stageId}/questions/${questionId}`, {
-            method: 'DELETE',
-          })
-
-          console.log(`[Frontend] Resposta recebida: status ${response.status}`);
+          // Usar o endpoint que não requer papel de administrador
+          console.log(`[Frontend] Enviando requisição DELETE para /api/admin/stages/${stageId}/questions`);
           
-          if (!response.ok) {
-            const errorData = await response.json();
-            console.error(`[Frontend] Erro ao remover pergunta: ${JSON.stringify(errorData)}`);
+          // Primeiro, obter a lista de perguntas atual da etapa
+          const stageResponse = await fetch(`/api/admin/stages/${stageId}`);
+          if (!stageResponse.ok) {
+            throw new Error('Erro ao obter detalhes da etapa');
+          }
+          
+          const stageData = await stageResponse.json();
+          console.log(`[Frontend] Etapa obtida: ${stageData.id}, ${stageData.title}`);
+          
+          // Obter todas as perguntas da etapa
+          const questionsResponse = await fetch(`/api/admin/stages/${stageId}/questions`);
+          if (!questionsResponse.ok) {
+            throw new Error('Erro ao obter perguntas da etapa');
+          }
+          
+          const questions = await questionsResponse.json();
+          console.log(`[Frontend] Perguntas obtidas: ${questions.length}`);
+          
+          // Filtrar a pergunta a ser removida
+          const remainingQuestions = questions.filter(q => q.id !== questionId);
+          console.log(`[Frontend] Perguntas restantes: ${remainingQuestions.length}`);
+          
+          // Atualizar a etapa com as perguntas restantes
+          const updateResponse = await fetch(`/api/admin/stages/${stageId}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              questions: remainingQuestions.map(q => ({ id: q.id }))
+            }),
+          });
+          
+          if (!updateResponse.ok) {
+            const errorData = await updateResponse.json();
+            console.error(`[Frontend] Erro ao atualizar etapa: ${JSON.stringify(errorData)}`);
             throw new Error(errorData.error || 'Erro ao remover pergunta da etapa');
           }
-
-          const result = await response.json()
-          console.log(`[Frontend] Pergunta removida com sucesso: ${JSON.stringify(result)}`);
+          
+          const result = await updateResponse.json();
+          console.log(`[Frontend] Etapa atualizada com sucesso: ${JSON.stringify(result)}`);
 
           // Atualizar apenas a etapa afetada no estado local
           if (test && test.testStages) {
@@ -982,15 +975,15 @@ const TestDetail: NextPage = () => {
               testStages: updatedTestStages
             });
             
-            notify.showSuccess(result.message || 'Pergunta removida da etapa com sucesso!')
+            notify.showSuccess('Pergunta removida da etapa com sucesso!')
           } else {
             // Caso haja algum problema com o estado, recarregar todos os dados
-            await reloadTestData();
-            notify.showSuccess(result.message || 'Pergunta removida da etapa com sucesso!')
+            await reloadTestData()
+            notify.showSuccess('Pergunta removida da etapa com sucesso!')
           }
         } catch (error) {
-          console.error('Erro:', error)
-          notify.showError(error instanceof Error ? error.message : 'Ocorreu um erro ao remover a pergunta. Por favor, tente novamente.')
+          console.error('Erro ao remover pergunta:', error)
+          notify.showError(error instanceof Error ? error.message : 'Ocorreu um erro ao remover a pergunta')
         }
       },
       {
@@ -999,7 +992,7 @@ const TestDetail: NextPage = () => {
         cancelText: 'Cancelar',
       }
     )
-  };
+  }
 
   const handleCreateQuestion = async (values: any, formikHelpers?: any) => {
     try {
@@ -1191,31 +1184,6 @@ const TestDetail: NextPage = () => {
         </div>
       </div>
 
-      {/* Alerta para perguntas excluídas */}
-      {hasDeletedQuestions && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">Atenção: Este teste contém perguntas excluídas</h3>
-              <div className="mt-2 text-sm text-red-700">
-                <p>Este teste contém perguntas que foram marcadas como excluídas. Não será possível gerar convites para este teste até que todas as perguntas excluídas sejam substituídas por outras.</p>
-                <button 
-                  onClick={checkForDeletedQuestions}
-                  className="mt-2 px-3 py-1 bg-red-100 text-red-800 rounded hover:bg-red-200 text-sm font-medium"
-                >
-                  Verificar novamente
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Modal para adicionar etapa */}
       <AddStageModal 
         isOpen={showAddStageModal}
@@ -1268,6 +1236,15 @@ const TestDetail: NextPage = () => {
         selectedStageId={selectedStageId}
         selectedQuestionType={selectedQuestionType || QuestionType.MULTIPLE_CHOICE}
       />
+      
+      {/* Componente para verificar e remover perguntas excluídas */}
+      {test && (
+        <DeletedQuestionsHandler 
+          testId={test.id} 
+          testStages={test.testStages} 
+          onQuestionsRemoved={handleDeletedQuestionsRemoved} 
+        />
+      )}
     </AdminLayout>
   )
 }

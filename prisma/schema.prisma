@@ -239,7 +239,7 @@ model TestStage {
 model Question {
   id               String          @id @default(uuid())
   text             String
-  stageId          String
+  stageId          String?         // Tornando o campo opcional com ?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
   companyId        String?
@@ -255,7 +255,7 @@ model Question {
   company          Company?        @relation(fields: [companyId], references: [id])
   emotionGroup     EmotionGroup?   @relation(fields: [emotionGroupId], references: [id])
   globalQuestion   GlobalQuestion? @relation(fields: [globalQuestionId], references: [id])
-  stage            Stage           @relation(fields: [stageId], references: [id])
+  stage            Stage?          @relation(fields: [stageId], references: [id])  // Tornando a relação opcional com ?
   responses        Response[]
   categories       Category[]      @relation("CategoryToQuestion")
 }
