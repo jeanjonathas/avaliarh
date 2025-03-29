@@ -174,7 +174,7 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
       totalCompatibility: totalGroupCompatibility,
       groupCompatibilities
     };
-  }, [personalityGroupIds]);
+  }, []);
 
   // Função auxiliar para calcular a compatibilidade para um conjunto de traços
   const calculateCompatibilityForTraits = (
