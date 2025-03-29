@@ -17,7 +17,7 @@ import TestStagesList from '../../../components/admin/TestStagesList'
 import DeletedQuestionsHandler from '../../../components/admin/DeletedQuestionsHandler'
 import { useNotification } from '../../../contexts/NotificationContext'
 import { useNotificationSystem } from '../../../hooks/useNotificationSystem'
-import { QuestionType } from '../../../types/questions'
+import { Question, TestStage } from '../../types/questions'
 
 interface Test {
   id: string
@@ -25,7 +25,7 @@ interface Test {
   description: string | null
   timeLimit: number | null
   active: boolean
-  stages: Stage[]
+  stages: any[]
   testStages?: TestStage[] // Adicionado para compatibilidade
 }
 
@@ -35,19 +35,8 @@ interface Stage {
   description: string | null
   order: number
   questions: Question[]
-  questionStages?: QuestionStage[] // Adicionado para compatibilidade
+  questionStages?: any[] // Adicionado para compatibilidade
   questionType?: string // Tipo de pergunta permitido nesta etapa
-}
-
-interface Question {
-  id: string
-  text: string
-  options: Option[]
-  categoryId?: string
-  categoryName?: string
-  categories?: Category[] // Mantido para compatibilidade com código existente
-  difficulty?: string // EASY, MEDIUM, HARD
-  type?: string // MULTIPLE_CHOICE, OPINION_MULTIPLE
 }
 
 interface Option {
@@ -61,20 +50,9 @@ interface Category {
   name: string
 }
 
-interface TestStage {
+interface Category {
   id: string
-  testId: string
-  stageId: string
-  order: number
-  stage: Stage
-}
-
-interface QuestionStage {
-  id: string
-  questionId: string
-  stageId: string
-  order: number
-  question: Question
+  name: string
 }
 
 const TestDetail: NextPage = () => {

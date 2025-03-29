@@ -27,7 +27,7 @@ const UpdateDeletedFlagPage: React.FC = () => {
   }
 
   // Verificar se o usuário é administrador
-  if (session.user.role !== 'ADMIN') {
+  if (session.user.role !== 'COMPANY_ADMIN') {
     router.push('/admin');
     return null;
   }

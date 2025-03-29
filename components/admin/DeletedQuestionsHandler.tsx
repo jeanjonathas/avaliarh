@@ -1,15 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import Modal from '../common/Modal';
-
-interface Question {
-  id: string;
-  text: string;
-  options: any[];
-  type?: string;
-  difficulty?: string;
-  deleted?: boolean;
-}
+import { Question } from '../../types/questions';
 
 interface Stage {
   id: string;
