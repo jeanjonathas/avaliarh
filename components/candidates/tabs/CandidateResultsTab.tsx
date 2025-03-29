@@ -552,22 +552,27 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
     return personalities;
   };
 
-  // Agrupar traços por grupo de personalidade (categoryNameUuid)
+  // Agrupar traços por grupo de personalidade (groupId)
   useEffect(() => {
     if (performance?.personalityAnalysis?.allPersonalities) {
       const traits = performance.personalityAnalysis.allPersonalities;
       
-      // Agrupar traços por grupo de personalidade (categoryNameUuid)
+      // Obter o mapa de IDs de grupo
+      const personalityAnalysis = performance.personalityAnalysis as any;
+      const personalityGroupIds = personalityAnalysis.personalityGroupIds || {};
+      
+      // Agrupar traços por grupo de personalidade
       const traitsByGroup: Record<string, Array<any>> = {};
       
-      // Primeiro, agrupar todos os traços pelo categoryNameUuid
+      // Primeiro, agrupar todos os traços pelo ID do grupo
       traits.forEach(trait => {
-        if (trait.categoryNameUuid) {
-          if (!traitsByGroup[trait.categoryNameUuid]) {
-            traitsByGroup[trait.categoryNameUuid] = [];
-          }
-          traitsByGroup[trait.categoryNameUuid].push(trait);
+        // Usar o mapa personalityGroupIds para obter o ID do grupo
+        const groupId = personalityGroupIds[trait.trait] || trait.categoryNameUuid || 'default';
+        
+        if (!traitsByGroup[groupId]) {
+          traitsByGroup[groupId] = [];
         }
+        traitsByGroup[groupId].push(trait);
       });
       
       console.log('Grupos de personalidade encontrados:', Object.keys(traitsByGroup).length);
@@ -590,8 +595,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
       
       setPersonalityGroups(groups);
       
-      // Atualizar compatibilidades por grupo - usando uma verificação de tipo segura
-      const personalityAnalysis = performance.personalityAnalysis as any;
+      // Atualizar compatibilidades por grupo
       if (personalityAnalysis.groupScores) {
         setGroupCompatibilities(personalityAnalysis.groupScores);
       }
@@ -978,6 +982,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                         updateCompatibilityData(score, calculatedTargetProfile, calculatedMatchPercentage);
                         setGroupCompatibilities(groupComps);
                       }}
+                      personalityGroupIds={(performance?.personalityAnalysis as any)?.personalityGroupIds}
                     />
                   </div>
                 )}

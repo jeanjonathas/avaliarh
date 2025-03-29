@@ -258,6 +258,8 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
   const personalityCount: Record<string, number> = {};
   // Mapa para armazenar UUIDs dos traços
   const personalityUuids: Record<string, string> = {};
+  // Mapa para armazenar IDs de grupo dos traços
+  const personalityGroupIds: Record<string, string> = {};
   // Mapa para agrupar traços por grupo de personalidade
   const personalityByGroup: Record<string, Record<string, number>> = {};
   // Mapa para contar respostas por grupo
@@ -296,6 +298,11 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
         // Armazenar o UUID associado a este traço de personalidade
         if (categoryNameUuid && !personalityUuids[personality]) {
           personalityUuids[personality] = categoryNameUuid;
+        }
+        
+        // Armazenar o ID do grupo associado a este traço
+        if (groupId && !personalityGroupIds[personality]) {
+          personalityGroupIds[personality] = groupId;
         }
         
         // Agrupar por grupo de personalidade
@@ -404,7 +411,8 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
       percentage,
       weight,
       weightedScore,
-      categoryNameUuid: personalityUuids[trait] || null
+      categoryNameUuid: personalityUuids[trait] || null,
+      groupId: personalityGroupIds[trait] || null // Adicionar o ID do grupo
     };
   }).sort((a, b) => b.percentage - a.percentage);
 
@@ -417,18 +425,21 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
         percentage: 0, 
         weight: 1, 
         weightedScore: 0,
-        categoryNameUuid: null 
+        categoryNameUuid: null,
+        groupId: null // Adicionar o ID do grupo
       };
 
+  // Incluir o mapa de IDs de grupo na resposta
   return {
     dominantPersonality,
     allPersonalities: personalityPercentages,
-    totalResponses: totalPersonalityResponses,
+    totalTraits: personalityPercentages.length,
     hasTraitWeights,
     weightedScore: personalityScore,
     groupScores,
     groupDetails,
-    groupCount: groupIds.length
+    groupCount: groupIds.length,
+    personalityGroupIds // Incluir o mapa de IDs de grupo
   };
 }
 

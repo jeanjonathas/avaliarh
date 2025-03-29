@@ -19,6 +19,7 @@ interface CandidateCompatibilityChartProps {
     targetProfileMatchPercentage?: number,
     groupCompatibilities?: Record<string, number>
   ) => void;
+  personalityGroupIds?: Record<string, string>;
 }
 
 interface TraitWithCompatibility extends PersonalityTrait {
@@ -37,6 +38,7 @@ interface ProcessPersonalityData {
     name: string;
     weight: number;
     categoryNameUuid?: string;
+    groupId?: string;
   }>;
   expectedProfile: Record<string, number> | null;
   isDefaultData?: boolean;
@@ -47,7 +49,8 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
   expectedProfile: propExpectedProfile,
   processId,
   candidateId,
-  onCompatibilityCalculated
+  onCompatibilityCalculated,
+  personalityGroupIds
 }) => {
   const [compatibilityScore, setCompatibilityScore] = useState<number>(0);
   const [traitsWithCompatibility, setTraitsWithCompatibility] = useState<TraitWithCompatibility[]>([]);
@@ -60,31 +63,35 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
   // Função para calcular a compatibilidade entre os traços do candidato e os pesos do processo
   const calculateCompatibility = useCallback((
     traits: PersonalityTrait[], 
-    processTraits: Array<{name: string, weight: number, categoryNameUuid?: string}>,
-    expectedProfile: Record<string, number>
+    processTraits: Array<{name: string, weight: number, categoryNameUuid?: string, groupId?: string}>,
+    expectedProfile: Record<string, number>,
+    personalityGroupIds?: Record<string, string>
   ): {traitsWithCompatibility: TraitWithCompatibility[], totalCompatibility: number, groupCompatibilities: Record<string, number>} => {
     console.log('Calculando compatibilidade com os seguintes dados:');
-    console.log('- Traços do candidato:', traits);
-    console.log('- Traços do processo:', processTraits);
-    console.log('- Perfil esperado:', expectedProfile);
+    console.log('- Traços do candidato:', traits.length);
+    console.log('- Traços do processo:', processTraits.length);
+    console.log('- Perfil esperado:', expectedProfile ? Object.keys(expectedProfile).length : 0);
     
+    // Verificar se temos dados suficientes para calcular a compatibilidade
     if (!traits || traits.length === 0) {
-      console.error('Nenhum traço de personalidade fornecido para o candidato');
+      console.log('Nenhum traço de personalidade encontrado para o candidato');
       return { traitsWithCompatibility: [], totalCompatibility: 0, groupCompatibilities: {} };
     }
     
     if (!processTraits || processTraits.length === 0) {
-      console.error('Nenhum traço de personalidade configurado para o processo');
+      console.log('Nenhum traço de personalidade encontrado para o processo');
       return { traitsWithCompatibility: [], totalCompatibility: 0, groupCompatibilities: {} };
     }
     
-    // Agrupar traços por grupo de personalidade (categoryNameUuid)
+    // Agrupar traços por grupo de personalidade
     const traitsByGroup: Record<string, PersonalityTrait[]> = {};
-    const processTraitsByGroup: Record<string, Array<{name: string, weight: number, categoryNameUuid?: string}>> = {};
+    const processTraitsByGroup: Record<string, Array<{name: string, weight: number, categoryNameUuid?: string, groupId?: string}>> = {};
     
     // Agrupar os traços do candidato
     traits.forEach(trait => {
-      const groupId = trait.categoryNameUuid || 'default';
+      // Usar o mapa personalityGroupIds para obter o ID do grupo
+      const groupId = personalityGroupIds?.[trait.trait] || trait.categoryNameUuid || 'default';
+      
       if (!traitsByGroup[groupId]) {
         traitsByGroup[groupId] = [];
       }
@@ -93,7 +100,9 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
     
     // Agrupar os traços do processo
     processTraits.forEach(trait => {
-      const groupId = trait.categoryNameUuid || 'default';
+      // Usar o mapa personalityGroupIds para obter o ID do grupo
+      const groupId = personalityGroupIds?.[trait.name] || trait.categoryNameUuid || 'default';
+      
       if (!processTraitsByGroup[groupId]) {
         processTraitsByGroup[groupId] = [];
       }
@@ -165,12 +174,12 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
       totalCompatibility: totalGroupCompatibility,
       groupCompatibilities
     };
-  }, []);
+  }, [personalityGroupIds]);
 
   // Função auxiliar para calcular a compatibilidade para um conjunto de traços
   const calculateCompatibilityForTraits = (
     traits: PersonalityTrait[], 
-    processTraits: Array<{name: string, weight: number, categoryNameUuid?: string}>,
+    processTraits: Array<{name: string, weight: number, categoryNameUuid?: string, groupId?: string}>,
     expectedProfile: Record<string, number>
   ): {traitsWithCompatibility: TraitWithCompatibility[], totalCompatibility: number, groupCompatibilities: Record<string, number>} => {
     // Mapear os traços do candidato para o formato esperado
@@ -180,7 +189,7 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
     }, {});
     
     // Mapear os traços do processo para o formato esperado
-    const processTraitsMap = processTraits.reduce((acc: Record<string, {name: string, weight: number, categoryNameUuid?: string}>, trait) => {
+    const processTraitsMap = processTraits.reduce((acc: Record<string, {name: string, weight: number, categoryNameUuid?: string, groupId?: string}>, trait) => {
       acc[trait.name] = trait;
       return acc;
     }, {});
@@ -463,7 +472,8 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
       const { traitsWithCompatibility, totalCompatibility, groupCompatibilities } = calculateCompatibility(
         personalityTraits,
         processPersonalityData.traits,
-        expectedProfile
+        expectedProfile,
+        personalityGroupIds
       );
       
       // Verificar se foi possível calcular a compatibilidade
@@ -506,7 +516,7 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
       console.error('Erro ao calcular compatibilidade:', error);
       setError('Erro ao calcular compatibilidade');
     }
-  }, [processPersonalityData, personalityTraits, calculateCompatibility, loading, onCompatibilityCalculated, propExpectedProfile, traitsWithCompatibility]);
+  }, [processPersonalityData, personalityTraits, calculateCompatibility, loading, onCompatibilityCalculated, propExpectedProfile, traitsWithCompatibility, personalityGroupIds]);
 
   // Efeito para atualizar o componente quando o estado muda
   useEffect(() => {
@@ -521,7 +531,7 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
 
   const mergePersonalityTraits = (
     candidateTraits: PersonalityTrait[],
-    processTraits?: Array<{name: string, weight: number, categoryNameUuid?: string}>
+    processTraits?: Array<{name: string, weight: number, categoryNameUuid?: string, groupId?: string}>
   ): PersonalityTrait[] => {
     console.log('Mesclando traços de personalidade:');
     console.log('- Traços do candidato:', candidateTraits);
