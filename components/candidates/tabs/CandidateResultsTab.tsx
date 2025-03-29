@@ -170,7 +170,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
   
   // Estado para controlar a aba de grupo de personalidade selecionada
   const [selectedPersonalityGroup, setSelectedPersonalityGroup] = useState<string>('all');
-  const [personalityGroups, setPersonalityGroups] = useState<{id: string, name: string}[]>([]);
+  const [personalityGroups, setPersonalityGroups] = useState<{id: string, name: string, traitsCount: number}[]>([]);
   const [personalityRadarDataByGroup, setPersonalityRadarDataByGroup] = useState<Record<string, any>>({});
 
   useEffect(() => {
@@ -274,24 +274,63 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
           if (data.personalityAnalysis.groupDetails && Object.keys(data.personalityAnalysis.groupDetails).length > 0) {
             console.log('Dados de grupos de personalidade disponíveis:', Object.keys(data.personalityAnalysis.groupDetails));
             
+            // Obter os nomes dos grupos de personalidade
+            // Aqui vamos buscar os nomes reais dos grupos, se disponíveis
+            const groupNames: Record<string, string> = {};
+            
+            // Tentar obter os nomes dos grupos a partir dos metadados das perguntas
+            if (data.opinionQuestions && data.opinionQuestions.length > 0) {
+              data.opinionQuestions.forEach((question: any) => {
+                if (question.options && question.options.length > 0) {
+                  question.options.forEach((option: any) => {
+                    if (option.emotionGroupId && option.emotionGroupName) {
+                      groupNames[option.emotionGroupId] = option.emotionGroupName;
+                    } else if (option.categoryNameUuid && option.categoryName) {
+                      // Usar o nome da categoria como nome do grupo
+                      // Isso é uma aproximação, pois o nome da categoria pode ser o nome do traço
+                      // e não do grupo, mas é melhor que nada
+                      groupNames[option.categoryNameUuid] = `Grupo: ${option.categoryName}`;
+                    }
+                  });
+                }
+              });
+            }
+            
             // Criar lista de grupos disponíveis
             const groups = Object.keys(data.personalityAnalysis.groupDetails).map(groupId => {
-              // Tentar encontrar um nome para o grupo
-              let groupName = `Grupo ${groupId.substring(0, 6)}`;
+              // Usar o nome do grupo se disponível, caso contrário usar um nome genérico
+              let groupName = groupNames[groupId] || `Grupo ${groupId.substring(0, 6)}`;
               
               // Se for o grupo padrão, usar um nome mais amigável
               if (groupId === 'default') {
                 groupName = 'Grupo Principal';
               }
               
-              return { id: groupId, name: groupName };
+              // Verificar quantos traços tem neste grupo
+              const traitsInGroup = data.personalityAnalysis.groupDetails[groupId].length;
+              
+              return { 
+                id: groupId, 
+                name: groupName,
+                traitsCount: traitsInGroup 
+              };
             });
             
-            // Adicionar a opção "Todos os grupos"
-            groups.unshift({ id: 'all', name: 'Todos os Grupos' });
+            // Filtrar grupos que realmente têm múltiplos traços (pelo menos 2)
+            // Isso evita que tenhamos uma aba para cada traço individual
+            const validGroups = groups.filter(group => group.traitsCount >= 1);
             
-            // Atualizar a lista de grupos
-            setPersonalityGroups(groups);
+            // Se não houver grupos válidos, usar apenas "Todos os Grupos"
+            if (validGroups.length === 0) {
+              console.log('Nenhum grupo com múltiplos traços encontrado, usando apenas "Todos os Grupos"');
+              setPersonalityGroups([{ id: 'all', name: 'Todos os Traços', traitsCount: personalityLabels.length }]);
+            } else {
+              // Adicionar a opção "Todos os grupos"
+              validGroups.unshift({ id: 'all', name: 'Todos os Grupos', traitsCount: personalityLabels.length });
+              
+              // Atualizar a lista de grupos
+              setPersonalityGroups(validGroups);
+            }
             
             // Para cada grupo, criar dados para o gráfico de radar
             Object.entries(data.personalityAnalysis.groupDetails).forEach(([groupId, traits]) => {
@@ -320,7 +359,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
           } else {
             console.log('Dados de grupos de personalidade não disponíveis, usando apenas dados agregados');
             // Definir apenas o grupo "Todos"
-            setPersonalityGroups([{ id: 'all', name: 'Todos os Traços' }]);
+            setPersonalityGroups([{ id: 'all', name: 'Todos os Traços', traitsCount: personalityLabels.length }]);
           }
           
           // Atualizar os dados de radar por grupo
@@ -718,7 +757,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                             }`}
                             onClick={() => setSelectedPersonalityGroup(group.id)}
                           >
-                            {group.name}
+                            {group.name} ({group.traitsCount} traços)
                           </button>
                         ))}
                       </div>
@@ -1201,7 +1240,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                       }`}
                       onClick={() => setSelectedPersonalityGroup(group.id)}
                     >
-                      {group.name}
+                      {group.name} ({group.traitsCount} traços)
                     </button>
                   ))}
                 </div>
@@ -1338,7 +1377,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                     }`}
                     onClick={() => setSelectedPersonalityGroup(group.id)}
                   >
-                    {group.name}
+                    {group.name} ({group.traitsCount} traços)
                   </button>
                 ))}
               </div>
@@ -1574,118 +1613,122 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
               {/* Abas para selecionar o grupo de personalidade (igual aos gráficos) */}
               {personalityGroups.length > 1 && (
                 <div className="flex flex-wrap mb-4 border-b border-gray-200">
-                  {personalityGroups.map((group) => (
-                    <button
-                      key={group.id}
-                      className={`px-4 py-2 text-sm font-medium ${
-                        selectedPersonalityGroup === group.id
-                          ? 'text-primary-600 border-b-2 border-primary-600'
-                          : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                      }`}
-                      onClick={() => setSelectedPersonalityGroup(group.id)}
-                    >
-                      {group.name}
-                    </button>
-                  ))}
+                  {/* Filtrar para mostrar apenas "Todos os Grupos" e no máximo 2 grupos mais relevantes */}
+                  {personalityGroups
+                    .filter((group, index) => 
+                      group.id === 'all' || 
+                      (index <= 2 && Object.keys(groupCompatibilities).includes(group.id))
+                    )
+                    .map((group) => (
+                      <button
+                        key={group.id}
+                        className={`px-4 py-2 text-sm font-medium ${
+                          selectedPersonalityGroup === group.id
+                            ? 'text-primary-600 border-b-2 border-primary-600'
+                            : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }`}
+                        onClick={() => setSelectedPersonalityGroup(group.id)}
+                      >
+                        {group.name} {group.id !== 'all' && `(${group.traitsCount} traços)`}
+                      </button>
+                    ))}
                 </div>
               )}
               
-              <div className="space-y-3">
-                {/* Compatibilidade geral (média de todos os grupos) */}
-                {targetProfile && selectedPersonalityGroup === 'all' && (
-                  <div className="flex flex-col">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-sm font-medium text-gray-700">
-                        {targetProfile} 
-                        <span className="text-xs font-medium text-green-600 ml-1">(Perfil Desejado)</span>
+              {/* Compatibilidade geral (média de todos os grupos) */}
+              {targetProfile && selectedPersonalityGroup === 'all' && (
+                <div className="flex flex-col">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm font-medium text-gray-700">
+                      {targetProfile} 
+                      <span className="text-xs font-medium text-green-600 ml-1">(Perfil Desejado)</span>
+                    </span>
+                    <span className="text-sm text-gray-600">
+                      {profileMatchPercentage.toFixed(1)}% 
+                      <span className="text-xs text-gray-500 ml-1">
+                        (Peso: {performance?.personalityAnalysis?.allPersonalities.find(p => p.trait === targetProfile)?.weight?.toFixed(1) || '?'})
                       </span>
-                      <span className="text-sm text-gray-600">
-                        {profileMatchPercentage.toFixed(1)}% 
-                        <span className="text-xs text-gray-500 ml-1">
-                          (Peso: {performance?.personalityAnalysis?.allPersonalities.find(p => p.trait === targetProfile)?.weight?.toFixed(1) || '?'})
-                        </span>
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className={`h-full rounded-full ${
-                          profileMatchPercentage >= 70 ? 'bg-green-500' : 
-                          profileMatchPercentage >= 40 ? 'bg-yellow-500' : 'bg-red-500'
-                        }`}
-                        style={{ width: `${profileMatchPercentage}%` }}
-                      />
-                    </div>
+                    </span>
                   </div>
-                )}
-                
-                {/* Compatibilidade por grupo */}
-                {targetProfile && selectedPersonalityGroup !== 'all' && Object.keys(groupCompatibilities).length > 0 && (
-                  <div className="flex flex-col">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-sm font-medium text-gray-700">
-                        {targetProfile} - {personalityGroups.find(g => g.id === selectedPersonalityGroup)?.name}
-                        <span className="text-xs font-medium text-green-600 ml-1">(Perfil Desejado)</span>
-                      </span>
-                      <span className="text-sm text-gray-600">
-                        {(groupCompatibilities[selectedPersonalityGroup] || 0).toFixed(1)}% 
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className={`h-full rounded-full ${
-                          (groupCompatibilities[selectedPersonalityGroup] || 0) >= 70 ? 'bg-green-500' : 
-                          (groupCompatibilities[selectedPersonalityGroup] || 0) >= 40 ? 'bg-yellow-500' : 'bg-red-500'
-                        }`}
-                        style={{ width: `${groupCompatibilities[selectedPersonalityGroup] || 0}%` }}
-                      />
-                    </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className={`h-full rounded-full ${
+                        profileMatchPercentage >= 70 ? 'bg-green-500' : 
+                        profileMatchPercentage >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                      }`}
+                      style={{ width: `${profileMatchPercentage}%` }}
+                    />
                   </div>
-                )}
-                
-                {/* Compatibilidade de todos os grupos (quando um grupo específico está selecionado) */}
-                {targetProfile && selectedPersonalityGroup !== 'all' && Object.keys(groupCompatibilities).length > 0 && (
-                  <div className="mt-4 p-3 bg-blue-50 rounded-md text-sm text-blue-700">
-                    <p className="font-medium">Compatibilidade média de todos os grupos: {profileMatchPercentage.toFixed(1)}%</p>
-                    <p className="mt-1">
-                      Esta é a média das compatibilidades de todos os grupos de personalidade.
-                      A compatibilidade acima é específica para o grupo selecionado.
-                    </p>
+                </div>
+              )}
+              
+              {/* Compatibilidade por grupo */}
+              {targetProfile && selectedPersonalityGroup !== 'all' && Object.keys(groupCompatibilities).length > 0 && (
+                <div className="flex flex-col">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm font-medium text-gray-700">
+                      {targetProfile} - {personalityGroups.find(g => g.id === selectedPersonalityGroup)?.name}
+                      <span className="text-xs font-medium text-green-600 ml-1">(Perfil Desejado)</span>
+                    </span>
+                    <span className="text-sm text-gray-600">
+                      {(groupCompatibilities[selectedPersonalityGroup] || 0).toFixed(1)}% 
+                    </span>
                   </div>
-                )}
-                
-                {/* Lista de compatibilidades por grupo (quando "Todos os Grupos" está selecionado) */}
-                {targetProfile && selectedPersonalityGroup === 'all' && Object.keys(groupCompatibilities).length > 0 && personalityGroups.length > 1 && (
-                  <div className="mt-4">
-                    <h5 className="text-sm font-medium text-gray-700 mb-2">Compatibilidade por Grupo de Personalidade</h5>
-                    <div className="space-y-2">
-                      {Object.entries(groupCompatibilities).map(([groupId, compatibility]) => {
-                        const groupName = personalityGroups.find(g => g.id === groupId)?.name || `Grupo ${groupId}`;
-                        return (
-                          <div key={groupId} className="flex flex-col">
-                            <div className="flex justify-between items-center mb-1">
-                              <span className="text-xs font-medium text-gray-700">
-                                {groupName}
-                              </span>
-                              <span className="text-xs text-gray-600">
-                                {compatibility.toFixed(1)}%
-                              </span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-1.5">
-                              <div 
-                                className={`h-full rounded-full ${
-                                  compatibility >= 70 ? 'bg-green-500' : 
-                                  compatibility >= 40 ? 'bg-yellow-500' : 'bg-red-500'
-                                }`}
-                                style={{ width: `${compatibility}%` }}
-                              />
-                            </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className={`h-full rounded-full ${
+                        (groupCompatibilities[selectedPersonalityGroup] || 0) >= 70 ? 'bg-green-500' : 
+                        (groupCompatibilities[selectedPersonalityGroup] || 0) >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                      }`}
+                      style={{ width: `${groupCompatibilities[selectedPersonalityGroup] || 0}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+              
+              {/* Compatibilidade de todos os grupos (quando um grupo específico está selecionado) */}
+              {targetProfile && selectedPersonalityGroup !== 'all' && Object.keys(groupCompatibilities).length > 0 && (
+                <div className="mt-4 p-3 bg-blue-50 rounded-md text-sm text-blue-700">
+                  <p className="font-medium">Compatibilidade média de todos os grupos: {profileMatchPercentage.toFixed(1)}%</p>
+                  <p className="mt-1">
+                    Esta é a média das compatibilidades de todos os grupos de personalidade.
+                    A compatibilidade acima é específica para o grupo selecionado.
+                  </p>
+                </div>
+              )}
+              
+              {/* Lista de compatibilidades por grupo (quando "Todos os Grupos" está selecionado) */}
+              {targetProfile && selectedPersonalityGroup === 'all' && Object.keys(groupCompatibilities).length > 0 && personalityGroups.length > 1 && (
+                <div className="mt-4">
+                  <h5 className="text-sm font-medium text-gray-700 mb-2">Compatibilidade por Grupo de Personalidade</h5>
+                  <div className="space-y-2">
+                    {Object.entries(groupCompatibilities).map(([groupId, compatibility]) => {
+                      const groupName = personalityGroups.find(g => g.id === groupId)?.name || `Grupo ${groupId}`;
+                      return (
+                        <div key={groupId} className="flex flex-col">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-xs font-medium text-gray-700">
+                              {groupName}
+                            </span>
+                            <span className="text-xs text-gray-600">
+                              {compatibility.toFixed(1)}%
+                            </span>
                           </div>
-                        );
-                      })}
-                    </div>
+                          <div className="w-full bg-gray-200 rounded-full h-1.5">
+                            <div 
+                              className={`h-full rounded-full ${
+                                compatibility >= 70 ? 'bg-green-500' : 
+                                compatibility >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                              }`}
+                              style={{ width: `${compatibility}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           )}
           

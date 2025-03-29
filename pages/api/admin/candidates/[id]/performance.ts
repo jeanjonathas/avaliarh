@@ -394,6 +394,14 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
   
   // Calcular a média das pontuações de todos os grupos
   const groupIds = Object.keys(groupScores);
+  
+  // Adicionar logs detalhados para depuração
+  console.log('Pontuações por grupo:');
+  groupIds.forEach(groupId => {
+    const traitsCount = groupDetails[groupId].length;
+    console.log(`- Grupo ${groupId}: ${groupScores[groupId]}% (${traitsCount} traços)`);
+  });
+  
   const averageGroupScore = groupIds.length > 0
     ? groupIds.reduce((sum, groupId) => sum + groupScores[groupId], 0) / groupIds.length
     : 0;
