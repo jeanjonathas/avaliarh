@@ -552,6 +552,52 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
     return personalities;
   };
 
+  // Agrupar traços por grupo de personalidade (categoryNameUuid)
+  useEffect(() => {
+    if (performance?.personalityAnalysis?.allPersonalities) {
+      const traits = performance.personalityAnalysis.allPersonalities;
+      
+      // Agrupar traços por grupo de personalidade (categoryNameUuid)
+      const traitsByGroup: Record<string, Array<any>> = {};
+      
+      // Primeiro, agrupar todos os traços pelo categoryNameUuid
+      traits.forEach(trait => {
+        if (trait.categoryNameUuid) {
+          if (!traitsByGroup[trait.categoryNameUuid]) {
+            traitsByGroup[trait.categoryNameUuid] = [];
+          }
+          traitsByGroup[trait.categoryNameUuid].push(trait);
+        }
+      });
+      
+      console.log('Grupos de personalidade encontrados:', Object.keys(traitsByGroup).length);
+      
+      // Criar array de grupos para as abas
+      const groups = [
+        { id: 'all', name: 'Todos os Grupos', traitsCount: traits.length }
+      ];
+      
+      // Adicionar grupos reais
+      Object.entries(traitsByGroup).forEach(([groupId, groupTraits]) => {
+        // Usar apenas os primeiros 6 caracteres do UUID para tornar a exibição mais limpa
+        const shortId = groupId.substring(0, 6);
+        groups.push({
+          id: groupId,
+          name: `Grupo ${shortId}`,
+          traitsCount: groupTraits.length
+        });
+      });
+      
+      setPersonalityGroups(groups);
+      
+      // Atualizar compatibilidades por grupo - usando uma verificação de tipo segura
+      const personalityAnalysis = performance.personalityAnalysis as any;
+      if (personalityAnalysis.groupScores) {
+        setGroupCompatibilities(personalityAnalysis.groupScores);
+      }
+    }
+  }, [performance]);
+
   if (loading && loadingPerformance) {
     return (
       <div className="flex justify-center items-center p-8">
@@ -1230,19 +1276,24 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
               {/* Abas para selecionar o grupo de personalidade (igual ao primeiro gráfico) */}
               {personalityGroups.length > 1 && (
                 <div className="flex flex-wrap mb-4 border-b border-gray-200">
-                  {personalityGroups.map((group) => (
-                    <button
-                      key={group.id}
-                      className={`px-3 py-1 text-xs font-medium ${
-                        selectedPersonalityGroup === group.id
-                          ? 'text-primary-600 border-b-2 border-primary-600'
-                          : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                      }`}
-                      onClick={() => setSelectedPersonalityGroup(group.id)}
-                    >
-                      {group.name} ({group.traitsCount} traços)
-                    </button>
-                  ))}
+                  {personalityGroups
+                    .filter((group, index) => 
+                      group.id === 'all' || 
+                      (index <= 2 && group.traitsCount > 1)
+                    )
+                    .map((group) => (
+                      <button
+                        key={group.id}
+                        className={`px-3 py-1 text-xs font-medium ${
+                          selectedPersonalityGroup === group.id
+                            ? 'text-primary-600 border-b-2 border-primary-600'
+                            : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }`}
+                        onClick={() => setSelectedPersonalityGroup(group.id)}
+                      >
+                        {group.name} ({group.traitsCount} traços)
+                      </button>
+                    ))}
                 </div>
               )}
               
@@ -1367,19 +1418,24 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
             {/* Abas para selecionar o grupo de personalidade (igual aos gráficos) */}
             {personalityGroups.length > 1 && (
               <div className="flex flex-wrap mb-4 border-b border-gray-200">
-                {personalityGroups.map((group) => (
-                  <button
-                    key={group.id}
-                    className={`px-4 py-2 text-sm font-medium ${
-                      selectedPersonalityGroup === group.id
-                        ? 'text-primary-600 border-b-2 border-primary-600'
-                        : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                    onClick={() => setSelectedPersonalityGroup(group.id)}
-                  >
-                    {group.name} ({group.traitsCount} traços)
-                  </button>
-                ))}
+                {personalityGroups
+                  .filter((group, index) => 
+                    group.id === 'all' || 
+                    (index <= 2 && group.traitsCount > 1)
+                  )
+                  .map((group) => (
+                    <button
+                      key={group.id}
+                      className={`px-4 py-2 text-sm font-medium ${
+                        selectedPersonalityGroup === group.id
+                          ? 'text-primary-600 border-b-2 border-primary-600'
+                          : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                      onClick={() => setSelectedPersonalityGroup(group.id)}
+                    >
+                      {group.name} ({group.traitsCount} traços)
+                    </button>
+                  ))}
               </div>
             )}
             

@@ -327,6 +327,66 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
     });
   }
 
+  // Agrupar traços por grupo de personalidade (categoryNameUuid)
+  const traitsByGroup: Record<string, PersonalityTrait[]> = {};
+  const groupDetails: Record<string, any[]> = {};
+  
+  // Primeiro, agrupar todos os traços pelo categoryNameUuid
+  Object.entries(personalityByGroup).forEach(([groupId, traits]) => {
+    traitsByGroup[groupId] = Object.entries(traits).map(([trait, count]) => ({
+      trait,
+      count,
+      score: 0,
+      weight: hasTraitWeights ? (traitWeights[trait.toLowerCase()] || 1) : 1
+    }));
+    groupDetails[groupId] = traitsByGroup[groupId].map(trait => ({
+      trait: trait.trait,
+      score: trait.score,
+      weight: trait.weight
+    }));
+  });
+  
+  console.log('Grupos de personalidade encontrados:', Object.keys(traitsByGroup).length);
+  
+  // Calcular compatibilidade por grupo
+  const groupScores: Record<string, number> = {};
+  
+  Object.entries(traitsByGroup).forEach(([groupId, traits]) => {
+    // Calcular a compatibilidade apenas para os traços deste grupo
+    let totalWeightedScore = 0;
+    let maxPossibleScore = 0;
+    
+    traits.forEach(trait => {
+      if (trait.weight && trait.weight > 0) {
+        const score = trait.score || 0;
+        totalWeightedScore += score * trait.weight;
+        maxPossibleScore += 100 * trait.weight; // Pontuação máxima possível é 100
+      }
+    });
+    
+    // Calcular a pontuação ponderada para este grupo
+    const groupWeightedScore = maxPossibleScore > 0 ? (totalWeightedScore / maxPossibleScore) * 100 : 0;
+    groupScores[groupId] = groupWeightedScore;
+  });
+  
+  // Adicionar logs detalhados para depuração
+  console.log('Pontuações por grupo:');
+  Object.keys(groupScores).forEach(groupId => {
+    const traitsCount = groupDetails[groupId].length;
+    console.log(`- Grupo ${groupId.substring(0, 6)}: ${groupScores[groupId].toFixed(1)}% (${traitsCount} traços)`);
+  });
+  
+  // Calcular a média das pontuações de todos os grupos
+  const groupIds = Object.keys(groupScores);
+  const averageGroupScore = groupIds.length > 0
+    ? groupIds.reduce((sum, groupId) => sum + groupScores[groupId], 0) / groupIds.length
+    : 0;
+  
+  console.log(`Média das pontuações dos grupos (${groupIds.length} grupos): ${averageGroupScore.toFixed(1)}%`);
+  
+  // Usar a média das pontuações dos grupos como a pontuação de personalidade
+  const personalityScore = averageGroupScore;
+  
   // Calcular percentuais e pontuações para todos os traços (para manter compatibilidade)
   const personalityPercentages = Object.entries(personalityCount).map(([trait, count]) => {
     const percentage = totalPersonalityResponses > 0 
@@ -348,66 +408,6 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
     };
   }).sort((a, b) => b.percentage - a.percentage);
 
-  // Calcular pontuações por grupo
-  const groupScores: Record<string, number> = {};
-  const groupDetails: Record<string, any[]> = {};
-  
-  // Para cada grupo de personalidade
-  Object.entries(personalityByGroup).forEach(([groupId, traitCounts]) => {
-    const groupResponseCount = responseCountByGroup[groupId];
-    
-    // Calcular percentuais e pontuações para este grupo
-    const groupTraits = Object.entries(traitCounts).map(([trait, count]) => {
-      const percentage = groupResponseCount > 0 
-        ? Number(((count / groupResponseCount) * 100).toFixed(1)) 
-        : 0;
-      
-      const traitLower = trait.toLowerCase();
-      const weight = hasTraitWeights ? (traitWeights[traitLower] || 1) : 1;
-      
-      const weightedScore = percentage * weight;
-      
-      return {
-        trait,
-        count,
-        percentage,
-        weight,
-        weightedScore,
-        groupId,
-        categoryNameUuid: personalityUuids[trait] || null
-      };
-    }).sort((a, b) => b.percentage - a.percentage);
-    
-    // Calcular pontuação ponderada para este grupo
-    const totalWeightedScore = groupTraits.reduce((sum, p) => sum + p.weightedScore, 0);
-    const maxPossibleScore = groupTraits.reduce((sum, p) => sum + (p.percentage * 5), 0);
-    
-    const groupWeightedScore = maxPossibleScore > 0 
-      ? (totalWeightedScore / maxPossibleScore) * 100 
-      : 0;
-    
-    groupScores[groupId] = Number(groupWeightedScore.toFixed(1));
-    groupDetails[groupId] = groupTraits;
-    
-    console.log(`Grupo ${groupId}: pontuação ${groupScores[groupId]}%, ${groupTraits.length} traços`);
-  });
-  
-  // Calcular a média das pontuações de todos os grupos
-  const groupIds = Object.keys(groupScores);
-  
-  // Adicionar logs detalhados para depuração
-  console.log('Pontuações por grupo:');
-  groupIds.forEach(groupId => {
-    const traitsCount = groupDetails[groupId].length;
-    console.log(`- Grupo ${groupId}: ${groupScores[groupId]}% (${traitsCount} traços)`);
-  });
-  
-  const averageGroupScore = groupIds.length > 0
-    ? groupIds.reduce((sum, groupId) => sum + groupScores[groupId], 0) / groupIds.length
-    : 0;
-  
-  console.log(`Média das pontuações dos grupos (${groupIds.length} grupos): ${averageGroupScore.toFixed(1)}%`);
-
   // Determinar o traço dominante (para manter compatibilidade)
   const dominantPersonality = personalityPercentages.length > 0 
     ? personalityPercentages[0] 
@@ -420,21 +420,21 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
         categoryNameUuid: null 
       };
 
-  // Usar a média das pontuações dos grupos como pontuação final
-  // Se não houver grupos identificados, usar o cálculo antigo
-  const weightedScore = groupIds.length > 0
-    ? Number(averageGroupScore.toFixed(1))
-    : Number((personalityPercentages.reduce((sum, p) => sum + p.weightedScore, 0) / 
-             Math.max(1, personalityPercentages.reduce((sum, p) => sum + (p.percentage * 5), 0)) * 100).toFixed(1));
-
   return {
     dominantPersonality,
     allPersonalities: personalityPercentages,
     totalResponses: totalPersonalityResponses,
     hasTraitWeights,
-    weightedScore,
+    weightedScore: personalityScore,
     groupScores,
     groupDetails,
     groupCount: groupIds.length
   };
+}
+
+interface PersonalityTrait {
+  trait: string;
+  count: number;
+  score: number;
+  weight: number;
 }
