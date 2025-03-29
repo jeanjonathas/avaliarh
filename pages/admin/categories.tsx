@@ -119,15 +119,10 @@ const Categories: NextPage = () => {
     setIsEditing(true)
   }
   
-  const handleDelete = async (id: string) => {
-    // Encontrar a categoria para mostrar o nome na confirmação
-    const categoryToDelete = categories.find(cat => cat.id === id);
-    
-    if (!categoryToDelete) {
-      notify.showError('Categoria não encontrada');
-      return;
-    }
-    
+  const handleDeleteCategory = (id: string) => {
+    const categoryToDelete = categories.find(category => category.id === id);
+    if (!categoryToDelete) return;
+
     // Usar o sistema de notificações para confirmar a exclusão
     notify.confirm(
       'Confirmar exclusão',
@@ -143,8 +138,42 @@ const Categories: NextPage = () => {
             setCategories(categories.filter(category => category.id !== id));
             notify.showSuccess('Categoria excluída com sucesso!');
           } else {
-            const error = await response.json();
-            notify.showError(`Erro ao excluir categoria: ${error.message || 'Erro desconhecido'}`);
+            const errorData = await response.json();
+            
+            // Verificar se o erro é devido a perguntas associadas e se podemos forçar a exclusão
+            if (errorData.canForceDelete) {
+              notify.confirm(
+                'Atenção: Perguntas associadas',
+                `Esta categoria possui ${errorData.questionsCount} pergunta(s) ativa(s) associada(s). Deseja remover a associação dessas perguntas e excluir a categoria mesmo assim?`,
+                async () => {
+                  try {
+                    // Chamar o endpoint com force=true para forçar a exclusão
+                    const forceResponse = await fetch(`/api/admin/categories/${id}?force=true`, {
+                      method: 'DELETE',
+                      credentials: 'include',
+                    });
+
+                    if (forceResponse.ok) {
+                      setCategories(categories.filter(category => category.id !== id));
+                      notify.showSuccess('Categoria excluída com sucesso!');
+                    } else {
+                      const forceError = await forceResponse.json();
+                      notify.showError(`Erro ao excluir categoria: ${forceError.message || 'Erro desconhecido'}`);
+                    }
+                  } catch (forceError) {
+                    console.error('Erro ao forçar exclusão da categoria:', forceError);
+                    notify.showError(`Erro ao excluir categoria: ${forceError instanceof Error ? forceError.message : 'Erro desconhecido'}`);
+                  }
+                },
+                {
+                  type: 'warning',
+                  confirmText: 'Sim, excluir mesmo assim',
+                  cancelText: 'Cancelar'
+                }
+              );
+            } else {
+              notify.showError(`Erro ao excluir categoria: ${errorData.message || 'Erro desconhecido'}`);
+            }
           }
         } catch (error) {
           console.error('Erro ao excluir categoria:', error);
@@ -323,7 +352,7 @@ const Categories: NextPage = () => {
                             Editar
                           </button>
                           <button
-                            onClick={() => handleDelete(category.id)}
+                            onClick={() => handleDeleteCategory(category.id)}
                             className="text-red-600 hover:text-red-900"
                           >
                             Excluir

@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../auth/[...nextauth]'
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 
 // Definição dos papéis de usuário conforme o schema
 type Role = 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'INSTRUCTOR' | 'STUDENT' | 'USER';
@@ -50,12 +51,7 @@ export default async function handler(
         
         // Buscar categoria usando Prisma Client
         const category = await prisma.category.findUnique({
-          where: { id },
-          include: {
-            _count: {
-              select: { questions: true }
-            }
-          }
+          where: { id }
         });
         
         if (!category) {
@@ -63,10 +59,18 @@ export default async function handler(
           return res.status(404).json({ message: 'Categoria não encontrada' });
         }
         
+        // Contar apenas perguntas não excluídas
+        const questionsCount = await prisma.$queryRaw`
+          SELECT COUNT(*) 
+          FROM "Question" q 
+          JOIN "_CategoryToQuestion" cq ON q.id = cq."B" 
+          WHERE cq."A" = ${id} AND q.deleted = false
+        `;
+        
         // Adicionar a contagem de questões ao objeto da categoria
         const categoryWithCount = {
           ...category,
-          questionsCount: category._count.questions
+          questionsCount: Number(questionsCount[0].count)
         };
 
         console.log(`API Categories [id]: Categoria encontrada:`, categoryWithCount);
@@ -136,12 +140,7 @@ export default async function handler(
         
         // Verificar se a categoria existe
         const category = await prisma.category.findUnique({
-          where: { id },
-          include: {
-            _count: {
-              select: { questions: true }
-            }
-          }
+          where: { id }
         });
         
         if (!category) {
@@ -149,12 +148,39 @@ export default async function handler(
           return res.status(404).json({ message: 'Categoria não encontrada' });
         }
         
-        // Verificar se há perguntas associadas
-        if (category._count.questions > 0) {
-          console.log(`API Categories [id]: Categoria tem ${category._count.questions} perguntas associadas, não pode ser excluída`);
+        // Verificar se há perguntas não excluídas associadas usando SQL bruto
+        const activeQuestionsCount = await prisma.$queryRaw`
+          SELECT COUNT(*) 
+          FROM "Question" q 
+          JOIN "_CategoryToQuestion" cq ON q.id = cq."B" 
+          WHERE cq."A" = ${id} AND q.deleted = false
+        `;
+        
+        const count = Number(activeQuestionsCount[0].count);
+        
+        // Verificar se o usuário solicitou para forçar a exclusão
+        const { force } = req.query;
+        
+        if (count > 0 && force !== 'true') {
+          console.log(`API Categories [id]: Categoria tem ${count} perguntas ativas associadas, não pode ser excluída`);
           return res.status(400).json({ 
-            message: 'Não é possível excluir esta categoria porque existem perguntas associadas a ela.' 
+            message: 'Não é possível excluir esta categoria porque existem perguntas ativas associadas a ela.',
+            questionsCount: count,
+            canForceDelete: true
           });
+        }
+        
+        // Se force=true, desassociar todas as perguntas da categoria
+        if (force === 'true' && count > 0) {
+          console.log(`API Categories [id]: Forçando exclusão e desassociando ${count} perguntas da categoria ${id}`);
+          
+          // Desassociar todas as perguntas da categoria
+          await prisma.$executeRaw`
+            DELETE FROM "_CategoryToQuestion" 
+            WHERE "A" = ${id}
+          `;
+          
+          console.log(`API Categories [id]: Perguntas desassociadas com sucesso`);
         }
         
         // Excluir categoria

@@ -63,24 +63,27 @@ export default async function handler(
         // Buscar todas as categorias usando o Prisma Client em vez de SQL raw
         // Temporariamente removendo o filtro por categoryType até que o Prisma Client seja atualizado
         const categories = await prisma.category.findMany({
-          include: {
-            _count: {
-              select: {
-                questions: true
-              }
-            }
-          },
           orderBy: {
             name: 'asc'
           }
         });
         
-        // Transformar os dados para incluir questionsCount
-        const formattedCategories = categories.map(category => ({
-          id: category.id,
-          name: category.name,
-          description: category.description,
-          questionsCount: category._count.questions
+        // Obter a contagem de perguntas não excluídas para cada categoria
+        const formattedCategories = await Promise.all(categories.map(async category => {
+          // Contar apenas perguntas não excluídas
+          const questionsCount = await prisma.$queryRaw`
+            SELECT COUNT(*) 
+            FROM "Question" q 
+            JOIN "_CategoryToQuestion" cq ON q.id = cq."B" 
+            WHERE cq."A" = ${category.id} AND q.deleted = false
+          `;
+          
+          return {
+            id: category.id,
+            name: category.name,
+            description: category.description,
+            questionsCount: Number(questionsCount[0].count)
+          };
         }));
         
         console.log(`API Categories: ${formattedCategories.length} categorias encontradas`);
