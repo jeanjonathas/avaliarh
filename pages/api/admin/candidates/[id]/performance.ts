@@ -365,14 +365,6 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
     if (selectedOption) {
       let personality = selectedOption.categoryName;
       
-      // Extrair informações do grupo
-      // Verificar primeiro se a opção tem um grupo definido
-      const emotionGroupId = selectedOption.emotionGroupId;
-      // Depois verificar se a questão tem um grupo definido
-      const questionGroup = response.question?.group;
-      // Usar o ID do grupo da opção, da questão ou o UUID da categoria como fallback
-      const groupId = emotionGroupId || questionGroup || selectedOption.categoryNameUuid || 'default';
-      
       // Verificar se o traço de personalidade está definido
       if (!personality) {
         const match = selectedOption.text.match(/\(([^)]+)\)/);
@@ -383,44 +375,61 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
         }
       }
       
+      // Determinar a qual grupo este traço pertence
+      // 1. Verificar no mapa de traços para grupos
+      let groupId = traitToGroupMap[personality.toLowerCase()];
+      
+      // 2. Se não encontrar, verificar se a opção ou questão tem um grupo definido
+      if (!groupId) {
+        const emotionGroupId = selectedOption.emotionGroupId;
+        const questionGroup = response.question?.group;
+        
+        if (emotionGroupId && personalityGroups[emotionGroupId]) {
+          groupId = emotionGroupId;
+        } else if (questionGroup && personalityGroups[questionGroup]) {
+          groupId = questionGroup;
+        } else {
+          // 3. Se ainda não encontrou, usar o grupo padrão
+          groupId = 'default-group';
+        }
+      }
+      
       // Adicionar log para depuração
       console.log(`Questão ${response.question?.number || 'N/A'}: Traço "${personality}" atribuído ao grupo "${groupId}"`);
       
       const categoryNameUuid = selectedOption.categoryNameUuid || selectedOption.id;
       
-      if (personality) {
-        // Obter o peso ajustado da alternativa, se disponível
-        let adjustedWeight = 1;
-        const questionId = response.question?.id;
-        
-        if (questionId && questionOptions[questionId] && selectedOption.id) {
-          adjustedWeight = questionOptions[questionId].weights[selectedOption.id] || 1;
-        }
-        
-        // Incrementar contagem global, considerando o peso ajustado
-        personalityCount[personality] = (personalityCount[personality] || 0) + adjustedWeight;
-        
-        // Armazenar o UUID associado a este traço de personalidade
-        if (categoryNameUuid && !personalityUuids[personality]) {
-          personalityUuids[personality] = categoryNameUuid;
-        }
-        
-        // Armazenar o ID do grupo associado a este traço
-        if (groupId && !personalityGroupIds[personality]) {
-          personalityGroupIds[personality] = groupId;
-        }
-        
-        // Agrupar por grupo de personalidade, considerando o peso ajustado
-        if (!personalityByGroup[groupId]) {
-          personalityByGroup[groupId] = {};
-          responseCountByGroup[groupId] = 0;
-        }
-        
-        personalityByGroup[groupId][personality] = (personalityByGroup[groupId][personality] || 0) + adjustedWeight;
-        responseCountByGroup[groupId] += adjustedWeight;
-        
-        totalPersonalityResponses += adjustedWeight;
+      // Obter o peso ajustado da alternativa, se disponível
+      let adjustedWeight = 1;
+      const questionId = response.question?.id;
+      
+      if (questionId && questionOptions[questionId] && selectedOption.id) {
+        adjustedWeight = questionOptions[questionId].weights[selectedOption.id] || 1;
       }
+      
+      // Incrementar contagem global, considerando o peso ajustado
+      personalityCount[personality] = (personalityCount[personality] || 0) + adjustedWeight;
+      
+      // Armazenar o UUID associado a este traço de personalidade
+      if (categoryNameUuid && !personalityUuids[personality]) {
+        personalityUuids[personality] = categoryNameUuid;
+      }
+      
+      // Armazenar o ID do grupo associado a este traço
+      if (groupId && !personalityGroupIds[personality]) {
+        personalityGroupIds[personality] = groupId;
+      }
+      
+      // Agrupar por grupo de personalidade, considerando o peso ajustado
+      if (!personalityByGroup[groupId]) {
+        personalityByGroup[groupId] = {};
+        responseCountByGroup[groupId] = 0;
+      }
+      
+      personalityByGroup[groupId][personality] = (personalityByGroup[groupId][personality] || 0) + adjustedWeight;
+      responseCountByGroup[groupId] += adjustedWeight;
+      
+      totalPersonalityResponses += adjustedWeight;
     }
   });
 
@@ -449,6 +458,65 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
   } else {
     console.log('Nenhum peso de traço configurado encontrado, usando pesos padrão');
   }
+
+  // Obter informações sobre os grupos de personalidade do processo seletivo
+  const personalityGroups: Record<string, {id: string, name: string, traits: string[]}> = {};
+  
+  // Tente identificar os grupos a partir da configuração do processo
+  if (processStages && processStages.length > 0) {
+    processStages.forEach(stage => {
+      if (stage.personalityConfig && stage.personalityConfig.traitGroups) {
+        // Se o processo tem grupos de traços definidos, use-os
+        stage.personalityConfig.traitGroups.forEach((group: any) => {
+          if (group.id && group.name) {
+            personalityGroups[group.id] = {
+              id: group.id,
+              name: group.name,
+              traits: group.traits || []
+            };
+          }
+        });
+      } else if (stage.personalityConfig && stage.personalityConfig.traitWeights) {
+        // Tente criar grupos a partir dos pesos de traços
+        // Agrupar os traços em um grupo padrão para testes que não têm grupos definidos
+        const defaultGroup = {
+          id: 'default-group',
+          name: 'Perfil de Personalidade',
+          traits: stage.personalityConfig.traitWeights.map((t: any) => t.traitName)
+        };
+        
+        personalityGroups[defaultGroup.id] = defaultGroup;
+      }
+    });
+  }
+  
+  console.log('Grupos de personalidade encontrados no processo:', Object.keys(personalityGroups).length);
+  Object.entries(personalityGroups).forEach(([id, group]) => {
+    console.log(`Grupo ${id}: "${group.name}" - ${group.traits.length} traços`);
+    if (group.traits.length > 0) {
+      console.log(`  Traços: ${group.traits.join(', ')}`);
+    }
+  });
+  
+  // Se não encontramos grupos, criar um grupo padrão
+  if (Object.keys(personalityGroups).length === 0) {
+    personalityGroups['default-group'] = {
+      id: 'default-group',
+      name: 'Perfil de Personalidade',
+      traits: []
+    };
+    console.log('Nenhum grupo encontrado, criando grupo padrão');
+  }
+  
+  // Mapear traços para seus grupos
+  const traitToGroupMap: Record<string, string> = {};
+  
+  // Preencher o mapa de traços para grupos
+  Object.entries(personalityGroups).forEach(([groupId, group]) => {
+    group.traits.forEach(trait => {
+      traitToGroupMap[trait.toLowerCase()] = groupId;
+    });
+  });
 
   // Agrupar traços por grupo de personalidade (categoryNameUuid)
   const traitsByGroup: Record<string, PersonalityTrait[]> = {};
