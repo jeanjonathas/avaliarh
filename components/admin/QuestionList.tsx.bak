@@ -1,0 +1,949 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/router';
+import { QuestionType, QuestionDifficulty } from '../../types/questions';
+import Link from 'next/link';
+import { useNotification } from '../../contexts/NotificationContext';
+import QuestionPreview from './QuestionPreview';
+import toast from 'react-hot-toast';
+import BulkDeleteProgress from './BulkDeleteProgress';
+
+interface Question {
+  id: string;
+  text: string;
+  type: QuestionType;
+  difficulty: QuestionDifficulty;
+  stageId?: string;
+  stageName?: string;
+  categoryName?: string;
+  initialExplanation?: string;
+  deleted?: boolean;
+  options: {
+    id: string;
+    text: string;
+    isCorrect?: boolean;
+    category?: string;
+    weight?: number;
+  }[];
+}
+
+interface QuestionListProps {
+  apiEndpoint?: string;
+  questionType?: string;
+}
+
+const QuestionList: React.FC<QuestionListProps> = ({ 
+  apiEndpoint = '/api/admin/questions',
+  questionType = 'selection'
+}) => {
+  const router = useRouter();
+  const { showToast, showModal } = useNotification();
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filterType, setFilterType] = useState<'all' | 'multiple_choice' | 'opinion'>('all');
+  const [filterDifficulty, setFilterDifficulty] = useState<'all' | 'easy' | 'medium' | 'hard'>('all');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterTest, setFilterTest] = useState<string>('all');
+  const [filterDeleted, setFilterDeleted] = useState<'all' | 'active' | 'deleted'>('active');
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [tests, setTests] = useState<{ id: string; title: string }[]>([]);
+  const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  
+  // Estados para paginação
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+  
+  // Estados para seleção múltipla
+  const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
+  const [selectAll, setSelectAll] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteProgress, setDeleteProgress] = useState(0);
+  const [cancelDeleteFlag, setCancelDeleteFlag] = useState(false);
+
+  const fetchQuestions = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // Construir os parâmetros de consulta
+      const queryParams = new URLSearchParams();
+      if (filterType !== 'all') {
+        queryParams.append('type', filterType === 'multiple_choice' ? QuestionType.MULTIPLE_CHOICE : QuestionType.OPINION_MULTIPLE);
+      }
+      if (filterDifficulty !== 'all') {
+        queryParams.append('difficulty', filterDifficulty.toUpperCase());
+      }
+      if (filterCategory !== 'all') {
+        queryParams.append('categoryId', filterCategory);
+      }
+      if (filterTest !== 'all') {
+        queryParams.append('testId', filterTest);
+      }
+      if (filterDeleted !== 'all') {
+        queryParams.append('deleted', filterDeleted === 'deleted' ? 'true' : 'false');
+      }
+      
+      // Adicionar parâmetros de paginação
+      queryParams.append('page', currentPage.toString());
+      queryParams.append('limit', itemsPerPage.toString());
+      
+      const response = await fetch(`${apiEndpoint}?${queryParams.toString()}`);
+      if (!response.ok) {
+        throw new Error('Erro ao carregar perguntas');
+      }
+      const data = await response.json();
+      
+      // Verificar se a resposta contém informações de paginação
+      if (data.items && data.totalItems !== undefined) {
+        setQuestions(data.items);
+        setTotalItems(data.totalItems);
+      } else {
+        // Fallback para o formato antigo de resposta (sem paginação)
+        setQuestions(data);
+        setTotalItems(data.length);
+      }
+    } catch (err) {
+      console.error('Erro ao buscar perguntas:', err);
+      setError('Erro ao carregar perguntas. Tente novamente mais tarde.');
+    } finally {
+      setLoading(false);
+    }
+  }, [filterType, filterDifficulty, filterCategory, filterTest, filterDeleted, apiEndpoint, currentPage, itemsPerPage]);
+
+  const fetchCategories = useCallback(async () => {
+    try {
+      // Determinar o endpoint correto para categorias com base no tipo de questão
+      const categoriesEndpoint = questionType === 'training' 
+        ? '/api/admin/training/categories' 
+        : '/api/admin/categories';
+      
+      const response = await fetch(categoriesEndpoint);
+      if (!response.ok) {
+        throw new Error('Erro ao carregar categorias');
+      }
+      
+      const data = await response.json();
+      setCategories(data);
+    } catch (error) {
+      console.error('Erro ao buscar categorias:', error);
+      setError('Falha ao carregar categorias');
+    }
+  }, [questionType]);
+
+  const fetchTests = useCallback(async () => {
+    try {
+      // Determinar o endpoint correto para testes com base no tipo de questão
+      const testsEndpoint = questionType === 'training' 
+        ? '/api/admin/training/courses' 
+        : '/api/admin/tests';
+      
+      const response = await fetch(testsEndpoint);
+      if (!response.ok) {
+        throw new Error('Erro ao carregar testes');
+      }
+      
+      const data = await response.json();
+      // Verificar se a resposta contém um array de testes ou se está em uma propriedade
+      if (data.tests && Array.isArray(data.tests)) {
+        setTests(data.tests);
+      } else if (Array.isArray(data)) {
+        setTests(data);
+      } else {
+        console.error('Formato de resposta inesperado:', data);
+        setTests([]);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar testes:', error);
+      setError('Falha ao carregar testes');
+      setTests([]);
+    }
+  }, [questionType]);
+
+  useEffect(() => {
+    fetchQuestions();
+    fetchCategories();
+    fetchTests();
+  }, [fetchQuestions, fetchCategories, fetchTests]);
+
+  // Função para mudar de página
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  // Função para mudar o número de itens por página
+  const handleItemsPerPageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setItemsPerPage(Number(e.target.value));
+    setCurrentPage(1); // Voltar para a primeira página ao mudar o número de itens por página
+  };
+
+  // Calcular o número total de páginas
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+
+  const handleEditQuestion = (id: string) => {
+    // Determinar a URL de edição com base no tipo de questão
+    if (questionType === 'training') {
+      // Para questões de treinamento
+      const question = questions.find(q => q.id === id);
+      if (question?.type === QuestionType.OPINION_MULTIPLE) {
+        router.push(`/admin/training/questions/edit-opinion/${id}`);
+      } else {
+        router.push(`/admin/training/questions/edit/${id}`);
+      }
+    } else {
+      // Para questões de seleção
+      const question = questions.find(q => q.id === id);
+      if (question?.type === QuestionType.OPINION_MULTIPLE) {
+        router.push(`/admin/questions/edit-opinion/${id}`);
+      } else {
+        router.push(`/admin/questions/edit/${id}`);
+      }
+    }
+  };
+
+  const handleDelete = (id: string) => {
+    showModal(
+      'Confirmar Exclusão',
+      'Tem certeza que deseja excluir esta pergunta?',
+      async () => {
+        try {
+          const response = await fetch(`${apiEndpoint}/${id}`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (!response.ok) {
+            throw new Error('Erro ao excluir pergunta');
+          }
+
+          // Atualizar a lista após exclusão bem-sucedida
+          fetchQuestions();
+          toast.success('Pergunta excluída com sucesso', { duration: 2000 });
+        } catch (error) {
+          console.error('Erro ao excluir pergunta:', error);
+          toast.error('Erro ao excluir pergunta', { duration: 2000 });
+        }
+      }
+    );
+  };
+
+  const handleRestore = (id: string) => {
+    showModal(
+      'Confirmar Restauração',
+      'Tem certeza que deseja restaurar esta pergunta?',
+      async () => {
+        try {
+          const response = await fetch(`${apiEndpoint}/${id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ operation: 'restore' })
+          });
+
+          if (!response.ok) {
+            throw new Error('Erro ao restaurar pergunta');
+          }
+
+          // Atualizar a lista após restauração bem-sucedida
+          fetchQuestions();
+          toast.success('Pergunta restaurada com sucesso', { duration: 2000 });
+        } catch (error) {
+          console.error('Erro ao restaurar pergunta:', error);
+          toast.error('Erro ao restaurar pergunta', { duration: 2000 });
+        }
+      }
+    );
+  };
+
+  const getDifficultyLabel = (difficulty: QuestionDifficulty) => {
+    switch (difficulty) {
+      case QuestionDifficulty.EASY:
+        return (
+          <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
+            Fácil
+          </span>
+        );
+      case QuestionDifficulty.MEDIUM:
+        return (
+          <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">
+            Médio
+          </span>
+        );
+      case QuestionDifficulty.HARD:
+        return (
+          <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">
+            Difícil
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const getTypeLabel = (type: QuestionType) => {
+    switch (type) {
+      case QuestionType.MULTIPLE_CHOICE:
+        return (
+          <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+            Múltipla Escolha
+          </span>
+        );
+      case QuestionType.OPINION_MULTIPLE:
+        return (
+          <span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-800">
+            Opinativa
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const fetchQuestionDetails = async (id: string) => {
+    try {
+      setLoadingPreview(true);
+      const response = await fetch(`${apiEndpoint}/${id}`);
+      
+      if (!response.ok) {
+        throw new Error('Erro ao carregar detalhes da pergunta');
+      }
+      
+      const data = await response.json();
+      setPreviewQuestion(data);
+    } catch (err) {
+      console.error('Erro ao buscar detalhes da pergunta:', err);
+      toast.error('Erro ao carregar detalhes da pergunta. Tente novamente.', { duration: 2000 });
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
+  // Função para selecionar/deselecionar todas as perguntas
+  const handleSelectAll = () => {
+    if (selectAll) {
+      // Se já estiver tudo selecionado, desmarcar tudo
+      setSelectedQuestions([]);
+    } else {
+      // Selecionar todas as perguntas da página atual
+      const allIds = questions.map(question => question.id);
+      setSelectedQuestions(allIds);
+    }
+    setSelectAll(!selectAll);
+  };
+
+  // Função para selecionar/deselecionar uma pergunta individual
+  const handleSelectQuestion = (id: string) => {
+    if (selectedQuestions.includes(id)) {
+      // Se já estiver selecionada, remover da seleção
+      setSelectedQuestions(selectedQuestions.filter(questionId => questionId !== id));
+      // Se estava com "selecionar todos" ativado, desativar
+      if (selectAll) {
+        setSelectAll(false);
+      }
+    } else {
+      // Adicionar à seleção
+      setSelectedQuestions([...selectedQuestions, id]);
+      // Verificar se todas as perguntas estão selecionadas
+      if (selectedQuestions.length + 1 === questions.length) {
+        setSelectAll(true);
+      }
+    }
+  };
+
+  // Função para cancelar a exclusão em massa
+  const cancelDelete = () => {
+    setCancelDeleteFlag(true);
+    toast.error('Processo de exclusão cancelado pelo usuário', { duration: 3000 });
+  };
+
+  // Função para excluir múltiplas perguntas
+  const handleDeleteSelected = () => {
+    if (selectedQuestions.length === 0) return;
+    
+    const message = selectedQuestions.length === 1
+      ? 'Tem certeza que deseja excluir a pergunta selecionada?'
+      : `Tem certeza que deseja excluir as ${selectedQuestions.length} perguntas selecionadas?`;
+    
+    showModal(
+      'Confirmar Exclusão',
+      message,
+      async () => {
+        try {
+          // Resetar estados
+          setCancelDeleteFlag(false);
+          setDeleteProgress(0);
+          setIsDeleting(true);
+          
+          // Contador de progresso
+          let processedCount = 0;
+          let successCount = 0;
+          
+          // Mostrar toast de início
+          toast.loading(
+            `Iniciando exclusão de ${selectedQuestions.length} ${selectedQuestions.length === 1 ? 'pergunta' : 'perguntas'}...`,
+            { duration: 2000 }
+          );
+          
+          // Criar uma cópia do array para não modificar o original durante o loop
+          const questionsToDelete = [...selectedQuestions];
+          
+          // Excluir cada pergunta selecionada
+          for (const id of questionsToDelete) {
+            // Verificar se o usuário cancelou o processo
+            if (cancelDeleteFlag) {
+              break;
+            }
+            
+            try {
+              const response = await fetch(`${apiEndpoint}/${id}`, {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json'
+                }
+              });
+
+              processedCount++;
+              setDeleteProgress(processedCount);
+              
+              if (response.ok) {
+                successCount++;
+              } else {
+                // Mostrar toast de erro para cada falha individual
+                const errorData = await response.json();
+                toast.error(`Erro ao excluir pergunta: ${errorData.error || 'Erro desconhecido'}`);
+              }
+              
+              // Pequena pausa para não sobrecarregar o servidor
+              await new Promise(resolve => setTimeout(resolve, 100));
+              
+            } catch (error) {
+              processedCount++;
+              setDeleteProgress(processedCount);
+              console.error(`Erro ao excluir pergunta ${id}:`, error);
+              toast.error(`Erro ao excluir pergunta: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+            }
+          }
+          
+          // Atualizar a lista após exclusão
+          fetchQuestions();
+          
+          // Limpar seleção
+          setSelectedQuestions([]);
+          setSelectAll(false);
+          
+          // Fechar modal de progresso
+          setIsDeleting(false);
+          
+          // Mostrar toast de conclusão
+          if (cancelDeleteFlag) {
+            // Já mostrou mensagem de cancelamento, não precisa mostrar outra
+          } else if (successCount === questionsToDelete.length) {
+            toast.success(
+              questionsToDelete.length === 1
+                ? 'Pergunta excluída com sucesso!'
+                : `${successCount} perguntas excluídas com sucesso!`
+            );
+          } else if (successCount > 0) {
+            toast.custom((t) => (
+              <div className={`${
+                t.visible ? 'animate-enter' : 'animate-leave'
+              } bg-yellow-50 p-4 rounded-lg shadow-md max-w-md w-full`}>
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-yellow-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-yellow-800">Exclusão parcial</h3>
+                    <div className="mt-2 text-sm text-yellow-700">
+                      <p>{`${successCount} de ${questionsToDelete.length} perguntas foram excluídas com sucesso.`}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ), { duration: 5000 });
+          } else {
+            toast.error('Não foi possível excluir nenhuma das perguntas selecionadas.');
+          }
+        } catch (error) {
+          console.error('Erro ao excluir perguntas:', error);
+          toast.error('Erro ao excluir perguntas. Tente novamente mais tarde.');
+          setIsDeleting(false);
+        }
+      }
+    );
+  };
+
+  // Limpar seleção quando mudar de página ou filtros
+  useEffect(() => {
+    setSelectedQuestions([]);
+    setSelectAll(false);
+  }, [currentPage, filterType, filterDifficulty, filterCategory, filterTest, filterDeleted]);
+
+  if (loading) {
+    return (
+      <div className="bg-white shadow-md rounded-lg p-6">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white shadow-md rounded-lg p-6">
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={fetchQuestions}
+          className="px-4 py-2 bg-primary-500 text-white rounded-md hover:bg-primary-600 transition-colors"
+        >
+          Tentar novamente
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white shadow-md rounded-lg p-6">
+      {/* Filtros */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        <div>
+          <label htmlFor="filterType" className="block text-sm font-medium text-gray-700 mb-1">
+            Tipo de Pergunta
+          </label>
+          <select
+            id="filterType"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value as any)}
+          >
+            <option value="all">Todos os tipos</option>
+            <option value="multiple_choice">Múltipla Escolha</option>
+            <option value="opinion">Opinativa</option>
+          </select>
+        </div>
+        <div>
+          <label htmlFor="filterDifficulty" className="block text-sm font-medium text-gray-700 mb-1">
+            Dificuldade
+          </label>
+          <select
+            id="filterDifficulty"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            value={filterDifficulty}
+            onChange={(e) => setFilterDifficulty(e.target.value as any)}
+          >
+            <option value="all">Todas as dificuldades</option>
+            <option value="easy">Fácil</option>
+            <option value="medium">Médio</option>
+            <option value="hard">Difícil</option>
+          </select>
+        </div>
+        <div>
+          <label htmlFor="filterCategory" className="block text-sm font-medium text-gray-700 mb-1">
+            Categoria
+          </label>
+          <select
+            id="filterCategory"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+          >
+            <option value="all">Todas as categorias</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="filterTest" className="block text-sm font-medium text-gray-700 mb-1">
+            Teste
+          </label>
+          <select
+            id="filterTest"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            value={filterTest}
+            onChange={(e) => setFilterTest(e.target.value)}
+          >
+            <option value="all">Todos os testes</option>
+            {tests.map((test) => (
+              <option key={test.id} value={test.id}>
+                {test.title}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="filterDeleted" className="block text-sm font-medium text-gray-700 mb-1">
+            Status
+          </label>
+          <select
+            id="filterDeleted"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            value={filterDeleted}
+            onChange={(e) => setFilterDeleted(e.target.value as any)}
+          >
+            <option value="active">Ativas</option>
+            <option value="deleted">Excluídas</option>
+            <option value="all">Todas</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Lista de perguntas */}
+      {questions.length === 0 ? (
+        <div className="text-center py-8">
+          <svg
+            className="mx-auto h-12 w-12 text-gray-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+            />
+          </svg>
+          <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhuma pergunta encontrada</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            Comece adicionando uma nova pergunta ou ajuste os filtros.
+          </p>
+        </div>
+      ) : (
+        <div>
+          {/* Barra de ações para itens selecionados */}
+          {selectedQuestions.length > 0 && (
+            <div className="bg-primary-50 border border-primary-200 rounded-md p-3 mb-4 flex justify-between items-center">
+              <div className="text-sm text-primary-700">
+                <span className="font-medium">{selectedQuestions.length}</span> {selectedQuestions.length === 1 ? 'pergunta selecionada' : 'perguntas selecionadas'}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleDeleteSelected}
+                  className="px-3 py-1 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition-colors flex items-center"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  Excluir
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedQuestions([]);
+                    setSelectAll(false);
+                  }}
+                  className="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded-md hover:bg-gray-300 transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+          
+          <div className="overflow-x-auto -mx-6 md:mx-0">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-3 py-3 text-left">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                        checked={selectAll}
+                        onChange={handleSelectAll}
+                        aria-label="Selecionar todas as perguntas"
+                      />
+                    </div>
+                  </th>
+                  <th scope="col" className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Pergunta
+                  </th>
+                  <th scope="col" className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
+                    Tipo
+                  </th>
+                  <th scope="col" className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
+                    Dificuldade
+                  </th>
+                  <th scope="col" className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
+                    Categoria
+                  </th>
+                  <th scope="col" className="px-3 md:px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider text-center">
+                    Ações
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {questions.map((question) => (
+                  <tr key={question.id} className={question.deleted ? "bg-red-50" : ""}>
+                    <td className="px-3 py-4">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                          checked={selectedQuestions.includes(question.id)}
+                          onChange={() => handleSelectQuestion(question.id)}
+                          aria-label={`Selecionar pergunta: ${question.text.substring(0, 20)}...`}
+                        />
+                      </div>
+                    </td>
+                    <td className="px-3 md:px-6 py-4">
+                      <div 
+                        className={`text-sm font-medium ${question.deleted ? "text-gray-500 line-through" : "text-gray-900"} line-clamp-2`}
+                        dangerouslySetInnerHTML={{ __html: question.text }}
+                      />
+                      {question.stageName && (
+                        <div className="text-xs text-gray-500">Etapa: {question.stageName}</div>
+                      )}
+                      {question.deleted && (
+                        <div className="text-xs text-red-500 mt-1">Excluída</div>
+                      )}
+                    </td>
+                    <td className="px-3 md:px-6 py-4 hidden sm:table-cell">
+                      {getTypeLabel(question.type)}
+                    </td>
+                    <td className="px-3 md:px-6 py-4 hidden sm:table-cell">
+                      {getDifficultyLabel(question.difficulty)}
+                    </td>
+                    <td className="px-3 md:px-6 py-4 hidden md:table-cell">
+                      <div className="text-sm text-gray-900">{question.categoryName || '-'}</div>
+                    </td>
+                    <td className="px-3 md:px-6 py-4 text-center">
+                      <div className="flex flex-col sm:flex-row justify-center sm:justify-end gap-2 sm:gap-4">
+                        <button
+                          onClick={() => fetchQuestionDetails(question.id)}
+                          className="text-indigo-600 hover:text-indigo-900 text-sm"
+                          aria-label="Visualizar"
+                        >
+                          <span className="flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                              <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                            </svg>
+                            <span className="hidden sm:inline">Visualizar</span>
+                          </span>
+                        </button>
+                        <Link
+                          href={`/admin/questions/edit/${question.id}`}
+                          className="text-primary-600 hover:text-primary-800 transition-colors px-2 py-1 rounded hover:bg-primary-50"
+                        >
+                          <span className="flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                            </svg>
+                            <span className="hidden sm:inline">Editar</span>
+                          </span>
+                        </Link>
+                        {question.deleted ? (
+                          <button
+                            onClick={() => handleRestore(question.id)}
+                            className="text-green-600 hover:text-green-900 text-sm"
+                            aria-label="Restaurar"
+                          >
+                            <span className="flex items-center justify-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                            </svg>
+                            <span className="hidden sm:inline">Restaurar</span>
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleDelete(question.id)}
+                            className="text-red-600 hover:text-red-900 text-sm"
+                            aria-label="Excluir"
+                          >
+                            <span className="flex items-center justify-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                              </svg>
+                              <span className="hidden sm:inline">Excluir</span>
+                            </span>
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* Controles de paginação */}
+          <div className="mt-6 flex flex-col sm:flex-row justify-between items-center">
+            <div className="flex items-center mb-4 sm:mb-0">
+              <span className="text-sm text-gray-700 mr-4">
+                Itens por página:
+              </span>
+              <select
+                className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                value={itemsPerPage}
+                onChange={handleItemsPerPageChange}
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+              <span className="ml-4 text-sm text-gray-700">
+                Mostrando {questions.length} de {totalItems} itens
+              </span>
+            </div>
+            
+            <div className="flex items-center">
+              <button
+                onClick={() => handlePageChange(1)}
+                disabled={currentPage === 1}
+                className={`px-3 py-1 rounded-l-md border ${
+                  currentPage === 1
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-white text-primary-600 hover:bg-primary-50'
+                }`}
+              >
+                <span className="sr-only">Primeira página</span>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M15.707 15.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 1.414L11.414 10l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                  <path fillRule="evenodd" d="M7.707 15.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 1.414L3.414 10l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className={`px-3 py-1 border-t border-b ${
+                  currentPage === 1
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-white text-primary-600 hover:bg-primary-50'
+                }`}
+              >
+                <span className="sr-only">Página anterior</span>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </button>
+              
+              {/* Números de página */}
+              <div className="hidden sm:flex">
+                {[...Array(totalPages)].map((_, index) => {
+                  const pageNumber = index + 1;
+                  
+                  // Mostrar apenas um número limitado de páginas
+                  if (
+                    pageNumber === 1 ||
+                    pageNumber === totalPages ||
+                    (pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1)
+                  ) {
+                    return (
+                      <button
+                        key={pageNumber}
+                        onClick={() => handlePageChange(pageNumber)}
+                        className={`px-3 py-1 border-t border-b ${
+                          currentPage === pageNumber
+                            ? 'bg-primary-100 text-primary-700 font-medium'
+                            : 'bg-white text-gray-700 hover:bg-primary-50'
+                        }`}
+                      >
+                        {pageNumber}
+                      </button>
+                    );
+                  }
+                  
+                  // Mostrar reticências para páginas omitidas
+                  if (
+                    (pageNumber === 2 && currentPage > 3) ||
+                    (pageNumber === totalPages - 1 && currentPage < totalPages - 2)
+                  ) {
+                    return (
+                      <span
+                        key={pageNumber}
+                        className="px-3 py-1 border-t border-b bg-white text-gray-700"
+                      >
+                        ...
+                      </span>
+                    );
+                  }
+                  
+                  return null;
+                })}
+              </div>
+              
+              {/* Versão móvel: apenas página atual/total */}
+              <div className="flex sm:hidden">
+                <span className="px-3 py-1 border-t border-b bg-white text-gray-700">
+                  {currentPage} / {totalPages}
+                </span>
+              </div>
+              
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-1 border-t border-b ${
+                  currentPage === totalPages
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-white text-primary-600 hover:bg-primary-50'
+                }`}
+              >
+                <span className="sr-only">Próxima página</span>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+              <button
+                onClick={() => handlePageChange(totalPages)}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-1 rounded-r-md border ${
+                  currentPage === totalPages
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-white text-primary-600 hover:bg-primary-50'
+                }`}
+              >
+                <span className="sr-only">Última página</span>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 15.707a1 1 0 010-1.414L8.586 10 4.293 6.707a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                  <path fillRule="evenodd" d="M12.293 15.707a1 1 0 010-1.414L16.586 10l-4.293-3.293a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Modal de visualização da pergunta */}
+      {previewQuestion && (
+        <QuestionPreview
+          question={previewQuestion}
+          onClose={() => setPreviewQuestion(null)}
+        />
+      )}
+      
+      {/* Modal de progresso de exclusão em massa */}
+      <BulkDeleteProgress 
+        isOpen={isDeleting}
+        current={deleteProgress}
+        total={selectedQuestions.length}
+        onCancel={cancelDelete}
+        canCancel={deleteProgress < selectedQuestions.length}
+      />
+    </div>
+  );
+};
+
+export default QuestionList;
