@@ -322,10 +322,23 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
         categoryNameUuid: null 
       };
 
-  const totalWeightedScore = personalityPercentages.reduce((sum, p) => sum + p.weightedScore, 0);
-  const maxPossibleScore = personalityPercentages.reduce((sum, p) => sum + (p.percentage * 5), 0); 
+  // Simplificação do cálculo da pontuação ponderada
+  // Se o candidato escolheu as alternativas com maior peso, a pontuação deve ser 100%
+  // Calculamos a média das compatibilidades (100% para cada traço com peso máximo)
+  let weightedScore = 0;
   
-  const weightedScore = maxPossibleScore > 0 ? (totalWeightedScore / maxPossibleScore) * 100 : 0;
+  if (personalityPercentages.length > 0) {
+    // Verificar se todos os traços têm peso máximo (5)
+    const allMaxWeight = personalityPercentages.every(p => p.weight === 5);
+    
+    if (allMaxWeight) {
+      // Se todos os traços têm peso máximo, a compatibilidade é 100%
+      weightedScore = 100;
+    } else {
+      // Caso contrário, calculamos a média das porcentagens
+      weightedScore = personalityPercentages.reduce((sum, p) => sum + p.percentage, 0) / personalityPercentages.length;
+    }
+  }
 
   return {
     dominantPersonality,

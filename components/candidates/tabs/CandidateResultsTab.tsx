@@ -167,6 +167,9 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
   const [compatibilityScore, setCompatibilityScore] = useState<number>(0);
   const [profileMatch, setProfileMatch] = useState<boolean>(false);
 
+  // Estado para controlar a tab ativa do gráfico de personalidade
+  const [activePersonalityTab, setActivePersonalityTab] = useState<string>('all');
+
   useEffect(() => {
     const fetchResults = async () => {
       try {
@@ -273,95 +276,170 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
   // Processar dados de personalidade para o gráfico de radar
   useEffect(() => {
     if (performance?.personalityAnalysis?.allPersonalities && candidate?.responses) {
-      // Extrair todos os traços de personalidade possíveis das perguntas opinativas do teste
-      const allPossibleTraits: string[] = [];
+      console.log('Processando dados para o gráfico de radar de personalidade');
       
-      // Verificar se temos acesso às respostas completas do candidato
-      if (candidate.responses) {
-        // Filtrar apenas as perguntas opinativas
-        const opinionResponses = candidate.responses.filter(response => {
-          // Verificar se é uma pergunta opinativa com base no snapshot
-          if (response.questionSnapshot && typeof response.questionSnapshot === 'object') {
-            const options = response.questionSnapshot.options || [];
-            // Verificar se a pergunta tem opções com personalidade
-            const hasPersonalityOptions = options.some((opt: any) => 
-              (opt.text && (opt.text.includes('(') && opt.text.includes(')'))) || opt.categoryName
-            );
-            
-            // Verificar se a pergunta não tem opções corretas/incorretas
-            const hasNoCorrectOptions = options.every((opt: any) => opt.isCorrect !== true);
-            
-            return hasPersonalityOptions || hasNoCorrectOptions;
-          }
-          return false;
-        });
-        
-        // Extrair todos os traços de personalidade possíveis das opções
-        opinionResponses.forEach(response => {
-          if (response.questionSnapshot && typeof response.questionSnapshot === 'object') {
-            const options = response.questionSnapshot.options || [];
-            options.forEach((option: any) => {
-              let trait = option.categoryName;
-              
-              // Se não houver categoryName, tentar extrair do texto (entre parênteses)
-              if (!trait && option.text) {
-                const match = option.text.match(/\(([^)]+)\)/);
-                if (match && match[1]) {
-                  trait = match[1].trim();
-                }
-              }
-              
-              // Adicionar o traço à lista se ainda não estiver presente
-              if (trait && !allPossibleTraits.includes(trait)) {
-                allPossibleTraits.push(trait);
-              }
-            });
-          }
-        });
-      }
-      
-      // Se não conseguimos extrair traços das perguntas, usar os traços que já temos na análise
-      if (allPossibleTraits.length === 0) {
-        performance.personalityAnalysis.allPersonalities.forEach(trait => {
-          if (!allPossibleTraits.includes(trait.trait)) {
-            allPossibleTraits.push(trait.trait);
-          }
-        });
-      }
-      
-      console.log('Traços de personalidade possíveis:', allPossibleTraits);
-      
-      // Criar um mapa com todos os traços possíveis inicializados com 0%
-      const traitMap: Record<string, number> = {};
-      allPossibleTraits.forEach(trait => {
-        traitMap[trait] = 0;
-      });
+      // Agrupar traços por categoria
+      const traitsByCategory: Record<string, Array<{trait: string, percentage: number, categoryNameUuid?: string, weight?: number}>> = {};
       
       // Preencher com os valores reais dos traços que o candidato possui
       performance.personalityAnalysis.allPersonalities.forEach(trait => {
-        traitMap[trait.trait] = trait.percentage;
+        const category = trait.categoryNameUuid || 'default';
+        if (!traitsByCategory[category]) {
+          traitsByCategory[category] = [];
+        }
+        traitsByCategory[category].push(trait);
       });
       
-      // Converter o mapa em arrays para o gráfico
-      const labels = Object.keys(traitMap);
-      const data = Object.values(traitMap);
+      console.log('Traços agrupados por categoria:', traitsByCategory);
       
-      setPersonalityRadarData({
-        labels,
-        datasets: [
-          {
-            label: 'Traços de Personalidade',
-            data,
-            backgroundColor: 'rgba(255, 99, 132, 0.2)',
-            borderColor: 'rgb(255, 99, 132)',
-            borderWidth: 2,
-            pointBackgroundColor: 'rgb(255, 99, 132)',
-            pointBorderColor: '#fff',
-            pointHoverBackgroundColor: '#fff',
-            pointHoverBorderColor: 'rgb(255, 99, 132)'
+      // Criar um dataset separado para cada categoria
+      const datasets: any[] = [];
+      
+      // Para cada categoria, criar um dataset com seus próprios labels
+      Object.entries(traitsByCategory).forEach(([category, traits], categoryIndex) => {
+        // Cores diferentes para cada categoria
+        const colors = [
+          { bg: 'rgba(255, 99, 132, 0.2)', border: 'rgb(255, 99, 132)' },
+          { bg: 'rgba(54, 162, 235, 0.2)', border: 'rgb(54, 162, 235)' },
+          { bg: 'rgba(255, 206, 86, 0.2)', border: 'rgb(255, 206, 86)' },
+          { bg: 'rgba(75, 192, 192, 0.2)', border: 'rgb(75, 192, 192)' },
+          { bg: 'rgba(153, 102, 255, 0.2)', border: 'rgb(153, 102, 255)' }
+        ];
+        
+        const colorIndex = categoryIndex % colors.length;
+        const categoryName = `Grupo ${categoryIndex + 1}`;
+        
+        // Obter todos os possíveis traços para esta categoria
+        // Aqui vamos simular todos os traços possíveis com base nos pesos
+        const allPossibleTraits = [];
+        const maxWeight = 5; // Peso máximo
+        
+        // Criar uma lista de todos os traços possíveis para esta categoria
+        for (let weight = maxWeight; weight >= 1; weight--) {
+          // Verificar se já temos um traço com este peso
+          const existingTrait = traits.find(t => t.weight === weight);
+          if (existingTrait) {
+            allPossibleTraits.push(existingTrait);
+          } else {
+            // Adicionar um traço fictício com este peso
+            allPossibleTraits.push({
+              trait: `Traço Peso ${weight}`,
+              percentage: 0,
+              weight: weight,
+              categoryNameUuid: category
+            });
           }
-        ]
+        }
+        
+        // Ordenar os traços por peso (decrescente)
+        allPossibleTraits.sort((a, b) => (b.weight || 0) - (a.weight || 0));
+        
+        // Criar um dataset para esta categoria
+        const dataset = {
+          label: categoryName,
+          data: allPossibleTraits.map(t => t.percentage), // Usar a porcentagem real
+          backgroundColor: colors[colorIndex].bg,
+          borderColor: colors[colorIndex].border,
+          borderWidth: 2,
+          pointBackgroundColor: colors[colorIndex].border,
+          pointBorderColor: '#fff',
+          pointHoverBackgroundColor: '#fff',
+          pointHoverBorderColor: colors[colorIndex].border,
+          categoryTraits: allPossibleTraits // Armazenar os traços para referência
+        };
+        
+        datasets.push(dataset);
       });
+      
+      // Criar um objeto para o gráfico de radar
+      // Cada dataset terá seu próprio gráfico
+      const radarData = datasets.map(dataset => {
+        return {
+          labels: dataset.categoryTraits.map((t: any) => `${t.trait} (Peso ${t.weight})`),
+          datasets: [{
+            label: dataset.label,
+            data: dataset.data,
+            backgroundColor: dataset.backgroundColor,
+            borderColor: dataset.borderColor,
+            borderWidth: dataset.borderWidth,
+            pointBackgroundColor: dataset.pointBackgroundColor,
+            pointBorderColor: dataset.pointBorderColor,
+            pointHoverBackgroundColor: dataset.pointHoverBackgroundColor,
+            pointHoverBorderColor: dataset.pointHoverBorderColor
+          }]
+        };
+      });
+      
+      // Criar um gráfico combinado com todos os traços
+      const allTraitsLabels: string[] = [];
+      const allTraitsDatasets: any[] = [];
+      
+      // Garantir que todos os traços possíveis sejam incluídos
+      // Para cada peso de 5 a 1, adicionar um traço para cada categoria
+      const maxWeight = 5;
+      const minWeight = 1;
+      
+      // Para cada categoria, garantir que todos os pesos estejam representados
+      Object.entries(traitsByCategory).forEach(([category, traits], categoryIndex) => {
+        const categoryName = `Grupo ${categoryIndex + 1}`;
+        
+        // Para cada peso possível
+        for (let weight = maxWeight; weight >= minWeight; weight--) {
+          // Verificar se já temos um traço com este peso
+          const existingTrait = traits.find(t => t.weight === weight);
+          
+          // Nome do traço para este peso e categoria
+          let traitName;
+          if (existingTrait) {
+            traitName = existingTrait.trait;
+          } else {
+            traitName = `${categoryName} - Peso ${weight}`;
+          }
+          
+          // Adicionar ao array de labels se ainda não estiver presente
+          const label = `${traitName} (Peso ${weight})`;
+          if (!allTraitsLabels.includes(label)) {
+            allTraitsLabels.push(label);
+          }
+        }
+      });
+      
+      // Criar datasets para o gráfico combinado
+      datasets.forEach((dataset, index) => {
+        // Criar um array de dados com o mesmo tamanho que allTraitsLabels, preenchido com zeros
+        const data = new Array(allTraitsLabels.length).fill(0);
+        
+        // Preencher os dados para os traços que existem neste dataset
+        dataset.categoryTraits.forEach((trait: any) => {
+          const label = `${trait.trait} (Peso ${trait.weight})`;
+          const labelIndex = allTraitsLabels.indexOf(label);
+          if (labelIndex !== -1) {
+            data[labelIndex] = trait.percentage;
+          }
+        });
+        
+        allTraitsDatasets.push({
+          label: dataset.label,
+          data: data,
+          backgroundColor: dataset.backgroundColor,
+          borderColor: dataset.borderColor,
+          borderWidth: dataset.borderWidth,
+          pointBackgroundColor: dataset.pointBackgroundColor,
+          pointBorderColor: dataset.pointBorderColor,
+          pointHoverBackgroundColor: dataset.pointHoverBackgroundColor,
+          pointHoverBorderColor: dataset.pointHoverBorderColor
+        });
+      });
+      
+      // Adicionar o gráfico combinado ao início do array
+      radarData.unshift({
+        labels: allTraitsLabels,
+        datasets: allTraitsDatasets
+      });
+      
+      console.log('Dados processados para os gráficos de radar:', radarData);
+      
+      setPersonalityRadarData(radarData);
     }
   }, [performance, candidate]);
 
@@ -744,14 +822,18 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                         })()
                       }
                       onCompatibilityCalculated={(score, calculatedTargetProfile, calculatedMatchPercentage) => {
-                        // Atualizar a pontuação de compatibilidade no card de Perfil de Personalidade
-                        const personalityCard = document.querySelector('.bg-gray-50.rounded-lg.p-4.border.border-gray-200 .text-3xl.font-bold.text-green-600');
-                        if (personalityCard && performance.opinionQuestionsCount > 0) {
-                          personalityCard.textContent = `${score.toFixed(1)}%`;
-                        }
+                        // Não atualizar a pontuação de personalidade, apenas usar os dados de perfil alvo
+                        // Remover a manipulação direta do DOM que sobrescreve a pontuação
                         
                         // Atualizar os dados de compatibilidade para a seção de recomendações
-                        updateCompatibilityData(score, calculatedTargetProfile, calculatedMatchPercentage);
+                        // Usar apenas o perfil alvo e sua porcentagem, não a pontuação
+                        if (calculatedTargetProfile) {
+                          updateCompatibilityData(
+                            performance.personalityAnalysis?.weightedScore || 0, 
+                            calculatedTargetProfile, 
+                            calculatedMatchPercentage
+                          );
+                        }
                       }}
                     />
                   </div>
@@ -834,8 +916,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
             Não há dados de desempenho disponíveis para este candidato
           </div>
         )}
-      </div>
-
+      </div>  
 
       {/* Seção de Desempenho */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -995,38 +1076,41 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
             {/* Gráfico de Radar */}
             <div>
               <h4 className="text-md font-medium text-gray-700 mb-4 text-center">Desempenho por Etapa (Radar)</h4>
-              <Radar data={{
-                labels: performance.stagePerformance.map(stage => stage.stageName),
-                datasets: [
-                  {
-                    label: 'Desempenho por Etapa',
-                    data: performance.stagePerformance.map(stage => stage.accuracy),
-                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                    borderColor: 'rgb(59, 130, 246)',
-                    borderWidth: 2,
-                    pointBackgroundColor: 'rgb(59, 130, 246)',
-                    pointBorderColor: '#fff',
-                    pointHoverBackgroundColor: '#fff',
-                    pointHoverBorderColor: 'rgb(59, 130, 246)'
-                  }
-                ]
-              }} options={{
-                responsive: true,
-                scales: {
-                  r: {
-                    beginAtZero: true,
-                    max: 100,
-                    ticks: {
-                      stepSize: 20
+              <Radar 
+                data={{
+                  labels: performance.stagePerformance.map(stage => stage.stageName),
+                  datasets: [
+                    {
+                      label: 'Desempenho por Etapa',
+                      data: performance.stagePerformance.map(stage => stage.accuracy),
+                      backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                      borderColor: 'rgb(59, 130, 246)',
+                      borderWidth: 2,
+                      pointBackgroundColor: 'rgb(59, 130, 246)',
+                      pointBorderColor: '#fff',
+                      pointHoverBackgroundColor: '#fff',
+                      pointHoverBorderColor: 'rgb(59, 130, 246)'
+                    }
+                  ]
+                }} 
+                options={{
+                  responsive: true,
+                  scales: {
+                    r: {
+                      beginAtZero: true,
+                      max: 100,
+                      ticks: {
+                        stepSize: 20
+                      }
+                    }
+                  },
+                  plugins: {
+                    legend: {
+                      position: 'top' as const,
                     }
                   }
-                },
-                plugins: {
-                  legend: {
-                    position: 'top' as const,
-                  }
-                }
-              }} />
+                }} 
+              />
             </div>
           </div>
         ) : (
@@ -1102,38 +1186,147 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
             {/* Gráfico de radar para personalidades */}
             <div>
               <h4 className="text-md font-medium text-gray-700 mb-4 text-center">Radar de Traços de Personalidade</h4>
-              {personalityRadarData && (
-                <Radar data={personalityRadarData} options={{
-                  responsive: true,
-                  scales: {
-                    r: {
-                      beginAtZero: true,
-                      max: 100,
-                      ticks: {
-                        stepSize: 20
-                      },
-                      pointLabels: {
-                        font: {
-                          size: 11
-                        }
-                      }
-                    }
-                  },
-                  plugins: {
-                    legend: {
-                      position: 'top' as const,
-                    },
-                    tooltip: {
-                      callbacks: {
-                        label: function(context) {
-                          const label = context.dataset.label || '';
-                          const value = context.raw as number;
-                          return `${label}: ${value}%`;
-                        }
-                      }
-                    }
-                  }
-                }} />
+              {personalityRadarData && personalityRadarData.length > 0 && (
+                <div>
+                  {/* Tabs de navegação */}
+                  <div className="flex border-b border-gray-200 mb-4">
+                    <button
+                      className={`px-4 py-2 text-sm font-medium ${activePersonalityTab === 'all' ? 'text-primary-600 border-b-2 border-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
+                      onClick={() => setActivePersonalityTab('all')}
+                    >
+                      Todos os Traços
+                    </button>
+                    {personalityRadarData.slice(1).map((_, index) => (
+                      <button
+                        key={index}
+                        className={`px-4 py-2 text-sm font-medium ${activePersonalityTab === `group-${index}` ? 'text-primary-600 border-b-2 border-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
+                        onClick={() => setActivePersonalityTab(`group-${index}`)}
+                      >
+                        Grupo {index + 1}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  {/* Conteúdo das tabs */}
+                  <div className="bg-white p-4 rounded-lg shadow">
+                    {/* Tab "Todos os Traços" */}
+                    {activePersonalityTab === 'all' && (
+                      <div>
+                        <h5 className="text-sm font-medium text-gray-700 mb-2 text-center">
+                          Todos os Traços de Personalidade
+                        </h5>
+                        <Radar 
+                          data={personalityRadarData[0]} 
+                          options={{
+                            responsive: true,
+                            scales: {
+                              r: {
+                                beginAtZero: true,
+                                max: 100,
+                                ticks: {
+                                  stepSize: 20
+                                },
+                                pointLabels: {
+                                  font: {
+                                    size: 9
+                                  },
+                                  callback: function(value) {
+                                    // Abreviar os labels para melhor visualização
+                                    if (typeof value === 'string') {
+                                      // Extrair apenas o nome do traço e o peso
+                                      const match = value.match(/(.*?)\s*\(Peso\s*(\d+)\)/);
+                                      if (match) {
+                                        const [_, traitName, weight] = match;
+                                        // Abreviar o nome do traço se for muito longo
+                                        const shortName = traitName.length > 15 
+                                          ? traitName.substring(0, 15) + '...' 
+                                          : traitName;
+                                        return `${shortName} (P${weight})`;
+                                      }
+                                    }
+                                    return value;
+                                  }
+                                }
+                              }
+                            },
+                            plugins: {
+                              legend: {
+                                position: 'top' as const,
+                              },
+                              tooltip: {
+                                callbacks: {
+                                  label: function(context) {
+                                    const label = context.dataset.label || '';
+                                    const value = context.raw as number;
+                                    const fullLabel = context.chart.data.labels?.[context.dataIndex] as string || '';
+                                    return `${fullLabel} - ${label}: ${value.toFixed(1)}%`;
+                                  }
+                                }
+                              },
+                              title: {
+                                display: true,
+                                text: 'Porcentagem real de cada traço por grupo',
+                                font: {
+                                  size: 12
+                                }
+                              }
+                            }
+                          }} 
+                        />
+                      </div>
+                    )}
+                    
+                    {/* Tabs de grupos individuais */}
+                    {personalityRadarData.slice(1).map((radarData, index) => (
+                      <div key={index} className={activePersonalityTab === `group-${index}` ? 'block' : 'hidden'}>
+                        <h5 className="text-sm font-medium text-gray-700 mb-2 text-center">
+                          {radarData.datasets[0].label}
+                        </h5>
+                        <Radar 
+                          data={radarData} 
+                          options={{
+                            responsive: true,
+                            scales: {
+                              r: {
+                                beginAtZero: true,
+                                max: 100,
+                                ticks: {
+                                  stepSize: 20
+                                },
+                                pointLabels: {
+                                  font: {
+                                    size: 11
+                                  }
+                                }
+                              }
+                            },
+                            plugins: {
+                              legend: {
+                                display: false
+                              },
+                              tooltip: {
+                                callbacks: {
+                                  label: function(context) {
+                                    const value = context.raw as number;
+                                    const fullLabel = context.chart.data.labels?.[context.dataIndex] as string || '';
+                                    return `${fullLabel} - ${value.toFixed(1)}%`;
+                                  }
+                                }
+                              },
+                              title: {
+                                display: true,
+                                text: 'Porcentagem real de cada traço',
+                                font: {
+                                  size: 12
+                                }
+                              }
+                            }
+                          }} 
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -1158,14 +1351,20 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {performance.personalityAnalysis.allPersonalities.map((personality, index) => (
-                    <tr key={index} className={index === 0 ? "bg-blue-50" : ""}>
+                    <tr key={index}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {personality.trait} {index === 0 && <span className="text-xs text-blue-600 ml-2">(Dominante)</span>}
+                        {personality.trait}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <div className="flex items-center">
-                          <div className="w-full bg-gray-200 rounded-full h-2.5">
-                            <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${personality.percentage}%` }}></div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className={`h-full rounded-full ${
+                                personality.percentage >= 70 ? 'bg-green-500' : 
+                                personality.percentage >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                              }`}
+                              style={{ width: `${personality.percentage}%` }}
+                            />
                           </div>
                           <span className="ml-2">{personality.percentage}%</span>
                         </div>
@@ -1399,7 +1598,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                         <span className="text-sm text-gray-600">
                           {personality.percentage.toFixed(1)}% 
                           <span className="text-xs text-gray-500 ml-1">
-                            (Peso: {personality.weight?.toFixed(1) || 1})
+                            (Peso: {personality.weight || 1})
                           </span>
                         </span>
                       </div>
@@ -1475,8 +1674,8 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
             <h4 className="font-medium text-gray-800">Análise de Tempo:</h4>
             <p className="mt-2 text-gray-600">
               {performance?.totalTime < 15 && 'O candidato completou o teste rapidamente, o que pode indicar eficiência ou familiaridade com os temas abordados.'}
-              {performance?.totalTime >= 15 && performance?.totalTime <= 30 && 'O candidato completou o teste em um tempo médio, demonstrando equilíbrio entre reflexão e agilidade.'}
-              {performance?.totalTime > 30 && 'O candidato dedicou um tempo considerável ao teste, o que pode indicar cuidado na análise ou dificuldade com os temas abordados.'}
+              {performance?.totalTime >= 15 && performance?.totalTime <= 45 && 'O candidato completou o teste em um tempo médio, demonstrando equilíbrio entre reflexão e agilidade.'}
+              {performance?.totalTime > 45 && 'O candidato dedicou um tempo considerável ao teste, o que pode indicar cuidado na análise ou dificuldade com os temas abordados.'}
             </p>
           </div>
           

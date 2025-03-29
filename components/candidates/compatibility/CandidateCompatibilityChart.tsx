@@ -424,8 +424,9 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
       
       // Notificar o componente pai sobre o cálculo de compatibilidade
       if (onCompatibilityCalculated) {
+        // Apenas notificar sobre o perfil alvo e sua porcentagem, sem sobrescrever a pontuação geral
         onCompatibilityCalculated(
-          totalCompatibility,
+          undefined as any, // Não enviar a pontuação de compatibilidade para não sobrescrever a pontuação original
           targetProfile,
           targetProfileMatchPercentage
         );
