@@ -4,6 +4,8 @@ import { QuestionType, QuestionDifficulty } from '../../types/questions';
 import Link from 'next/link';
 import { useNotification } from '../../contexts/NotificationContext';
 import QuestionPreview from './QuestionPreview';
+import toast from 'react-hot-toast';
+import BulkDeleteProgress from './BulkDeleteProgress';
 
 interface Question {
   id: string;
@@ -56,6 +58,9 @@ const QuestionList: React.FC<QuestionListProps> = ({
   // Estados para seleção múltipla
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteProgress, setDeleteProgress] = useState(0);
+  const [cancelDeleteFlag, setCancelDeleteFlag] = useState(false);
 
   const fetchQuestions = useCallback(async () => {
     try {
@@ -215,10 +220,10 @@ const QuestionList: React.FC<QuestionListProps> = ({
 
           // Atualizar a lista após exclusão bem-sucedida
           fetchQuestions();
-          showToast('Pergunta excluída com sucesso', 'success');
+          toast.success('Pergunta excluída com sucesso', { duration: 2000 });
         } catch (error) {
           console.error('Erro ao excluir pergunta:', error);
-          showToast('Erro ao excluir pergunta', 'error');
+          toast.error('Erro ao excluir pergunta', { duration: 2000 });
         }
       }
     );
@@ -281,7 +286,7 @@ const QuestionList: React.FC<QuestionListProps> = ({
       setPreviewQuestion(data);
     } catch (err) {
       console.error('Erro ao buscar detalhes da pergunta:', err);
-      showToast('Erro ao carregar detalhes da pergunta. Tente novamente.', 'error');
+      toast.error('Erro ao carregar detalhes da pergunta. Tente novamente.', { duration: 2000 });
     } finally {
       setLoadingPreview(false);
     }
@@ -319,6 +324,12 @@ const QuestionList: React.FC<QuestionListProps> = ({
     }
   };
 
+  // Função para cancelar a exclusão em massa
+  const cancelDelete = () => {
+    setCancelDeleteFlag(true);
+    toast.error('Processo de exclusão cancelado pelo usuário', { duration: 3000 });
+  };
+
   // Função para excluir múltiplas perguntas
   const handleDeleteSelected = () => {
     if (selectedQuestions.length === 0) return;
@@ -332,20 +343,58 @@ const QuestionList: React.FC<QuestionListProps> = ({
       message,
       async () => {
         try {
-          // Contador de sucesso
+          // Resetar estados
+          setCancelDeleteFlag(false);
+          setDeleteProgress(0);
+          setIsDeleting(true);
+          
+          // Contador de progresso
+          let processedCount = 0;
           let successCount = 0;
           
+          // Mostrar toast de início
+          toast.loading(
+            `Iniciando exclusão de ${selectedQuestions.length} ${selectedQuestions.length === 1 ? 'pergunta' : 'perguntas'}...`,
+            { duration: 2000 }
+          );
+          
+          // Criar uma cópia do array para não modificar o original durante o loop
+          const questionsToDelete = [...selectedQuestions];
+          
           // Excluir cada pergunta selecionada
-          for (const id of selectedQuestions) {
-            const response = await fetch(`${apiEndpoint}/${id}`, {
-              method: 'DELETE',
-              headers: {
-                'Content-Type': 'application/json'
-              }
-            });
+          for (const id of questionsToDelete) {
+            // Verificar se o usuário cancelou o processo
+            if (cancelDeleteFlag) {
+              break;
+            }
+            
+            try {
+              const response = await fetch(`${apiEndpoint}/${id}`, {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json'
+                }
+              });
 
-            if (response.ok) {
-              successCount++;
+              processedCount++;
+              setDeleteProgress(processedCount);
+              
+              if (response.ok) {
+                successCount++;
+              } else {
+                // Mostrar toast de erro para cada falha individual
+                const errorData = await response.json();
+                toast.error(`Erro ao excluir pergunta: ${errorData.error || 'Erro desconhecido'}`);
+              }
+              
+              // Pequena pausa para não sobrecarregar o servidor
+              await new Promise(resolve => setTimeout(resolve, 100));
+              
+            } catch (error) {
+              processedCount++;
+              setDeleteProgress(processedCount);
+              console.error(`Erro ao excluir pergunta ${id}:`, error);
+              toast.error(`Erro ao excluir pergunta: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
             }
           }
           
@@ -356,23 +405,45 @@ const QuestionList: React.FC<QuestionListProps> = ({
           setSelectedQuestions([]);
           setSelectAll(false);
           
-          // Mostrar mensagem de sucesso
-          if (successCount === selectedQuestions.length) {
-            showToast(
-              selectedQuestions.length === 1
-                ? 'Pergunta excluída com sucesso'
-                : `${successCount} perguntas excluídas com sucesso`,
-              'success'
+          // Fechar modal de progresso
+          setIsDeleting(false);
+          
+          // Mostrar toast de conclusão
+          if (cancelDeleteFlag) {
+            // Já mostrou mensagem de cancelamento, não precisa mostrar outra
+          } else if (successCount === questionsToDelete.length) {
+            toast.success(
+              questionsToDelete.length === 1
+                ? 'Pergunta excluída com sucesso!'
+                : `${successCount} perguntas excluídas com sucesso!`
             );
+          } else if (successCount > 0) {
+            toast.custom((t) => (
+              <div className={`${
+                t.visible ? 'animate-enter' : 'animate-leave'
+              } bg-yellow-50 p-4 rounded-lg shadow-md max-w-md w-full`}>
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-yellow-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-yellow-800">Exclusão parcial</h3>
+                    <div className="mt-2 text-sm text-yellow-700">
+                      <p>{`${successCount} de ${questionsToDelete.length} perguntas foram excluídas com sucesso.`}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ), { duration: 5000 });
           } else {
-            showToast(
-              `${successCount} de ${selectedQuestions.length} perguntas excluídas com sucesso`,
-              'warning'
-            );
+            toast.error('Não foi possível excluir nenhuma das perguntas selecionadas.');
           }
         } catch (error) {
           console.error('Erro ao excluir perguntas:', error);
-          showToast('Erro ao excluir perguntas', 'error');
+          toast.error('Erro ao excluir perguntas. Tente novamente mais tarde.');
+          setIsDeleting(false);
         }
       }
     );
@@ -642,10 +713,9 @@ const QuestionList: React.FC<QuestionListProps> = ({
                             <span className="hidden sm:inline">Visualizar</span>
                           </span>
                         </button>
-                        <button
-                          onClick={() => handleEditQuestion(question.id)}
-                          className="text-primary-600 hover:text-primary-900 text-sm"
-                          aria-label="Editar"
+                        <Link
+                          href={`/admin/questions/edit/${question.id}`}
+                          className="text-primary-600 hover:text-primary-800 transition-colors px-2 py-1 rounded hover:bg-primary-50"
                         >
                           <span className="flex items-center justify-center">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
@@ -653,7 +723,7 @@ const QuestionList: React.FC<QuestionListProps> = ({
                             </svg>
                             <span className="hidden sm:inline">Editar</span>
                           </span>
-                        </button>
+                        </Link>
                         <button
                           onClick={() => handleDelete(question.id)}
                           className="text-red-600 hover:text-red-900 text-sm"
@@ -821,15 +891,14 @@ const QuestionList: React.FC<QuestionListProps> = ({
         />
       )}
       
-      {/* Indicador de carregamento para visualização */}
-      {loadingPreview && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 flex items-center space-x-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"></div>
-            <p className="text-gray-700">Carregando detalhes da pergunta...</p>
-          </div>
-        </div>
-      )}
+      {/* Modal de progresso de exclusão em massa */}
+      <BulkDeleteProgress 
+        isOpen={isDeleting}
+        current={deleteProgress}
+        total={selectedQuestions.length}
+        onCancel={cancelDelete}
+        canCancel={deleteProgress < selectedQuestions.length}
+      />
     </div>
   );
 };
