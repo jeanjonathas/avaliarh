@@ -288,25 +288,101 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
 
   console.log('Analisando respostas opinativas com pesos:', opinionResponses.length);
   
-  // Função para calcular o peso com base na ordem
-  const calculateWeight = (position: number, totalOptions: number): number => {
-    const W_max = 5;
-    const W_min = 1;
-    
-    if (totalOptions === 1) return W_max; // Se houver apenas uma opção, ela tem o peso máximo
-    
-    // Aplicar a fórmula de normalização: Peso = 5 - ((posição - 1) / (n_alternativas - 1)) × (5 - 1)
-    const weight = W_max - ((position - 1) * (W_max - W_min)) / (totalOptions - 1);
-    
-    // Arredondar para 2 casas decimais para evitar problemas de precisão
-    const roundedWeight = Math.round(weight * 100) / 100;
-    
-    // Garantir que o peso esteja dentro dos limites
-    return Math.max(W_min, Math.min(W_max, roundedWeight));
-  };
+  // Obter pesos dos traços do processo seletivo
+  const traitWeights: Record<string, number> = {};
+  let hasTraitWeights = false;
+  
+  if (processStages && processStages.length > 0) {
+    for (let i = 0; i < processStages.length; i++) {
+      const stage = processStages[i];
+      if (stage.personalityConfig && stage.personalityConfig.traitWeights) {
+        // Adicionar log para depuração
+        console.log(`Encontrados pesos de traços configurados na etapa "${stage.name}":`);
+        
+        for (let j = 0; j < stage.personalityConfig.traitWeights.length; j++) {
+          const trait = stage.personalityConfig.traitWeights[j];
+          traitWeights[trait.traitName.toLowerCase()] = trait.weight;
+          hasTraitWeights = true;
+          
+          console.log(`  - Traço "${trait.traitName}": peso ${trait.weight}`);
+        }
+      }
+    }
+  }
+  
+  if (hasTraitWeights) {
+    console.log('Usando pesos de traços configurados no processo seletivo');
+  } else {
+    console.log('Nenhum peso de traço configurado encontrado, usando pesos padrão');
+  }
+
+  // Obter informações sobre os grupos de personalidade do processo seletivo
+  const personalityGroups: Record<string, {id: string, name: string, traits: string[]}> = {};
+  
+  // Tente identificar os grupos a partir da configuração do processo
+  if (processStages && processStages.length > 0) {
+    for (let i = 0; i < processStages.length; i++) {
+      const stage = processStages[i];
+      if (stage.personalityConfig && stage.personalityConfig.traitGroups) {
+        // Se o processo tem grupos de traços definidos, use-os
+        for (let j = 0; j < stage.personalityConfig.traitGroups.length; j++) {
+          const group = stage.personalityConfig.traitGroups[j];
+          if (group.id && group.name) {
+            personalityGroups[group.id] = {
+              id: group.id,
+              name: group.name,
+              traits: group.traits || []
+            };
+          }
+        }
+      } else if (stage.personalityConfig && stage.personalityConfig.traitWeights) {
+        // Tente criar grupos a partir dos pesos de traços
+        // Agrupar os traços em um grupo padrão para testes que não têm grupos definidos
+        const defaultGroup = {
+          id: 'default-group',
+          name: 'Perfil de Personalidade',
+          traits: stage.personalityConfig.traitWeights.map((t: any) => t.traitName)
+        };
+        
+        personalityGroups[defaultGroup.id] = defaultGroup;
+      }
+    }
+  }
+  
+  console.log('Grupos de personalidade encontrados no processo:', Object.keys(personalityGroups).length);
+  for (const id in personalityGroups) {
+    const group = personalityGroups[id];
+    console.log(`Grupo ${id}: "${group.name}" - ${group.traits.length} traços`);
+    if (group.traits.length > 0) {
+      console.log(`  Traços: ${group.traits.join(', ')}`);
+    }
+  }
+  
+  // Se não encontramos grupos, criar um grupo padrão
+  if (Object.keys(personalityGroups).length === 0) {
+    personalityGroups['default-group'] = {
+      id: 'default-group',
+      name: 'Perfil de Personalidade',
+      traits: []
+    };
+    console.log('Nenhum grupo encontrado, criando grupo padrão');
+  }
+  
+  // Mapear traços para seus grupos
+  const traitToGroupMap: Record<string, string> = {};
+  
+  // Preencher o mapa de traços para grupos
+  for (const groupId in personalityGroups) {
+    const group = personalityGroups[groupId];
+    for (let i = 0; i < group.traits.length; i++) {
+      const trait = group.traits[i];
+      traitToGroupMap[trait.toLowerCase()] = groupId;
+    }
+  }
 
   // Primeiro passo: analisar todas as perguntas para determinar o número de alternativas
-  opinionResponses.forEach(response => {
+  for (let i = 0; i < opinionResponses.length; i++) {
+    const response = opinionResponses[i];
     if (response.question?.options && Array.isArray(response.question.options)) {
       const questionId = response.question.id;
       
@@ -318,33 +394,74 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
         const weights: Record<string, number> = {};
         
         // Verificar se há pesos configurados para as opções
-        const optionsWithConfiguredWeights = options.filter((option: any) => {
-          if (!option.categoryName) return false;
-          const categoryNameLower = option.categoryName.toLowerCase();
-          return traitWeights[categoryNameLower] !== undefined;
-        });
+        let optionsWithConfiguredWeights = [];
+        
+        try {
+          // Verificar cada opção individualmente para evitar erros
+          for (let j = 0; j < options.length; j++) {
+            const option = options[j];
+            if (option && option.categoryName && typeof option.categoryName === 'string') {
+              const categoryNameLower = option.categoryName.toLowerCase();
+              if (traitWeights[categoryNameLower] !== undefined) {
+                optionsWithConfiguredWeights.push(option);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao verificar opções com pesos configurados:', error);
+          optionsWithConfiguredWeights = [];
+        }
         
         if (optionsWithConfiguredWeights.length > 0) {
           // Usar os pesos configurados no processo seletivo
           console.log(`Pergunta ${questionId}: Usando pesos configurados para as alternativas`);
           
-          options.forEach((option: any) => {
-            if (option.categoryName) {
-              const configuredWeight = traitWeights[option.categoryName.toLowerCase()] || 1;
-              weights[option.id] = configuredWeight;
-            } else {
-              // Para opções sem categoria, usar o peso padrão baseado na posição
-              const position = options.indexOf(option) + 1;
-              weights[option.id] = calculateWeight(position, totalOptions);
+          try {
+            for (let j = 0; j < options.length; j++) {
+              const option = options[j];
+              if (option && option.id) {
+                if (option.categoryName && typeof option.categoryName === 'string') {
+                  const categoryNameLower = option.categoryName.toLowerCase();
+                  const configuredWeight = traitWeights[categoryNameLower];
+                  if (configuredWeight !== undefined) {
+                    weights[option.id] = configuredWeight;
+                  } else {
+                    // Para opções sem peso configurado, usar o peso padrão baseado na posição
+                    const position = j + 1;
+                    weights[option.id] = calculateWeight(position, totalOptions);
+                  }
+                } else {
+                  // Para opções sem categoria, usar o peso padrão baseado na posição
+                  const position = j + 1;
+                  weights[option.id] = calculateWeight(position, totalOptions);
+                }
+              }
             }
-          });
+          } catch (error) {
+            console.error('Erro ao atribuir pesos configurados:', error);
+            // Fallback para cálculo baseado na posição
+            for (let j = 0; j < options.length; j++) {
+              const option = options[j];
+              if (option && option.id) {
+                const position = j + 1;
+                weights[option.id] = calculateWeight(position, totalOptions);
+              }
+            }
+          }
         } else {
           // Usar a fórmula para calcular os pesos baseados na posição
-          options.forEach((option: any, index: number) => {
-            const position = index + 1;
-            const adjustedWeight = calculateWeight(position, totalOptions);
-            weights[option.id] = adjustedWeight;
-          });
+          try {
+            for (let j = 0; j < options.length; j++) {
+              const option = options[j];
+              if (option && option.id) {
+                const position = j + 1;
+                const adjustedWeight = calculateWeight(position, totalOptions);
+                weights[option.id] = adjustedWeight;
+              }
+            }
+          } catch (error) {
+            console.error('Erro ao calcular pesos baseados na posição:', error);
+          }
         }
         
         questionOptions[questionId] = {
@@ -356,10 +473,11 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
           Object.entries(weights).map(([id, weight]) => `${id.substring(0, 6)}: ${weight.toFixed(2)}`).join(', '));
       }
     }
-  });
+  }
 
   // Processar cada resposta opinativa
-  opinionResponses.forEach(response => {
+  for (let i = 0; i < opinionResponses.length; i++) {
+    const response = opinionResponses[i];
     const selectedOption = response.question?.options.find(
       (opt: any) => opt.id === response.optionId || opt.text === response.optionText
     );
@@ -444,99 +562,14 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
         totalPersonalityResponses += adjustedWeight;
       }
     }
-  });
-
-  // Obter pesos dos traços do processo seletivo
-  const traitWeights: Record<string, number> = {};
-  let hasTraitWeights = false;
-  
-  if (processStages && processStages.length > 0) {
-    processStages.forEach(stage => {
-      if (stage.personalityConfig && stage.personalityConfig.traitWeights) {
-        // Adicionar log para depuração
-        console.log(`Encontrados pesos de traços configurados na etapa "${stage.name}":`);
-        
-        stage.personalityConfig.traitWeights.forEach((trait: any) => {
-          traitWeights[trait.traitName.toLowerCase()] = trait.weight;
-          hasTraitWeights = true;
-          
-          console.log(`  - Traço "${trait.traitName}": peso ${trait.weight}`);
-        });
-      }
-    });
   }
-  
-  if (hasTraitWeights) {
-    console.log('Usando pesos de traços configurados no processo seletivo');
-  } else {
-    console.log('Nenhum peso de traço configurado encontrado, usando pesos padrão');
-  }
-
-  // Obter informações sobre os grupos de personalidade do processo seletivo
-  const personalityGroups: Record<string, {id: string, name: string, traits: string[]}> = {};
-  
-  // Tente identificar os grupos a partir da configuração do processo
-  if (processStages && processStages.length > 0) {
-    processStages.forEach(stage => {
-      if (stage.personalityConfig && stage.personalityConfig.traitGroups) {
-        // Se o processo tem grupos de traços definidos, use-os
-        stage.personalityConfig.traitGroups.forEach((group: any) => {
-          if (group.id && group.name) {
-            personalityGroups[group.id] = {
-              id: group.id,
-              name: group.name,
-              traits: group.traits || []
-            };
-          }
-        });
-      } else if (stage.personalityConfig && stage.personalityConfig.traitWeights) {
-        // Tente criar grupos a partir dos pesos de traços
-        // Agrupar os traços em um grupo padrão para testes que não têm grupos definidos
-        const defaultGroup = {
-          id: 'default-group',
-          name: 'Perfil de Personalidade',
-          traits: stage.personalityConfig.traitWeights.map((t: any) => t.traitName)
-        };
-        
-        personalityGroups[defaultGroup.id] = defaultGroup;
-      }
-    });
-  }
-  
-  console.log('Grupos de personalidade encontrados no processo:', Object.keys(personalityGroups).length);
-  Object.entries(personalityGroups).forEach(([id, group]) => {
-    console.log(`Grupo ${id}: "${group.name}" - ${group.traits.length} traços`);
-    if (group.traits.length > 0) {
-      console.log(`  Traços: ${group.traits.join(', ')}`);
-    }
-  });
-  
-  // Se não encontramos grupos, criar um grupo padrão
-  if (Object.keys(personalityGroups).length === 0) {
-    personalityGroups['default-group'] = {
-      id: 'default-group',
-      name: 'Perfil de Personalidade',
-      traits: []
-    };
-    console.log('Nenhum grupo encontrado, criando grupo padrão');
-  }
-  
-  // Mapear traços para seus grupos
-  const traitToGroupMap: Record<string, string> = {};
-  
-  // Preencher o mapa de traços para grupos
-  Object.entries(personalityGroups).forEach(([groupId, group]) => {
-    group.traits.forEach(trait => {
-      traitToGroupMap[trait.toLowerCase()] = groupId;
-    });
-  });
 
   // Agrupar traços por grupo de personalidade (categoryNameUuid)
   const traitsByGroup: Record<string, PersonalityTrait[]> = {};
   const groupDetails: Record<string, any[]> = {};
   
   // Primeiro, agrupar todos os traços pelo ID do grupo
-  Object.entries(personalityCount).forEach(([trait, count]) => {
+  for (const trait in personalityCount) {
     // Obter o ID do grupo para este traço
     const groupId = personalityGroupIds[trait] || 'default';
     
@@ -549,37 +582,38 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
     const weight = traitWeights[trait] || 1;
     groupDetails[groupId].push({
       trait,
-      count,
-      score: (count / totalPersonalityResponses) * 100,
+      count: personalityCount[trait],
+      score: (personalityCount[trait] / totalPersonalityResponses) * 100,
       weight
     });
-  });
+  }
   
   console.log('Grupos de personalidade encontrados:', Object.keys(groupDetails).length);
   
   // Para cada grupo, calcular a pontuação com base nos pesos ajustados
   const groupScores: Record<string, number> = {};
-  Object.entries(groupDetails).forEach(([groupId, traits]) => {
+  for (const groupId in groupDetails) {
     // Verificar se o grupo tem apenas um traço
-    if (traits.length === 1) {
+    if (groupDetails[groupId].length === 1) {
       // Se o grupo tem apenas um traço, considerar o peso ajustado desse traço
-      const trait = traits[0];
+      const trait = groupDetails[groupId][0];
       
       // Calcular a compatibilidade como uma porcentagem do peso máximo (5)
       // Compatibilidade (%) = (Peso / 5) × 100
       const compatibility = (trait.count / totalPersonalityResponses) * 100;
       groupScores[groupId] = Math.min(100, compatibility);
       
-      console.log(`Grupo ${groupId}: ${traits.length} traço(s) - "${traits.map(t => t.trait).join(', ')}"`);
+      console.log(`Grupo ${groupId}: ${groupDetails[groupId].length} traço(s) - "${groupDetails[groupId].map(t => t.trait).join(', ')}"`);
       console.log(`  Pontuação: ${compatibility.toFixed(1)}% (peso médio: ${(trait.count / totalPersonalityResponses * 5).toFixed(2)})`);
     } else {
       // Se o grupo tem múltiplos traços, calcular a média ponderada das compatibilidades
       let totalWeightedCompatibility = 0;
       let totalTraitResponses = 0;
       
-      console.log(`Grupo ${groupId}: ${traits.length} traço(s) - "${traits.map(t => t.trait).join(', ')}"`);
+      console.log(`Grupo ${groupId}: ${groupDetails[groupId].length} traço(s) - "${groupDetails[groupId].map(t => t.trait).join(', ')}"`);
       
-      traits.forEach(trait => {
+      for (let i = 0; i < groupDetails[groupId].length; i++) {
+        const trait = groupDetails[groupId][i];
         // Calcular a compatibilidade para este traço
         // Compatibilidade (%) = (Peso / 5) × 100
         const traitCompatibility = (trait.count / totalPersonalityResponses) * 100;
@@ -589,7 +623,7 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
         // Ponderar a compatibilidade pelo número de respostas deste traço
         totalWeightedCompatibility += traitCompatibility * trait.count;
         totalTraitResponses += trait.count;
-      });
+      }
       
       // Calcular a compatibilidade média ponderada para este grupo
       const groupCompatibility = totalTraitResponses > 0 
@@ -600,17 +634,18 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
       
       console.log(`  Pontuação final: ${groupCompatibility.toFixed(1)}% (${totalTraitResponses.toFixed(1)} respostas ponderadas)`);
     }
-  });
+  }
   
   // Calcular a média das pontuações de todos os grupos
   const groupIds = Object.keys(groupDetails);
   
   // Adicionar logs detalhados para depuração
   console.log('Resumo das pontuações por grupo:');
-  groupIds.forEach(groupId => {
+  for (let i = 0; i < groupIds.length; i++) {
+    const groupId = groupIds[i];
     const traitsCount = groupDetails[groupId].length;
     console.log(`- Grupo ${groupId}: ${groupScores[groupId].toFixed(1)}% (${traitsCount} traços)`);
-  });
+  }
   
   const averageGroupScore = groupIds.length > 0
     ? groupIds.reduce((sum, groupId) => sum + groupScores[groupId], 0) / groupIds.length
@@ -675,4 +710,20 @@ interface PersonalityTrait {
   count: number;
   score: number;
   weight: number;
+}
+
+function calculateWeight(position: number, totalOptions: number): number {
+  const W_max = 5;
+  const W_min = 1;
+  
+  if (totalOptions === 1) return W_max; // Se houver apenas uma opção, ela tem o peso máximo
+  
+  // Aplicar a fórmula de normalização: Peso = 5 - ((posição - 1) / (n_alternativas - 1)) × (5 - 1)
+  const weight = W_max - ((position - 1) * (W_max - W_min)) / (totalOptions - 1);
+  
+  // Arredondar para 2 casas decimais para evitar problemas de precisão
+  const roundedWeight = Math.round(weight * 100) / 100;
+  
+  // Garantir que o peso esteja dentro dos limites
+  return Math.max(W_min, Math.min(W_max, roundedWeight));
 }
