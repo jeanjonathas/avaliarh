@@ -166,6 +166,12 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
   const [profileMatchPercentage, setProfileMatchPercentage] = useState<number>(0);
   const [compatibilityScore, setCompatibilityScore] = useState<number>(0);
   const [profileMatch, setProfileMatch] = useState<boolean>(false);
+  const [groupCompatibilities, setGroupCompatibilities] = useState<Record<string, number>>({});
+  
+  // Estado para controlar a aba de grupo de personalidade selecionada
+  const [selectedPersonalityGroup, setSelectedPersonalityGroup] = useState<string>('all');
+  const [personalityGroups, setPersonalityGroups] = useState<{id: string, name: string}[]>([]);
+  const [personalityRadarDataByGroup, setPersonalityRadarDataByGroup] = useState<Record<string, any>>({});
 
   useEffect(() => {
     const fetchResults = async () => {
@@ -234,10 +240,12 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
         
         // Preparar dados para o gráfico de radar de personalidade
         if (data.personalityAnalysis && data.personalityAnalysis.allPersonalities) {
+          // Dados para o gráfico de radar com todos os traços (para manter compatibilidade)
           const personalityLabels = data.personalityAnalysis.allPersonalities.map((p: any) => p.trait);
           const personalityValues = data.personalityAnalysis.allPersonalities.map((p: any) => p.percentage);
           
-          setPersonalityRadarData({
+          // Criar dados para o gráfico de radar com todos os traços
+          const allTraitsRadarData = {
             labels: personalityLabels,
             datasets: [
               {
@@ -252,7 +260,71 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                 pointHoverBorderColor: 'rgba(75, 192, 192, 1)',
               }
             ]
-          });
+          };
+          
+          // Definir o radar data para todos os traços
+          setPersonalityRadarData(allTraitsRadarData);
+          
+          // Armazenar o radar data para todos os traços
+          const radarDataByGroup: Record<string, any> = {
+            all: allTraitsRadarData
+          };
+          
+          // Verificar se temos dados de grupos de personalidade
+          if (data.personalityAnalysis.groupDetails && Object.keys(data.personalityAnalysis.groupDetails).length > 0) {
+            console.log('Dados de grupos de personalidade disponíveis:', Object.keys(data.personalityAnalysis.groupDetails));
+            
+            // Criar lista de grupos disponíveis
+            const groups = Object.keys(data.personalityAnalysis.groupDetails).map(groupId => {
+              // Tentar encontrar um nome para o grupo
+              let groupName = `Grupo ${groupId.substring(0, 6)}`;
+              
+              // Se for o grupo padrão, usar um nome mais amigável
+              if (groupId === 'default') {
+                groupName = 'Grupo Principal';
+              }
+              
+              return { id: groupId, name: groupName };
+            });
+            
+            // Adicionar a opção "Todos os grupos"
+            groups.unshift({ id: 'all', name: 'Todos os Grupos' });
+            
+            // Atualizar a lista de grupos
+            setPersonalityGroups(groups);
+            
+            // Para cada grupo, criar dados para o gráfico de radar
+            Object.entries(data.personalityAnalysis.groupDetails).forEach(([groupId, traits]) => {
+              const groupTraits = traits as any[];
+              const groupLabels = groupTraits.map(p => p.trait);
+              const groupValues = groupTraits.map(p => p.percentage);
+              
+              // Criar dados para o gráfico de radar deste grupo
+              radarDataByGroup[groupId] = {
+                labels: groupLabels,
+                datasets: [
+                  {
+                    label: `Perfil de Personalidade - ${groups.find(g => g.id === groupId)?.name || groupId}`,
+                    data: groupValues,
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 1,
+                    pointBackgroundColor: 'rgba(75, 192, 192, 1)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgba(75, 192, 192, 1)',
+                  }
+                ]
+              };
+            });
+          } else {
+            console.log('Dados de grupos de personalidade não disponíveis, usando apenas dados agregados');
+            // Definir apenas o grupo "Todos"
+            setPersonalityGroups([{ id: 'all', name: 'Todos os Traços' }]);
+          }
+          
+          // Atualizar os dados de radar por grupo
+          setPersonalityRadarDataByGroup(radarDataByGroup);
         }
         
         setPerformance(data)
@@ -431,6 +503,15 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
     
     return timeString.trim();
   }
+
+  // Função para converter dados do gráfico de radar em formato de tabela
+  const getPersonalitiesFromRadarData = (radarData: any) => {
+    const personalities = radarData.datasets[0].data.map((value: number, index: number) => ({
+      trait: radarData.labels[index],
+      percentage: value,
+    }));
+    return personalities;
+  };
 
   if (loading && loadingPerformance) {
     return (
@@ -623,40 +704,98 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                   {/* Gráfico de Radar de Personalidade */}
                   <div className="bg-white rounded-lg p-4 border border-gray-200">
                     <h3 className="text-lg font-medium text-gray-700 mb-4">Perfil de Personalidade</h3>
-                    {performance.personalityAnalysis && performance.personalityAnalysis.allPersonalities && performance.personalityAnalysis.allPersonalities.length > 0 ? (
+                    
+                    {/* Abas para selecionar o grupo de personalidade */}
+                    {personalityGroups.length > 1 && (
+                      <div className="flex flex-wrap mb-4 border-b border-gray-200">
+                        {personalityGroups.map((group) => (
+                          <button
+                            key={group.id}
+                            className={`px-4 py-2 text-sm font-medium ${
+                              selectedPersonalityGroup === group.id
+                                ? 'text-primary-600 border-b-2 border-primary-600'
+                                : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                            }`}
+                            onClick={() => setSelectedPersonalityGroup(group.id)}
+                          >
+                            {group.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {personalityRadarData ? (
                       <div className="h-64">
                         <Radar 
-                          data={personalityRadarData} 
+                          data={personalityRadarDataByGroup[selectedPersonalityGroup] || personalityRadarData} 
                           options={{
                             responsive: true,
                             maintainAspectRatio: false,
                             scales: {
                               r: {
-                                angleLines: {
-                                  display: true
+                                min: 0,
+                                max: 100,
+                                ticks: {
+                                  stepSize: 20,
+                                  showLabelBackdrop: false,
+                                  color: '#6B7280',
+                                  font: {
+                                    size: 10
+                                  }
                                 },
-                                suggestedMin: 0,
-                                suggestedMax: 100
+                                pointLabels: {
+                                  color: '#4B5563',
+                                  font: {
+                                    size: 11
+                                  }
+                                },
+                                grid: {
+                                  color: 'rgba(107, 114, 128, 0.2)'
+                                },
+                                angleLines: {
+                                  color: 'rgba(107, 114, 128, 0.2)'
+                                }
                               }
                             },
                             plugins: {
                               legend: {
-                                display: false
+                                position: 'top' as const,
+                                labels: {
+                                  boxWidth: 12,
+                                  font: {
+                                    size: 11
+                                  }
+                                }
                               },
                               tooltip: {
                                 callbacks: {
-                                  label: function(context) {
-                                    return `${context.label}: ${context.raw}%`;
+                                  label: function(context: any) {
+                                    return `${context.dataset.label}: ${context.raw}%`;
                                   }
                                 }
                               }
                             }
-                          }} 
+                          }}
                         />
                       </div>
                     ) : (
-                      <div className="flex justify-center items-center h-40 text-gray-500">
-                        Não há dados de personalidade disponíveis
+                      <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p>Não há dados de personalidade disponíveis</p>
+                        <p className="text-sm mt-2">O candidato não respondeu perguntas opinativas ou os dados não foram processados corretamente</p>
+                      </div>
+                    )}
+                    
+                    {/* Informações adicionais sobre o grupo selecionado */}
+                    {selectedPersonalityGroup !== 'all' && personalityGroups.length > 1 && (
+                      <div className="mt-4 p-3 bg-blue-50 rounded-md text-sm text-blue-700">
+                        <p className="font-medium">Informações sobre {personalityGroups.find(g => g.id === selectedPersonalityGroup)?.name}</p>
+                        <p className="mt-1">
+                          Este gráfico mostra apenas os traços de personalidade deste grupo específico.
+                          A pontuação de compatibilidade é calculada separadamente para cada grupo.
+                        </p>
                       </div>
                     )}
                   </div>
@@ -743,7 +882,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                           return demoProfile;
                         })()
                       }
-                      onCompatibilityCalculated={(score, calculatedTargetProfile, calculatedMatchPercentage) => {
+                      onCompatibilityCalculated={(score, calculatedTargetProfile, calculatedMatchPercentage, groupComps) => {
                         // Atualizar a pontuação de compatibilidade no card de Perfil de Personalidade
                         const personalityCard = document.querySelector('.bg-gray-50.rounded-lg.p-4.border.border-gray-200 .text-3xl.font-bold.text-green-600');
                         if (personalityCard && performance.opinionQuestionsCount > 0) {
@@ -752,6 +891,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                         
                         // Atualizar os dados de compatibilidade para a seção de recomendações
                         updateCompatibilityData(score, calculatedTargetProfile, calculatedMatchPercentage);
+                        setGroupCompatibilities(groupComps);
                       }}
                     />
                   </div>
@@ -834,8 +974,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
             Não há dados de desempenho disponíveis para este candidato
           </div>
         )}
-      </div>
-
+      </div>  
 
       {/* Seção de Desempenho */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -859,7 +998,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                       </div>
                       <div className="ml-4">
                         <p className="text-sm text-gray-500">Total de Questões</p>
-                        <p className="text-xl font-semibold text-gray-900">{performance.summary.totalQuestions}</p>
+                        <p className="text-xl font-semibold">{performance.summary.totalQuestions}</p>
                       </div>
                     </div>
                   </div>
@@ -873,7 +1012,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                       </div>
                       <div className="ml-4">
                         <p className="text-sm text-gray-500">Respostas Corretas</p>
-                        <p className="text-xl font-semibold text-gray-900">{performance.summary.correctAnswers}</p>
+                        <p className="text-xl font-semibold text-green-600">{performance.summary.correctAnswers}</p>
                       </div>
                     </div>
                   </div>
@@ -887,7 +1026,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                       </div>
                       <div className="ml-4">
                         <p className="text-sm text-gray-500">Taxa de Acerto</p>
-                        <p className="text-xl font-semibold text-gray-900">{typeof performance.summary.accuracy === 'number' ? performance.summary.accuracy.toFixed(1) : '0'}%</p>
+                        <p className="text-xl font-semibold">{typeof performance.summary.accuracy === 'number' ? performance.summary.accuracy.toFixed(1) : '0'}%</p>
                       </div>
                     </div>
                   </div>
@@ -900,7 +1039,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                     <div className="space-y-4">
                       {performance.stagePerformance.map((stage: any) => (
                         <div key={stage.stageId} className="bg-white p-4 rounded-lg shadow border">
-                          <h4 className="font-medium text-gray-900 mb-2">{stage.stageName}</h4>
+                          <h4 className="font-medium">{stage.stageName}</h4>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div>
                               <p className="text-sm text-gray-500">Total de Questões</p>
@@ -1032,7 +1171,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
         ) : (
           <div className="flex flex-col items-center justify-center p-8 text-gray-500">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <p>Não há dados de desempenho por etapa disponíveis</p>
             <p className="text-sm mt-2">O candidato não respondeu perguntas de múltipla escolha ou os dados não foram processados corretamente</p>
@@ -1048,11 +1187,36 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
             {/* Gráfico de pizza para personalidades */}
             <div>
               <h4 className="text-md font-medium text-gray-700 mb-4 text-center">Distribuição de Personalidade</h4>
+              
+              {/* Abas para selecionar o grupo de personalidade (igual ao primeiro gráfico) */}
+              {personalityGroups.length > 1 && (
+                <div className="flex flex-wrap mb-4 border-b border-gray-200">
+                  {personalityGroups.map((group) => (
+                    <button
+                      key={group.id}
+                      className={`px-3 py-1 text-xs font-medium ${
+                        selectedPersonalityGroup === group.id
+                          ? 'text-primary-600 border-b-2 border-primary-600'
+                          : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                      onClick={() => setSelectedPersonalityGroup(group.id)}
+                    >
+                      {group.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              
               <Pie data={{
-                labels: performance.personalityAnalysis.allPersonalities.map(p => p.trait),
+                // Usar os dados do grupo selecionado ou todos os traços se "all" estiver selecionado
+                labels: selectedPersonalityGroup !== 'all' && personalityRadarDataByGroup[selectedPersonalityGroup]
+                  ? personalityRadarDataByGroup[selectedPersonalityGroup].labels
+                  : personalityRadarDataByGroup.all.labels,
                 datasets: [
                   {
-                    data: performance.personalityAnalysis.allPersonalities.map(p => p.percentage),
+                    data: selectedPersonalityGroup !== 'all' && personalityRadarDataByGroup[selectedPersonalityGroup]
+                      ? personalityRadarDataByGroup[selectedPersonalityGroup].datasets[0].data
+                      : personalityRadarDataByGroup.all.datasets[0].data,
                     backgroundColor: [
                       'rgba(255, 99, 132, 0.5)',
                       'rgba(54, 162, 235, 0.5)',
@@ -1064,6 +1228,11 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                       'rgba(83, 102, 255, 0.5)',
                       'rgba(40, 159, 64, 0.5)',
                       'rgba(210, 199, 199, 0.5)',
+                      'rgba(255, 99, 132, 0.5)',  // Cores adicionais para suportar mais de 10 traços
+                      'rgba(54, 162, 235, 0.5)',
+                      'rgba(255, 206, 86, 0.5)',
+                      'rgba(75, 192, 192, 0.5)',
+                      'rgba(153, 102, 255, 0.5)',
                     ],
                     borderColor: [
                       'rgba(255, 99, 132, 1)',
@@ -1076,6 +1245,11 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                       'rgba(83, 102, 255, 1)',
                       'rgba(40, 159, 64, 1)',
                       'rgba(210, 199, 199, 1)',
+                      'rgba(255, 99, 132, 1)',  // Cores adicionais para suportar mais de 10 traços
+                      'rgba(54, 162, 235, 1)',
+                      'rgba(255, 206, 86, 1)',
+                      'rgba(75, 192, 192, 1)',
+                      'rgba(153, 102, 255, 1)',
                     ],
                     borderWidth: 1,
                   },
@@ -1085,6 +1259,12 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                 plugins: {
                   legend: {
                     position: 'right' as const,
+                    labels: {
+                      boxWidth: 12,
+                      font: {
+                        size: 10
+                      }
+                    }
                   },
                   tooltip: {
                     callbacks: {
@@ -1102,38 +1282,41 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
             {/* Gráfico de radar para personalidades */}
             <div>
               <h4 className="text-md font-medium text-gray-700 mb-4 text-center">Radar de Traços de Personalidade</h4>
-              {personalityRadarData && (
-                <Radar data={personalityRadarData} options={{
-                  responsive: true,
-                  scales: {
-                    r: {
-                      beginAtZero: true,
-                      max: 100,
-                      ticks: {
-                        stepSize: 20
-                      },
-                      pointLabels: {
-                        font: {
-                          size: 11
+              {personalityRadarDataByGroup && (
+                <Radar 
+                  data={personalityRadarDataByGroup[selectedPersonalityGroup] || personalityRadarDataByGroup.all} 
+                  options={{
+                    responsive: true,
+                    scales: {
+                      r: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                          stepSize: 20
+                        },
+                        pointLabels: {
+                          font: {
+                            size: 11
+                          }
                         }
                       }
-                    }
-                  },
-                  plugins: {
-                    legend: {
-                      position: 'top' as const,
                     },
-                    tooltip: {
-                      callbacks: {
-                        label: function(context) {
-                          const label = context.dataset.label || '';
-                          const value = context.raw as number;
-                          return `${label}: ${value}%`;
+                    plugins: {
+                      legend: {
+                        position: 'top' as const,
+                      },
+                      tooltip: {
+                        callbacks: {
+                          label: function(context) {
+                            const label = context.dataset.label || '';
+                            const value = context.raw as number;
+                            return `${label}: ${value}%`;
+                          }
                         }
                       }
                     }
-                  }
-                }} />
+                  }}
+                />
               )}
             </div>
           </div>
@@ -1141,6 +1324,26 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
           {/* Tabela de Personalidades */}
           <div className="mt-8">
             <h4 className="text-md font-medium text-gray-700 mb-4">Detalhamento de Traços de Personalidade</h4>
+            
+            {/* Abas para selecionar o grupo de personalidade (igual aos gráficos) */}
+            {personalityGroups.length > 1 && (
+              <div className="flex flex-wrap mb-4 border-b border-gray-200">
+                {personalityGroups.map((group) => (
+                  <button
+                    key={group.id}
+                    className={`px-4 py-2 text-sm font-medium ${
+                      selectedPersonalityGroup === group.id
+                        ? 'text-primary-600 border-b-2 border-primary-600'
+                        : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                    onClick={() => setSelectedPersonalityGroup(group.id)}
+                  >
+                    {group.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -1157,7 +1360,10 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {performance.personalityAnalysis.allPersonalities.map((personality, index) => (
+                  {(selectedPersonalityGroup !== 'all' && personalityRadarDataByGroup[selectedPersonalityGroup]
+                    ? getPersonalitiesFromRadarData(personalityRadarDataByGroup[selectedPersonalityGroup])
+                    : performance.personalityAnalysis.allPersonalities
+                  ).map((personality, index) => (
                     <tr key={index} className={index === 0 ? "bg-blue-50" : ""}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {personality.trait} {index === 0 && <span className="text-xs text-blue-600 ml-2">(Dominante)</span>}
@@ -1165,7 +1371,13 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <div className="flex items-center">
                           <div className="w-full bg-gray-200 rounded-full h-2.5">
-                            <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${personality.percentage}%` }}></div>
+                            <div 
+                              className={`h-full rounded-full ${
+                                personality.percentage >= 70 ? 'bg-green-500' : 
+                                personality.percentage >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                              }`}
+                              style={{ width: `${personality.percentage}%` }}
+                            />
                           </div>
                           <span className="ml-2">{personality.percentage}%</span>
                         </div>
@@ -1289,7 +1501,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
               recommendationText = `Este candidato demonstrou desempenho satisfatório com ${accuracy.toFixed(1)}% de acertos. `;
               
               if (totalTime < 15) {
-                recommendationText += 'Completou o teste rapidamente, o que pode indicar eficiência ou pressa. ';
+                recommendationText += 'Completou o teste rapidamente, o que pode indicar eficiência ou familiaridade com os temas abordados. ';
               } else if (totalTime > 45) {
                 recommendationText += 'Dedicou tempo considerável ao teste, o que pode indicar cuidado na análise ou dificuldade com os temas abordados. ';
               }
@@ -1335,7 +1547,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                 );
                 
                 if (bestStage && bestStage.stageName) {
-                  recommendationText += `Destaque para &ldquo;${bestStage.stageName}&rdquo; com ${bestStage.accuracy.toFixed(1)}% de acertos. `;
+                  recommendationText += `\n\nDestaque para &ldquo;${bestStage.stageName}&rdquo; com ${bestStage.accuracy.toFixed(1)}% de acertos. `;
                 }
                 
                 recommendationText += 'Pode ser considerado para outras posições que exijam essas habilidades específicas.';
@@ -1359,8 +1571,28 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
             <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
               <h4 className="font-medium text-gray-800 mb-2">Compatibilidade com o Perfil Desejado</h4>
               
+              {/* Abas para selecionar o grupo de personalidade (igual aos gráficos) */}
+              {personalityGroups.length > 1 && (
+                <div className="flex flex-wrap mb-4 border-b border-gray-200">
+                  {personalityGroups.map((group) => (
+                    <button
+                      key={group.id}
+                      className={`px-4 py-2 text-sm font-medium ${
+                        selectedPersonalityGroup === group.id
+                          ? 'text-primary-600 border-b-2 border-primary-600'
+                          : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                      onClick={() => setSelectedPersonalityGroup(group.id)}
+                    >
+                      {group.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              
               <div className="space-y-3">
-                {targetProfile && (
+                {/* Compatibilidade geral (média de todos os grupos) */}
+                {targetProfile && selectedPersonalityGroup === 'all' && (
                   <div className="flex flex-col">
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-sm font-medium text-gray-700">
@@ -1386,56 +1618,73 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                   </div>
                 )}
                 
-                {performance?.personalityAnalysis?.allPersonalities
-                  .filter(p => p.trait !== targetProfile)
-                  .sort((a, b) => (b.weight || 1) - (a.weight || 1))
-                  .slice(0, 2)  // Mostrar apenas os 2 mais relevantes após o perfil alvo
-                  .map((personality, index) => (
-                    <div key={index} className="flex flex-col">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-medium text-gray-700">
-                          {personality.trait}
-                        </span>
-                        <span className="text-sm text-gray-600">
-                          {personality.percentage.toFixed(1)}% 
-                          <span className="text-xs text-gray-500 ml-1">
-                            (Peso: {personality.weight?.toFixed(1) || 1})
-                          </span>
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className={`h-full rounded-full ${
-                            personality.percentage >= 70 ? 'bg-green-500' : 
-                            personality.percentage >= 40 ? 'bg-yellow-500' : 'bg-red-500'
-                          }`}
-                          style={{ width: `${personality.percentage}%` }}
-                        />
-                      </div>
+                {/* Compatibilidade por grupo */}
+                {targetProfile && selectedPersonalityGroup !== 'all' && Object.keys(groupCompatibilities).length > 0 && (
+                  <div className="flex flex-col">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-medium text-gray-700">
+                        {targetProfile} - {personalityGroups.find(g => g.id === selectedPersonalityGroup)?.name}
+                        <span className="text-xs font-medium text-green-600 ml-1">(Perfil Desejado)</span>
+                      </span>
+                      <span className="text-sm text-gray-600">
+                        {(groupCompatibilities[selectedPersonalityGroup] || 0).toFixed(1)}% 
+                      </span>
                     </div>
-                  ))
-                }
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className={`h-full rounded-full ${
+                          (groupCompatibilities[selectedPersonalityGroup] || 0) >= 70 ? 'bg-green-500' : 
+                          (groupCompatibilities[selectedPersonalityGroup] || 0) >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                        }`}
+                        style={{ width: `${groupCompatibilities[selectedPersonalityGroup] || 0}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
                 
-                <div className="mt-3 pt-3 border-t border-gray-200">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm font-medium text-gray-700">Compatibilidade Geral</span>
-                    <span className="text-sm text-gray-600">
-                      {compatibilityScore.toFixed(1)}%
-                    </span>
+                {/* Compatibilidade de todos os grupos (quando um grupo específico está selecionado) */}
+                {targetProfile && selectedPersonalityGroup !== 'all' && Object.keys(groupCompatibilities).length > 0 && (
+                  <div className="mt-4 p-3 bg-blue-50 rounded-md text-sm text-blue-700">
+                    <p className="font-medium">Compatibilidade média de todos os grupos: {profileMatchPercentage.toFixed(1)}%</p>
+                    <p className="mt-1">
+                      Esta é a média das compatibilidades de todos os grupos de personalidade.
+                      A compatibilidade acima é específica para o grupo selecionado.
+                    </p>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className={`h-full rounded-full ${
-                        compatibilityScore >= 70 ? 'bg-green-500' : 
-                        compatibilityScore >= 40 ? 'bg-yellow-500' : 'bg-red-500'
-                      }`}
-                      style={{ width: `${compatibilityScore}%` }}
-                    />
+                )}
+                
+                {/* Lista de compatibilidades por grupo (quando "Todos os Grupos" está selecionado) */}
+                {targetProfile && selectedPersonalityGroup === 'all' && Object.keys(groupCompatibilities).length > 0 && personalityGroups.length > 1 && (
+                  <div className="mt-4">
+                    <h5 className="text-sm font-medium text-gray-700 mb-2">Compatibilidade por Grupo de Personalidade</h5>
+                    <div className="space-y-2">
+                      {Object.entries(groupCompatibilities).map(([groupId, compatibility]) => {
+                        const groupName = personalityGroups.find(g => g.id === groupId)?.name || `Grupo ${groupId}`;
+                        return (
+                          <div key={groupId} className="flex flex-col">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-xs font-medium text-gray-700">
+                                {groupName}
+                              </span>
+                              <span className="text-xs text-gray-600">
+                                {compatibility.toFixed(1)}%
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-1.5">
+                              <div 
+                                className={`h-full rounded-full ${
+                                  compatibility >= 70 ? 'bg-green-500' : 
+                                  compatibility >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                                }`}
+                                style={{ width: `${compatibility}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <p className="mt-2 text-xs text-gray-500">
-                    A compatibilidade geral é calculada considerando os pesos atribuídos a cada perfil comportamental desejado para esta vaga.
-                  </p>
-                </div>
+                )}
               </div>
             </div>
           )}
@@ -1475,8 +1724,8 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
             <h4 className="font-medium text-gray-800">Análise de Tempo:</h4>
             <p className="mt-2 text-gray-600">
               {performance?.totalTime < 15 && 'O candidato completou o teste rapidamente, o que pode indicar eficiência ou familiaridade com os temas abordados.'}
-              {performance?.totalTime >= 15 && performance?.totalTime <= 30 && 'O candidato completou o teste em um tempo médio, demonstrando equilíbrio entre reflexão e agilidade.'}
-              {performance?.totalTime > 30 && 'O candidato dedicou um tempo considerável ao teste, o que pode indicar cuidado na análise ou dificuldade com os temas abordados.'}
+              {performance?.totalTime >= 15 && performance?.totalTime <= 45 && 'O candidato completou o teste em um tempo médio, demonstrando equilíbrio entre reflexão e agilidade.'}
+              {performance?.totalTime > 45 && 'O candidato dedicou um tempo considerável ao teste, o que pode indicar cuidado na análise ou dificuldade com os temas abordados.'}
             </p>
           </div>
           
