@@ -52,6 +52,10 @@ const QuestionList: React.FC<QuestionListProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
+  
+  // Estados para seleção múltipla
+  const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
+  const [selectAll, setSelectAll] = useState(false);
 
   const fetchQuestions = useCallback(async () => {
     try {
@@ -283,6 +287,103 @@ const QuestionList: React.FC<QuestionListProps> = ({
     }
   };
 
+  // Função para selecionar/deselecionar todas as perguntas
+  const handleSelectAll = () => {
+    if (selectAll) {
+      // Se já estiver tudo selecionado, desmarcar tudo
+      setSelectedQuestions([]);
+    } else {
+      // Selecionar todas as perguntas da página atual
+      const allIds = questions.map(question => question.id);
+      setSelectedQuestions(allIds);
+    }
+    setSelectAll(!selectAll);
+  };
+
+  // Função para selecionar/deselecionar uma pergunta individual
+  const handleSelectQuestion = (id: string) => {
+    if (selectedQuestions.includes(id)) {
+      // Se já estiver selecionada, remover da seleção
+      setSelectedQuestions(selectedQuestions.filter(questionId => questionId !== id));
+      // Se estava com "selecionar todos" ativado, desativar
+      if (selectAll) {
+        setSelectAll(false);
+      }
+    } else {
+      // Adicionar à seleção
+      setSelectedQuestions([...selectedQuestions, id]);
+      // Verificar se todas as perguntas estão selecionadas
+      if (selectedQuestions.length + 1 === questions.length) {
+        setSelectAll(true);
+      }
+    }
+  };
+
+  // Função para excluir múltiplas perguntas
+  const handleDeleteSelected = () => {
+    if (selectedQuestions.length === 0) return;
+    
+    const message = selectedQuestions.length === 1
+      ? 'Tem certeza que deseja excluir a pergunta selecionada?'
+      : `Tem certeza que deseja excluir as ${selectedQuestions.length} perguntas selecionadas?`;
+    
+    showModal(
+      'Confirmar Exclusão',
+      message,
+      async () => {
+        try {
+          // Contador de sucesso
+          let successCount = 0;
+          
+          // Excluir cada pergunta selecionada
+          for (const id of selectedQuestions) {
+            const response = await fetch(`${apiEndpoint}/${id}`, {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            });
+
+            if (response.ok) {
+              successCount++;
+            }
+          }
+          
+          // Atualizar a lista após exclusão
+          fetchQuestions();
+          
+          // Limpar seleção
+          setSelectedQuestions([]);
+          setSelectAll(false);
+          
+          // Mostrar mensagem de sucesso
+          if (successCount === selectedQuestions.length) {
+            showToast(
+              selectedQuestions.length === 1
+                ? 'Pergunta excluída com sucesso'
+                : `${successCount} perguntas excluídas com sucesso`,
+              'success'
+            );
+          } else {
+            showToast(
+              `${successCount} de ${selectedQuestions.length} perguntas excluídas com sucesso`,
+              'warning'
+            );
+          }
+        } catch (error) {
+          console.error('Erro ao excluir perguntas:', error);
+          showToast('Erro ao excluir perguntas', 'error');
+        }
+      }
+    );
+  };
+
+  // Limpar seleção quando mudar de página ou filtros
+  useEffect(() => {
+    setSelectedQuestions([]);
+    setSelectAll(false);
+  }, [currentPage, filterType, filterDifficulty, filterCategory, filterTest, filterDeleted]);
+
   if (loading) {
     return (
       <div className="bg-white shadow-md rounded-lg p-6">
@@ -430,10 +531,50 @@ const QuestionList: React.FC<QuestionListProps> = ({
         </div>
       ) : (
         <div>
+          {/* Barra de ações para itens selecionados */}
+          {selectedQuestions.length > 0 && (
+            <div className="bg-primary-50 border border-primary-200 rounded-md p-3 mb-4 flex justify-between items-center">
+              <div className="text-sm text-primary-700">
+                <span className="font-medium">{selectedQuestions.length}</span> {selectedQuestions.length === 1 ? 'pergunta selecionada' : 'perguntas selecionadas'}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleDeleteSelected}
+                  className="px-3 py-1 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition-colors flex items-center"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  Excluir
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedQuestions([]);
+                    setSelectAll(false);
+                  }}
+                  className="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded-md hover:bg-gray-300 transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+          
           <div className="overflow-x-auto -mx-6 md:mx-0">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th scope="col" className="px-3 py-3 text-left">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                        checked={selectAll}
+                        onChange={handleSelectAll}
+                        aria-label="Selecionar todas as perguntas"
+                      />
+                    </div>
+                  </th>
                   <th scope="col" className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Pergunta
                   </th>
@@ -454,6 +595,17 @@ const QuestionList: React.FC<QuestionListProps> = ({
               <tbody className="bg-white divide-y divide-gray-200">
                 {questions.map((question) => (
                   <tr key={question.id} className={question.deleted ? "bg-red-50" : ""}>
+                    <td className="px-3 py-4">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                          checked={selectedQuestions.includes(question.id)}
+                          onChange={() => handleSelectQuestion(question.id)}
+                          aria-label={`Selecionar pergunta: ${question.text.substring(0, 20)}...`}
+                        />
+                      </div>
+                    </td>
                     <td className="px-3 md:px-6 py-4">
                       <div 
                         className={`text-sm font-medium ${question.deleted ? "text-gray-500 line-through" : "text-gray-900"} line-clamp-2`}
