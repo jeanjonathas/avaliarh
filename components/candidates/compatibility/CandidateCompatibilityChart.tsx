@@ -449,55 +449,49 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
     });
   }, [loading, error, traitsWithCompatibility, compatibilityScore]);
 
-  // Buscar os traços de personalidade completos do processo seletivo
   const mergePersonalityTraits = (
-    candidateTraits: PersonalityTrait[], 
-    processTraits: Array<{name: string, weight: number, categoryNameUuid?: string}>
+    candidateTraits: PersonalityTrait[],
+    processTraits?: Array<{name: string, weight: number, categoryNameUuid?: string}>
   ): PersonalityTrait[] => {
-    // Se não houver traços do candidato, retornar vazio
-    if (!candidateTraits || candidateTraits.length === 0) {
-      console.log('Sem traços do candidato para mesclar');
-      return [];
-    }
-
-    console.log('Mesclando traços - Candidato:', candidateTraits, 'Processo:', processTraits);
+    console.log('Mesclando traços de personalidade:');
+    console.log('- Traços do candidato:', candidateTraits);
+    console.log('- Traços do processo:', processTraits);
     
-    // Criar mapas dos traços do candidato para fácil acesso - um por nome e outro por UUID
+    // Garantir que temos arrays válidos
+    const safeProcessTraits = processTraits || [];
+    const safeCandidateTraits = [...candidateTraits]; // Criar uma cópia para não modificar o original
+    
+    // Mapas para rastrear traços por nome e UUID
     const candidateTraitsByName = new Map<string, PersonalityTrait>();
     const candidateTraitsByUuid = new Map<string, PersonalityTrait>();
     
-    candidateTraits.forEach(trait => {
-      if (trait && trait.trait) {
-        // Normalizar o nome do traço para comparação
-        candidateTraitsByName.set(trait.trait.toLowerCase().trim(), trait);
-        
-        // Se tiver UUID, adicionar ao mapa por UUID também
-        if (trait.categoryNameUuid) {
-          candidateTraitsByUuid.set(trait.categoryNameUuid, trait);
-        }
+    // Preencher os mapas com os traços do candidato
+    safeCandidateTraits.forEach(trait => {
+      const normalizedName = trait.trait.toLowerCase().trim();
+      candidateTraitsByName.set(normalizedName, trait);
+      
+      if (trait.categoryNameUuid) {
+        candidateTraitsByUuid.set(trait.categoryNameUuid, trait);
       }
     });
     
-    console.log('Mapa de traços do candidato por nome:', Array.from(candidateTraitsByName.entries()));
-    console.log('Mapa de traços do candidato por UUID:', Array.from(candidateTraitsByUuid.entries()));
+    // Conjuntos para rastrear quais traços já foram usados
+    const usedCandidateTraits = new Set<string>();
+    const usedCandidateTraitUuids = new Set<string>();
     
-    // Se houver traços do processo, mesclar com os do candidato
-    if (processTraits && processTraits.length > 0) {
-      // Criar um conjunto para rastrear quais traços do candidato foram usados
-      const usedCandidateTraits = new Set<string>();
-      const usedCandidateTraitUuids = new Set<string>();
-      
-      // Primeiro, mapear os traços do processo
-      const mergedTraits = processTraits.map(processTrait => {
-        // Normalizar o nome do traço para comparação
+    // Array para armazenar os traços mesclados
+    let mergedTraits: PersonalityTrait[] = [];
+    
+    // Se temos traços do processo, usá-los como base para a mesclagem
+    if (safeProcessTraits.length > 0) {
+      // Primeiro, adicionar todos os traços do processo, mesclando com os do candidato quando possível
+      mergedTraits = safeProcessTraits.map(processTrait => {
         const processTraitName = processTrait.name.toLowerCase().trim();
         const processTraitUuid = processTrait.categoryNameUuid;
         
-        console.log(`Buscando traço do candidato para "${processTrait.name}" (UUID: "${processTraitUuid}")`);
+        let candidateTrait: PersonalityTrait | undefined;
         
-        // Tentar encontrar o traço primeiro pelo UUID, depois pelo nome
-        let candidateTrait = null;
-        
+        // Tentar encontrar o traço correspondente no candidato (por UUID ou nome)
         if (processTraitUuid && candidateTraitsByUuid.has(processTraitUuid)) {
           candidateTrait = candidateTraitsByUuid.get(processTraitUuid);
           usedCandidateTraitUuids.add(processTraitUuid);
@@ -531,8 +525,8 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
         }
       });
       
-      // Agora, adicionar os traços do candidato que não foram usados
-      candidateTraits.forEach(trait => {
+      // Agora, adicionar TODOS os traços do candidato que não foram usados
+      safeCandidateTraits.forEach(trait => {
         const normalizedTraitName = trait.trait.toLowerCase().trim();
         const traitUuid = trait.categoryNameUuid;
         
@@ -550,14 +544,20 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
         }
       });
       
+      // Registrar o número total de traços após a mesclagem
+      console.log(`Total de traços após mesclagem: ${mergedTraits.length} (Candidato tinha ${safeCandidateTraits.length}, Processo tinha ${safeProcessTraits.length})`);
+      
       return mergedTraits;
     } else {
-      // Se não houver traços do processo, usar apenas os do candidato
-      return candidateTraits.map(trait => ({
+      // Se não houver traços do processo, usar TODOS os traços do candidato
+      const allCandidateTraits = safeCandidateTraits.map(trait => ({
         ...trait,
         weight: trait.weight || 1,
         weightedScore: trait.weightedScore || (trait.percentage / 100)
       }));
+      
+      console.log(`Usando apenas os traços do candidato: ${allCandidateTraits.length} traços`);
+      return allCandidateTraits;
     }
   };
 
