@@ -14,6 +14,7 @@ interface Question {
   stageName?: string;
   categoryName?: string;
   initialExplanation?: string;
+  deleted?: boolean;
   options: {
     id: string;
     text: string;
@@ -41,6 +42,7 @@ const QuestionList: React.FC<QuestionListProps> = ({
   const [filterDifficulty, setFilterDifficulty] = useState<'all' | 'easy' | 'medium' | 'hard'>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterTest, setFilterTest] = useState<string>('all');
+  const [filterDeleted, setFilterDeleted] = useState<'all' | 'active' | 'deleted'>('active');
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [tests, setTests] = useState<{ id: string; title: string }[]>([]);
   const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
@@ -64,6 +66,9 @@ const QuestionList: React.FC<QuestionListProps> = ({
       if (filterTest !== 'all') {
         queryParams.append('testId', filterTest);
       }
+      if (filterDeleted !== 'all') {
+        queryParams.append('deleted', filterDeleted === 'deleted' ? 'true' : 'false');
+      }
       
       const response = await fetch(`${apiEndpoint}?${queryParams.toString()}`);
       if (!response.ok) {
@@ -77,7 +82,7 @@ const QuestionList: React.FC<QuestionListProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [filterType, filterDifficulty, filterCategory, filterTest, apiEndpoint]);
+  }, [filterType, filterDifficulty, filterCategory, filterTest, filterDeleted, apiEndpoint]);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -284,7 +289,7 @@ const QuestionList: React.FC<QuestionListProps> = ({
   return (
     <div className="bg-white shadow-md rounded-lg p-6">
       {/* Filtros */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <div>
           <label htmlFor="filterType" className="block text-sm font-medium text-gray-700 mb-1">
             Tipo de Pergunta
@@ -352,6 +357,21 @@ const QuestionList: React.FC<QuestionListProps> = ({
             ))}
           </select>
         </div>
+        <div>
+          <label htmlFor="filterDeleted" className="block text-sm font-medium text-gray-700 mb-1">
+            Status
+          </label>
+          <select
+            id="filterDeleted"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            value={filterDeleted}
+            onChange={(e) => setFilterDeleted(e.target.value as any)}
+          >
+            <option value="active">Ativas</option>
+            <option value="deleted">Excluídas</option>
+            <option value="all">Todas</option>
+          </select>
+        </div>
       </div>
 
       {/* Lista de perguntas */}
@@ -400,14 +420,17 @@ const QuestionList: React.FC<QuestionListProps> = ({
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {questions.map((question) => (
-                <tr key={question.id}>
+                <tr key={question.id} className={question.deleted ? "bg-red-50" : ""}>
                   <td className="px-3 md:px-6 py-4">
                     <div 
-                      className="text-sm font-medium text-gray-900 line-clamp-2"
+                      className={`text-sm font-medium ${question.deleted ? "text-gray-500 line-through" : "text-gray-900"} line-clamp-2`}
                       dangerouslySetInnerHTML={{ __html: question.text }}
                     />
                     {question.stageName && (
                       <div className="text-xs text-gray-500">Etapa: {question.stageName}</div>
+                    )}
+                    {question.deleted && (
+                      <div className="text-xs text-red-500 mt-1">Excluída</div>
                     )}
                   </td>
                   <td className="px-3 md:px-6 py-4 hidden sm:table-cell">

@@ -29,25 +29,24 @@ export default async function handler(
       console.log('Iniciando busca de perguntas');
       let questions = [];
       
-      const { stageId, testId, categoryId, ids, type, includeDeleted } = req.query;
+      const { stageId, testId, categoryId, ids, type, deleted } = req.query;
       
-      console.log('Parâmetros de busca:', { stageId, testId, categoryId, ids, type, includeDeleted });
+      console.log('Parâmetros de busca:', { stageId, testId, categoryId, ids, type, deleted });
       
       try {
         // Base where condition
-        let whereCondition: any = {
-          // Filtrar perguntas excluídas (marcadas com showResults = false)
-          showResults: true,
-        };
+        let whereCondition: any = {};
         
-        // Adicionar filtro para excluir perguntas marcadas como deleted
-        // Mas permitir incluí-las se o parâmetro includeDeleted=true for fornecido
-        if (req.query.includeDeleted !== 'true') {
-          // Usar type casting para contornar a verificação de tipos do TypeScript
-          whereCondition = {
-            ...whereCondition,
-            ...({ deleted: false } as any)
-          };
+        // Adicionar filtro para perguntas excluídas com base no parâmetro 'deleted'
+        if (deleted === 'true') {
+          console.log('Filtrando apenas perguntas marcadas como excluídas');
+          whereCondition.deleted = true;
+        } else if (deleted === 'false') {
+          console.log('Filtrando apenas perguntas ativas (não excluídas)');
+          whereCondition.deleted = false;
+        } else {
+          console.log('Incluindo todas as perguntas (excluídas e não excluídas)');
+          // Não adicionar filtro de deleted para incluir todas
         }
         
         // Determinar o tipo de questão com base no referer ou query parameter
@@ -215,60 +214,61 @@ export default async function handler(
           });
         }
         console.log(`Encontradas ${questions.length} perguntas`);
+        
+        // Formatar os resultados
+        console.log('Formatando resultados das perguntas');
+        const formattedQuestions = questions.map((question: any) => {
+          return {
+            id: question.id,
+            text: question.text,
+            stageId: question.stageId,
+            categoryId: question.categories.length > 0 ? question.categories[0].id : null,
+            categoryName: question.categories.length > 0 ? question.categories[0].name : null,
+            createdAt: new Date(question.createdAt).toISOString(),
+            updatedAt: new Date(question.updatedAt).toISOString(),
+            stage: {
+              id: question.stageId,
+              title: question.stage?.title || '',
+              description: question.stage?.description || '',
+              order: question.stage?.order || 0
+            },
+            category: question.categories.length > 0 ? {
+              id: question.categories[0].id,
+              name: question.categories[0].name || '',
+              description: question.categories[0].description || ''
+            } : null,
+            options: question.options.map((option: any) => ({
+              id: option.id,
+              text: option.text,
+              isCorrect: option.isCorrect,
+              categoryName: option.categoryName || option.category?.name || null,
+              categoryId: option.categoryId || option.category?.id || null,
+              weight: option.weight || 0,
+              position: option.position || 0,
+              explanation: option.explanation || null
+            })),
+            difficulty: question.difficulty || 'MEDIUM',
+            type: question.type || 'MULTIPLE_CHOICE'
+          };
+        });
+        
+        console.log(`Retornando ${formattedQuestions.length} perguntas formatadas`);
+        
+        // Verificar se há perguntas opinativas e se o tipo solicitado é OPINION_MULTIPLE
+        if (type === 'OPINION_MULTIPLE' && formattedQuestions.length > 0) {
+          console.log('Retornando perguntas opinativas para configuração de traços de personalidade');
+        } else if (type === 'OPINION_MULTIPLE' && formattedQuestions.length === 0) {
+          console.log('Nenhum traço de personalidade encontrado no teste selecionado.');
+          console.log('Verifique se o teste contém perguntas opinativas com categorias de personalidade definidas.');
+        }
+        
+        return res.status(200).json(formattedQuestions);
       } catch (error) {
         console.error('Erro ao buscar perguntas:', error);
         // Se ocorrer um erro, retornar array vazio
         return res.status(200).json([]);
       }
 
-      // Formatar os resultados
-      console.log('Formatando resultados das perguntas');
-      const formattedQuestions = questions.map((question: any) => {
-        return {
-          id: question.id,
-          text: question.text,
-          stageId: question.stageId,
-          categoryId: question.categories.length > 0 ? question.categories[0].id : null,
-          categoryName: question.categories.length > 0 ? question.categories[0].name : null,
-          createdAt: new Date(question.createdAt).toISOString(),
-          updatedAt: new Date(question.updatedAt).toISOString(),
-          stage: {
-            id: question.stageId,
-            title: question.stage?.title || '',
-            description: question.stage?.description || '',
-            order: question.stage?.order || 0
-          },
-          category: question.categories.length > 0 ? {
-            id: question.categories[0].id,
-            name: question.categories[0].name || '',
-            description: question.categories[0].description || ''
-          } : null,
-          options: question.options.map((option: any) => ({
-            id: option.id,
-            text: option.text,
-            isCorrect: option.isCorrect,
-            categoryName: option.categoryName || option.category?.name || null,
-            categoryId: option.categoryId || option.category?.id || null,
-            weight: option.weight || 0,
-            position: option.position || 0,
-            explanation: option.explanation || null
-          })),
-          difficulty: question.difficulty || 'MEDIUM',
-          type: question.type || 'MULTIPLE_CHOICE'
-        };
-      });
-      
-      console.log(`Retornando ${formattedQuestions.length} perguntas formatadas`);
-      
-      // Verificar se há perguntas opinativas e se o tipo solicitado é OPINION_MULTIPLE
-      if (type === 'OPINION_MULTIPLE' && formattedQuestions.length > 0) {
-        console.log('Retornando perguntas opinativas para configuração de traços de personalidade');
-      } else if (type === 'OPINION_MULTIPLE' && formattedQuestions.length === 0) {
-        console.log('Nenhum traço de personalidade encontrado no teste selecionado.');
-        console.log('Verifique se o teste contém perguntas opinativas com categorias de personalidade definidas.');
-      }
-      
-      return res.status(200).json(formattedQuestions);
     } catch (error) {
       console.error('Erro ao buscar perguntas:', error);
       // Retornar array vazio em vez de erro para não quebrar a UI

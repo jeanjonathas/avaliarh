@@ -1,0 +1,265 @@
+/// <reference types="next" />
+import type { NextApiRequest, NextApiResponse } from 'next'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/pages/api/auth/[...nextauth]'
+import { prisma, reconnectPrisma } from '@/lib/prisma'
+import crypto from 'crypto';
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  // Verificar autenticação
+  const session = await getServerSession(req, res, authOptions)
+  
+  // Log para depuração
+  console.log('[PRISMA] Verificando sessão em questions:', session ? 'Autenticado' : 'Não autenticado');
+  
+  if (!session) {
+    console.log('[PRISMA] Erro de autenticação: Sessão não encontrada');
+    return res.status(401).json({ error: 'Não autorizado' })
+  }
+
+  // Garantir que temos uma conexão fresca com o banco de dados
+  console.log('[PRISMA] Forçando reconexão do Prisma antes de buscar questões');
+  await reconnectPrisma();
+
+  if (req.method === 'GET') {
+    try {
+      console.log('Iniciando busca de perguntas');
+      let questions = [];
+      
+      const { stageId, testId, categoryId, ids, type, includeDeleted } = req.query;
+      
+      console.log('Parâmetros de busca:', { stageId, testId, categoryId, ids, type, includeDeleted });
+      
+      try {
+        // Base where condition
+        let whereCondition: any = {
+          // Filtrar perguntas excluídas (marcadas com showResults = false)
+          showResults: true,
+          deleted: false,
+        };
+        
+        // Determinar o tipo de questão com base no referer ou query parameter
+        const referer = req.headers.referer || '';
+        const questionTypeFromQuery = req.query.questionType as string;
+        let questionType = 'selection'; // Valor padrão
+        
+        if (questionTypeFromQuery) {
+          // Se fornecido explicitamente na query, use esse valor
+          questionType = questionTypeFromQuery;
+        } else if (referer.includes('/admin/training/')) {
+          // Se o referer contém '/admin/training/', é uma questão de treinamento
+          questionType = 'training';
+        }
+        
+        console.log(`Tipo de questão determinado: ${questionType}`);
+        
+        // Adicionar filtro de questionType à condição where
+        whereCondition.questionType = questionType;
+        console.log(`Filtrando perguntas por questionType: ${questionType}`);
+        
+        // Add type filter if provided
+        if (type) {
+          whereCondition.type = type;
+          console.log(`Filtrando perguntas por tipo: ${type}`);
+        }
+        
+        if (stageId) {
+          console.log(`Buscando perguntas para a etapa ${stageId}`);
+          // Buscar perguntas de uma etapa específica
+          whereCondition.stageId = stageId;
+          
+          questions = await prisma.question.findMany({
+            where: whereCondition,
+            include: {
+              stage: true,
+              categories: true,
+              options: {
+                include: {
+                  category: true
+                }
+              }
+            },
+            orderBy: [
+              { 
+                stage: {
+                  order: 'asc'
+                }
+              },
+              { createdAt: 'desc' }
+            ]
+          });
+        } else if (testId) {
+          console.log(`Buscando perguntas para o teste ${testId}`);
+          // Buscar perguntas de um teste específico
+          const test = await prisma.test.findUnique({
+            where: { id: testId as string },
+            include: {
+              stages: {
+                include: {
+                  questions: {
+                    where: whereCondition,
+                    include: {
+                      stage: true,
+                      categories: true,
+                      options: {
+                        include: {
+                          category: true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          });
+          
+          if (test && test.stages) {
+            // Extrair todas as perguntas de todas as etapas do teste
+            questions = test.stages.flatMap(stage => stage.questions);
+          } else {
+            questions = [];
+          }
+        } else if (categoryId) {
+          console.log(`Buscando perguntas para a categoria ${categoryId}`);
+          // Buscar perguntas de uma categoria específica
+          questions = await prisma.question.findMany({
+            where: {
+              ...whereCondition,
+              categories: {
+                some: {
+                  id: categoryId
+                }
+              }
+            },
+            include: {
+              stage: true,
+              categories: true,
+              options: {
+                include: {
+                  category: true
+                }
+              }
+            },
+            orderBy: [
+              { 
+                stage: {
+                  order: 'asc'
+                }
+              },
+              { createdAt: 'desc' }
+            ]
+          });
+        } else if (ids && ids.length > 0) {
+          const idArray = Array.isArray(ids) ? ids : [ids];
+          console.log(`Buscando perguntas específicas: ${idArray.join(', ')}`);
+          // Buscar perguntas específicas por IDs
+          questions = await prisma.question.findMany({
+            where: {
+              ...whereCondition,
+              id: {
+                in: idArray
+              }
+            },
+            include: {
+              stage: true,
+              categories: true,
+              options: {
+                include: {
+                  category: true
+                }
+              }
+            },
+            orderBy: [
+              { 
+                stage: {
+                  order: 'asc'
+                }
+              },
+              { createdAt: 'desc' }
+            ]
+          });
+        } else {
+          console.log('Buscando todas as perguntas');
+          // Obter todas as perguntas
+          questions = await prisma.question.findMany({
+            where: whereCondition,
+            include: {
+              stage: true,
+              categories: true,
+              options: {
+                include: {
+                  category: true
+                }
+              }
+            },
+            orderBy: [
+              { 
+                stage: {
+                  order: 'asc'
+                }
+              },
+              { createdAt: 'desc' }
+            ]
+          });
+        }
+        console.log(`Encontradas ${questions.length} perguntas`);
+        
+        // Formatar os resultados
+        console.log('Formatando resultados das perguntas');
+        const formattedQuestions = questions
+          .map((question: any) => {
+            return {
+              id: question.id,
+              text: question.text,
+              stageId: question.stageId,
+              categoryId: question.categories.length > 0 ? question.categories[0].id : null,
+              categoryName: question.categories.length > 0 ? question.categories[0].name : null,
+              createdAt: new Date(question.createdAt).toISOString(),
+              updatedAt: new Date(question.updatedAt).toISOString(),
+              stage: {
+                id: question.stageId,
+                title: question.stage?.title || '',
+                description: question.stage?.description || '',
+                order: question.stage?.order || 0
+              },
+              category: question.categories.length > 0 ? {
+                id: question.categories[0].id,
+                name: question.categories[0].name || '',
+                description: question.categories[0].description || ''
+              } : null,
+              options: question.options.map((option: any) => ({
+                id: option.id,
+                text: option.text,
+                isCorrect: option.isCorrect,
+                categoryName: option.categoryName || option.category?.name || null,
+                categoryId: option.categoryId || option.category?.id || null,
+                weight: option.weight || 0,
+                position: option.position || 0,
+                explanation: option.explanation || null
+              })),
+              difficulty: question.difficulty || 'MEDIUM',
+              type: question.type || 'MULTIPLE_CHOICE'
+            };
+          });
+        
+        console.log(`Retornando ${formattedQuestions.length} perguntas formatadas`);
+        
+        // Verificar se há perguntas opinativas e se o tipo solicitado é OPINION_MULTIPLE
+        if (type === 'OPINION_MULTIPLE' && formattedQuestions.length > 0) {
+          console.log('Retornando perguntas opinativas para configuração de traços de personalidade');
+        } else if (type === 'OPINION_MULTIPLE' && formattedQuestions.length === 0) {
+          console.log('Nenhum traço de personalidade encontrado no teste selecionado.');
+          console.log('Verifique se o teste contém perguntas opinativas com categorias de personalidade definidas.');
+        }
+        
+        return res.status(200).json(formattedQuestions);
+      } catch (error) {
+        console.error('Erro ao buscar perguntas:', error);
+        // Se ocorrer um erro, retornar array vazio
+        return res.status(200).json([]);
+      }
+
+      // Restante do código...
