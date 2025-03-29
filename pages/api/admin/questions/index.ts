@@ -29,16 +29,26 @@ export default async function handler(
       console.log('Iniciando busca de perguntas');
       let questions = [];
       
-      const { stageId, testId, categoryId, ids, type } = req.query;
+      const { stageId, testId, categoryId, ids, type, includeDeleted } = req.query;
       
-      console.log('Parâmetros de busca:', { stageId, testId, categoryId, ids, type });
+      console.log('Parâmetros de busca:', { stageId, testId, categoryId, ids, type, includeDeleted });
       
       try {
         // Base where condition
         let whereCondition: any = {
           // Filtrar perguntas excluídas (marcadas com showResults = false)
-          showResults: true
+          showResults: true,
         };
+        
+        // Adicionar filtro para excluir perguntas marcadas como deleted
+        // Mas permitir incluí-las se o parâmetro includeDeleted=true for fornecido
+        if (req.query.includeDeleted !== 'true') {
+          // Usar type casting para contornar a verificação de tipos do TypeScript
+          whereCondition = {
+            ...whereCondition,
+            ...({ deleted: false } as any)
+          };
+        }
         
         // Determinar o tipo de questão com base no referer ou query parameter
         const referer = req.headers.referer || '';

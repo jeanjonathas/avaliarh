@@ -87,13 +87,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     // Verificar se o teste existe
     const testExists = await prisma.test.findUnique({
-      where: { id: testId }
+      where: { id: testId },
+      include: {
+        stages: {
+          include: {
+            questions: true
+          }
+        }
+      }
     });
     
     if (!testExists) {
       return res.status(400).json({ 
         success: false,
         error: 'O teste selecionado não existe. Por favor, selecione um teste válido.' 
+      });
+    }
+    
+    // Verificar se o teste possui perguntas excluídas
+    const hasDeletedQuestions = testExists.stages.some(stage => 
+      stage.questions.some(question => (question as any).deleted === true)
+    );
+    
+    if (hasDeletedQuestions) {
+      return res.status(400).json({
+        success: false,
+        error: 'O teste selecionado contém perguntas que foram marcadas como excluídas. Por favor, substitua essas perguntas por outras antes de gerar um convite.'
+      });
+    }
+    
+    // Verificar se o teste possui perguntas
+    const hasQuestions = testExists.stages.some(stage => stage.questions.length > 0);
+    
+    if (!hasQuestions) {
+      return res.status(400).json({
+        success: false,
+        error: 'O teste selecionado não possui perguntas. Por favor, adicione perguntas ao teste antes de gerar um convite.'
       });
     }
     

@@ -126,6 +126,52 @@ const TestDetail: NextPage = () => {
   // Ref para controlar se já carregamos os dados
   const hasLoadedDataRef = useRef(false);
   
+  // Verificar se o teste tem perguntas excluídas
+  const [hasDeletedQuestions, setHasDeletedQuestions] = useState(false);
+  
+  // Função para verificar perguntas excluídas
+  const checkForDeletedQuestions = useCallback(async () => {
+    if (!test || !test.testStages) return;
+    
+    try {
+      // Para cada etapa do teste, verificar se há perguntas excluídas
+      let foundDeletedQuestions = false;
+      
+      for (const testStage of test.testStages) {
+        if (!testStage.stage.questionStages) continue;
+        
+        // Obter todos os IDs de perguntas desta etapa
+        const questionIds = testStage.stage.questionStages.map(qs => qs.questionId);
+        if (questionIds.length === 0) continue;
+        
+        // Buscar detalhes das perguntas para verificar se alguma está excluída
+        const response = await fetch(`/api/admin/questions?ids=${questionIds.join(',')}&includeDeleted=true`);
+        if (!response.ok) continue;
+        
+        const questions = await response.json();
+        
+        // Verificar se alguma pergunta está marcada como excluída
+        const deletedQuestions = questions.filter((q: any) => q.deleted === true);
+        if (deletedQuestions.length > 0) {
+          console.log(`Encontradas ${deletedQuestions.length} perguntas excluídas na etapa ${testStage.stage.id}`);
+          foundDeletedQuestions = true;
+          break;
+        }
+      }
+      
+      setHasDeletedQuestions(foundDeletedQuestions);
+    } catch (error) {
+      console.error('Erro ao verificar perguntas excluídas:', error);
+    }
+  }, [test]);
+  
+  // Verificar perguntas excluídas quando o teste for carregado
+  useEffect(() => {
+    if (test && test.testStages) {
+      checkForDeletedQuestions();
+    }
+  }, [test, checkForDeletedQuestions]);
+
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/admin/login')
@@ -1144,6 +1190,31 @@ const TestDetail: NextPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Alerta para perguntas excluídas */}
+      {hasDeletedQuestions && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">Atenção: Este teste contém perguntas excluídas</h3>
+              <div className="mt-2 text-sm text-red-700">
+                <p>Este teste contém perguntas que foram marcadas como excluídas. Não será possível gerar convites para este teste até que todas as perguntas excluídas sejam substituídas por outras.</p>
+                <button 
+                  onClick={checkForDeletedQuestions}
+                  className="mt-2 px-3 py-1 bg-red-100 text-red-800 rounded hover:bg-red-200 text-sm font-medium"
+                >
+                  Verificar novamente
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal para adicionar etapa */}
       <AddStageModal 
