@@ -430,7 +430,13 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
 
   // Efeito para calcular a compatibilidade quando os dados do processo são carregados
   useEffect(() => {
-    if (loading) return;
+    if (loading || !processPersonalityData) return;
+    
+    // Evitar recálculos desnecessários
+    if (traitsWithCompatibility.length > 0 && !processPersonalityData.isDefaultData) {
+      console.log('Compatibilidade já calculada, ignorando recálculo');
+      return;
+    }
     
     console.log('Calculando compatibilidade com dados de processo:', processPersonalityData);
     
@@ -438,33 +444,6 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
     if (!personalityTraits || personalityTraits.length === 0) {
       setError('Candidato não possui traços de personalidade');
       return;
-    }
-    
-    // Verificar se há dados de personalidade do processo
-    if (!processPersonalityData) {
-      // Se não temos dados do processo, tentar criar dados padrão
-      if (personalityTraits.length > 0) {
-        console.log('Criando dados padrão baseados nos traços do candidato');
-        
-        // Criar dados de processo padrão
-        const defaultTraits = personalityTraits.map((trait, index) => ({
-          name: trait.trait,
-          weight: trait.weight || (personalityTraits.length - index), // Peso baseado na ordem
-          categoryNameUuid: trait.categoryNameUuid
-        }));
-        
-        setProcessPersonalityData({
-          traits: defaultTraits,
-          expectedProfile: propExpectedProfile || null,
-          isDefaultData: true
-        });
-        
-        setUsingDefaultData(true);
-        return; // O próximo ciclo do useEffect vai pegar esses dados
-      } else {
-        setError('Dados de personalidade do processo não disponíveis');
-        return;
-      }
     }
     
     // Verificar se há traços configurados no processo
@@ -527,7 +506,7 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
       console.error('Erro ao calcular compatibilidade:', error);
       setError('Erro ao calcular compatibilidade');
     }
-  }, [processPersonalityData, personalityTraits, calculateCompatibility, loading, onCompatibilityCalculated, propExpectedProfile]);
+  }, [processPersonalityData, personalityTraits, calculateCompatibility, loading, onCompatibilityCalculated, propExpectedProfile, traitsWithCompatibility]);
 
   // Efeito para atualizar o componente quando o estado muda
   useEffect(() => {

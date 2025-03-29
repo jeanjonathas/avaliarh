@@ -196,6 +196,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Se temos ambos os tipos de questões, usar os pesos
         overallScore = (multipleChoiceScore * multipleChoiceWeight) + (opinionScore * opinionWeight);
         console.log(`Pontuação geral: (${multipleChoiceScore} * ${multipleChoiceWeight}) + (${opinionScore} * ${opinionWeight}) = ${overallScore}`);
+        
+        // Verificar se a pontuação geral é consistente com as pontuações individuais
+        const expectedMinScore = Math.min(multipleChoiceScore, opinionScore);
+        const expectedMaxScore = Math.max(multipleChoiceScore, opinionScore);
+        
+        // Se a pontuação geral estiver fora do intervalo esperado, ajustar para a média ponderada
+        if (overallScore < expectedMinScore || overallScore > expectedMaxScore) {
+          console.log(`Pontuação geral inconsistente (${overallScore}). Ajustando para média ponderada.`);
+          // Usar a média ponderada como fallback
+          overallScore = (multipleChoiceScore * 0.65) + (opinionScore * 0.35);
+          console.log(`Nova pontuação geral: (${multipleChoiceScore} * 0.65) + (${opinionScore} * 0.35) = ${overallScore}`);
+        }
       } else if (totalQuestions > 0) {
         // Se só temos questões de múltipla escolha
         overallScore = multipleChoiceScore;
