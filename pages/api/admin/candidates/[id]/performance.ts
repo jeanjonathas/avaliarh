@@ -281,11 +281,46 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
   const personalityByGroup: Record<string, Record<string, number>> = {};
   // Mapa para contar respostas por grupo
   const responseCountByGroup: Record<string, number> = {};
+  // Mapa para armazenar informações sobre as alternativas de cada pergunta
+  const questionOptions: Record<string, {totalOptions: number, weights: Record<string, number>}> = {};
   
   let totalPersonalityResponses = 0;
 
   console.log('Analisando respostas opinativas com pesos:', opinionResponses.length);
   
+  // Primeiro passo: analisar todas as perguntas para determinar o número de alternativas
+  opinionResponses.forEach(response => {
+    if (response.question?.options && Array.isArray(response.question.options)) {
+      const questionId = response.question.id;
+      
+      if (!questionOptions[questionId]) {
+        const options = response.question.options;
+        const totalOptions = options.length;
+        
+        // Calcular os pesos ajustados para cada alternativa
+        const weights: Record<string, number> = {};
+        
+        options.forEach((option: any, index: number) => {
+          // Aplicar a fórmula: Peso = 5 - ((Posição - 1) / (Número de alternativas - 1) * (5 - 1))
+          // Isso garante que a primeira alternativa tenha peso 5 e a última tenha peso 1
+          const position = index + 1;
+          const adjustedWeight = totalOptions > 1 
+            ? 5 - ((position - 1) / (totalOptions - 1) * (5 - 1))
+            : 5;
+          
+          weights[option.id] = adjustedWeight;
+        });
+        
+        questionOptions[questionId] = {
+          totalOptions,
+          weights
+        };
+        
+        console.log(`Pergunta ${questionId}: ${totalOptions} alternativas, pesos ajustados:`, weights);
+      }
+    }
+  });
+
   // Processar cada resposta opinativa
   opinionResponses.forEach(response => {
     const selectedOption = response.question?.options.find(
@@ -309,8 +344,16 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
       }
       
       if (personality) {
-        // Incrementar contagem global
-        personalityCount[personality] = (personalityCount[personality] || 0) + 1;
+        // Obter o peso ajustado da alternativa, se disponível
+        let adjustedWeight = 1;
+        const questionId = response.question?.id;
+        
+        if (questionId && questionOptions[questionId] && selectedOption.id) {
+          adjustedWeight = questionOptions[questionId].weights[selectedOption.id] || 1;
+        }
+        
+        // Incrementar contagem global, considerando o peso ajustado
+        personalityCount[personality] = (personalityCount[personality] || 0) + adjustedWeight;
         
         // Armazenar o UUID associado a este traço de personalidade
         if (categoryNameUuid && !personalityUuids[personality]) {
@@ -322,16 +365,16 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
           personalityGroupIds[personality] = groupId;
         }
         
-        // Agrupar por grupo de personalidade
+        // Agrupar por grupo de personalidade, considerando o peso ajustado
         if (!personalityByGroup[groupId]) {
           personalityByGroup[groupId] = {};
           responseCountByGroup[groupId] = 0;
         }
         
-        personalityByGroup[groupId][personality] = (personalityByGroup[groupId][personality] || 0) + 1;
-        responseCountByGroup[groupId]++;
+        personalityByGroup[groupId][personality] = (personalityByGroup[groupId][personality] || 0) + adjustedWeight;
+        responseCountByGroup[groupId] += adjustedWeight;
         
-        totalPersonalityResponses++;
+        totalPersonalityResponses += adjustedWeight;
       }
     }
   });
@@ -385,37 +428,43 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
   Object.entries(traitsByGroup).forEach(([groupId, traits]) => {
     // Verificar se o grupo tem apenas um traço
     if (traits.length === 1) {
-      // Se o grupo tem apenas um traço, usar a porcentagem desse traço
+      // Se o grupo tem apenas um traço, considerar o peso ajustado desse traço
       const trait = traits[0];
-      const groupResponseCount = responseCountByGroup[groupId] || 1;
       const totalResponses = totalPersonalityResponses || 1;
       
-      // Calcular a pontuação como a proporção das respostas deste traço em relação ao total
-      const percentage = (trait.count / totalResponses) * 100;
-      groupScores[groupId] = percentage;
+      // Calcular a compatibilidade como a proporção do peso obtido em relação ao peso máximo
+      const weightedScore = trait.count;
+      const maxPossibleScore = totalResponses * 5; // Peso máximo é 5
       
-      console.log(`Grupo ${groupId.substring(0, 6)} tem apenas um traço (${trait.trait}): ${percentage.toFixed(1)}% (${trait.count}/${totalResponses} respostas)`);
+      // Calcular a pontuação como uma porcentagem do peso máximo possível
+      const compatibility = (weightedScore / maxPossibleScore) * 100;
+      groupScores[groupId] = Math.min(100, compatibility);
+      
+      console.log(`Grupo ${groupId.substring(0, 6)} tem apenas um traço (${trait.trait}): ${compatibility.toFixed(1)}% (${weightedScore.toFixed(1)}/${maxPossibleScore.toFixed(1)} pontos ponderados)`);
     } else {
-      // Se o grupo tem múltiplos traços, calcular a média ponderada
-      let totalWeightedScore = 0;
-      let maxPossibleScore = 0;
+      // Se o grupo tem múltiplos traços, calcular considerando os pesos ajustados
+      let totalWeightedResponses = 0;
+      let totalMaxPossibleScore = 0;
       
       traits.forEach(trait => {
-        if (trait.weight && trait.weight > 0) {
-          // Usar a porcentagem global do traço, não a porcentagem dentro do grupo
-          const totalResponses = totalPersonalityResponses || 1;
-          const percentage = (trait.count / totalResponses) * 100;
-          
-          totalWeightedScore += percentage * trait.weight;
-          maxPossibleScore += 100 * trait.weight; // Pontuação máxima possível é 100
-        }
+        // Calcular respostas ponderadas pelo peso ajustado
+        const weightedResponses = trait.count;
+        totalWeightedResponses += weightedResponses;
+        
+        // Calcular o máximo possível de respostas ponderadas
+        // Assumindo que o candidato poderia ter escolhido este traço com peso máximo (5) em todas as suas respostas
+        const maxPossibleWeight = totalPersonalityResponses * 5; // Peso máximo é 5
+        totalMaxPossibleScore += maxPossibleWeight;
       });
       
-      // Calcular a pontuação ponderada para este grupo
-      const groupWeightedScore = maxPossibleScore > 0 ? (totalWeightedScore / maxPossibleScore) * 100 : 0;
-      groupScores[groupId] = groupWeightedScore;
+      // Calcular a compatibilidade como a proporção do peso obtido em relação ao peso máximo
+      const compatibility = totalMaxPossibleScore > 0 
+        ? (totalWeightedResponses / totalMaxPossibleScore) * 100 
+        : 0;
       
-      console.log(`Grupo ${groupId.substring(0, 6)} tem ${traits.length} traços: ${groupWeightedScore.toFixed(1)}%`);
+      groupScores[groupId] = Math.min(100, compatibility);
+      
+      console.log(`Grupo ${groupId.substring(0, 6)} tem ${traits.length} traços: ${compatibility.toFixed(1)}% (${totalWeightedResponses.toFixed(1)}/${totalMaxPossibleScore.toFixed(1)} pontos ponderados)`);
     }
   });
   
