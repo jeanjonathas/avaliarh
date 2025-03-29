@@ -318,9 +318,11 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
         const weights: Record<string, number> = {};
         
         // Verificar se há pesos configurados para as opções
-        const optionsWithConfiguredWeights = options.filter((option: any) => 
-          option.categoryName && traitWeights[option.categoryName.toLowerCase()]
-        );
+        const optionsWithConfiguredWeights = options.filter((option: any) => {
+          if (!option.categoryName) return false;
+          const categoryNameLower = option.categoryName.toLowerCase();
+          return traitWeights[categoryNameLower] !== undefined;
+        });
         
         if (optionsWithConfiguredWeights.length > 0) {
           // Usar os pesos configurados no processo seletivo
@@ -375,61 +377,72 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
         }
       }
       
-      // Determinar a qual grupo este traço pertence
-      // 1. Verificar no mapa de traços para grupos
-      let groupId = traitToGroupMap[personality.toLowerCase()];
-      
-      // 2. Se não encontrar, verificar se a opção ou questão tem um grupo definido
-      if (!groupId) {
-        const emotionGroupId = selectedOption.emotionGroupId;
-        const questionGroup = response.question?.group;
+      if (personality) {
+        // Determinar a qual grupo este traço pertence
+        // 1. Verificar no mapa de traços para grupos
+        let groupId = null;
         
-        if (emotionGroupId && personalityGroups[emotionGroupId]) {
-          groupId = emotionGroupId;
-        } else if (questionGroup && personalityGroups[questionGroup]) {
-          groupId = questionGroup;
-        } else {
-          // 3. Se ainda não encontrou, usar o grupo padrão
-          groupId = 'default-group';
+        try {
+          if (personality && typeof personality === 'string') {
+            const personalityLower = personality.toLowerCase();
+            groupId = traitToGroupMap[personalityLower];
+          }
+        } catch (error) {
+          console.error(`Erro ao verificar grupo para o traço "${personality}":`, error);
         }
+        
+        // 2. Se não encontrar, verificar se a opção ou questão tem um grupo definido
+        if (!groupId) {
+          const emotionGroupId = selectedOption.emotionGroupId;
+          const questionGroup = response.question?.group;
+          
+          if (emotionGroupId && personalityGroups[emotionGroupId]) {
+            groupId = emotionGroupId;
+          } else if (questionGroup && personalityGroups[questionGroup]) {
+            groupId = questionGroup;
+          } else {
+            // 3. Se ainda não encontrou, usar o grupo padrão
+            groupId = 'default-group';
+          }
+        }
+        
+        // Adicionar log para depuração
+        console.log(`Questão ${response.question?.number || 'N/A'}: Traço "${personality}" atribuído ao grupo "${groupId}"`);
+        
+        const categoryNameUuid = selectedOption.categoryNameUuid || selectedOption.id;
+        
+        // Obter o peso ajustado da alternativa, se disponível
+        let adjustedWeight = 1;
+        const questionId = response.question?.id;
+        
+        if (questionId && questionOptions[questionId] && selectedOption.id) {
+          adjustedWeight = questionOptions[questionId].weights[selectedOption.id] || 1;
+        }
+        
+        // Incrementar contagem global, considerando o peso ajustado
+        personalityCount[personality] = (personalityCount[personality] || 0) + adjustedWeight;
+        
+        // Armazenar o UUID associado a este traço de personalidade
+        if (categoryNameUuid && !personalityUuids[personality]) {
+          personalityUuids[personality] = categoryNameUuid;
+        }
+        
+        // Armazenar o ID do grupo associado a este traço
+        if (groupId && !personalityGroupIds[personality]) {
+          personalityGroupIds[personality] = groupId;
+        }
+        
+        // Agrupar por grupo de personalidade, considerando o peso ajustado
+        if (!personalityByGroup[groupId]) {
+          personalityByGroup[groupId] = {};
+          responseCountByGroup[groupId] = 0;
+        }
+        
+        personalityByGroup[groupId][personality] = (personalityByGroup[groupId][personality] || 0) + adjustedWeight;
+        responseCountByGroup[groupId] += adjustedWeight;
+        
+        totalPersonalityResponses += adjustedWeight;
       }
-      
-      // Adicionar log para depuração
-      console.log(`Questão ${response.question?.number || 'N/A'}: Traço "${personality}" atribuído ao grupo "${groupId}"`);
-      
-      const categoryNameUuid = selectedOption.categoryNameUuid || selectedOption.id;
-      
-      // Obter o peso ajustado da alternativa, se disponível
-      let adjustedWeight = 1;
-      const questionId = response.question?.id;
-      
-      if (questionId && questionOptions[questionId] && selectedOption.id) {
-        adjustedWeight = questionOptions[questionId].weights[selectedOption.id] || 1;
-      }
-      
-      // Incrementar contagem global, considerando o peso ajustado
-      personalityCount[personality] = (personalityCount[personality] || 0) + adjustedWeight;
-      
-      // Armazenar o UUID associado a este traço de personalidade
-      if (categoryNameUuid && !personalityUuids[personality]) {
-        personalityUuids[personality] = categoryNameUuid;
-      }
-      
-      // Armazenar o ID do grupo associado a este traço
-      if (groupId && !personalityGroupIds[personality]) {
-        personalityGroupIds[personality] = groupId;
-      }
-      
-      // Agrupar por grupo de personalidade, considerando o peso ajustado
-      if (!personalityByGroup[groupId]) {
-        personalityByGroup[groupId] = {};
-        responseCountByGroup[groupId] = 0;
-      }
-      
-      personalityByGroup[groupId][personality] = (personalityByGroup[groupId][personality] || 0) + adjustedWeight;
-      responseCountByGroup[groupId] += adjustedWeight;
-      
-      totalPersonalityResponses += adjustedWeight;
     }
   });
 
