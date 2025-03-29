@@ -29,9 +29,17 @@ export default async function handler(
       console.log('Iniciando busca de perguntas');
       let questions = [];
       
-      const { stageId, testId, categoryId, ids, type, deleted } = req.query;
+      const { stageId, testId, categoryId, ids, type, deleted, page, limit } = req.query;
       
-      console.log('Parâmetros de busca:', { stageId, testId, categoryId, ids, type, deleted });
+      console.log('Parâmetros de busca:', { stageId, testId, categoryId, ids, type, deleted, page, limit });
+      
+      // Parâmetros de paginação
+      const pageNumber = page ? parseInt(page as string, 10) : 1;
+      const pageSize = limit ? parseInt(limit as string, 10) : 10;
+      const skip = (pageNumber - 1) * pageSize;
+      
+      // Contador para o total de itens
+      let totalItems = 0;
       
       try {
         // Base where condition
@@ -97,7 +105,9 @@ export default async function handler(
                 }
               },
               { createdAt: 'desc' }
-            ]
+            ],
+            skip,
+            take: pageSize
           });
         } else if (testId) {
           console.log(`Buscando perguntas para o teste ${testId}`);
@@ -158,7 +168,9 @@ export default async function handler(
                 }
               },
               { createdAt: 'desc' }
-            ]
+            ],
+            skip,
+            take: pageSize
           });
         } else if (ids && ids.length > 0) {
           const idArray = Array.isArray(ids) ? ids : [ids];
@@ -187,7 +199,9 @@ export default async function handler(
                 }
               },
               { createdAt: 'desc' }
-            ]
+            ],
+            skip,
+            take: pageSize
           });
         } else {
           console.log('Buscando todas as perguntas');
@@ -210,9 +224,17 @@ export default async function handler(
                 }
               },
               { createdAt: 'desc' }
-            ]
+            ],
+            skip,
+            take: pageSize
           });
         }
+        
+        // Contar o total de itens
+        totalItems = await prisma.question.count({
+          where: whereCondition
+        });
+        
         console.log(`Encontradas ${questions.length} perguntas`);
         
         // Formatar os resultados
@@ -262,7 +284,16 @@ export default async function handler(
           console.log('Verifique se o teste contém perguntas opinativas com categorias de personalidade definidas.');
         }
         
-        return res.status(200).json(formattedQuestions);
+        // Retornar a página atual e o total de itens
+        return res.status(200).json({
+          items: formattedQuestions,
+          totalItems: totalItems,
+          pagination: {
+            page: pageNumber,
+            limit: pageSize,
+            totalPages: Math.ceil(totalItems / pageSize)
+          }
+        });
       } catch (error) {
         console.error('Erro ao buscar perguntas:', error);
         // Se ocorrer um erro, retornar array vazio

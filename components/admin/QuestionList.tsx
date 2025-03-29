@@ -47,6 +47,11 @@ const QuestionList: React.FC<QuestionListProps> = ({
   const [tests, setTests] = useState<{ id: string; title: string }[]>([]);
   const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  
+  // Estados para paginação
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
 
   const fetchQuestions = useCallback(async () => {
     try {
@@ -70,19 +75,32 @@ const QuestionList: React.FC<QuestionListProps> = ({
         queryParams.append('deleted', filterDeleted === 'deleted' ? 'true' : 'false');
       }
       
+      // Adicionar parâmetros de paginação
+      queryParams.append('page', currentPage.toString());
+      queryParams.append('limit', itemsPerPage.toString());
+      
       const response = await fetch(`${apiEndpoint}?${queryParams.toString()}`);
       if (!response.ok) {
         throw new Error('Erro ao carregar perguntas');
       }
       const data = await response.json();
-      setQuestions(data);
+      
+      // Verificar se a resposta contém informações de paginação
+      if (data.items && data.totalItems !== undefined) {
+        setQuestions(data.items);
+        setTotalItems(data.totalItems);
+      } else {
+        // Fallback para o formato antigo de resposta (sem paginação)
+        setQuestions(data);
+        setTotalItems(data.length);
+      }
     } catch (err) {
       console.error('Erro ao buscar perguntas:', err);
       setError('Erro ao carregar perguntas. Tente novamente mais tarde.');
     } finally {
       setLoading(false);
     }
-  }, [filterType, filterDifficulty, filterCategory, filterTest, filterDeleted, apiEndpoint]);
+  }, [filterType, filterDifficulty, filterCategory, filterTest, filterDeleted, apiEndpoint, currentPage, itemsPerPage]);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -138,6 +156,20 @@ const QuestionList: React.FC<QuestionListProps> = ({
     fetchCategories();
     fetchTests();
   }, [fetchQuestions, fetchCategories, fetchTests]);
+
+  // Função para mudar de página
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  // Função para mudar o número de itens por página
+  const handleItemsPerPageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setItemsPerPage(Number(e.target.value));
+    setCurrentPage(1); // Voltar para a primeira página ao mudar o número de itens por página
+  };
+
+  // Calcular o número total de páginas
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
 
   const handleEditQuestion = (id: string) => {
     // Determinar a URL de edição com base no tipo de questão
@@ -397,96 +429,235 @@ const QuestionList: React.FC<QuestionListProps> = ({
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto -mx-6 md:mx-0">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Pergunta
-                </th>
-                <th scope="col" className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
-                  Tipo
-                </th>
-                <th scope="col" className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
-                  Dificuldade
-                </th>
-                <th scope="col" className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
-                  Categoria
-                </th>
-                <th scope="col" className="px-3 md:px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider text-center">
-                  Ações
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {questions.map((question) => (
-                <tr key={question.id} className={question.deleted ? "bg-red-50" : ""}>
-                  <td className="px-3 md:px-6 py-4">
-                    <div 
-                      className={`text-sm font-medium ${question.deleted ? "text-gray-500 line-through" : "text-gray-900"} line-clamp-2`}
-                      dangerouslySetInnerHTML={{ __html: question.text }}
-                    />
-                    {question.stageName && (
-                      <div className="text-xs text-gray-500">Etapa: {question.stageName}</div>
-                    )}
-                    {question.deleted && (
-                      <div className="text-xs text-red-500 mt-1">Excluída</div>
-                    )}
-                  </td>
-                  <td className="px-3 md:px-6 py-4 hidden sm:table-cell">
-                    {getTypeLabel(question.type)}
-                  </td>
-                  <td className="px-3 md:px-6 py-4 hidden sm:table-cell">
-                    {getDifficultyLabel(question.difficulty)}
-                  </td>
-                  <td className="px-3 md:px-6 py-4 hidden md:table-cell">
-                    <div className="text-sm text-gray-900">{question.categoryName || '-'}</div>
-                  </td>
-                  <td className="px-3 md:px-6 py-4 text-center">
-                    <div className="flex flex-col sm:flex-row justify-center sm:justify-end gap-2 sm:gap-4">
-                      <button
-                        onClick={() => fetchQuestionDetails(question.id)}
-                        className="text-indigo-600 hover:text-indigo-900 text-sm"
-                        aria-label="Visualizar"
-                      >
-                        <span className="flex items-center justify-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                            <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                          </svg>
-                          <span className="hidden sm:inline">Visualizar</span>
-                        </span>
-                      </button>
-                      <button
-                        onClick={() => handleEditQuestion(question.id)}
-                        className="text-primary-600 hover:text-primary-900 text-sm"
-                        aria-label="Editar"
-                      >
-                        <span className="flex items-center justify-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                          </svg>
-                          <span className="hidden sm:inline">Editar</span>
-                        </span>
-                      </button>
-                      <button
-                        onClick={() => handleDelete(question.id)}
-                        className="text-red-600 hover:text-red-900 text-sm"
-                        aria-label="Excluir"
-                      >
-                        <span className="flex items-center justify-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                          </svg>
-                          <span className="hidden sm:inline">Excluir</span>
-                        </span>
-                      </button>
-                    </div>
-                  </td>
+        <div>
+          <div className="overflow-x-auto -mx-6 md:mx-0">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Pergunta
+                  </th>
+                  <th scope="col" className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
+                    Tipo
+                  </th>
+                  <th scope="col" className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
+                    Dificuldade
+                  </th>
+                  <th scope="col" className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
+                    Categoria
+                  </th>
+                  <th scope="col" className="px-3 md:px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider text-center">
+                    Ações
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {questions.map((question) => (
+                  <tr key={question.id} className={question.deleted ? "bg-red-50" : ""}>
+                    <td className="px-3 md:px-6 py-4">
+                      <div 
+                        className={`text-sm font-medium ${question.deleted ? "text-gray-500 line-through" : "text-gray-900"} line-clamp-2`}
+                        dangerouslySetInnerHTML={{ __html: question.text }}
+                      />
+                      {question.stageName && (
+                        <div className="text-xs text-gray-500">Etapa: {question.stageName}</div>
+                      )}
+                      {question.deleted && (
+                        <div className="text-xs text-red-500 mt-1">Excluída</div>
+                      )}
+                    </td>
+                    <td className="px-3 md:px-6 py-4 hidden sm:table-cell">
+                      {getTypeLabel(question.type)}
+                    </td>
+                    <td className="px-3 md:px-6 py-4 hidden sm:table-cell">
+                      {getDifficultyLabel(question.difficulty)}
+                    </td>
+                    <td className="px-3 md:px-6 py-4 hidden md:table-cell">
+                      <div className="text-sm text-gray-900">{question.categoryName || '-'}</div>
+                    </td>
+                    <td className="px-3 md:px-6 py-4 text-center">
+                      <div className="flex flex-col sm:flex-row justify-center sm:justify-end gap-2 sm:gap-4">
+                        <button
+                          onClick={() => fetchQuestionDetails(question.id)}
+                          className="text-indigo-600 hover:text-indigo-900 text-sm"
+                          aria-label="Visualizar"
+                        >
+                          <span className="flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                              <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                            </svg>
+                            <span className="hidden sm:inline">Visualizar</span>
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => handleEditQuestion(question.id)}
+                          className="text-primary-600 hover:text-primary-900 text-sm"
+                          aria-label="Editar"
+                        >
+                          <span className="flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                            </svg>
+                            <span className="hidden sm:inline">Editar</span>
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => handleDelete(question.id)}
+                          className="text-red-600 hover:text-red-900 text-sm"
+                          aria-label="Excluir"
+                        >
+                          <span className="flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            <span className="hidden sm:inline">Excluir</span>
+                          </span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* Controles de paginação */}
+          <div className="mt-6 flex flex-col sm:flex-row justify-between items-center">
+            <div className="flex items-center mb-4 sm:mb-0">
+              <span className="text-sm text-gray-700 mr-4">
+                Itens por página:
+              </span>
+              <select
+                className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                value={itemsPerPage}
+                onChange={handleItemsPerPageChange}
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+              <span className="ml-4 text-sm text-gray-700">
+                Mostrando {questions.length} de {totalItems} itens
+              </span>
+            </div>
+            
+            <div className="flex items-center">
+              <button
+                onClick={() => handlePageChange(1)}
+                disabled={currentPage === 1}
+                className={`px-3 py-1 rounded-l-md border ${
+                  currentPage === 1
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-white text-primary-600 hover:bg-primary-50'
+                }`}
+              >
+                <span className="sr-only">Primeira página</span>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M15.707 15.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                  <path fillRule="evenodd" d="M7.707 15.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 111.414 1.414L3.414 10l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className={`px-3 py-1 border-t border-b ${
+                  currentPage === 1
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-white text-primary-600 hover:bg-primary-50'
+                }`}
+              >
+                <span className="sr-only">Página anterior</span>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </button>
+              
+              {/* Números de página */}
+              <div className="hidden sm:flex">
+                {[...Array(totalPages)].map((_, index) => {
+                  const pageNumber = index + 1;
+                  
+                  // Mostrar apenas um número limitado de páginas
+                  if (
+                    pageNumber === 1 ||
+                    pageNumber === totalPages ||
+                    (pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1)
+                  ) {
+                    return (
+                      <button
+                        key={pageNumber}
+                        onClick={() => handlePageChange(pageNumber)}
+                        className={`px-3 py-1 border-t border-b ${
+                          currentPage === pageNumber
+                            ? 'bg-primary-100 text-primary-700 font-medium'
+                            : 'bg-white text-gray-700 hover:bg-primary-50'
+                        }`}
+                      >
+                        {pageNumber}
+                      </button>
+                    );
+                  }
+                  
+                  // Mostrar reticências para páginas omitidas
+                  if (
+                    (pageNumber === 2 && currentPage > 3) ||
+                    (pageNumber === totalPages - 1 && currentPage < totalPages - 2)
+                  ) {
+                    return (
+                      <span
+                        key={pageNumber}
+                        className="px-3 py-1 border-t border-b bg-white text-gray-700"
+                      >
+                        ...
+                      </span>
+                    );
+                  }
+                  
+                  return null;
+                })}
+              </div>
+              
+              {/* Versão móvel: apenas página atual/total */}
+              <div className="flex sm:hidden">
+                <span className="px-3 py-1 border-t border-b bg-white text-gray-700">
+                  {currentPage} / {totalPages}
+                </span>
+              </div>
+              
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-1 border-t border-b ${
+                  currentPage === totalPages
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-white text-primary-600 hover:bg-primary-50'
+                }`}
+              >
+                <span className="sr-only">Próxima página</span>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+              </button>
+              <button
+                onClick={() => handlePageChange(totalPages)}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-1 rounded-r-md border ${
+                  currentPage === totalPages
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-white text-primary-600 hover:bg-primary-50'
+                }`}
+              >
+                <span className="sr-only">Última página</span>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 15.707a1 1 0 010-1.414L8.586 10 4.293 6.707a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                  <path fillRule="evenodd" d="M12.293 15.707a1 1 0 010-1.414L16.586 10l-4.293-3.293a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          </div>
         </div>
       )}
       
