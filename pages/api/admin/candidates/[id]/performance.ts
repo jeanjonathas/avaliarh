@@ -161,7 +161,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const multipleChoiceScore = accuracy;
       const opinionScore = personalityAnalysis.weightedScore || 0;
       
-      // Calcular a pontuação geral com base nos pesos definidos no processo seletivo
+      console.log(`Pontuação de múltipla escolha: ${multipleChoiceScore.toFixed(2)}%`);
+      console.log(`Pontuação de perfil de personalidade: ${opinionScore.toFixed(2)}%`);
+      
+      // Verificar se a pontuação de personalidade está zerada quando deveria ter valor
+      if (opinionResponses.length > 0 && opinionScore === 0) {
+        console.log('ATENÇÃO: Pontuação de personalidade está zerada mesmo com respostas opinativas!');
+        console.log('Detalhes da análise de personalidade:', JSON.stringify({
+          traitsCount: personalityAnalysis.totalTraits,
+          groupsCount: personalityAnalysis.groupCount,
+          weightedScore: personalityAnalysis.weightedScore,
+          groupScores: personalityAnalysis.groupScores
+        }, null, 2));
+      }
+      
+      // Calcular a pontuação geral com base nos pesos e na presença de cada tipo de questão
       let overallScore = 0;
       
       // Verificar se temos configurações de peso para o processo
@@ -201,12 +215,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const expectedMinScore = Math.min(multipleChoiceScore, opinionScore);
         const expectedMaxScore = Math.max(multipleChoiceScore, opinionScore);
         
-        // Se a pontuação geral estiver fora do intervalo esperado, ajustar para a média ponderada
-        if (overallScore < expectedMinScore || overallScore > expectedMaxScore) {
-          console.log(`Pontuação geral inconsistente (${overallScore}). Ajustando para média ponderada.`);
-          // Usar a média ponderada como fallback
-          overallScore = (multipleChoiceScore * 0.65) + (opinionScore * 0.35);
-          console.log(`Nova pontuação geral: (${multipleChoiceScore} * 0.65) + (${opinionScore} * 0.35) = ${overallScore}`);
+        // Se a pontuação geral estiver fora do intervalo esperado, ajustar para a média simples
+        if (overallScore < expectedMinScore * 0.9 || overallScore > expectedMaxScore * 1.1) {
+          console.log(`Pontuação geral inconsistente (${overallScore}). Ajustando para média ponderada fixa.`);
+          
+          // Usar uma média ponderada fixa (60% múltipla escolha, 40% perfil de personalidade)
+          // Isso garante que a pontuação geral fique entre as pontuações individuais
+          overallScore = (multipleChoiceScore * 0.6) + (opinionScore * 0.4);
+          
+          console.log(`Nova pontuação geral: (${multipleChoiceScore} * 0.6) + (${opinionScore} * 0.4) = ${overallScore}`);
         }
       } else if (totalQuestions > 0) {
         // Se só temos questões de múltipla escolha
@@ -340,12 +357,19 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
   
   // Primeiro, agrupar todos os traços pelo categoryNameUuid
   Object.entries(personalityByGroup).forEach(([groupId, traits]) => {
-    traitsByGroup[groupId] = Object.entries(traits).map(([trait, count]) => ({
-      trait,
-      count,
-      score: 0,
-      weight: hasTraitWeights ? (traitWeights[trait.toLowerCase()] || 1) : 1
-    }));
+    traitsByGroup[groupId] = Object.entries(traits).map(([trait, count]) => {
+      // Calcular a pontuação percentual para este traço
+      const groupResponseCount = responseCountByGroup[groupId] || 1;
+      const percentage = (count / groupResponseCount) * 100;
+      
+      return {
+        trait,
+        count,
+        score: percentage, // Definir a pontuação como a porcentagem
+        weight: hasTraitWeights ? (traitWeights[trait.toLowerCase()] || 1) : 1
+      };
+    });
+    
     groupDetails[groupId] = traitsByGroup[groupId].map(trait => ({
       trait: trait.trait,
       score: trait.score,
@@ -385,13 +409,21 @@ function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?
   
   // Calcular a média das pontuações de todos os grupos
   const groupIds = Object.keys(groupScores);
+  
+  // Adicionar logs detalhados para depuração
+  console.log('Pontuações por grupo:');
+  groupIds.forEach(groupId => {
+    const traitsCount = groupDetails[groupId].length;
+    console.log(`- Grupo ${groupId.substring(0, 6)}: ${groupScores[groupId].toFixed(1)}% (${traitsCount} traços)`);
+  });
+  
   const averageGroupScore = groupIds.length > 0
     ? groupIds.reduce((sum, groupId) => sum + groupScores[groupId], 0) / groupIds.length
     : 0;
   
   console.log(`Média das pontuações dos grupos (${groupIds.length} grupos): ${averageGroupScore.toFixed(1)}%`);
   
-  // Usar a média das pontuações dos grupos como a pontuação de personalidade
+  // Usar a média das pontuações dos grupos como pontuação final de personalidade
   const personalityScore = averageGroupScore;
   
   // Calcular percentuais e pontuações para todos os traços (para manter compatibilidade)
