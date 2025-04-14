@@ -100,19 +100,44 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
         traitsByGroup[groupId].push(trait);
       });
       
-      // Criar grupos com compatibilidade baseada no weightedScore
+      // Calcular a compatibilidade para cada grupo
       Object.entries(traitsByGroup).forEach(([groupId, traits]) => {
+        // Calcular a média de peso para este grupo
+        let totalWeight = 0;
+        let totalTraits = 0;
+        
+        traits.forEach(trait => {
+          // Obter o peso da alternativa escolhida
+          const traitWeight = trait.weight || ((trait.percentage / 100) * 5);
+          totalWeight += traitWeight;
+          totalTraits++;
+        });
+        
+        // Calcular a média de peso para o grupo
+        const avgWeight = totalTraits > 0 ? totalWeight / totalTraits : 0;
+        
+        // Calcular a compatibilidade do grupo (0-100%)
+        const groupCompatibility = Math.min(100, Math.round((avgWeight / 5) * 100));
+        
+        console.log(`Grupo ${groupId}: Peso médio = ${avgWeight}, Compatibilidade = ${groupCompatibility}%`);
+        
+        // Criar traços com compatibilidade calculada
         const traitsWithCompatibility: TraitWithCompatibility[] = traits.map(trait => {
-          // Usar o weightedScore do traço se disponível, caso contrário usar 100%
-          const traitScore = (trait as any).weightedScore !== undefined ? 
-            Math.min(100, (trait as any).weightedScore) : 100;
+          // Obter o peso da alternativa escolhida
+          const traitWeight = trait.weight || ((trait.percentage / 100) * 5);
+          
+          // Calcular a compatibilidade individual do traço (0-100%)
+          const traitCompatibility = Math.min(100, Math.round((traitWeight / 5) * 100));
+          
+          // Determinar o valor esperado (em porcentagem)
+          const expectedValue = 100; // Valor esperado sempre é 100% para compatibilidade máxima
           
           return {
             ...trait,
-            compatibility: traitScore,
-            realCompatibility: traitScore,
-            weight: 5,
-            expectedValue: 5,
+            compatibility: traitCompatibility,
+            realCompatibility: traitCompatibility,
+            weight: traitWeight,
+            expectedValue: expectedValue,
             position: 0,
             categoryNameUuid: trait.categoryNameUuid
           };
@@ -121,7 +146,7 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
         traitGroups.push({
           id: groupId,
           traits: traitsWithCompatibility,
-          totalCompatibility: 100
+          totalCompatibility: groupCompatibility
         });
       });
       
@@ -681,7 +706,7 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
                   <div key={trait.trait} className="mb-4">
                     <div className="flex justify-between mb-1">
                       <span className="text-sm font-medium text-gray-700">
-                        {trait.trait} {trait.weight > 1 && `(Peso hierárquico: ${trait.weight})`}
+                        {trait.trait} {trait.weight > 1 && `(Peso: ${trait.weight})`}
                       </span>
                       <span className="text-sm text-gray-500">
                         Valor: {trait.percentage}%
@@ -691,13 +716,13 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
                     <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-primary-600"
-                        style={{ width: `${trait.percentage}%` }}
+                        style={{ width: `${trait.realCompatibility}%` }}
                       />
                     </div>
                     
                     <div className="flex justify-between mt-1 text-xs text-gray-500">
                       <span>Compatibilidade: {trait.realCompatibility.toFixed(1)}%</span>
-                      <span>Esperado: {trait.expectedValue}%</span>
+                      <span>Esperado: {trait.expectedValue}{typeof trait.expectedValue === 'number' && trait.expectedValue <= 5 ? '' : '%'}</span>
                     </div>
                   </div>
                 ))}
