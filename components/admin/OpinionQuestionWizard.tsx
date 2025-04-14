@@ -593,8 +593,8 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
                 className={`p-3 border rounded-lg cursor-pointer transition-all ${isCreatingNewGroup ? 'border-primary-500 bg-primary-50' : 'border-gray-300 hover:border-primary-300'}`}
                 onClick={handleCreateNewGroup}
               >
-                <h4 className="font-medium text-sm">CRIAR NOVO GRUPO</h4>
-                <p className="text-xs text-gray-600">Defina novas categorias para esta pergunta</p>
+                <h4 className="font-medium text-sm">CRIAR NOVO GRUPO DE PERSONALIDADE</h4>
+                <p className="text-xs text-gray-600">Defina um novo conjunto de perfil de personalide que você deseja analisar.</p>
               </div>
               
               <div className="p-3 border rounded-lg">

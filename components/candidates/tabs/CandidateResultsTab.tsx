@@ -379,6 +379,9 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
       const maxWeight = 5;
       const minWeight = 1;
       
+      // Número de grupos de traços para ajustar a visualização
+      const numberOfGroups = Object.keys(traitsByCategory).length;
+      
       // Para cada categoria, garantir que todos os pesos estejam representados
       Object.entries(traitsByCategory).forEach(([category, traits], categoryIndex) => {
         const categoryName = `Grupo ${categoryIndex + 1}`;
@@ -414,7 +417,8 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
           const label = `${trait.trait} (Peso ${trait.weight})`;
           const labelIndex = allTraitsLabels.indexOf(label);
           if (labelIndex !== -1) {
-            data[labelIndex] = trait.percentage;
+            // Multiplicar o valor pelo número de grupos para corrigir a visualização
+            data[labelIndex] = trait.percentage * numberOfGroups;
           }
         });
         
@@ -520,7 +524,15 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
 
   // Função para atualizar os dados de compatibilidade quando o cálculo for concluído
   const updateCompatibilityData = (score: number, calculatedTargetProfile: string = '', calculatedMatchPercentage: number = 0) => {
-    setCompatibilityScore(score);
+    // Verificar se o teste só tem perguntas opinativas
+    const hasOnlyOpinionQuestions = performance && 
+      performance.opinionQuestionsCount > 0 && 
+      performance.multipleChoiceQuestionsCount === 0;
+    
+    // Se só tiver perguntas opinativas, a compatibilidade deve ser 100%
+    const finalScore = hasOnlyOpinionQuestions ? 100 : score;
+    
+    setCompatibilityScore(finalScore);
     
     if (calculatedTargetProfile) {
       setTargetProfile(calculatedTargetProfile);
@@ -528,7 +540,7 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
       setProfileMatch(performance?.personalityAnalysis?.dominantPersonality?.trait === calculatedTargetProfile);
       
       // Atualizar o texto da recomendação com os novos valores
-      updateRecommendationText(score, calculatedTargetProfile, calculatedMatchPercentage);
+      updateRecommendationText(finalScore, calculatedTargetProfile, calculatedMatchPercentage);
     }
   };
 

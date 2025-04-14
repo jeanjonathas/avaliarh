@@ -161,47 +161,51 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const multipleChoiceScore = accuracy;
       const opinionScore = personalityAnalysis.weightedScore || 0;
       
-      // Calcular a pontuação geral com base nos pesos definidos no processo seletivo
+      // Calcular a pontuação geral com base nos pesos e na presença de cada tipo de questão
+      // Verificar quais tipos de perguntas existem no teste
+      const hasMultipleChoiceQuestions = multipleChoiceResponses.length > 0;
+      const hasOpinionQuestions = opinionResponses.length > 0;
+      
+      // Variável para armazenar a pontuação geral
       let overallScore = 0;
       
-      // Verificar se temos configurações de peso para o processo
-      let multipleChoiceWeight = 0.5; // Peso padrão para questões de múltipla escolha
-      let opinionWeight = 0.5; // Peso padrão para questões opinativas
-      
-      // Tentar obter os pesos definidos no processo seletivo
-      if (candidate.process?.stages && candidate.process.stages.length > 0) {
-        // Procurar por configurações de peso nas etapas do processo
-        const processConfig = candidate.process.stages.find(
-          (stage: any) => stage.personalityConfig && stage.personalityConfig.multipleChoiceWeight !== undefined
-        );
+      // Calcular a pontuação geral considerando apenas os tipos de perguntas presentes
+      if (hasMultipleChoiceQuestions && hasOpinionQuestions) {
+        // Se temos ambos os tipos de questões, usar os pesos configurados
+        let multipleChoiceWeight = 0.5; // Peso padrão para questões de múltipla escolha
+        let opinionWeight = 0.5; // Peso padrão para questões opinativas
         
-        if (processConfig) {
-          console.log('Configuração de pesos encontrada no processo seletivo');
-          multipleChoiceWeight = processConfig.personalityConfig.multipleChoiceWeight || 0.5;
-          opinionWeight = processConfig.personalityConfig.opinionWeight || 0.5;
+        // Tentar obter os pesos definidos no processo seletivo
+        if (candidate.process?.stages && candidate.process.stages.length > 0) {
+          // Procurar por configurações de peso nas etapas do processo
+          const processConfig = candidate.process.stages.find(
+            (stage: any) => stage.personalityConfig && stage.personalityConfig.multipleChoiceWeight !== undefined
+          );
           
-          // Garantir que os pesos somam 1
-          const totalWeight = multipleChoiceWeight + opinionWeight;
-          if (totalWeight !== 0) {
-            multipleChoiceWeight = multipleChoiceWeight / totalWeight;
-            opinionWeight = opinionWeight / totalWeight;
+          if (processConfig) {
+            console.log('Configuração de pesos encontrada no processo seletivo');
+            multipleChoiceWeight = processConfig.personalityConfig.multipleChoiceWeight || 0.5;
+            opinionWeight = processConfig.personalityConfig.opinionWeight || 0.5;
+            
+            // Garantir que os pesos somam 1
+            const totalWeight = multipleChoiceWeight + opinionWeight;
+            if (totalWeight !== 0) {
+              multipleChoiceWeight = multipleChoiceWeight / totalWeight;
+              opinionWeight = opinionWeight / totalWeight;
+            }
+            
+            console.log(`Pesos ajustados: Múltipla escolha=${multipleChoiceWeight}, Opinativa=${opinionWeight}`);
           }
-          
-          console.log(`Pesos ajustados: Múltipla escolha=${multipleChoiceWeight}, Opinativa=${opinionWeight}`);
         }
-      }
-      
-      // Calcular a pontuação geral com base nos pesos e na presença de cada tipo de questão
-      if (totalQuestions > 0 && opinionResponses.length > 0) {
-        // Se temos ambos os tipos de questões, usar os pesos
+        
         overallScore = (multipleChoiceScore * multipleChoiceWeight) + (opinionScore * opinionWeight);
-        console.log(`Pontuação geral: (${multipleChoiceScore} * ${multipleChoiceWeight}) + (${opinionScore} * ${opinionWeight}) = ${overallScore}`);
-      } else if (totalQuestions > 0) {
-        // Se só temos questões de múltipla escolha
+        console.log(`Pontuação geral (ambos os tipos): (${multipleChoiceScore} * ${multipleChoiceWeight}) + (${opinionScore} * ${opinionWeight}) = ${overallScore}`);
+      } else if (hasMultipleChoiceQuestions) {
+        // Se só temos questões de múltipla escolha, a pontuação é 100% baseada nelas
         overallScore = multipleChoiceScore;
         console.log(`Pontuação geral (apenas múltipla escolha): ${overallScore}`);
-      } else if (opinionResponses.length > 0) {
-        // Se só temos questões opinativas
+      } else if (hasOpinionQuestions) {
+        // Se só temos questões opinativas, a pontuação é 100% baseada nelas
         overallScore = opinionScore;
         console.log(`Pontuação geral (apenas opinativas): ${overallScore}`);
       }
