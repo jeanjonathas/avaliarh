@@ -43,6 +43,70 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
       
       console.log('Buscando traços para o teste:', testId);
       
+      // Primeiro, tentar buscar dados de personalidade do processo, se disponível
+      if (testId) {
+        try {
+          // Extrair o ID do processo da URL, se estivermos na página de edição
+          const url = window.location.pathname;
+          const processIdMatch = url.match(/\/processes\/edit\/([^\/]+)/);
+          
+          if (processIdMatch && processIdMatch[1]) {
+            const processId = processIdMatch[1];
+            console.log('Detectado ID do processo:', processId);
+            
+            const personalityResponse = await fetch(`/api/admin/processes/${processId}/personality-data`);
+            
+            if (personalityResponse.ok) {
+              const personalityData = await personalityResponse.json();
+              console.log('Dados de personalidade do processo:', personalityData);
+              
+              if (personalityData && personalityData.groups && personalityData.groups.length > 0) {
+                // Processar os grupos e traços
+                const newGroups: TraitGroup[] = personalityData.groups.map((group: any) => {
+                  // Extrair os nomes dos traços para o array traits
+                  const traitNames = group.traits.map((trait: any) => trait.name);
+                  
+                  // Converter os traços para o formato esperado pelo componente
+                  const selectedTraits: PersonalityTrait[] = group.traits.map((trait: any, index: number) => ({
+                    id: trait.categoryNameUuid,
+                    traitName: trait.name,
+                    weight: trait.weight,
+                    order: index,
+                    groupId: group.id,
+                    groupName: group.name
+                  }));
+                  
+                  return {
+                    id: group.id,
+                    name: group.name,
+                    traits: traitNames,
+                    selectedTraits
+                  };
+                });
+                
+                console.log('Grupos processados:', newGroups);
+                setTraitGroups(newGroups);
+                
+                // Atualizar o valor do campo com os traços selecionados
+                const allSelectedTraits = newGroups.flatMap(group => group.selectedTraits);
+                if (allSelectedTraits.length > 0 && !hasInitializedRef.current[testId]) {
+                  console.log('Atualizando valor do campo com traços do processo:', allSelectedTraits);
+                  onChange(allSelectedTraits);
+                  hasInitializedRef.current[testId] = true;
+                }
+                
+                setIsLoadingTraits(false);
+                return;
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao buscar dados de personalidade do processo:', error);
+          // Continuar com a busca normal de traços
+        }
+      }
+      
+      // Se não conseguimos dados do processo, buscar as questões do teste
       // Buscar as questões do teste com tipo OPINION_MULTIPLE
       const response = await fetch(`/api/admin/questions?testId=${testId}&type=OPINION_MULTIPLE`);
       
@@ -363,7 +427,7 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
     } finally {
       setIsLoadingTraits(false);
     }
-  }, [value]);  
+  }, [value, onChange]);  
 
   // Calcular o peso com base na ordem
   const calculateWeight = (position: number, totalTraits: number): number => {

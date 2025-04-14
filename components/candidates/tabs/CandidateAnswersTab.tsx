@@ -259,11 +259,11 @@ export const CandidateAnswersTab = ({ candidate }: CandidateAnswersTabProps) => 
                                               <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                                                 Personalidade
                                               </th>
-                                              <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-full">
-                                                Alternativa
-                                              </th>
                                               <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                                                 Peso
+                                              </th>
+                                              <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-full">
+                                                Alternativa
                                               </th>
                                             </tr>
                                           </thead>
@@ -293,18 +293,6 @@ export const CandidateAnswersTab = ({ candidate }: CandidateAnswersTabProps) => 
                                                       {personality}
                                                     </span>
                                                   </td>
-                                                  <td className="px-4 py-2 w-full">
-                                                    <div className="flex items-center">
-                                                      <span className={isSelected ? 'font-medium' : ''}>
-                                                        {formattedText}
-                                                      </span>
-                                                      {isSelected && (
-                                                        <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500 text-white">
-                                                          Escolhida
-                                                        </span>
-                                                      )}
-                                                    </div>
-                                                  </td>
                                                   <td className="px-4 py-2 whitespace-nowrap">
                                                     {weight !== null ? (
                                                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -317,6 +305,18 @@ export const CandidateAnswersTab = ({ candidate }: CandidateAnswersTabProps) => 
                                                     ) : (
                                                       <span className="text-gray-400 text-xs">Não especificado</span>
                                                     )}
+                                                  </td>
+                                                  <td className="px-4 py-2 w-full">
+                                                    <div className="flex items-center">
+                                                      <span className={isSelected ? 'font-medium' : ''}>
+                                                        {formattedText}
+                                                      </span>
+                                                      {isSelected && (
+                                                        <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500 text-white">
+                                                          Escolhida
+                                                        </span>
+                                                      )}
+                                                    </div>
                                                   </td>
                                                 </tr>
                                               );
