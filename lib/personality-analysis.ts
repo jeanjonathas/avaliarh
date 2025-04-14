@@ -130,20 +130,10 @@ export function analyzePersonalitiesWithProcessData(opinionResponses: any[], pro
     };
   }).sort((a, b) => b.percentage - a.percentage);
 
-  // Obter o traço dominante global
-  const dominantPersonality = personalityPercentages.length > 0 
-    ? personalityPercentages[0] 
-    : { 
-        trait: 'Não identificado', 
-        count: 0, 
-        percentage: 0,
-        globalPercentage: 0,
-        weight: 1, 
-        weightedScore: 0,
-        categoryNameUuid: null,
-        groupId: null,
-        groupName: null
-      };
+  // Obter todos os traços dominantes em caso de empate
+  const dominantPersonalities = personalityPercentages.length > 0
+    ? personalityPercentages.filter(p => p.percentage === personalityPercentages[0].percentage)
+    : [];
 
   // Calcular traços dominantes por grupo
   const dominantPersonalitiesByGroup: Record<string, any> = {};
@@ -178,7 +168,7 @@ export function analyzePersonalitiesWithProcessData(opinionResponses: any[], pro
   }
 
   return {
-    dominantPersonality,
+    dominantPersonalities,
     dominantPersonalitiesByGroup,
     allPersonalities: personalityPercentages,
     totalResponses: totalPersonalityResponses,

@@ -78,11 +78,81 @@ export default async function handler(
       return (response as any).selectedOptionId === correctOption?.id;
     }).length;
 
+    // Separar respostas por tipo
+    const multipleChoiceResponses = candidate.responses.filter(response => 
+      response.question.options.some(opt => opt.isCorrect)
+    );
+    
+    const opinionResponses = candidate.responses.filter(response => 
+      !response.question.options.some(opt => opt.isCorrect)
+    );
+
+    // Calcular pontuação para questões de múltipla escolha
     const score = {
       total: totalQuestions,
       correct: correctAnswers,
       percentage: totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0
     };
+
+    // Calcular pontuação para questões opinativas (usando API de personality-data)
+    let opinionScore = 0;
+    let personalityData = null;
+    
+    // Verificar se o candidato tem um processo associado
+    if (candidate.process?.id) {
+      try {
+        // Obter os dados de personalidade do processo
+        const baseUrl = process.env.NEXTAUTH_URL || `http://localhost:${process.env.PORT || 3000}`;
+        const personalityResponse = await fetch(
+          `${baseUrl}/api/admin/processes/${candidate.process.id}/personality-data`, 
+          {
+            headers: {
+              'Cookie': req.headers.cookie || '',
+            }
+          }
+        );
+        
+        if (personalityResponse.ok) {
+          personalityData = await personalityResponse.json();
+          
+          // Calcular pontuação mesmo se não houver respostas opinativas
+          // Isso é útil para mostrar a pontuação esperada baseada no perfil do processo
+          if (personalityData && personalityData.groups && personalityData.groups.length > 0) {
+            // Usar a mesma lógica do endpoint de performance:
+            // Pegar os traços com maior peso em cada grupo
+            let totalWeightedScore = 0;
+            let groupCount = 0;
+            
+            personalityData.groups.forEach(group => {
+              if (group.traits && group.traits.length > 0) {
+                // Encontrar o traço com maior peso no grupo
+                const maxWeightTrait = group.traits.reduce((max, trait) => 
+                  trait.weight > max.weight ? trait : max, group.traits[0]);
+                
+                // Calcular o weightedScore como porcentagem do peso máximo (5)
+                const traitWeightedScore = (maxWeightTrait.weight / 5) * 100;
+                totalWeightedScore += traitWeightedScore;
+                groupCount++;
+                
+                console.log(`Grupo ${group.name}: traço dominante ${maxWeightTrait.name} com peso ${maxWeightTrait.weight} (${traitWeightedScore}%)`);
+              }
+            });
+            
+            // Calcular média dos weightedScores dos traços dominantes
+            if (groupCount > 0) {
+              opinionScore = Math.round(totalWeightedScore / groupCount);
+              console.log(`Pontuação opinativa calculada: ${opinionScore} (baseada em ${groupCount} grupos)`);
+            }
+          }
+        } else {
+          console.error('Erro ao buscar dados de personalidade:', await personalityResponse.text());
+        }
+      } catch (error) {
+        console.error('Erro ao buscar dados de personalidade:', error);
+      }
+    } else {
+      console.log('Candidato não tem processo associado, não é possível calcular pontuação opinativa');
+    }
 
     // Calcular pontuação por etapa
     const stageScores = candidate.process?.stages.map(stage => {
@@ -160,6 +230,10 @@ export default async function handler(
     // Retornar os resultados compilados
     return res.status(200).json({
       score,
+      opinionScore,
+      multipleChoiceResponses: multipleChoiceResponses.length,
+      opinionResponses: opinionResponses.length,
+      personalityData,
       stageScores,
       skillScores,
       completed: candidate.completed,

@@ -29,15 +29,21 @@ interface TraitWithCompatibility extends PersonalityTrait {
   hierarchicalWeight?: number;
   questionCount?: number;
   normalizationFactor?: number;
+  groupId?: string;
+  groupName?: string;
 }
 
 interface ProcessPersonalityData {
-  traits: Array<{
+  groups: Array<{
+    id: string;
     name: string;
-    weight: number;
-    categoryNameUuid?: string;
+    traits: Array<{
+      name: string;
+      weight: number;
+      categoryNameUuid?: string;
+    }>;
+    expectedProfile: Record<string, number>;
   }>;
-  expectedProfile: Record<string, number> | null;
   isDefaultData?: boolean;
 }
 
@@ -210,8 +216,14 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
           
           console.log('Usando traços do candidato como fallback:', defaultTraits);
           setProcessPersonalityData({
-            traits: defaultTraits,
-            expectedProfile: propExpectedProfile || null,
+            groups: [
+              {
+                id: 'default',
+                name: 'Padrão',
+                traits: defaultTraits,
+                expectedProfile: propExpectedProfile || {}
+              }
+            ],
             isDefaultData: true
           });
           
@@ -242,42 +254,49 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
         throw new Error('Dados de personalidade do processo inválidos');
       }
       
-      // Verificar se há traços configurados
-      if (data.traits && data.traits.length > 0) {
-        console.log(`Encontrados ${data.traits.length} traços configurados para o processo`);
+      // Verificar se há grupos configurados
+      if (data.groups && data.groups.length > 0) {
+        console.log(`Encontrados ${data.groups.length} grupos configurados para o processo`);
         
-        // Verificar se os traços têm os campos necessários
-        const validTraits = data.traits.filter(trait => 
-          trait && typeof trait.name === 'string' && typeof trait.weight === 'number'
+        // Verificar se os grupos têm os campos necessários
+        const validGroups = data.groups.filter(group => 
+          group && typeof group.id === 'string' && typeof group.name === 'string' && Array.isArray(group.traits)
         );
         
-        if (validTraits.length === 0) {
-          console.error('Nenhum traço válido encontrado nos dados do processo');
-          throw new Error('Configuração de traços inválida');
+        if (validGroups.length === 0) {
+          console.error('Nenhum grupo válido encontrado nos dados do processo');
+          throw new Error('Configuração de grupos inválida');
         }
         
-        // Adicionar UUID dos traços do candidato aos traços do processo
-        const traitsWithUuid = validTraits.map(trait => {
+        // Adicionar UUID dos traços do candidato aos grupos do processo
+        const groupsWithUuid = validGroups.map(group => {
           // Tentar encontrar o UUID correspondente nos traços do candidato
-          const matchingTrait = personalityTraits.find(pt => 
-            pt.trait.toLowerCase().trim() === trait.name.toLowerCase().trim()
-          );
+          const traitsWithUuid = group.traits.map(trait => {
+            const matchingTrait = personalityTraits.find(pt => 
+              pt.trait.toLowerCase().trim() === trait.name.toLowerCase().trim()
+            );
+            
+            return {
+              ...trait,
+              categoryNameUuid: matchingTrait?.categoryNameUuid
+            };
+          });
           
           return {
-            ...trait,
-            categoryNameUuid: matchingTrait?.categoryNameUuid
+            ...group,
+            traits: traitsWithUuid
           };
         });
         
-        console.log('Traços processados com UUID:', traitsWithUuid);
+        console.log('Grupos processados com UUID:', groupsWithUuid);
         
         setProcessPersonalityData({
-          traits: traitsWithUuid,
-          expectedProfile: data.expectedProfile || propExpectedProfile || null
+          groups: groupsWithUuid,
+          isDefaultData: false
         });
         setUsingDefaultData(false);
       } else {
-        console.log('Nenhum traço configurado para o processo, verificando traços do candidato');
+        console.log('Nenhum grupo configurado para o processo, verificando traços do candidato');
         // Verificar se temos traços do candidato para usar como fallback
         if (personalityTraits && personalityTraits.length > 0) {
           const defaultTraits = personalityTraits.map(trait => ({
@@ -288,8 +307,14 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
           
           console.log('Usando traços do candidato como fallback:', defaultTraits);
           setProcessPersonalityData({
-            traits: defaultTraits,
-            expectedProfile: propExpectedProfile || null,
+            groups: [
+              {
+                id: 'default',
+                name: 'Padrão',
+                traits: defaultTraits,
+                expectedProfile: propExpectedProfile || {}
+              }
+            ],
             isDefaultData: true
           });
           
@@ -313,8 +338,14 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
         }));
         
         setProcessPersonalityData({
-          traits: defaultTraits,
-          expectedProfile: propExpectedProfile || null,
+          groups: [
+            {
+              id: 'default',
+              name: 'Padrão',
+              traits: defaultTraits,
+              expectedProfile: propExpectedProfile || {}
+            }
+          ],
           isDefaultData: true
         });
         
@@ -338,22 +369,100 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
     }
   }, [personalityTraits, fetchProcessPersonalityData]);
 
-  // Efeito para calcular a compatibilidade quando os dados do processo são carregados
   useEffect(() => {
-    if (loading) return;
-    
-    console.log('Calculando compatibilidade com dados de processo:', processPersonalityData);
-    
-    // Verificar se há traços de personalidade do candidato
+    // Processar os dados de personalidade quando disponíveis
     if (!personalityTraits || personalityTraits.length === 0) {
       setError('Candidato não possui traços de personalidade');
+      setLoading(false);
       return;
     }
     
     // Verificar se há dados de personalidade do processo
     if (!processPersonalityData) {
+      setError('Dados de personalidade do processo não disponíveis');
+      setLoading(false);
+      return;
+    }
+    
+    // Verificar se há grupos configurados no processo
+    if (!processPersonalityData.groups || processPersonalityData.groups.length === 0) {
+      setError('Nenhum grupo de personalidade configurado para este processo');
+      return;
+    }
+    
+    // Processar cada grupo e calcular a compatibilidade
+    const allTraitsWithCompatibility: TraitWithCompatibility[] = [];
+    let totalCompatibilityScore = 0;
+    
+    // Para cada grupo no processo
+    processPersonalityData.groups.forEach(group => {
+      const expectedProfile = group.expectedProfile || {};
+      if (Object.keys(expectedProfile).length === 0) {
+        console.log(`Perfil esperado não configurado para o grupo ${group.name}, usando valores padrão`);
+      }
+      
+      // Calcular a compatibilidade para este grupo
+      const { traitsWithCompatibility, totalCompatibility } = calculateCompatibility(
+        personalityTraits,
+        group.traits,
+        expectedProfile
+      );
+      
+      // Adicionar informação do grupo a cada traço
+      const traitsWithGroup = traitsWithCompatibility.map(trait => ({
+        ...trait,
+        groupId: group.id,
+        groupName: group.name
+      }));
+      
+      // Adicionar ao array geral
+      allTraitsWithCompatibility.push(...traitsWithGroup);
+      
+      // Acumular a pontuação de compatibilidade
+      totalCompatibilityScore += totalCompatibility;
+    });
+    
+    // Calcular a média da compatibilidade entre todos os grupos
+    const avgCompatibilityScore = processPersonalityData.groups.length > 0
+      ? totalCompatibilityScore / processPersonalityData.groups.length
+      : 0;
+    
+    // Arredondar para o inteiro mais próximo
+    const roundedScore = Math.round(avgCompatibilityScore);
+    
+    // Atualizar o estado
+    setTraitsWithCompatibility(allTraitsWithCompatibility);
+    setCompatibilityScore(roundedScore);
+    
+    // Chamar o callback se fornecido
+    if (onCompatibilityCalculated) {
+      // Encontrar o traço com maior compatibilidade para sugerir como perfil alvo
+      const mostCompatibleTrait = allTraitsWithCompatibility.length > 0
+        ? allTraitsWithCompatibility.reduce((prev, current) => 
+            prev.realCompatibility > current.realCompatibility ? prev : current
+          )
+        : null;
+      
+      // Calcular a porcentagem de correspondência com o perfil alvo
+      const targetProfileMatchPercentage = mostCompatibleTrait
+        ? mostCompatibleTrait.realCompatibility
+        : 0;
+      
+      onCompatibilityCalculated(
+        roundedScore,
+        mostCompatibleTrait ? mostCompatibleTrait.trait : undefined,
+        targetProfileMatchPercentage
+      );
+    }
+    
+    setLoading(false);
+  }, [processPersonalityData, personalityTraits, calculateCompatibility, onCompatibilityCalculated]);
+
+  useEffect(() => {
+    // Verificar se há dados de personalidade do processo
+    if (!processPersonalityData) {
       // Se não temos dados do processo, tentar criar dados padrão
-      if (personalityTraits.length > 0) {
+      if (personalityTraits && personalityTraits.length > 0) {
         console.log('Criando dados padrão baseados nos traços do candidato');
         
         // Criar dados de processo padrão
@@ -364,80 +473,22 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
         }));
         
         setProcessPersonalityData({
-          traits: defaultTraits,
-          expectedProfile: propExpectedProfile || null,
+          groups: [
+            {
+              id: 'default',
+              name: 'Padrão',
+              traits: defaultTraits,
+              expectedProfile: propExpectedProfile || {}
+            }
+          ],
           isDefaultData: true
         });
         
         setUsingDefaultData(true);
         return; // O próximo ciclo do useEffect vai pegar esses dados
-      } else {
-        setError('Dados de personalidade do processo não disponíveis');
-        return;
       }
     }
-    
-    // Verificar se há traços configurados no processo
-    if (!processPersonalityData.traits || processPersonalityData.traits.length === 0) {
-      setError('Nenhum traço de personalidade configurado para este processo');
-      return;
-    }
-    
-    // Verificar se há um perfil esperado configurado
-    const expectedProfile = processPersonalityData.expectedProfile || {};
-    if (Object.keys(expectedProfile).length === 0) {
-      console.log('Perfil esperado não configurado, usando valores padrão');
-    }
-    
-    try {
-      // Calcular a compatibilidade
-      const { traitsWithCompatibility, totalCompatibility } = calculateCompatibility(
-        personalityTraits,
-        processPersonalityData.traits,
-        expectedProfile
-      );
-      
-      // Verificar se foi possível calcular a compatibilidade
-      if (traitsWithCompatibility.length === 0) {
-        setError('Não foi possível calcular a compatibilidade');
-        return;
-      }
-      
-      // Atualizar o estado com os resultados
-      setTraitsWithCompatibility(traitsWithCompatibility);
-      setCompatibilityScore(Math.round(totalCompatibility));
-      
-      // Encontrar o perfil alvo (traço com maior peso)
-      let targetProfile = '';
-      let targetProfileMatchPercentage = 0;
-      
-      if (traitsWithCompatibility.length > 0) {
-        // Ordenar por peso para encontrar o traço com maior peso
-        const sortedByWeight = [...traitsWithCompatibility].sort((a, b) => (b.weight || 1) - (a.weight || 1));
-        if (sortedByWeight.length > 0) {
-          targetProfile = sortedByWeight[0].trait;
-          // Encontrar a porcentagem de compatibilidade para o perfil alvo
-          const targetProfileData = traitsWithCompatibility.find(t => t.trait === targetProfile);
-          targetProfileMatchPercentage = targetProfileData ? targetProfileData.percentage : 0;
-        }
-      }
-      
-      // Notificar o componente pai sobre o cálculo de compatibilidade
-      if (onCompatibilityCalculated) {
-        // Apenas notificar sobre o perfil alvo e sua porcentagem, sem sobrescrever a pontuação geral
-        onCompatibilityCalculated(
-          undefined as any, // Não enviar a pontuação de compatibilidade para não sobrescrever a pontuação original
-          targetProfile,
-          targetProfileMatchPercentage
-        );
-      }
-      
-      setError(null);
-    } catch (error) {
-      console.error('Erro ao calcular compatibilidade:', error);
-      setError('Erro ao calcular compatibilidade');
-    }
-  }, [processPersonalityData, personalityTraits, calculateCompatibility, loading, onCompatibilityCalculated, propExpectedProfile]);
+  }, [personalityTraits, processPersonalityData, propExpectedProfile]);
 
   // Efeito para atualizar o componente quando o estado muda
   useEffect(() => {
@@ -594,86 +645,71 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
     maintainAspectRatio: false,
   };
 
+  // Função para renderizar o gráfico de compatibilidade
   const renderChart = () => {
     if (loading) {
       return (
-        <div className="flex justify-center items-center p-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+        <div className="flex justify-center items-center h-40">
+          <CircularProgress size={40} />
         </div>
       );
     }
 
     if (error) {
       return (
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <div className="flex flex-col items-center justify-center p-4 text-gray-500">
-            <div className="bg-red-50 border-l-4 border-red-500 p-4 w-full">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">Configuração Incompleta</h3>
-                  <div className="mt-2 text-sm text-red-700">
-                    <p>
-                      {error === 'Nenhum traço de personalidade configurado para este processo' ? (
-                        <>
-                          Não foi possível calcular a compatibilidade. Verifique se os traços de personalidade foram configurados corretamente no processo seletivo.
-                          <br /><br />
-                          Acesse a configuração do processo e defina os pesos para cada traço de personalidade.
-                        </>
-                      ) : error === 'Candidato não possui traços de personalidade' ? (
-                        <>
-                          Não foi possível calcular a compatibilidade. O candidato não possui traços de personalidade.
-                          <br /><br />
-                          Verifique se o candidato respondeu perguntas opinativas no teste.
-                        </>
-                      ) : (
-                        <>
-                          Ocorreu um erro ao calcular a compatibilidade. Verifique se o candidato está associado a um processo seletivo válido.
-                          <br /><br />
-                          Verifique se o processo seletivo tem os pesos de personalidade configurados corretamente.
-                        </>
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+        <div className="bg-red-50 p-4 rounded-lg border border-red-200 text-red-700">
+          <p className="font-medium">Erro ao calcular compatibilidade</p>
+          <p className="text-sm mt-1">{error}</p>
         </div>
       );
     }
 
-    if (!traitsWithCompatibility || traitsWithCompatibility.length === 0) {
-      return (
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <div className="flex flex-col items-center justify-center p-4 text-gray-500">
-            <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 w-full">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-yellow-800">Sem Dados Suficientes</h3>
-                  <div className="mt-2 text-sm text-yellow-700">
-                    <p>
-                      Não há dados suficientes para calcular a compatibilidade do candidato com o perfil desejado.
-                      <br /><br />
-                      Verifique se o candidato completou o teste e se o processo seletivo tem os traços de personalidade configurados.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
+    // Dados para o gráfico de rosca
+    const chartData = {
+      labels: ['Compatível', 'Não Compatível'],
+      datasets: [
+        {
+          data: [compatibilityScore, 100 - compatibilityScore],
+          backgroundColor: [
+            'rgba(54, 162, 235, 0.8)',
+            'rgba(211, 211, 211, 0.3)'
+          ],
+          borderColor: [
+            'rgba(54, 162, 235, 1)',
+            'rgba(211, 211, 211, 1)'
+          ],
+          borderWidth: 1,
+        },
+      ],
+    };
+
+    // Opções para o gráfico de rosca
+    const chartOptions = {
+      cutout: '70%',
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          enabled: false
+        }
+      },
+      maintainAspectRatio: true,
+      responsive: true,
+    };
+
+    // Agrupar traços por grupo
+    const traitsByGroup: Record<string, TraitWithCompatibility[]> = {};
+    traitsWithCompatibility.forEach(trait => {
+      const groupId = trait.groupId || 'default';
+      const groupName = trait.groupName || 'Padrão';
+      
+      if (!traitsByGroup[groupId]) {
+        traitsByGroup[groupId] = [];
+      }
+      
+      traitsByGroup[groupId].push(trait);
+    });
 
     return (
       <div className="bg-white rounded-lg shadow p-6">
@@ -696,70 +732,85 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
                 <p>Usando perfil padrão para demonstração</p>
               </div>
             )}
+            
+            <div className="mt-2 text-xs text-gray-600 text-center">
+              <p>{Object.keys(traitsByGroup).length} grupos de traços</p>
+            </div>
           </div>
           <div className="w-full md:w-2/3">
-            <div className="flex justify-between items-center mb-3">
-              <h4 className="text-lg font-medium text-gray-700">Traços de Personalidade</h4>
-              <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                Compatibilidade baseada na hierarquia dos traços
-              </div>
-            </div>
-            
-            {traitsWithCompatibility.map((trait, index) => (
-              <div key={`${trait.trait}-${index}`} className="bg-gray-50 p-3 rounded-md mb-3">
-                <div className="flex justify-between mb-1">
-                  <span className="text-sm font-medium text-gray-700">
-                    {trait.trait}
-                    <span className="ml-2 text-xs text-gray-500">(Peso hierárquico: {trait.hierarchicalWeight?.toFixed(2)})</span>
-                  </span>
-                  <span className="text-sm text-gray-500">
-                    Valor: {trait.percentage}%
-                  </span>
+            {Object.entries(traitsByGroup).map(([groupId, traits], groupIndex) => (
+              <div key={groupId} className="mb-6">
+                <div className="flex justify-between items-center mb-3">
+                  <h4 className="text-lg font-medium text-gray-700">
+                    {traits[0]?.groupName || `Grupo ${groupIndex + 1}`}
+                  </h4>
+                  <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                    {traits.length} traços
+                  </div>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                  <div 
-                    className="bg-blue-500 h-2 rounded-full" 
-                    style={{ width: `${trait.percentage}%` }}
-                  ></div>
-                </div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-xs text-gray-500">
-                    Compatibilidade hierárquica: {Math.round(trait.compatibility)}%
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    Posição: {trait.position} de {traitsWithCompatibility.length} 
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                  <div 
-                    className={`h-2 rounded-full ${
-                      trait.compatibility >= 70 ? 'bg-green-500' : 
-                      trait.compatibility >= 40 ? 'bg-yellow-500' : 
-                      'bg-red-500'
-                    }`}
-                    style={{ width: `${trait.compatibility}%` }}
-                  ></div>
-                </div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-xs text-gray-500">
-                    Compatibilidade real: {Math.round(trait.realCompatibility)}%
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    {trait.normalizationFactor !== 1 ? 
-                      `(Normalização: ${trait.normalizationFactor?.toFixed(2)})` : 
-                      ''}
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className={`h-2 rounded-full ${
-                      trait.realCompatibility >= 70 ? 'bg-indigo-500' : 
-                      trait.realCompatibility >= 40 ? 'bg-orange-500' : 
-                      'bg-pink-500'
-                    }`}
-                    style={{ width: `${trait.realCompatibility}%` }}
-                  ></div>
-                </div>
+                
+                {traits.map((trait, index) => (
+                  <div key={`${trait.trait}-${index}`} className="bg-gray-50 p-3 rounded-md mb-3">
+                    <div className="flex justify-between mb-1">
+                      <span className="text-sm font-medium text-gray-700">
+                        {trait.trait}
+                        <span className="ml-2 text-xs text-gray-500">(Peso: {trait.weight})</span>
+                        {trait.percentage === Math.max(...traits.map(t => t.percentage)) && (
+                          <span className="ml-2 text-xs font-semibold bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">
+                            Dominante
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-sm text-gray-500">
+                        Valor: {trait.percentage}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                      <div 
+                        className="bg-blue-500 h-2 rounded-full" 
+                        style={{ width: `${trait.percentage}%` }}
+                      ></div>
+                    </div>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-xs text-gray-500">
+                        Compatibilidade hierárquica: {Math.round(trait.compatibility)}%
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        Posição: {trait.position} de {traits.length} 
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                      <div 
+                        className={`h-2 rounded-full ${
+                          trait.compatibility >= 70 ? 'bg-green-500' : 
+                          trait.compatibility >= 40 ? 'bg-yellow-500' : 
+                          'bg-red-500'
+                        }`}
+                        style={{ width: `${trait.compatibility}%` }}
+                      ></div>
+                    </div>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-xs text-gray-500">
+                        Compatibilidade real: {Math.round(trait.realCompatibility)}%
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {trait.normalizationFactor !== 1 ? 
+                          `(Normalização: ${trait.normalizationFactor?.toFixed(2)})` : 
+                          ''}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className={`h-2 rounded-full ${
+                          trait.realCompatibility >= 70 ? 'bg-indigo-500' : 
+                          trait.realCompatibility >= 40 ? 'bg-orange-500' : 
+                          'bg-pink-500'
+                        }`}
+                        style={{ width: `${trait.realCompatibility}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                ))}
               </div>
             ))}
           </div>

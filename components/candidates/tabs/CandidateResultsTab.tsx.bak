@@ -17,7 +17,7 @@ import { Bar, Radar, Pie, Doughnut } from 'react-chartjs-2'
 import { useEffect, useState } from 'react'
 import { toast, Toaster } from 'react-hot-toast'
 import CandidateCompatibilityChart from '../compatibility/CandidateCompatibilityChart'
-import PersonalityRadarChart from '../charts/PersonalityRadarChart'
+import PersonalityRadarChart from '../personality/PersonalityRadarChart'
 
 // Registrar componentes do Chart.js
 ChartJS.register(
@@ -1023,17 +1023,6 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                     </div>
                   </div>
                 )}
-                
-                {/* Gráfico de Radar de Personalidade */}
-                {performance?.personalityAnalysis?.allPersonalities && performance.personalityAnalysis.allPersonalities.length > 0 && (
-                  <div className="mt-6">
-                    <PersonalityRadarChart 
-                      traits={performance.personalityAnalysis.allPersonalities}
-                      height={300}
-                      className="bg-white rounded-lg p-4 shadow-sm"
-                    />
-                  </div>
-                )}
               </div>
             ) : (
               <div className="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
@@ -1211,85 +1200,389 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
               }} />
             </div>
             
-          </div>
+            {/* Gráfico de radar de personalidade */}
+            <div className="mt-6">
+              <PersonalityRadarChart 
+                candidateId={candidate.id} 
+                className="bg-white rounded-lg p-4 border border-gray-200"
+              />
+            </div>
 
-          {/* Tabela de Personalidades */}
-          <div className="mt-8">
-            <h4 className="text-md font-medium text-gray-700 mb-4">Detalhamento de Traços de Personalidade</h4>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Traço de Personalidade
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Porcentagem
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Contagem
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {performance.personalityAnalysis.allPersonalities.map((personality, index) => (
-                    <tr key={index}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {personality.trait}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <div className="flex items-center">
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className={`h-full rounded-full ${
-                                personality.percentage >= 70 ? 'bg-green-500' : 
-                                personality.percentage >= 40 ? 'bg-yellow-500' : 'bg-red-500'
-                              }`}
-                              style={{ width: `${personality.percentage}%` }}
-                            />
-                          </div>
-                          <span className="ml-2">{personality.percentage}%</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {personality.count} respostas
-                      </td>
+            {/* Tabela de Personalidades */}
+            <div className="mt-8">
+              <h4 className="text-md font-medium text-gray-700 mb-4">Detalhamento de Traços de Personalidade</h4>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Traço de Personalidade
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Porcentagem
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Contagem
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {performance.personalityAnalysis.allPersonalities.map((personality, index) => (
+                      <tr key={index}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {personality.trait}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <div className="flex items-center">
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div 
+                                className={`h-full rounded-full ${
+                                  personality.percentage >= 70 ? 'bg-green-500' : 
+                                  personality.percentage >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                                }`}
+                                style={{ width: `${personality.percentage}%` }}
+                              />
+                            </div>
+                            <span className="ml-2">{personality.percentage}%</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {personality.count} respostas
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Personalidade Dominante */}
+            <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-100">
+              <h4 className="text-md font-medium text-gray-700 mb-2">Personalidade Dominante</h4>
+              <p className="text-lg font-semibold text-blue-800">
+                {performance.personalityAnalysis.dominantPersonalities.map(p => p.trait).join(', ')} 
+                <span className="text-sm font-normal text-blue-600 ml-2">
+                  ({performance.personalityAnalysis.dominantPersonalities.map(p => p.percentage).join(', ')}%)
+                </span>
+              </p>
+              <p className="text-sm text-gray-600 mt-2">
+                Baseado em {performance.personalityAnalysis.totalResponses} respostas de perguntas opinativas.
+              </p>
             </div>
           </div>
+        ) : (
+          <div className="bg-white p-6 rounded-lg shadow-md mt-8">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Análise de Personalidade</h3>
+            <div className="flex flex-col items-center justify-center p-8 text-gray-500">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p>Não há dados de personalidade disponíveis</p>
+              <p className="text-sm mt-2">O candidato não respondeu perguntas opinativas ou os dados não foram processados corretamente</p>
+            </div>
+          </div>
+        )}         
 
-          {/* Personalidade Dominante */}
-          <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-100">
-            <h4 className="text-md font-medium text-gray-700 mb-2">Personalidade Dominante</h4>
-            <p className="text-lg font-semibold text-blue-800">
-              {performance.personalityAnalysis.dominantPersonalities.map(p => p.trait).join(', ')} 
-              <span className="text-sm font-normal text-blue-600 ml-2">
-                ({performance.personalityAnalysis.dominantPersonalities.map(p => p.percentage).join(', ')}%)
-              </span>
-            </p>
-            <p className="text-sm text-gray-600 mt-2">
-              Baseado em {performance.personalityAnalysis.totalResponses} respostas de perguntas opinativas.
+      {/* Recomendações baseadas no desempenho */}
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">Recomendações</h3>
+        <div className="space-y-4">
+          {(() => {
+            // Usar os dados de performance em vez dos resultados antigos
+            const overallScore = performance?.summary?.overallScore || 0;
+            const multipleChoiceScore = performance?.summary?.multipleChoiceScore || 0;
+            const opinionScore = performance?.summary?.opinionScore || 0;
+            const accuracy = performance?.summary?.accuracy || 0;
+            const dominantPersonalities = performance?.personalityAnalysis?.dominantPersonalities || [];
+            const totalTime = performance?.totalTime || 0;
+            const avgTimePerQuestion = performance?.avgTimePerQuestion || 0;
+            
+            // Identificar o perfil procurado (perfil com maior peso)
+            const allPersonalities = performance?.personalityAnalysis?.allPersonalities || [];
+            const hasTraitWeights = performance?.personalityAnalysis?.hasTraitWeights || false;
+            
+            // Encontrar o perfil com maior peso (se houver pesos configurados)
+            let targetProfile = '';
+            let targetProfileWeight = 0;
+            let profileMatch = false;
+            let profileMatchPercentage = 0;
+            
+            if (hasTraitWeights && allPersonalities.length > 0) {
+              const sortedByWeight = [...allPersonalities].sort((a, b) => (b.weight || 1) - (a.weight || 1));
+              if (sortedByWeight.length > 0) {
+                targetProfile = sortedByWeight[0].trait;
+                targetProfileWeight = sortedByWeight[0].weight || 1;
+                
+                // Verificar se o perfil dominante do candidato corresponde ao perfil procurado
+                profileMatch = dominantPersonalities.some(p => p.trait === targetProfile);
+                
+                // Calcular a porcentagem de correspondência com o perfil procurado
+                const targetProfileData = allPersonalities.find(p => p.trait === targetProfile);
+                profileMatchPercentage = targetProfileData ? targetProfileData.percentage : 0;
+              }
+            }
+            
+            let recommendationClass = '';
+            let recommendationTitle = '';
+            let recommendationText = '';
+            
+            if (accuracy >= 80) {
+              recommendationClass = 'bg-green-50 border-l-4 border-green-500';
+              recommendationTitle = 'Candidato Recomendado';
+              recommendationText = `Este candidato demonstrou excelente desempenho técnico com ${accuracy.toFixed(1)}% de acertos. `;
+              
+              if (dominantPersonalities.length > 0) {
+                recommendationText += `Seu perfil dominante é &ldquo;${dominantPersonalities.map(p => p.trait).join(', ')}&rdquo; (${dominantPersonalities.map(p => p.percentage).join(', ')}%), `;
+                recommendationText += 'o que complementa suas habilidades técnicas. ';
+                
+                // Adicionar informações sobre o perfil procurado
+                if (hasTraitWeights && targetProfile) {
+                  recommendationText += `\n\nO perfil procurado para esta vaga é &ldquo;${targetProfile}&rdquo; `;
+                  
+                  if (profileMatch) {
+                    recommendationText += `e o candidato demonstra forte alinhamento com este perfil (${profileMatchPercentage.toFixed(1)}%). `;
+                    recommendationText += `Esta correspondência de perfil, combinada com o excelente desempenho técnico, torna este candidato altamente recomendado para a posição. `;
+                  } else {
+                    // Verificar se o perfil procurado está entre os perfis do candidato
+                    const targetProfileInCandidate = allPersonalities.find(p => p.trait === targetProfile);
+                    if (targetProfileInCandidate && targetProfileInCandidate.percentage > 30) {
+                      recommendationText += `e, embora o perfil dominante do candidato seja diferente, ele demonstra características significativas deste perfil (${targetProfileInCandidate.percentage.toFixed(1)}%). `;
+                      recommendationText += `Considerando seu excelente desempenho técnico, recomendamos prosseguir com o processo de contratação. `;
+                    } else {
+                      recommendationText += `enquanto o perfil dominante do candidato é diferente. Isto pode indicar uma abordagem alternativa, mas potencialmente valiosa para a função. `;
+                      recommendationText += `Recomendamos avaliar durante a entrevista se esta diferença de perfil pode trazer diversidade positiva para a equipe. `;
+                    }
+                  }
+                } else {
+                  recommendationText += 'Recomendamos prosseguir com o processo de contratação. ';
+                }
+              } else {
+                recommendationText += 'Recomendamos prosseguir com o processo de contratação. ';
+              }
+            } else if (accuracy >= 60) {
+              recommendationClass = 'bg-yellow-50 border-l-4 border-yellow-500';
+              recommendationTitle = 'Candidato para Consideração';
+              recommendationText = `Este candidato demonstrou desempenho satisfatório com ${accuracy.toFixed(1)}% de acertos. `;
+              
+              if (totalTime < 15) {
+                recommendationText += 'Completou o teste rapidamente, o que pode indicar eficiência ou familiaridade com os temas abordados. ';
+              } else if (totalTime > 45) {
+                recommendationText += 'Dedicou tempo considerável ao teste, o que pode indicar cuidado na análise ou dificuldade com os temas abordados. ';
+              }
+              
+              if (dominantPersonalities.length > 0) {
+                recommendationText += `\n\nSeu perfil dominante é &ldquo;${dominantPersonalities.map(p => p.trait).join(', ')}&rdquo; (${dominantPersonalities.map(p => p.percentage).join(', ')}%). `;
+                
+                // Adicionar informações sobre o perfil procurado
+                if (hasTraitWeights && targetProfile) {
+                  recommendationText += `O perfil procurado para esta vaga é &ldquo;${targetProfile}&rdquo;. `;
+                  
+                  if (profileMatch) {
+                    recommendationText += `O alinhamento do candidato com o perfil desejado (${profileMatchPercentage.toFixed(1)}%) é um ponto positivo que pode compensar parcialmente seu desempenho técnico moderado. `;
+                    recommendationText += 'Recomendamos avaliar cuidadosamente outros aspectos como experiência prévia e desempenho na entrevista. ';
+                  } else {
+                    recommendationText += `Há uma divergência entre o perfil do candidato e o perfil ideal para a vaga, o que, combinado com seu desempenho técnico moderado, sugere cautela. `;
+                    recommendationText += 'Recomendamos avaliar se as habilidades específicas do candidato podem ser desenvolvidas com treinamento. ';
+                  }
+                } else {
+                  recommendationText += 'Recomendamos avaliar outros aspectos como experiência e entrevista antes de tomar uma decisão. ';
+                }
+              } else {
+                recommendationText += 'Recomendamos avaliar outros aspectos como experiência e entrevista antes de tomar uma decisão. ';
+              }
+            } else {
+              recommendationClass = 'bg-red-50 border-l-4 border-red-500';
+              recommendationTitle = 'Candidato Não Recomendado';
+              recommendationText = `Este candidato não atingiu a pontuação mínima necessária (${accuracy.toFixed(1)}% de acertos). `;
+              
+              if (dominantPersonalities.length > 0 && hasTraitWeights && targetProfile) {
+                if (profileMatch) {
+                  recommendationText += `\n\nApesar do baixo desempenho técnico, o candidato demonstra forte alinhamento com o perfil comportamental desejado (&ldquo;${targetProfile}&rdquo;). `;
+                  recommendationText += 'Isto pode indicar potencial para desenvolvimento com o treinamento adequado. ';
+                }
+              }
+              
+              if (performance?.stagePerformance?.some(stage => stage.accuracy >= 70)) {
+                recommendationText += 'No entanto, demonstrou bom desempenho em algumas áreas específicas. ';
+                
+                const bestStage = performance?.stagePerformance?.reduce(
+                  (best, current) => current.accuracy > best.accuracy ? current : best, 
+                  { accuracy: 0, stageName: '' }
+                );
+                
+                if (bestStage && bestStage.stageName) {
+                  recommendationText += `Destaque para &ldquo;${bestStage.stageName}&rdquo; com ${bestStage.accuracy.toFixed(1)}% de acertos. `;
+                }
+                
+                recommendationText += 'Pode ser considerado para outras posições que exijam essas habilidades específicas.';
+              } else {
+                recommendationText += 'Recomendamos considerar outros candidatos para esta posição.';
+              }
+            }
+            
+            return (
+              <div className={`p-4 ${recommendationClass}`}>
+                <h4 className="font-medium text-gray-800">{recommendationTitle}</h4>
+                <p id="recommendation-text" className="text-sm text-gray-600 mt-2 whitespace-pre-line">
+                  {recommendationText}
+                </p>
+              </div>
+            );
+          })()}
+          
+          {/* Análise de Compatibilidade com o Perfil Desejado */}
+          {performance?.personalityAnalysis?.hasTraitWeights && (
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <h4 className="font-medium text-gray-800 mb-2">Compatibilidade com o Perfil Desejado</h4>
+              
+              <div className="space-y-3">
+                {targetProfile && (
+                  <div className="flex flex-col">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-medium text-gray-700">
+                        {targetProfile} 
+                        <span className="text-xs text-green-600 font-medium ml-1">(Perfil Desejado)</span>
+                      </span>
+                      <span className="text-sm text-gray-600">
+                        {profileMatchPercentage.toFixed(1)}% 
+                        <span className="text-xs text-gray-500 ml-1">
+                          (Peso: {performance?.personalityAnalysis?.allPersonalities.find(p => p.trait === targetProfile)?.weight?.toFixed(1) || '?'})
+                        </span>
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className={`h-full rounded-full ${
+                          profileMatchPercentage >= 70 ? 'bg-green-500' : 
+                          profileMatchPercentage >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                        }`}
+                        style={{ width: `${profileMatchPercentage}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+                
+                {performance?.personalityAnalysis?.allPersonalities
+                  .filter(p => p.trait !== targetProfile)
+                  .sort((a, b) => (b.weight || 1) - (a.weight || 1))
+                  .slice(0, 2)  // Mostrar apenas os 2 mais relevantes após o perfil alvo
+                  .map((personality, index) => (
+                    <div key={index} className="flex flex-col">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-medium text-gray-700">
+                          {personality.trait}
+                        </span>
+                        <span className="text-sm text-gray-600">
+                          {personality.percentage.toFixed(1)}% 
+                          <span className="text-xs text-gray-500 ml-1">
+                            (Peso: {personality.weight || 1})
+                          </span>
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className={`h-full rounded-full ${
+                            personality.percentage >= 70 ? 'bg-green-500' : 
+                            personality.percentage >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                          }`}
+                          style={{ width: `${personality.percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))
+                }
+                
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm font-medium text-gray-700">Compatibilidade Geral</span>
+                    <span className="text-sm text-gray-600">
+                      {compatibilityScore.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className={`h-full rounded-full ${
+                        compatibilityScore >= 70 ? 'bg-green-500' : 
+                        compatibilityScore >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                      }`}
+                      style={{ width: `${compatibilityScore}%` }}
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">
+                    A compatibilidade geral é calculada considerando os pesos atribuídos a cada perfil comportamental desejado para esta vaga.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Áreas para desenvolvimento */}
+          <div className="mt-4">
+            <h4 className="font-medium text-gray-800">Áreas para Desenvolvimento:</h4>
+            <ul className="mt-2 space-y-1 list-disc list-inside text-gray-600">
+              {performance?.stagePerformance?.filter(stage => stage.accuracy < 60).map(stage => (
+                <li key={stage.stageId}>
+                  {stage.stageName} ({stage.accuracy.toFixed(1)}%) - Necessita aprimoramento
+                </li>
+              ))}
+              {performance?.stagePerformance?.filter(stage => stage.accuracy < 60).length === 0 && (
+                <li>Não foram identificadas áreas críticas para desenvolvimento.</li>
+              )}
+            </ul>
+          </div>
+          
+          {/* Pontos fortes */}
+          <div className="mt-4">
+            <h4 className="font-medium text-gray-800">Pontos Fortes:</h4>
+            <ul className="mt-2 space-y-1 list-disc list-inside text-gray-600">
+              {performance?.stagePerformance?.filter(stage => stage.accuracy >= 80).map(stage => (
+                <li key={stage.stageId}>
+                  {stage.stageName} ({stage.accuracy.toFixed(1)}%) - Excelente desempenho
+                </li>
+              ))}
+              {performance?.stagePerformance?.filter(stage => stage.accuracy >= 80).length === 0 && (
+                <li>Não foram identificados pontos de excelência.</li>
+              )}
+            </ul>
+          </div>
+          
+          {/* Tempo de resposta */}
+          <div className="mt-4">
+            <h4 className="font-medium text-gray-800">Análise de Tempo:</h4>
+            <p className="mt-2 text-gray-600">
+              {performance?.totalTime < 15 && 'O candidato completou o teste rapidamente, o que pode indicar eficiência ou familiaridade com os temas abordados.'}
+              {performance?.totalTime >= 15 && performance?.totalTime <= 45 && 'O candidato completou o teste em um tempo médio, demonstrando equilíbrio entre reflexão e agilidade.'}
+              {performance?.totalTime > 45 && 'O candidato dedicou um tempo considerável ao teste, o que pode indicar cuidado na análise ou dificuldade com os temas abordados.'}
             </p>
           </div>
+          
+          {/* Personalidade */}
+          {performance?.personalityAnalysis?.dominantPersonalities && (
+            <div className="mt-4">
+              <h4 className="font-medium text-gray-800">Perfil Comportamental:</h4>
+              <p className="mt-2 text-gray-600">
+                O perfil predominante do candidato é &ldquo;{performance.personalityAnalysis.dominantPersonalities.map(p => p.trait).join(', ')}&rdquo; 
+                ({performance.personalityAnalysis.dominantPersonalities.map(p => p.percentage).join(', ')}%), 
+                o que complementa suas habilidades técnicas.
+              </p>
+              
+              {performance.personalityAnalysis.allPersonalities.length > 1 && (
+                <div className="mt-3">
+                  <h5 className="text-sm font-medium text-gray-700">Perfis Secundários:</h5>
+                  <ul className="mt-1 space-y-1 list-disc list-inside text-gray-600 text-sm">
+                    {performance.personalityAnalysis.allPersonalities.slice(1, 3).map((personality, index) => (
+                      <li key={index}>
+                        {personality.trait} ({personality.percentage.toFixed(1)}%) - 
+                        O que complementa suas habilidades técnicas
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="bg-white p-6 rounded-lg shadow-md mt-8">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Análise de Personalidade</h3>
-          <div className="flex flex-col items-center justify-center p-8 text-gray-500">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p>Não há dados de personalidade disponíveis</p>
-            <p className="text-sm mt-2">O candidato não respondeu perguntas opinativas ou os dados não foram processados corretamente</p>
-          </div>
-        </div>
-      )}        
-
-
-      
+      </div>
     </div>
   )
 }
