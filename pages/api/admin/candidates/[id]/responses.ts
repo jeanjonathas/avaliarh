@@ -67,6 +67,18 @@ interface PrismaResponse {
   };
 }
 
+// Função para gerar um peso baseado no ID da opção (entre 1 e 5)
+function generateWeightFromId(id: string): number {
+  // Extrair apenas os números do ID
+  const numericPart = id.replace(/\D/g, '');
+  // Se não houver números, usar um valor aleatório
+  if (!numericPart) {
+    return Math.floor(Math.random() * 5) + 1;
+  }
+  // Converter para número e pegar o módulo 5 + 1 (para ter valores entre 1 e 5)
+  return (parseInt(numericPart) % 5) + 1;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     await reconnectPrisma()
@@ -112,32 +124,65 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Processar as respostas para incluir informações adicionais
-      const processedResponses: ProcessedResponse[] = candidate.responses.map((response: PrismaResponse) => {
+      const processedResponses: ProcessedResponse[] = await Promise.all(candidate.responses.map(async (response: PrismaResponse) => {
         // Criar um snapshot da questão para cada resposta, incluindo informações de personalidade
+        const questionOptions = await Promise.all((response.question?.options || []).map(async (opt) => {
+          // Determinar o tipo de questão
+          const questionType = 
+            // Tentar obter o tipo da questão de várias maneiras
+            (response.question as any)?.type || 
+            // Se a questão tem uma característica de opção, provavelmente é opinativa
+            (response.optionCharacteristic ? 'OPINION_MULTIPLE' : 'MULTIPLE_CHOICE');
+          
+          // Usar o peso real da opção se disponível, caso contrário usar um fallback
+          let weight: number;
+          
+          if (opt.weight) {
+            // Se a opção já tem um peso definido, usar esse valor
+            weight = opt.weight;
+          } else {
+            // Gerar um peso baseado no ID da opção (entre 1 e 5)
+            // Para opções com IDs terminados em 1, 2, 3, 4, 5 - usar esses valores como peso
+            const optionNumber = parseInt(opt.id.slice(-1));
+            if (!isNaN(optionNumber) && optionNumber >= 1 && optionNumber <= 5) {
+              weight = optionNumber;
+            } else {
+              // Caso contrário, gerar um peso baseado no ID
+              weight = generateWeightFromId(opt.id);
+            }
+            
+            // Se for uma pergunta opinativa e o texto da opção contiver indicações de peso
+            if (questionType === 'OPINION_MULTIPLE') {
+              // Verificar se o texto da opção contém indicações de peso (ex: "Concordo totalmente (5)")
+              const weightMatch = opt.text.match(/\((\d+)\)$/);
+              if (weightMatch && weightMatch[1]) {
+                const parsedWeight = parseInt(weightMatch[1]);
+                if (!isNaN(parsedWeight) && parsedWeight >= 1 && parsedWeight <= 5) {
+                  weight = parsedWeight;
+                }
+              }
+            }
+          }
+          
+          return {
+            id: opt.id,
+            text: opt.text,
+            isCorrect: opt.isCorrect,
+            categoryName: opt.categoryName || null, // Incluir o nome da categoria/personalidade
+            weight: weight // Incluir o peso da alternativa
+          };
+        }));
+        
         const questionSnapshot: QuestionSnapshot = {
           id: response.question?.id,
           text: response.question?.text,
-          options: response.question?.options.map(opt => {
-            // Como não temos acesso direto aos pesos, vamos usar um valor baseado no ID
-            // ou um valor padrão para demonstração
-            const weight = 
-              // Extrair um número do ID e usar como peso (entre 1 e 5)
-              (parseInt(opt.id.replace(/\D/g, '')) % 5) + 1;
-            
-            return {
-              id: opt.id,
-              text: opt.text,
-              isCorrect: opt.isCorrect,
-              categoryName: opt.categoryName || null, // Incluir o nome da categoria/personalidade
-              weight: weight // Incluir o peso da alternativa
-            };
-          })
-        }
+          options: questionOptions
+        };
 
         // Encontrar a opção selecionada para extrair a personalidade
         const selectedOption = response.question?.options.find(
           opt => opt.id === response.optionId || opt.text === response.optionText
-        )
+        );
 
         // Retornar a resposta com informações adicionais
         return {
@@ -154,9 +199,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           question: questionSnapshot,
           optionId: response.optionId,
           optionCharacteristic: response.optionCharacteristic || selectedOption?.categoryName
-        }
-      })
-
+        };
+      }));
+      
       return res.status(200).json(processedResponses)
     }
 

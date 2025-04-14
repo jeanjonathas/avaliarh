@@ -7,43 +7,59 @@ interface CandidateAnswersTabProps {
 }
 
 export const CandidateAnswersTab = ({ candidate }: CandidateAnswersTabProps) => {
-  const [responses, setResponses] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const [responses, setResponses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [optionWeights, setOptionWeights] = useState<Record<string, number>>({});
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
 
-  const loadCandidateData = useCallback(async () => {
-    setLoading(true)
-
+  // Função para buscar as respostas do candidato
+  const fetchResponses = useCallback(async () => {
+    // Evitar múltiplas chamadas se os dados já foram carregados
+    if (isDataLoaded) return;
+    
     try {
-      // Carregar respostas
-      const responsesPromise = toast.promise(
-        fetch(`/api/admin/candidates/${candidate.id}/responses`, {
-          credentials: 'include'
-        }).then(res => {
-          if (!res.ok) throw new Error('Erro ao carregar respostas')
-          return res.json()
-        }),
-        {
-          pending: 'Carregando respostas...',
-          success: 'Respostas carregadas com sucesso',
-          error: 'Erro ao carregar respostas'
+      setLoading(true);
+      setError(null);
+      
+      const response = await fetch(`/api/admin/candidates/${candidate.id}/responses`);
+      
+      if (!response.ok) {
+        throw new Error('Erro ao buscar respostas do candidato');
+      }
+      
+      const data = await response.json();
+      setResponses(data);
+      
+      // Buscar os pesos das alternativas se o candidato tiver um teste associado
+      if (candidate.testId) {
+        try {
+          const weightsResponse = await fetch(`/api/admin/option-weights/${candidate.testId}`);
+          if (weightsResponse.ok) {
+            const weightsData = await weightsResponse.json();
+            console.log('Pesos das alternativas:', weightsData.optionWeights);
+            setOptionWeights(weightsData.optionWeights || {});
+          }
+        } catch (error) {
+          console.error('Erro ao buscar pesos das alternativas:', error);
         }
-      )
-
-      const responsesData = await responsesPromise
-      console.log('Dados de respostas recebidos:', JSON.stringify(responsesData, null, 2))
-      setResponses(responsesData)
+      }
+      
+      // Marcar que os dados foram carregados
+      setIsDataLoaded(true);
     } catch (error) {
-      console.error('Erro ao carregar dados do candidato:', error)
+      console.error('Erro ao buscar respostas:', error);
+      setError('Erro ao carregar respostas. Por favor, tente novamente.');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [candidate.id])
+  }, [candidate.id, candidate.testId, isDataLoaded]);
 
   useEffect(() => {
-    if (candidate.id) {
-      loadCandidateData()
+    if (candidate.id && !isDataLoaded) {
+      fetchResponses();
     }
-  }, [candidate.id, loadCandidateData])
+  }, [candidate.id, fetchResponses, isDataLoaded]);
 
   // Função para verificar se a pergunta é opinativa
   const isOpinionQuestion = (response: any) => {
@@ -179,17 +195,65 @@ export const CandidateAnswersTab = ({ candidate }: CandidateAnswersTabProps) => 
                                             {response.question.options.map((option: any) => {
                                               console.log('Opção:', option, 'ID da opção selecionada:', selectedOptionId)
                                               
-                                              // Extrair a personalidade usando a função melhorada
-                                              const personality = extractPersonality(option, response);
-                                              const formattedText = formatOptionText(option.text);
-                                              
                                               // Verificar se esta é a opção selecionada
                                               const isSelected = 
                                                 option.id === selectedOptionId || 
                                                 option.text === response.optionText;
                                               
-                                              // Determinar o peso da alternativa (assumindo escala de 1 a 5)
-                                              const weight = option.weight || (option.id % 5) + 1;
+                                              // Extrair a personalidade usando a função melhorada
+                                              const personality = extractPersonality(option, response);
+                                              const formattedText = formatOptionText(option.text);
+                                              
+                                              // Determinar o peso da alternativa
+                                              let weight = option.weight;
+                                              
+                                              // Se temos um peso configurado para esta opção, usar ele
+                                              if (optionWeights[option.id]) {
+                                                weight = optionWeights[option.id];
+                                              } 
+                                              // Se não tiver peso definido, tentar determinar pelo ID da opção
+                                              else if (!weight) {
+                                                // Para opções com IDs terminados em 1, 2, 3, 4, 5 - usar esses valores como peso
+                                                const lastChar = option.id.slice(-1);
+                                                const optionNumber = parseInt(lastChar);
+                                                if (!isNaN(optionNumber) && optionNumber >= 1 && optionNumber <= 5) {
+                                                  weight = optionNumber;
+                                                } else {
+                                                  // Caso contrário, usar o texto da opção para determinar o peso
+                                                  // Verificar se o texto contém indicações de peso (ex: "Concordo totalmente (5)")
+                                                  const weightMatch = option.text.match(/\((\d+)\)$/);
+                                                  if (weightMatch && weightMatch[1]) {
+                                                    const parsedWeight = parseInt(weightMatch[1]);
+                                                    if (!isNaN(parsedWeight) && parsedWeight >= 1 && parsedWeight <= 5) {
+                                                      weight = parsedWeight;
+                                                    } else {
+                                                      // Fallback: usar o número da opção na lista (assumindo que a ordem é importante)
+                                                      const index = response.question.options.findIndex(o => o.id === option.id);
+                                                      if (index !== -1) {
+                                                        // Inverter o índice para que as últimas opções tenham peso maior
+                                                        weight = response.question.options.length - index;
+                                                        // Garantir que o peso esteja entre 1 e 5
+                                                        weight = Math.max(1, Math.min(5, weight));
+                                                      } else {
+                                                        // Último recurso: usar um valor baseado no ID
+                                                        weight = (parseInt(option.id.replace(/\D/g, '')) % 5) + 1;
+                                                      }
+                                                    }
+                                                  } else {
+                                                    // Se o texto não contém indicações de peso, usar o número da opção
+                                                    const index = response.question.options.findIndex(o => o.id === option.id);
+                                                    if (index !== -1) {
+                                                      // Inverter o índice para que as últimas opções tenham peso maior
+                                                      weight = response.question.options.length - index;
+                                                      // Garantir que o peso esteja entre 1 e 5
+                                                      weight = Math.max(1, Math.min(5, weight));
+                                                    } else {
+                                                      // Último recurso: usar um valor baseado no ID
+                                                      weight = (parseInt(option.id.replace(/\D/g, '')) % 5) + 1;
+                                                    }
+                                                  }
+                                                }
+                                              }
                                               
                                               return (
                                                 <tr 

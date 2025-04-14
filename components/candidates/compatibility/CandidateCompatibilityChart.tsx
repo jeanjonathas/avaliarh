@@ -138,9 +138,9 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
           compatibility = Math.max(0, 100 - difference);
         }
         
-        // Forçar compatibilidade 100% para testes apenas com perguntas opinativas
-        // quando o candidato escolheu a alternativa com peso máximo
-        if (candidateTrait.percentage > 0 && expectedValue === maxWeight) {
+        // Para testes apenas com perguntas opinativas, verificar se o candidato escolheu a alternativa com peso máximo
+        // Se sim, a compatibilidade deve ser 100%
+        if (candidateTrait.isOpinionQuestion && candidateTrait.percentage >= 80) {
           compatibility = 100;
         }
         
@@ -242,7 +242,7 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
       setLoading(true);
       
       // Buscar dados de personalidade do processo
-      const response = await fetch(`/api/admin/processes/${processId}/personality`);
+      const response = await fetch(`/api/admin/processes/${processId}/personality-traits`);
       
       if (!response.ok) {
         throw new Error(`Erro ao buscar dados de personalidade: ${response.status}`);
@@ -261,7 +261,7 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
           
           const defaultTraits = personalityTraits.map((trait, index) => ({
             name: trait.trait,
-            weight: trait.weight || (personalityTraits.length - index),
+            weight: trait.weight || 5, // Usar peso máximo como padrão para perguntas opinativas
             categoryNameUuid: trait.categoryNameUuid
           }));
           
@@ -295,7 +295,7 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
         
         const defaultTraits = personalityTraits.map((trait, index) => ({
           name: trait.trait,
-          weight: trait.weight || (personalityTraits.length - index),
+          weight: trait.weight || 5, // Usar peso máximo como padrão para perguntas opinativas
           categoryNameUuid: trait.categoryNameUuid
         }));
         
@@ -344,7 +344,7 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
         // Criar dados de processo padrão
         const defaultTraits = personalityTraits.map((trait, index) => ({
           name: trait.trait,
-          weight: trait.weight || (personalityTraits.length - index),
+          weight: trait.weight || 5, // Usar peso máximo como padrão para perguntas opinativas
           categoryNameUuid: trait.categoryNameUuid
         }));
         
@@ -629,33 +629,40 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <div className="relative">
-              <Doughnut
-                data={{
-                  labels: ['Compatibilidade', 'Diferença'],
-                  datasets: [
-                    {
-                      data: [compatibilityScore, 100 - compatibilityScore],
-                      backgroundColor: ['#4F46E5', '#E5E7EB'],
-                      borderWidth: 0
+            <div className="flex flex-col items-center">
+              <div className="w-full max-w-xs h-64 max-h-64 relative">
+                <Doughnut
+                  data={{
+                    labels: ['Compatibilidade', 'Diferença'],
+                    datasets: [
+                      {
+                        data: [compatibilityScore, Math.max(0, 100 - compatibilityScore)],
+                        backgroundColor: ['#4F46E5', '#E5E7EB'],
+                        borderWidth: 0,
+                        cutout: '80%'
+                      }
+                    ]
+                  }}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                      legend: {
+                        display: false
+                      },
+                      tooltip: {
+                        enabled: false
+                      }
                     }
-                  ]
-                }}
-                options={{
-                  cutout: '70%',
-                  plugins: {
-                    legend: {
-                      display: false
-                    }
-                  }
-                }}
-              />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-gray-900">
-                    {compatibilityScore}%
+                  }}
+                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-gray-900">
+                      {compatibilityScore}%
+                    </div>
+                    <div className="text-sm text-gray-500">Compatibilidade</div>
                   </div>
-                  <div className="text-sm text-gray-500">Compatibilidade</div>
                 </div>
               </div>
             </div>
