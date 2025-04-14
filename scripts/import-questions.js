@@ -2,7 +2,11 @@ const { PrismaClient } = require('@prisma/client');
 const fs = require('fs');
 const path = require('path');
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  __internal: {
+    enableTracing: false
+  }
+});
 
 // Função para extrair as perguntas do arquivo testes.md
 function extractQuestionsFromMd(filePath) {

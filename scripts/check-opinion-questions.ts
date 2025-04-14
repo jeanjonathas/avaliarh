@@ -1,6 +1,10 @@
 import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  __internal: {
+    enableTracing: false
+  }
+});
 
 async function main() {
   try {

@@ -3,7 +3,11 @@
  * Este script identifica empresas com o mesmo CNPJ e mantém apenas a mais antiga
  */
 const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  __internal: {
+    enableTracing: false
+  }
+});
 
 async function cleanupDuplicateCompanies() {
   console.log('=== LIMPEZA DE EMPRESAS DUPLICADAS ===');

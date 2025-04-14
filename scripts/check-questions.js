@@ -1,6 +1,10 @@
 // Script para verificar se há perguntas cadastradas no banco de dados
 const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  __internal: {
+    enableTracing: false
+  }
+});
 
 async function main() {
   try {

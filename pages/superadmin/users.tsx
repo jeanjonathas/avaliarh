@@ -554,7 +554,11 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     };
   }
 
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient({
+  __internal: {
+    enableTracing: false
+  }
+});
 
   try {
     // Busca todos os usuários com informações da empresa

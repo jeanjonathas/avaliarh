@@ -1,6 +1,10 @@
 import { PrismaClient } from '@prisma/client'
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient({
+  __internal: {
+    enableTracing: false
+  }
+})
 
 // Novas perguntas de Compreensão Verbal com suas opções e respostas corretas
 const verbalComprehensionQuestions = [

@@ -1,7 +1,11 @@
 import { PrismaClient } from '@prisma/client'
 import * as crypto from 'crypto'
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient({
+  __internal: {
+    enableTracing: false
+  }
+})
 
 async function main() {
   // Criar as 6 etapas básicas

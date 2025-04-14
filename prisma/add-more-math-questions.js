@@ -1,5 +1,9 @@
 const { PrismaClient } = require('@prisma/client')
-const prisma = new PrismaClient()
+const prisma = new PrismaClient({
+  __internal: {
+    enableTracing: false
+  }
+})
 
 async function main() {
   // Obter o ID da etapa de Matemática Básica

@@ -4,7 +4,11 @@ import path from 'path';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  __internal: {
+    enableTracing: false
+  }
+});
 
 interface ExportOptions {
   format: 'sql' | 'json' | 'both';

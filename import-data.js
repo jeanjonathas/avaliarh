@@ -1,7 +1,11 @@
 const { PrismaClient } = require('@prisma/client');
 const fs = require('fs');
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  __internal: {
+    enableTracing: false
+  }
+});
 
 async function clearDatabase() {
   // Desabilitar temporariamente as foreign key constraints

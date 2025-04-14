@@ -1,6 +1,10 @@
 import { PrismaClient } from '@prisma/client'
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient({
+  __internal: {
+    enableTracing: false
+  }
+})
 
 // Novas perguntas de Matemática Básica com suas opções e respostas corretas
 const basicMathQuestions = [

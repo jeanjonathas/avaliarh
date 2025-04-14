@@ -1,6 +1,10 @@
 // Script para aplicar a alteração que torna o campo stageId opcional
 const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  __internal: {
+    enableTracing: false
+  }
+});
 
 async function main() {
   try {
