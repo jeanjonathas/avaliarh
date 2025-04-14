@@ -658,14 +658,14 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
                       {
                         data: [compatibilityScore, Math.max(0, 100 - compatibilityScore)],
                         backgroundColor: ['#4F46E5', '#E5E7EB'],
-                        borderWidth: 0,
-                        cutout: '80%'
+                        borderWidth: 0
                       }
                     ]
                   }}
                   options={{
                     responsive: true,
                     maintainAspectRatio: true,
+                    cutout: '80%',
                     plugins: {
                       legend: {
                         display: false
