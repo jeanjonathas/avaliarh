@@ -34,26 +34,40 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
   const [error, setError] = useState<string | null>(null);
   const hasInitializedRef = useRef<{[key: string]: boolean}>({});
   const previousValueRef = useRef<PersonalityTrait[]>([]);
+  const valueRef = useRef<PersonalityTrait[]>(value);
+
+  // Atualizar a referência quando o valor mudar
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
 
   // Função para buscar traços de personalidade do teste selecionado
-  const fetchPersonalityTraits = useCallback(async (testId: string) => {
+  const loadTraitsFromTest = useCallback(async () => {
+    setIsLoadingTraits(true);
+    setError(null);
+    
+    if (!testId) {
+      setError('Nenhum teste selecionado');
+      setIsLoadingTraits(false);
+      return;
+    }
+    
     try {
-      setIsLoadingTraits(true);
-      setError(null);
+      console.log('Carregando traços de personalidade do teste:', testId);
       
-      console.log('Buscando traços para o teste:', testId);
-      
-      // Buscar as questões do teste com tipo OPINION_MULTIPLE
+      // Buscar perguntas opinativas do teste
       const response = await fetch(`/api/admin/questions?testId=${testId}&type=OPINION_MULTIPLE`);
       
       if (!response.ok) {
-        throw new Error(`Erro ao buscar questões: ${response.status}`);
+        throw new Error(`Erro ao buscar perguntas: ${response.statusText}`);
       }
       
-      const data = await response.json();
+      const responseData = await response.json();
+      // Verificar se a resposta é um objeto com propriedade 'items' ou um array direto
+      const data = responseData.items || responseData;
       const questions = Array.isArray(data) ? data : [];
       
-      console.log('Resposta da API:', data);
+      console.log('Resposta da API:', responseData);
       console.log('Questões encontradas:', questions);
       
       if (!questions || questions.length === 0) {
@@ -66,304 +80,215 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
       
       // Extrair grupos e traços das questões
       const groups: TraitGroup[] = [];
-      const groupMap: Record<string, string[]> = {};
       
-      // Primeiro, vamos buscar os grupos de opinião para obter informações sobre os grupos
-      try {
-        const opinionGroupsResponse = await fetch('/api/admin/opinion-groups');
-        if (opinionGroupsResponse.ok) {
-          const opinionGroups = await opinionGroupsResponse.json();
-          console.log('Grupos de opinião encontrados:', opinionGroups);
+      // Primeiro, vamos tentar criar um grupo para cada pergunta opinativa
+      questions.forEach((question: any) => {
+        console.log(`Processando questão ${question.id}:`, question);
+        
+        if (question.options && question.options.length > 0) {
+          // Criar um grupo para esta pergunta
+          const questionGroup: TraitGroup = {
+            id: `question-${question.id}`,
+            name: `Pergunta: ${question.text?.substring(0, 30)}...` || `Pergunta ${question.id}`,
+            traits: [],
+            selectedTraits: []
+          };
           
-          if (opinionGroups && opinionGroups.length > 0) {
-            // Criar um grupo para cada grupo de opinião
-            opinionGroups.forEach((group: any) => {
-              const groupId = group.id;
-              const groupName = group.name;
-              
-              if (!groupMap[groupId]) {
-                groupMap[groupId] = [];
+          // Coletar todas as categorias únicas das opções desta pergunta
+          const uniqueTraits = new Set<string>();
+          
+          question.options.forEach((option: any) => {
+            console.log(`Opção ${option.id}:`, option);
+            
+            // Tentar extrair a categoria da opção de várias formas possíveis
+            const categoryName = option.categoryName || 
+                                (option.category && option.category.name) ||
+                                option.categoryId;
+            
+            if (categoryName) {
+              console.log(`Encontrado traço de personalidade: ${categoryName}`);
+              uniqueTraits.add(categoryName);
+            } else {
+              console.log(`Opção ${option.id} não tem categoria definida`);
+            }
+          });
+          
+          // Adicionar todas as categorias únicas ao grupo da pergunta
+          questionGroup.traits = Array.from(uniqueTraits);
+          
+          if (questionGroup.traits.length > 0) {
+            console.log(`Adicionando grupo para pergunta ${question.id} com ${questionGroup.traits.length} traços:`, questionGroup.traits);
+            groups.push(questionGroup);
+          } else {
+            console.log(`Pergunta ${question.id} não tem traços de personalidade definidos`);
+          }
+        } else {
+          console.log(`Questão ${question.id} não tem opções`);
+        }
+      });
+      
+      // Se não conseguimos criar grupos por pergunta, tentar buscar grupos de opinião
+      if (groups.length === 0) {
+        try {
+          const opinionGroupsResponse = await fetch('/api/admin/opinion-groups');
+          if (opinionGroupsResponse.ok) {
+            const opinionGroups = await opinionGroupsResponse.json();
+            console.log('Grupos de opinião encontrados:', opinionGroups);
+            
+            if (opinionGroups && opinionGroups.length > 0) {
+              // Criar um grupo para cada grupo de opinião
+              opinionGroups.forEach((group: any) => {
+                const groupId = group.id;
                 groups.push({
                   id: groupId,
-                  name: groupName,
+                  name: group.name,
                   traits: [],
                   selectedTraits: []
                 });
-              }
-              
-              // Adicionar as categorias do grupo como traços
-              if (group.categories && group.categories.length > 0) {
-                const groupIndex = groups.findIndex(g => g.id === groupId);
-                if (groupIndex !== -1) {
-                  group.categories.forEach((category: any) => {
-                    if (category.name && !groupMap[groupId].includes(category.name)) {
-                      groupMap[groupId].push(category.name);
-                      groups[groupIndex].traits.push(category.name);
-                    }
-                  });
-                }
-              }
-            });
-          }
-        }
-      } catch (error) {
-        console.error('Erro ao buscar grupos de opinião:', error);
-      }
-      
-      // Se não conseguimos obter grupos de opinião, vamos criar grupos baseados nas categorias das opções
-      if (groups.length === 0) {
-        console.log('Criando grupos baseados nas categorias das opções');
-        
-        // Mapear categorias por UUID para agrupar perguntas com as mesmas categorias
-        const categoriesByUUID: Record<string, { name: string, questions: any[] }> = {};
-        
-        // Primeiro passo: coletar todas as categorias únicas por UUID
-        questions.forEach((question: any) => {
-          if (question.options && question.options.length > 0) {
-            question.options.forEach((option: any) => {
-              if (option.categoryName && option.categoryId) {
-                const uuid = option.categoryId;
-                if (!categoriesByUUID[uuid]) {
-                  categoriesByUUID[uuid] = {
-                    name: option.categoryName,
-                    questions: []
-                  };
-                }
                 
-                // Adicionar a questão à categoria se ainda não estiver lá
-                if (!categoriesByUUID[uuid].questions.some((q: any) => q.id === question.id)) {
-                  categoriesByUUID[uuid].questions.push(question);
-                }
-              }
-            });
-          }
-        });
-        
-        // Segundo passo: criar grupos baseados nas categorias únicas
-        const processedGroups = new Set<string>();
-        
-        Object.entries(categoriesByUUID).forEach(([uuid, categoryInfo]) => {
-          // Criar um ID de grupo baseado nas categorias presentes nas questões
-          const questionsIds = categoryInfo.questions.map(q => q.id).sort().join('-');
-          const groupId = `group-${questionsIds}`;
-          
-          // Evitar duplicação de grupos
-          if (!processedGroups.has(groupId)) {
-            processedGroups.add(groupId);
-            
-            // Criar um nome para o grupo baseado nas categorias
-            const categoryNames = Object.values(categoriesByUUID)
-              .filter(cat => cat.questions.some(q => categoryInfo.questions.includes(q)))
-              .map(cat => cat.name);
-            
-            const groupName = `Grupo: ${categoryNames.join(', ')}`;
-            
-            if (!groupMap[groupId]) {
-              groupMap[groupId] = [];
-              groups.push({
-                id: groupId,
-                name: groupName,
-                traits: [],
-                selectedTraits: []
-              });
-            }
-            
-            // Adicionar todas as categorias únicas como traços
-            const groupIndex = groups.findIndex(g => g.id === groupId);
-            if (groupIndex !== -1) {
-              Object.values(categoriesByUUID)
-                .filter(cat => cat.questions.some(q => categoryInfo.questions.includes(q)))
-                .forEach(cat => {
-                  if (!groupMap[groupId].includes(cat.name)) {
-                    groupMap[groupId].push(cat.name);
-                    groups[groupIndex].traits.push(cat.name);
+                // Verificar se há perguntas com categorias que pertencem a este grupo
+                questions.forEach((question: any) => {
+                  if (question.options && question.options.length > 0) {
+                    question.options.forEach((option: any) => {
+                      // Verificar se a opção tem uma categoria associada ao grupo atual
+                      const category = option.categoryName || option.categoryId;
+                      const groupIndex = groups.findIndex(g => g.id === groupId);
+                      
+                      if (category && groupIndex !== -1 && !groups[groupIndex].traits.includes(category)) {
+                        groups[groupIndex].traits.push(category);
+                      }
+                    });
                   }
                 });
+              });
+              
+              // Remover grupos sem traços
+              const filteredGroups = groups.filter(group => group.traits.length > 0);
+              if (filteredGroups.length > 0) {
+                groups.length = 0;
+                groups.push(...filteredGroups);
+              }
             }
           }
-        });
+        } catch (error) {
+          console.error('Erro ao buscar grupos de opinião:', error);
+        }
       }
       
-      // Se ainda não temos grupos, criar um grupo para cada pergunta (fallback)
+      // Se ainda não temos grupos, criar um grupo padrão
       if (groups.length === 0) {
-        console.log('Fallback: Criando um grupo para cada pergunta');
+        console.log('Criando grupo padrão para todas as categorias');
+        
+        // Criar um grupo padrão para todas as categorias
+        const defaultGroup: TraitGroup = {
+          id: 'default-group',
+          name: 'Traços de Personalidade',
+          traits: [],
+          selectedTraits: []
+        };
+        
+        // Coletar todas as categorias únicas das opções
+        const uniqueTraits = new Set<string>();
         
         questions.forEach((question: any) => {
-          const groupName = `Grupo: ${question.text}`;
-          const groupId = `group-${question.id}`;
-          
-          if (!groupMap[groupId]) {
-            groupMap[groupId] = [];
-            groups.push({
-              id: groupId,
-              name: groupName,
-              traits: [],
-              selectedTraits: []
-            });
-          }
-          
-          // Extrair categorias das opções
           if (question.options && question.options.length > 0) {
-            // Coletar todas as categorias únicas das opções
-            const categoryNames = new Set<string>();
-            
             question.options.forEach((option: any) => {
-              // Verificar se a opção tem uma categoria associada
-              if (option.categoryName) {
-                categoryNames.add(option.categoryName);
-              }
-            });
-            
-            // Se não encontramos categorias, usar os textos das opções como último recurso
-            if (categoryNames.size === 0) {
-              question.options.forEach((option: any) => {
-                if (option.text) {
-                  categoryNames.add(option.text);
-                }
-              });
-            }
-            
-            // Adicionar as categorias encontradas ao grupo
-            const groupIndex = groups.findIndex(g => g.id === groupId);
-            if (groupIndex !== -1) {
-              categoryNames.forEach(categoryName => {
-                if (!groupMap[groupId].includes(categoryName)) {
-                  groupMap[groupId].push(categoryName);
-                  groups[groupIndex].traits.push(categoryName);
-                }
-              });
-            }
-          }
-        });
-      }
-      
-      console.log('Grupos extraídos:', groups);
-      
-      // Atualizar o estado com os grupos e traços disponíveis
-      setTraitGroups(groups);
-      
-      // Se houver valores iniciais, inicializar os traços selecionados
-      if (value && value.length > 0) {
-        console.log('Valores iniciais recebidos:', value);
-        const updatedGroups = [...groups];
-        
-        // Criar mapas para facilitar a busca
-        const traitsByName: Record<string, PersonalityTrait[]> = {};
-        const traitsById: Record<string, PersonalityTrait> = {};
-        
-        // Indexar os traços salvos por nome e ID
-        value.forEach(trait => {
-          // Indexar por ID se disponível
-          if (trait.id) {
-            traitsById[trait.id] = trait;
-          }
-          
-          // Também indexar por nome para fallback
-          if (trait.traitName) {
-            if (!traitsByName[trait.traitName]) {
-              traitsByName[trait.traitName] = [];
-            }
-            traitsByName[trait.traitName].push(trait);
-          }
-        });
-        
-        console.log('Mapa de traços por ID:', traitsById);
-        console.log('Mapa de traços por nome:', traitsByName);
-        
-        // Para cada grupo, verificar se há traços salvos correspondentes
-        updatedGroups.forEach((group, groupIndex) => {
-          // Primeiro, tentar encontrar traços salvos pelo ID do grupo
-          const savedTraitsByGroup = value.filter(trait => 
-            trait.groupId === group.id || trait.groupName === group.name
-          );
-          
-          if (savedTraitsByGroup.length > 0) {
-            // Se encontrou traços pelo ID do grupo, usar esses
-            console.log(`Encontrados ${savedTraitsByGroup.length} traços para o grupo ${group.name} pelo ID/nome do grupo`);
-            
-            savedTraitsByGroup.forEach(savedTrait => {
-              // Verificar se o traço está disponível no grupo atual
-              if (group.traits.includes(savedTrait.traitName)) {
-                // Verificar se o traço já existe no grupo
-                const existingTraitIndex = group.selectedTraits.findIndex(t => 
-                  t.id === savedTrait.id || t.traitName === savedTrait.traitName
-                );
-                
-                if (existingTraitIndex === -1) {
-                  // Se o traço não existe, adicionar
-                  group.selectedTraits.push({
-                    id: savedTrait.id || `trait-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                    traitName: savedTrait.traitName,
-                    weight: savedTrait.weight || 0,
-                    order: savedTrait.order || group.selectedTraits.length + 1,
-                    groupId: group.id,
-                    groupName: group.name
-                  });
-                } else {
-                  // Se o traço já existe, atualizar
-                  group.selectedTraits[existingTraitIndex] = {
-                    ...group.selectedTraits[existingTraitIndex],
-                    weight: savedTrait.weight || group.selectedTraits[existingTraitIndex].weight,
-                    order: savedTrait.order || group.selectedTraits[existingTraitIndex].order
-                  };
-                }
-              }
-            });
-          } else {
-            // Se não encontrou pelo ID do grupo, tentar pelo nome dos traços
-            console.log(`Tentando encontrar traços para o grupo ${group.name} pelo nome dos traços`);
-            
-            // Para cada traço disponível no grupo, verificar se há um valor salvo
-            group.traits.forEach(traitName => {
-              const matchingTraits = traitsByName[traitName] || [];
+              const categoryName = option.categoryName || 
+                                  (option.category && option.category.name) ||
+                                  option.categoryId;
               
-              if (matchingTraits.length > 0) {
-                // Se há múltiplos traços com o mesmo nome, tentar encontrar o que melhor corresponde a este grupo
-                // Priorizar traços que têm o mesmo groupId ou groupName
-                const bestMatch = matchingTraits.find(t => 
-                  t.groupId === group.id || t.groupName === group.name
-                ) || matchingTraits[0]; // Fallback para o primeiro se não encontrar correspondência exata
-                
-                // Verificar se o traço já existe no grupo
-                const existingTraitIndex = group.selectedTraits.findIndex(t => 
-                  t.traitName === traitName || (t.id && t.id === bestMatch.id)
-                );
-                
-                if (existingTraitIndex === -1) {
-                  // Se o traço não existe, adicionar
-                  group.selectedTraits.push({
-                    id: bestMatch.id || `trait-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                    traitName: traitName,
-                    weight: bestMatch.weight || 0,
-                    order: bestMatch.order || group.selectedTraits.length + 1,
-                    groupId: group.id,
-                    groupName: group.name
-                  });
-                } else {
-                  // Se o traço já existe, atualizar
-                  group.selectedTraits[existingTraitIndex] = {
-                    ...group.selectedTraits[existingTraitIndex],
-                    weight: bestMatch.weight || group.selectedTraits[existingTraitIndex].weight,
-                    order: bestMatch.order || group.selectedTraits[existingTraitIndex].order
-                  };
-                }
+              if (categoryName) {
+                uniqueTraits.add(categoryName);
               }
             });
           }
-          
-          // Ordenar os traços em cada grupo por ordem
-          group.selectedTraits.sort((a, b) => a.order - b.order);
         });
         
-        // Atualizar o estado
-        setTraitGroups(updatedGroups);
+        // Adicionar todas as categorias únicas ao grupo padrão
+        defaultGroup.traits = Array.from(uniqueTraits);
         
-        console.log('Grupos atualizados com valores iniciais:', updatedGroups);
+        if (defaultGroup.traits.length > 0) {
+          groups.push(defaultGroup);
+        }
       }
+      
+      // Se ainda não temos grupos, criar um grupo vazio
+      if (groups.length === 0) {
+        console.log('Nenhum traço de personalidade encontrado. Criando grupo vazio.');
+        groups.push({
+          id: 'empty-group',
+          name: 'Traços de Personalidade',
+          traits: [],
+          selectedTraits: []
+        });
+      }
+      
+      console.log('Grupos finais:', groups);
+      
+      // Inicializar os traços selecionados com base nos valores existentes
+      const currentValue = valueRef.current; // Usar a referência em vez do valor direto
+      
+      if (currentValue && currentValue.length > 0) {
+        console.log('Distribuindo traços selecionados nos grupos:', currentValue);
+        
+        // Primeiro, vamos mapear os traços por nome para facilitar a busca
+        const traitsByName: Record<string, PersonalityTrait> = {};
+        currentValue.forEach(trait => {
+          traitsByName[trait.traitName] = trait;
+        });
+        
+        // Agora, para cada grupo, verificamos quais traços pertencem a ele
+        groups.forEach(group => {
+          group.selectedTraits = []; // Limpar os traços selecionados
+          
+          // Para cada traço disponível no grupo, verificar se ele está nos traços selecionados
+          group.traits.forEach(traitName => {
+            if (traitsByName[traitName]) {
+              // Se o traço estiver nos selecionados, adicioná-lo ao grupo
+              const trait = { ...traitsByName[traitName], groupId: group.id };
+              group.selectedTraits.push(trait);
+              console.log(`Adicionando traço "${traitName}" ao grupo "${group.name}"`);
+            }
+          });
+        });
+        
+        // Verificar se há traços selecionados que não foram adicionados a nenhum grupo
+        const assignedTraits = new Set<string>();
+        groups.forEach(group => {
+          group.selectedTraits.forEach(trait => {
+            assignedTraits.add(trait.traitName);
+          });
+        });
+        
+        // Adicionar traços não atribuídos ao primeiro grupo que tiver o traço disponível
+        currentValue.forEach(trait => {
+          if (!assignedTraits.has(trait.traitName)) {
+            // Procurar um grupo que tenha este traço disponível
+            const groupIndex = groups.findIndex(g => g.traits.includes(trait.traitName));
+            if (groupIndex !== -1) {
+              const updatedTrait = { ...trait, groupId: groups[groupIndex].id };
+              groups[groupIndex].selectedTraits.push(updatedTrait);
+              assignedTraits.add(trait.traitName);
+              console.log(`Adicionando traço não atribuído "${trait.traitName}" ao grupo "${groups[groupIndex].name}"`);
+            } else if (groups.length > 0) {
+              // Se não encontrarmos um grupo adequado, adicionar ao primeiro grupo
+              console.log(`Traço "${trait.traitName}" não encontrado em nenhum grupo, adicionando ao primeiro grupo`);
+              const updatedTrait = { ...trait, groupId: groups[0].id };
+              groups[0].selectedTraits.push(updatedTrait);
+              assignedTraits.add(trait.traitName);
+            }
+          }
+        });
+      }
+      
+      setTraitGroups(groups);
+    } catch (error) {
+      console.error('Erro ao carregar traços de personalidade:', error);
+      setError(`Erro ao carregar traços de personalidade: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     } finally {
       setIsLoadingTraits(false);
     }
-  }, [value]);  
+  }, [testId]); // Usando apenas testId como dependência para evitar looping
 
   // Calcular o peso com base na ordem
   const calculateWeight = (position: number, totalTraits: number): number => {
@@ -580,13 +505,13 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
   useEffect(() => {
     if (testId) {
       console.log('TestId mudou, buscando traços:', testId);
-      fetchPersonalityTraits(testId);
+      loadTraitsFromTest();
     } else {
       // Se não houver testId, limpar os grupos
       setTraitGroups([]);
-      setError('Selecione um teste para configurar os traços de personalidade.');
+      setError(null);
     }
-  }, [testId, fetchPersonalityTraits]);
+  }, [testId, loadTraitsFromTest]);
 
   useEffect(() => {
     if (testId) {
