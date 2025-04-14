@@ -4,7 +4,7 @@ services:
     image: node:18
     entrypoint: ["/bin/bash", "-c"]
     command: [
-      "git clone https://github.com/jeanjonathas/avaliarh.git /tmp/app && cd /tmp/app && npm install --no-fund --no-audit --legacy-peer-deps && npx prisma generate && cp /opt/avaliarh/.env /tmp/app/.env && node scripts/setup-db-config.js && npx prisma migrate deploy && npx prisma db seed && npm run build && NODE_ENV=production npm run start"
+      "git clone https://github.com/jeanjonathas/avaliarh.git /tmp/app && cd /tmp/app && npm install --no-fund --no-audit --legacy-peer-deps && npm install prisma@5.10.0 @prisma/client@5.10.0 date-fns@4.1.0 && cp /opt/avaliarh/.env /tmp/app/.env && node /tmp/app/scripts/setup-db-config.js && cd /tmp/app && npx prisma generate --schema=/tmp/app/prisma/schema.prisma && npx prisma migrate deploy --schema=/tmp/app/prisma/schema.prisma && npx prisma db seed --schema=/tmp/app/prisma/schema.prisma && npm run build && NODE_ENV=production npm run start"
     ]
     environment:
       - DATABASE_URL=postgresql://postgres:02e821629ceff274c853f24327a36132@avaliarh_postgres:5432/avaliacao_candidatos?schema=public
