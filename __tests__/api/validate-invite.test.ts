@@ -37,11 +37,7 @@ describe('Validate Invite API', () => {
     };
     
     // Obter a instância mockada do Prisma
-    mockPrisma = new PrismaClient({
-  __internal: {
-    enableTracing: false
-  }
-});
+    mockPrisma = new PrismaClient();
   });
   
   it('should return 405 for non-POST requests', async () => {

@@ -1,12 +1,8 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 
-// Criar o cliente Prisma com configuração explícita para evitar o erro de enableTracing
-const prisma = new PrismaClient({
-  __internal: {
-    enableTracing: false
-  }
-});
+// Inicialização simples do Prisma Client
+const prisma = new PrismaClient();
 
 async function main() {
   // Verificar se já existe um superadmin

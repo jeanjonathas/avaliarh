@@ -12,11 +12,7 @@ const http = require('http');
 const { parse } = require('url');
 
 // Inicializar o cliente Prisma
-const prisma = new PrismaClient({
-  __internal: {
-    enableTracing: false
-  }
-});
+const prisma = new PrismaClient();
 
 // Configurações
 const config = {

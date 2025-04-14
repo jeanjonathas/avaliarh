@@ -321,11 +321,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   }
 
   // Criando uma única instância do Prisma Client
-  const prisma = new PrismaClient({
-  __internal: {
-    enableTracing: false
-  }
-});
+  const prisma = new PrismaClient();
   
   try {
     // Busca estatísticas de empresas usando métodos nativos do Prisma

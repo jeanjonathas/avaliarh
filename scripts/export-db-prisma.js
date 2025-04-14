@@ -10,11 +10,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Inicializar o cliente Prisma
-const prisma = new PrismaClient({
-  __internal: {
-    enableTracing: false
-  }
-});
+const prisma = new PrismaClient();
 
 // Nome do arquivo de saída
 const outputFile = path.join(__dirname, '..', 'avaliarh_export.sql');

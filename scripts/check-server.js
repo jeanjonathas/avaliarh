@@ -11,11 +11,7 @@ const path = require('path');
 const os = require('os');
 
 // Inicializar o cliente Prisma
-const prisma = new PrismaClient({
-  __internal: {
-    enableTracing: false
-  }
-});
+const prisma = new PrismaClient();
 
 // Função para verificar variáveis de ambiente
 async function checkEnvironmentVariables() {

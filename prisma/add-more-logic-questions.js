@@ -1,9 +1,5 @@
 const { PrismaClient } = require('@prisma/client')
-const prisma = new PrismaClient({
-  __internal: {
-    enableTracing: false
-  }
-})
+const prisma = new PrismaClient()
 
 async function main() {
   // Obter o ID da etapa de Raciocínio Lógico

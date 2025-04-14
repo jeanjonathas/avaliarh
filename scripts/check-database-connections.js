@@ -40,11 +40,7 @@ async function checkDatabaseConnections() {
   // Verificar a conexão com o banco de dados
   console.log('\nTestando conexão com o banco de dados...');
   try {
-    const prisma = new PrismaClient({
-  __internal: {
-    enableTracing: false
-  }
-});
+    const prisma = new PrismaClient();
     
     // Testar a conexão fazendo uma consulta simples
     const companyCount = await prisma.company.count();

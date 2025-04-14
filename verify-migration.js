@@ -1,9 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient({
-  __internal: {
-    enableTracing: false
-  }
-});
+const prisma = new PrismaClient();
 
 async function verifyMigration() {
   console.log('Verificando se a migração foi aplicada corretamente...');

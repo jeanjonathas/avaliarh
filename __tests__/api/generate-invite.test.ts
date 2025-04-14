@@ -70,11 +70,7 @@ describe('Generate Invite API', () => {
     };
     
     // Obter a instância mockada do Prisma
-    mockPrisma = new PrismaClient({
-  __internal: {
-    enableTracing: false
-  }
-});
+    mockPrisma = new PrismaClient();
     
     // Mock da sessão autenticada
     (getServerSession as jest.Mock).mockResolvedValue({

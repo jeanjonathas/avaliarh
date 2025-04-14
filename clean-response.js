@@ -1,10 +1,6 @@
 // Script para limpar a tabela Response
 const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient({
-  __internal: {
-    enableTracing: false
-  }
-});
+const prisma = new PrismaClient();
 
 async function cleanResponseTable() {
   try {
