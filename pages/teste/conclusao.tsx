@@ -413,51 +413,74 @@ const Conclusao: NextPage = () => {
                 <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm text-left">
                   <h3 className="text-lg font-semibold text-secondary-800 mb-4">Seu desempenho</h3>
                   
-                  <div className="flex flex-col items-center justify-center mb-4">
-                    <div className="relative w-40 h-40 mb-3">
-                      <svg viewBox="0 0 36 36" className="w-full h-full">
-                        <path
-                          d="M18 2.0845
-                            a 15.9155 15.9155 0 0 1 0 31.831
-                            a 15.9155 15.9155 0 0 1 0 -31.831"
-                          fill="none"
-                          stroke="#eee"
-                          strokeWidth="3"
-                          strokeDasharray="100, 100"
-                        />
-                        <path
-                          d="M18 2.0845
-                            a 15.9155 15.9155 0 0 1 0 31.831
-                            a 15.9155 15.9155 0 0 1 0 -31.831"
-                          fill="none"
-                          stroke={candidateData?.accuracyRate >= 80 ? "#10b981" : 
-                                  candidateData?.accuracyRate >= 60 ? "#f59e0b" : "#ef4444"}
-                          strokeWidth="3"
-                          strokeDasharray={`${(candidateData?.accuracyRate || 0).toFixed(1)}, 100`}
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="text-center">
-                          <span className="text-3xl font-bold">{(candidateData?.accuracyRate || 0).toFixed(1)}%</span>
-                          <p className="text-sm text-gray-500">Acertos</p>
+                  {/* Verificar se existem questões de múltipla escolha para exibir o gráfico */}
+                  {candidateData?.multipleChoiceQuestions > 0 ? (
+                    <div className="flex flex-col items-center justify-center mb-4">
+                      <div className="relative w-40 h-40 mb-3">
+                        <svg viewBox="0 0 36 36" className="w-full h-full">
+                          <path
+                            d="M18 2.0845
+                              a 15.9155 15.9155 0 0 1 0 31.831
+                              a 15.9155 15.9155 0 0 1 0 -31.831"
+                            fill="none"
+                            stroke="#eee"
+                            strokeWidth="3"
+                            strokeDasharray="100, 100"
+                          />
+                          <path
+                            d="M18 2.0845
+                              a 15.9155 15.9155 0 0 1 0 31.831
+                              a 15.9155 15.9155 0 0 1 0 -31.831"
+                            fill="none"
+                            stroke={candidateData?.accuracyRate >= 80 ? "#10b981" : 
+                                    candidateData?.accuracyRate >= 60 ? "#f59e0b" : "#ef4444"}
+                            strokeWidth="3"
+                            strokeDasharray={`${(candidateData?.accuracyRate || 0).toFixed(1)}, 100`}
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="text-center">
+                            <span className="text-3xl font-bold">{(candidateData?.accuracyRate || 0).toFixed(1)}%</span>
+                            <p className="text-sm text-gray-500">Acertos</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    
-                    <div className="text-center">
-                      <p className="text-sm text-gray-600 mb-1">
-                        Você acertou <span className="font-semibold">{Math.round((candidateData?.accuracyRate || 0) * (candidateData?.multipleChoiceQuestions || 0) / 100)}</span> de <span className="font-semibold">{candidateData?.multipleChoiceQuestions || 0}</span> questões de múltipla escolha
-                      </p>
-                      {candidateData?.opinionQuestions > 0 && (
+                      
+                      <div className="text-center">
                         <p className="text-sm text-gray-600 mb-1">
-                          Você também respondeu <span className="font-semibold">{candidateData?.opinionQuestions || 0}</span> questões opinativas
+                          Você acertou <span className="font-semibold">{Math.round((candidateData?.accuracyRate || 0) * (candidateData?.multipleChoiceQuestions || 0) / 100)}</span> de <span className="font-semibold">{candidateData?.multipleChoiceQuestions || 0}</span> questões de múltipla escolha
+                        </p>
+                        {candidateData?.opinionQuestions > 0 && (
+                          <p className="text-sm text-gray-600 mb-1">
+                            Você também respondeu <span className="font-semibold">{candidateData?.opinionQuestions || 0}</span> questões opinativas
+                          </p>
+                        )}
+                        <p className="text-sm text-gray-500">
+                          Obrigado por participar do nosso processo seletivo!
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      {candidateData?.opinionQuestions > 0 ? (
+                        <div>
+                          <p className="text-lg text-secondary-700 mb-3">
+                            Você respondeu <span className="font-semibold">{candidateData?.opinionQuestions || 0}</span> questões opinativas.
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            Este teste contém apenas questões opinativas, que avaliam seu perfil e preferências.
+                          </p>
+                          <p className="text-sm text-gray-500 mt-4">
+                            Obrigado por participar do nosso processo seletivo!
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-lg text-secondary-700">
+                          Obrigado por completar o teste!
                         </p>
                       )}
-                      <p className="text-sm text-gray-500">
-                        Obrigado por participar do nosso processo seletivo!
-                      </p>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
               

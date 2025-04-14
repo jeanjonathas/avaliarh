@@ -103,13 +103,18 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
             // Tentar extrair a categoria da opção de várias formas possíveis
             const categoryName = option.categoryName || 
                                 (option.category && option.category.name) ||
-                                option.categoryId;
+                                option.categoryId ||
+                                option.text; // Usar o texto da opção como fallback
             
             if (categoryName) {
               console.log(`Encontrado traço de personalidade: ${categoryName}`);
               uniqueTraits.add(categoryName);
             } else {
-              console.log(`Opção ${option.id} não tem categoria definida`);
+              console.log(`Opção ${option.id} não tem categoria definida, usando texto da opção`);
+              // Se não encontrarmos uma categoria, usar o texto da opção como traço
+              if (option.text) {
+                uniqueTraits.add(option.text);
+              }
             }
           });
           
@@ -195,7 +200,8 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
             question.options.forEach((option: any) => {
               const categoryName = option.categoryName || 
                                   (option.category && option.category.name) ||
-                                  option.categoryId;
+                                  option.categoryId ||
+                                  option.text; // Usar o texto da opção como fallback
               
               if (categoryName) {
                 uniqueTraits.add(categoryName);
@@ -231,54 +237,45 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
       if (currentValue && currentValue.length > 0) {
         console.log('Distribuindo traços selecionados nos grupos:', currentValue);
         
-        // Primeiro, vamos mapear os traços por nome para facilitar a busca
-        const traitsByName: Record<string, PersonalityTrait> = {};
-        currentValue.forEach(trait => {
-          traitsByName[trait.traitName] = trait;
-        });
-        
-        // Agora, para cada grupo, verificamos quais traços pertencem a ele
+        // Primeiro, vamos criar um mapa de grupos por ID para facilitar a busca
+        const groupsById: Record<string, TraitGroup> = {};
         groups.forEach(group => {
+          groupsById[group.id] = group;
           group.selectedTraits = []; // Limpar os traços selecionados
-          
-          // Para cada traço disponível no grupo, verificar se ele está nos traços selecionados
-          group.traits.forEach(traitName => {
-            if (traitsByName[traitName]) {
-              // Se o traço estiver nos selecionados, adicioná-lo ao grupo
-              const trait = { ...traitsByName[traitName], groupId: group.id };
-              group.selectedTraits.push(trait);
-              console.log(`Adicionando traço "${traitName}" ao grupo "${group.name}"`);
-            }
-          });
         });
         
-        // Verificar se há traços selecionados que não foram adicionados a nenhum grupo
-        const assignedTraits = new Set<string>();
-        groups.forEach(group => {
-          group.selectedTraits.forEach(trait => {
-            assignedTraits.add(trait.traitName);
-          });
-        });
-        
-        // Adicionar traços não atribuídos ao primeiro grupo que tiver o traço disponível
+        // Tentar distribuir os traços nos grupos corretos
         currentValue.forEach(trait => {
-          if (!assignedTraits.has(trait.traitName)) {
-            // Procurar um grupo que tenha este traço disponível
-            const groupIndex = groups.findIndex(g => g.traits.includes(trait.traitName));
-            if (groupIndex !== -1) {
-              const updatedTrait = { ...trait, groupId: groups[groupIndex].id };
-              groups[groupIndex].selectedTraits.push(updatedTrait);
-              assignedTraits.add(trait.traitName);
-              console.log(`Adicionando traço não atribuído "${trait.traitName}" ao grupo "${groups[groupIndex].name}"`);
-            } else if (groups.length > 0) {
-              // Se não encontrarmos um grupo adequado, adicionar ao primeiro grupo
+          // Se o traço já tem um groupId e esse grupo existe, adicionar ao grupo correto
+          if (trait.groupId && groupsById[trait.groupId]) {
+            groupsById[trait.groupId].selectedTraits.push({...trait});
+            console.log(`Adicionando traço "${trait.traitName}" ao grupo "${groupsById[trait.groupId].name}" pelo groupId`);
+          } else {
+            // Se não tem groupId ou o grupo não existe, procurar um grupo que contenha o traço
+            let found = false;
+            
+            for (const group of groups) {
+              if (group.traits.includes(trait.traitName)) {
+                group.selectedTraits.push({...trait, groupId: group.id});
+                console.log(`Adicionando traço "${trait.traitName}" ao grupo "${group.name}" pelo nome do traço`);
+                found = true;
+                break;
+              }
+            }
+            
+            // Se ainda não encontrou, adicionar ao primeiro grupo
+            if (!found && groups.length > 0) {
               console.log(`Traço "${trait.traitName}" não encontrado em nenhum grupo, adicionando ao primeiro grupo`);
-              const updatedTrait = { ...trait, groupId: groups[0].id };
-              groups[0].selectedTraits.push(updatedTrait);
-              assignedTraits.add(trait.traitName);
+              groups[0].selectedTraits.push({...trait, groupId: groups[0].id});
             }
           }
         });
+        
+        // Verificar se algum grupo ficou sem traços selecionados
+        const emptyGroups = groups.filter(group => group.selectedTraits.length === 0);
+        if (emptyGroups.length > 0) {
+          console.log(`${emptyGroups.length} grupos ficaram sem traços selecionados:`, emptyGroups.map(g => g.name));
+        }
       }
       
       setTraitGroups(groups);
