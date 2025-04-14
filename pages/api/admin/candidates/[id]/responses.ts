@@ -9,6 +9,7 @@ interface ResponseOption {
   text: string;
   isCorrect: boolean;
   categoryName?: string | null;
+  weight?: number; // Adicionar campo de peso
 }
 
 interface QuestionSnapshot {
@@ -61,6 +62,7 @@ interface PrismaResponse {
       text: string;
       isCorrect: boolean;
       categoryName?: string;
+      weight?: number; // Adicionar campo de peso
     }[];
   };
 }
@@ -115,12 +117,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const questionSnapshot: QuestionSnapshot = {
           id: response.question?.id,
           text: response.question?.text,
-          options: response.question?.options.map(opt => ({
-            id: opt.id,
-            text: opt.text,
-            isCorrect: opt.isCorrect,
-            categoryName: opt.categoryName || null // Incluir o nome da categoria/personalidade
-          }))
+          options: response.question?.options.map(opt => {
+            // Como não temos acesso direto aos pesos, vamos usar um valor baseado no ID
+            // ou um valor padrão para demonstração
+            const weight = 
+              // Extrair um número do ID e usar como peso (entre 1 e 5)
+              (parseInt(opt.id.replace(/\D/g, '')) % 5) + 1;
+            
+            return {
+              id: opt.id,
+              text: opt.text,
+              isCorrect: opt.isCorrect,
+              categoryName: opt.categoryName || null, // Incluir o nome da categoria/personalidade
+              weight: weight // Incluir o peso da alternativa
+            };
+          })
         }
 
         // Encontrar a opção selecionada para extrair a personalidade

@@ -713,57 +713,59 @@ const TestDetail: NextPage = () => {
     }
   };
 
-  const filteredQuestions = availableQuestions.filter(question => {
-    // Excluir perguntas que já estão sendo usadas no teste
-    if (questionsAlreadyInTest.includes(question.id)) {
-      console.log(`[Filter] Pergunta ${question.id} rejeitada: já está sendo usada no teste`);
-      return false;
-    }
-    
-    // Filtrar pelo tipo de pergunta da etapa selecionada
-    // Verificação mais robusta para garantir que o tipo corresponda
-    if (selectedStageQuestionType) {
-      // Garantir que estamos comparando strings
-      const questionType = String(question.type || '').toUpperCase();
-      const stageType = String(selectedStageQuestionType).toUpperCase();
-      
-      console.log(`[Filter] Comparando tipos: pergunta=${questionType}, etapa=${stageType}`);
-      
-      if (questionType !== stageType) {
-        console.log(`[Filter] Pergunta ${question.id} rejeitada: tipo ${questionType} não corresponde ao tipo da etapa ${stageType}`);
+  const filteredQuestions = Array.isArray(availableQuestions) 
+    ? availableQuestions.filter(question => {
+      // Excluir perguntas que já estão sendo usadas no teste
+      if (questionsAlreadyInTest.includes(question.id)) {
+        console.log(`[Filter] Pergunta ${question.id} rejeitada: já está sendo usada no teste`);
         return false;
       }
-    }
-    
-    // Filtro por categoria
-    if (selectedCategory !== 'all') {
-      // Verificar se a pergunta tem categorias
-      if (!question.categories || question.categories.length === 0) {
-        // Se a pergunta não tem categorias, verificar se tem categoryId
-        if (!question.categoryId || question.categoryId !== selectedCategory) {
-          console.log(`[Filter] Pergunta ${question.id} rejeitada: não tem a categoria selecionada`);
-          return false;
-        }
-      } else {
-        // Se a pergunta tem categorias, verificar se alguma corresponde ao filtro
-        if (!question.categories.some(cat => cat.id === selectedCategory)) {
-          console.log(`[Filter] Pergunta ${question.id} rejeitada: categoria não corresponde`);
+      
+      // Filtrar pelo tipo de pergunta da etapa selecionada
+      // Verificação mais robusta para garantir que o tipo corresponda
+      if (selectedStageQuestionType) {
+        // Garantir que estamos comparando strings
+        const questionType = String(question.type || '').toUpperCase();
+        const stageType = String(selectedStageQuestionType).toUpperCase();
+        
+        console.log(`[Filter] Comparando tipos: pergunta=${questionType}, etapa=${stageType}`);
+        
+        if (questionType !== stageType) {
+          console.log(`[Filter] Pergunta ${question.id} rejeitada: tipo ${questionType} não corresponde ao tipo da etapa ${stageType}`);
           return false;
         }
       }
-    }
-    
-    // Filtro por dificuldade
-    if (selectedDifficulty !== 'all') {
-      if (question.difficulty !== selectedDifficulty) {
-        console.log(`[Filter] Pergunta ${question.id} rejeitada: dificuldade não corresponde`);
-        return false;
+      
+      // Filtro por categoria
+      if (selectedCategory !== 'all') {
+        // Verificar se a pergunta tem categorias
+        if (!question.categories || question.categories.length === 0) {
+          // Se a pergunta não tem categorias, verificar se tem categoryId
+          if (!question.categoryId || question.categoryId !== selectedCategory) {
+            console.log(`[Filter] Pergunta ${question.id} rejeitada: não tem a categoria selecionada`);
+            return false;
+          }
+        } else {
+          // Se a pergunta tem categorias, verificar se alguma corresponde ao filtro
+          if (!question.categories.some(cat => cat.id === selectedCategory)) {
+            console.log(`[Filter] Pergunta ${question.id} rejeitada: categoria não corresponde`);
+            return false;
+          }
+        }
       }
-    }
-    
-    console.log(`[Filter] Pergunta ${question.id} aceita: tipo ${question.type}, etapa ${selectedStageQuestionType}`);
-    return true;
-  });
+      
+      // Filtro por dificuldade
+      if (selectedDifficulty !== 'all') {
+        if (question.difficulty !== selectedDifficulty) {
+          console.log(`[Filter] Pergunta ${question.id} rejeitada: dificuldade não corresponde`);
+          return false;
+        }
+      }
+      
+      console.log(`[Filter] Pergunta ${question.id} aceita: tipo ${question.type}, etapa ${selectedStageQuestionType}`);
+      return true;
+    })
+    : []; // Se availableQuestions não for um array, retornar um array vazio
 
   const toggleQuestionSelection = (questionId: string) => {
     if (selectedQuestions.includes(questionId)) {

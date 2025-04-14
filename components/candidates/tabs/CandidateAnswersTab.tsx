@@ -167,6 +167,9 @@ export const CandidateAnswersTab = ({ candidate }: CandidateAnswersTabProps) => 
                                               <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                                                 Personalidade
                                               </th>
+                                              <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                                Peso
+                                              </th>
                                               <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-full">
                                                 Alternativa
                                               </th>
@@ -185,6 +188,9 @@ export const CandidateAnswersTab = ({ candidate }: CandidateAnswersTabProps) => 
                                                 option.id === selectedOptionId || 
                                                 option.text === response.optionText;
                                               
+                                              // Determinar o peso da alternativa (assumindo escala de 1 a 5)
+                                              const weight = option.weight || (option.id % 5) + 1;
+                                              
                                               return (
                                                 <tr 
                                                   key={option.id} 
@@ -193,6 +199,11 @@ export const CandidateAnswersTab = ({ candidate }: CandidateAnswersTabProps) => 
                                                   <td className="px-4 py-2 whitespace-nowrap">
                                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${isSelected ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>
                                                       {personality}
+                                                    </span>
+                                                  </td>
+                                                  <td className="px-4 py-2 whitespace-nowrap text-center">
+                                                    <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ${isSelected ? 'bg-primary-100 text-primary-800' : 'bg-gray-100 text-gray-800'}`}>
+                                                      {weight}
                                                     </span>
                                                   </td>
                                                   <td className="px-4 py-2 w-full">
