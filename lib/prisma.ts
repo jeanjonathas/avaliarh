@@ -140,13 +140,14 @@ const createPrismaClient = async (): Promise<PrismaClient> => {
   console.log('[PRISMA] Criando nova instância do Prisma Client')
   const dbUrl = await getDatabaseUrl()
   
+  // Configuração do Prisma Client compatível com a versão 5.x
   return new PrismaClient({
-    log: ['error', 'query'],
+    log: ['error'],
     datasources: {
       db: {
         url: dbUrl,
       },
-    },
+    }
   })
 }
 
@@ -195,7 +196,7 @@ export const prisma = globalThis.prisma ||
           ? `postgresql://postgres:postgres@localhost:5432/avaliarh`
           : process.env.DATABASE_URL,
       },
-    },
+    }
   })
 
 // Garantir que a variável global seja sempre atualizada

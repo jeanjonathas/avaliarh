@@ -1,9 +1,9 @@
-// Gerado automaticamente em 2025-03-29T01:46:57.433Z
+// Gerado automaticamente em 2025-04-14T16:31:37.178Z
 module.exports = {
-  "commitHash": "eff97e9",
+  "commitHash": "a69daa2",
   "branch": "master",
-  "commitDate": "2025-03-28",
-  "commitTime": "22:36:19",
-  "commitMessage": "corrigido erro em deletedquestionshnndler",
-  "buildDate": "2025-03-29T01:46:57.432Z"
+  "commitDate": "2025-04-14",
+  "commitTime": "13:21:01",
+  "commitMessage": "corrigido erro no charts",
+  "buildDate": "2025-04-14T16:31:37.178Z"
 };
