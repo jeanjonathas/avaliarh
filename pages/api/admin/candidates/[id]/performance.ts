@@ -2,6 +2,12 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { prisma, reconnectPrisma } from '@/lib/prisma';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
+import fetch from 'node-fetch';
+import { 
+  analyzePersonalitiesWithProcessData, 
+  analyzePersonalitiesWithWeights,
+  ProcessPersonalityData
+} from '@/lib/personality-analysis';
 
 // Tipo estendido para o candidato com as propriedades necessárias
 interface ExtendedCandidate {
@@ -129,7 +135,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }).filter(stage => stage !== null) || [] 
 
-      const personalityAnalysis = analyzePersonalitiesWithWeights(opinionResponses, candidate.process?.stages);
+      // Buscar dados de personalidade do processo, se o candidato estiver vinculado a um processo
+      let processPersonalityData: ProcessPersonalityData | null = null;
+      if (candidate.process?.id) {
+        try {
+          // Construir a URL para o endpoint de dados de personalidade do processo
+          const processId = candidate.process.id;
+          const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+          const url = `${baseUrl}/api/admin/processes/${processId}/personality-data`;
+          
+          console.log(`Buscando dados de personalidade do processo: ${url}`);
+          
+          const response = await fetch(url, {
+            headers: {
+              'Cookie': req.headers.cookie || '',
+              'Authorization': req.headers.authorization || ''
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            processPersonalityData = data as ProcessPersonalityData;
+            console.log('Dados de personalidade do processo obtidos com sucesso');
+          } else {
+            console.error(`Erro ao buscar dados de personalidade do processo: ${response.status}`);
+          }
+        } catch (error) {
+          console.error('Erro ao buscar dados de personalidade do processo:', error);
+        }
+      }
+
+      // Analisar personalidades usando os dados do processo, se disponíveis
+      const personalityAnalysis = processPersonalityData 
+        ? analyzePersonalitiesWithProcessData(opinionResponses, processPersonalityData)
+        : analyzePersonalitiesWithWeights(opinionResponses, candidate.process?.stages);
       
       console.log('Análise de Personalidade:', JSON.stringify(personalityAnalysis, null, 2));
       console.log('Número de perguntas opinativas:', opinionResponses.length);
@@ -230,7 +269,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         totalTime: responseTotalTimeSeconds, // Tempo total em segundos
         testStartTime: candidate.testDate,
         testEndTime,
-        showResults: candidate.showResults
+        showResults: candidate.showResults,
+        processPersonalityData // Incluir os dados de personalidade do processo na resposta
       })
     }
 
@@ -239,112 +279,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.error('Erro ao buscar desempenho do candidato:', error)
     return res.status(500).json({ message: 'Erro interno do servidor' })
   }
-}
-
-function analyzePersonalitiesWithWeights(opinionResponses: any[], processStages?: any[]) {
-  const personalityCount: Record<string, number> = {};
-  const personalityUuids: Record<string, string> = {}; // Para armazenar UUIDs dos traços
-  let totalPersonalityResponses = 0;
-
-  console.log('Analisando respostas opinativas com pesos:', opinionResponses.length);
-  
-  opinionResponses.forEach(response => {
-    const selectedOption = response.question?.options.find(
-      (opt: any) => opt.id === response.optionId || opt.text === response.optionText
-    );
-    
-    if (selectedOption) {
-      let personality = selectedOption.categoryName;
-      const categoryNameUuid = selectedOption.categoryNameUuid || selectedOption.id;
-      
-      if (!personality) {
-        const match = selectedOption.text.match(/\(([^)]+)\)/);
-        if (match && match[1]) {
-          personality = match[1].trim();
-        } else {
-          personality = selectedOption.text.split(' ').slice(0, 2).join(' ');
-        }
-      }
-      
-      if (personality) {
-        personalityCount[personality] = (personalityCount[personality] || 0) + 1;
-        // Armazenar o UUID associado a este traço de personalidade
-        if (categoryNameUuid && !personalityUuids[personality]) {
-          personalityUuids[personality] = categoryNameUuid;
-        }
-        totalPersonalityResponses++;
-      }
-    }
-  });
-
-  const traitWeights: Record<string, number> = {};
-  let hasTraitWeights = false;
-  
-  if (processStages && processStages.length > 0) {
-    processStages.forEach(stage => {
-      if (stage.personalityConfig && stage.personalityConfig.traitWeights) {
-        stage.personalityConfig.traitWeights.forEach((trait: any) => {
-          traitWeights[trait.traitName.toLowerCase()] = trait.weight;
-          hasTraitWeights = true;
-        });
-      }
-    });
-  }
-
-  const personalityPercentages = Object.entries(personalityCount).map(([trait, count]) => {
-    const percentage = totalPersonalityResponses > 0 
-      ? Number(((count / totalPersonalityResponses) * 100).toFixed(1)) 
-      : 0;
-    
-    const traitLower = trait.toLowerCase();
-    const weight = hasTraitWeights ? (traitWeights[traitLower] || 1) : 1;
-    
-    const weightedScore = percentage * weight;
-    
-    return {
-      trait,
-      count,
-      percentage,
-      weight,
-      weightedScore,
-      categoryNameUuid: personalityUuids[trait] || null // Incluir o UUID do traço
-    };
-  }).sort((a, b) => b.percentage - a.percentage);
-
-  const dominantPersonality = personalityPercentages.length > 0 
-    ? personalityPercentages[0] 
-    : { 
-        trait: 'Não identificado', 
-        count: 0, 
-        percentage: 0, 
-        weight: 1, 
-        weightedScore: 0,
-        categoryNameUuid: null 
-      };
-
-  // Simplificação do cálculo da pontuação ponderada
-  // Se o candidato escolheu as alternativas com maior peso, a pontuação deve ser 100%
-  // Calculamos a média das compatibilidades (100% para cada traço com peso máximo)
-  let weightedScore = 0;
-  
-  if (personalityPercentages.length > 0) {
-    // Verificar se todos os traços têm peso máximo (5)
-    const allMaxWeight = personalityPercentages.every(p => p.weight === 5);
-    
-    if (allMaxWeight) {
-      // Se todos os traços têm peso máximo, a compatibilidade é 100%
-      weightedScore = 100;
-    } else {
-      // Caso contrário, calculamos a média das porcentagens
-      weightedScore = personalityPercentages.reduce((sum, p) => sum + p.percentage, 0) / personalityPercentages.length;
-    }
-  }
-
-  return {
-    dominantPersonality,
-    allPersonalities: personalityPercentages,
-    totalResponses: totalPersonalityResponses,
-    hasTraitWeights,
-    weightedScore: Number(weightedScore.toFixed(1))
-  };
 }
