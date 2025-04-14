@@ -9,6 +9,8 @@ interface CandidateAnswersTabProps {
 export const CandidateAnswersTab = ({ candidate }: CandidateAnswersTabProps) => {
   const [responses, setResponses] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [personalityData, setPersonalityData] = useState<any>(null)
+  const [categoryWeightMap, setCategoryWeightMap] = useState<Record<string, number>>({})
 
   const loadCandidateData = useCallback(async () => {
     setLoading(true)
@@ -29,15 +31,60 @@ export const CandidateAnswersTab = ({ candidate }: CandidateAnswersTabProps) => 
         }
       )
 
+      // Se o candidato tem um processo seletivo associado, carregar dados de personalidade
+      let personalityDataResult = null;
+      if (candidate.processId) {
+        try {
+          const personalityResponse = await fetch(`/api/admin/processes/${candidate.processId}/personality-data`, {
+            credentials: 'include'
+          });
+          
+          if (personalityResponse.ok) {
+            personalityDataResult = await personalityResponse.json();
+            console.log('Dados de personalidade do processo:', personalityDataResult);
+            
+            // Criar mapa de pesos por UUID da categoria
+            const weightMap: Record<string, number> = {};
+            
+            if (personalityDataResult && personalityDataResult.groups) {
+              personalityDataResult.groups.forEach((group: any) => {
+                if (group.traits) {
+                  group.traits.forEach((trait: any) => {
+                    if (trait.categoryNameUuid && trait.weight !== undefined) {
+                      weightMap[trait.categoryNameUuid] = trait.weight;
+                    }
+                  });
+                }
+              });
+            }
+            
+            console.log('Mapa de pesos por categoria:', weightMap);
+            setCategoryWeightMap(weightMap);
+            setPersonalityData(personalityDataResult);
+          }
+        } catch (error) {
+          console.error('Erro ao carregar dados de personalidade:', error);
+        }
+      }
+
       const responsesData = await responsesPromise
       console.log('Dados de respostas recebidos:', JSON.stringify(responsesData, null, 2))
+      
+      // Verificar a estrutura dos dados para debug
+      if (responsesData && responsesData.length > 0) {
+        console.log('Exemplo de opções da primeira resposta:', 
+          responsesData[0].question?.options ? 
+          JSON.stringify(responsesData[0].question.options, null, 2) : 
+          'Sem opções')
+      }
+      
       setResponses(responsesData)
     } catch (error) {
       console.error('Erro ao carregar dados do candidato:', error)
     } finally {
       setLoading(false)
     }
-  }, [candidate.id])
+  }, [candidate.id, candidate.processId, setLoading, setResponses, setPersonalityData, setCategoryWeightMap])
 
   useEffect(() => {
     if (candidate.id) {
@@ -77,6 +124,51 @@ export const CandidateAnswersTab = ({ candidate }: CandidateAnswersTabProps) => 
     }
     
     return "Não especificado"
+  }
+
+  // Função para extrair o peso da opção
+  const extractWeight = (option: any, response: any) => {
+    // Verificar se temos o peso diretamente no objeto da opção
+    if (option.weight !== undefined) {
+      return option.weight
+    }
+    
+    // Verificar se temos o peso no emotionCategory
+    if (option.emotionCategory && option.emotionCategory.weight !== undefined) {
+      return option.emotionCategory.weight
+    }
+    
+    // Verificar se temos o peso no categoryWeight
+    if (option.categoryWeight !== undefined) {
+      return option.categoryWeight
+    }
+    
+    // Verificar se o peso está no snapshot da resposta
+    if (response.optionWeight !== undefined && option.id === response.optionId) {
+      return response.optionWeight
+    }
+    
+    // Verificar se temos o UUID da categoria e se existe no mapa de pesos
+    if (option.categoryNameUuid && categoryWeightMap[option.categoryNameUuid] !== undefined) {
+      return categoryWeightMap[option.categoryNameUuid]
+    }
+    
+    // Verificar se o nome da categoria existe no mapa de pesos
+    if (option.categoryName) {
+      // Procurar no personalityData por um trait com o mesmo nome
+      if (personalityData && personalityData.groups) {
+        for (const group of personalityData.groups) {
+          if (group.traits) {
+            const trait = group.traits.find((t: any) => t.name === option.categoryName)
+            if (trait && trait.weight !== undefined) {
+              return trait.weight
+            }
+          }
+        }
+      }
+    }
+    
+    return null
   }
 
   // Função para formatar o texto da opção removendo a personalidade entre parênteses
@@ -170,6 +262,9 @@ export const CandidateAnswersTab = ({ candidate }: CandidateAnswersTabProps) => 
                                               <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-full">
                                                 Alternativa
                                               </th>
+                                              <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                                Peso
+                                              </th>
                                             </tr>
                                           </thead>
                                           <tbody className="bg-white divide-y divide-gray-200">
@@ -179,6 +274,9 @@ export const CandidateAnswersTab = ({ candidate }: CandidateAnswersTabProps) => 
                                               // Extrair a personalidade usando a função melhorada
                                               const personality = extractPersonality(option, response);
                                               const formattedText = formatOptionText(option.text);
+                                              
+                                              // Extrair o peso da opção
+                                              const weight = extractWeight(option, response);
                                               
                                               // Verificar se esta é a opção selecionada
                                               const isSelected = 
@@ -206,6 +304,19 @@ export const CandidateAnswersTab = ({ candidate }: CandidateAnswersTabProps) => 
                                                         </span>
                                                       )}
                                                     </div>
+                                                  </td>
+                                                  <td className="px-4 py-2 whitespace-nowrap">
+                                                    {weight !== null ? (
+                                                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                                        weight > 0.7 ? 'bg-green-100 text-green-800' : 
+                                                        weight > 0.4 ? 'bg-yellow-100 text-yellow-800' : 
+                                                        'bg-red-100 text-red-800'
+                                                      }`}>
+                                                        {typeof weight === 'number' ? weight.toFixed(2) : weight}
+                                                      </span>
+                                                    ) : (
+                                                      <span className="text-gray-400 text-xs">Não especificado</span>
+                                                    )}
                                                   </td>
                                                 </tr>
                                               );
