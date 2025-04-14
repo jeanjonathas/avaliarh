@@ -1497,18 +1497,55 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
             let recommendationTitle = '';
             let recommendationText = '';
             
-            if (accuracy >= 80) {
-              recommendationClass = 'bg-green-50 border-l-4 border-green-500';
-              recommendationTitle = 'Candidato Recomendado';
-              recommendationText = `Este candidato demonstrou excelente desempenho técnico com ${accuracy.toFixed(1)}% de acertos. `;
-              
-              if (dominantPersonality) {
-                recommendationText += `Seu perfil dominante é &ldquo;${dominantPersonality}&rdquo; (${performance?.personalityAnalysis?.dominantPersonality?.percentage.toFixed(1)}%), `;
-                recommendationText += 'o que complementa suas habilidades técnicas. ';
+            // Lógica para testes com apenas perguntas opinativas
+            if (performance && performance.opinionQuestionsCount > 0 && performance.multipleChoiceQuestionsCount === 0) {
+              // Se o teste tem apenas perguntas opinativas, a recomendação deve ser baseada na compatibilidade
+              if (compatibilityScore >= 80) {
+                recommendationClass = 'bg-green-50 border-l-4 border-green-500';
+                recommendationTitle = 'Candidato Recomendado';
+                recommendationText = `Este candidato demonstrou excelente compatibilidade com o perfil desejado (${compatibilityScore.toFixed(1)}%). `;
+                
+                // Adicionar informações sobre os perfis dominantes de cada grupo
+                if (performance.personalityAnalysis && performance.personalityAnalysis.allPersonalities) {
+                  const traitsByGroup: Record<string, any[]> = {};
+                  performance.personalityAnalysis.allPersonalities.forEach(trait => {
+                    const groupId = trait.categoryNameUuid || 'default';
+                    if (!traitsByGroup[groupId]) {
+                      traitsByGroup[groupId] = [];
+                    }
+                    traitsByGroup[groupId].push(trait);
+                  });
+                  
+                  const dominantTraitsByGroup: Record<string, any> = {};
+                  Object.entries(traitsByGroup).forEach(([groupId, traits]) => {
+                    const sortedTraits = [...traits].sort((a, b) => {
+                      // Se ambos têm weightedScore, ordenar por weightedScore
+                      if (a.weightedScore && b.weightedScore) {
+                        return b.weightedScore - a.weightedScore;
+                      }
+                      // Caso contrário, ordenar por porcentagem
+                      return b.percentage - a.percentage;
+                    });
+                    
+                    if (sortedTraits.length > 0) {
+                      dominantTraitsByGroup[groupId] = sortedTraits[0];
+                    }
+                  });
+                  
+                  recommendationText += `\n\nPerfis dominantes por grupo:\n`;
+                  
+                  Object.entries(dominantTraitsByGroup).forEach(([groupId, trait], index) => {
+                    recommendationText += `- Grupo ${index + 1}: "${trait.trait}" (${trait.percentage.toFixed(1)}%)\n`;
+                  });
+                  
+                  recommendationText += `\n`;
+                } else if (dominantPersonality) {
+                  recommendationText += `Seu perfil dominante é "${dominantPersonality}" (${performance?.personalityAnalysis?.dominantPersonality?.percentage.toFixed(1)}%). `;
+                }
                 
                 // Adicionar informações sobre o perfil procurado
                 if (hasTraitWeights && targetProfile) {
-                  recommendationText += `\n\nO perfil procurado para esta vaga é &ldquo;${targetProfile}&rdquo; `;
+                  recommendationText += `\n\nO perfil procurado para esta vaga é "${targetProfile}" `;
                   
                   if (profileMatch) {
                     recommendationText += `e o candidato demonstra forte alinhamento com este perfil (${profileMatchPercentage.toFixed(1)}%). `;
@@ -1524,11 +1561,126 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                       recommendationText += `Recomendamos avaliar durante a entrevista se esta diferença de perfil pode trazer diversidade positiva para a equipe. `;
                     }
                   }
-                } else {
-                  recommendationText += 'Recomendamos prosseguir com o processo de contratação. ';
                 }
+              } else if (compatibilityScore >= 60) {
+                recommendationClass = 'bg-yellow-50 border-l-4 border-yellow-500';
+                recommendationTitle = 'Candidato Potencialmente Adequado';
+                recommendationText = `Este candidato demonstrou boa compatibilidade com o perfil desejado (${compatibilityScore.toFixed(1)}%). `;
+                
+                // Adicionar informações sobre os perfis dominantes
+                if (performance.personalityAnalysis && performance.personalityAnalysis.allPersonalities) {
+                  const traitsByGroup: Record<string, any[]> = {};
+                  performance.personalityAnalysis.allPersonalities.forEach(trait => {
+                    const groupId = trait.categoryNameUuid || 'default';
+                    if (!traitsByGroup[groupId]) {
+                      traitsByGroup[groupId] = [];
+                    }
+                    traitsByGroup[groupId].push(trait);
+                  });
+                  
+                  const dominantTraitsByGroup: Record<string, any> = {};
+                  Object.entries(traitsByGroup).forEach(([groupId, traits]) => {
+                    const sortedTraits = [...traits].sort((a, b) => {
+                      // Se ambos têm weightedScore, ordenar por weightedScore
+                      if (a.weightedScore && b.weightedScore) {
+                        return b.weightedScore - a.weightedScore;
+                      }
+                      // Caso contrário, ordenar por porcentagem
+                      return b.percentage - a.percentage;
+                    });
+                    
+                    if (sortedTraits.length > 0) {
+                      dominantTraitsByGroup[groupId] = sortedTraits[0];
+                    }
+                  });
+                  
+                  recommendationText += `\n\nPerfis dominantes por grupo:\n`;
+                  
+                  Object.entries(dominantTraitsByGroup).forEach(([groupId, trait], index) => {
+                    recommendationText += `- Grupo ${index + 1}: "${trait.trait}" (${trait.percentage.toFixed(1)}%)\n`;
+                  });
+                  
+                  recommendationText += `\n`;
+                }
+                
+                recommendationText += `Recomendamos avaliar outros aspectos como experiência e entrevista antes de tomar uma decisão. `;
               } else {
-                recommendationText += 'Recomendamos prosseguir com o processo de contratação. ';
+                recommendationClass = 'bg-red-50 border-l-4 border-red-500';
+                recommendationTitle = 'Candidato Não Recomendado';
+                recommendationText = `Este candidato demonstrou baixa compatibilidade com o perfil desejado (${compatibilityScore.toFixed(1)}%). `;
+                
+                // Adicionar informações sobre os perfis dominantes
+                if (performance.personalityAnalysis && performance.personalityAnalysis.allPersonalities) {
+                  const traitsByGroup: Record<string, any[]> = {};
+                  performance.personalityAnalysis.allPersonalities.forEach(trait => {
+                    const groupId = trait.categoryNameUuid || 'default';
+                    if (!traitsByGroup[groupId]) {
+                      traitsByGroup[groupId] = [];
+                    }
+                    traitsByGroup[groupId].push(trait);
+                  });
+                  
+                  const dominantTraitsByGroup: Record<string, any> = {};
+                  Object.entries(traitsByGroup).forEach(([groupId, traits]) => {
+                    const sortedTraits = [...traits].sort((a, b) => {
+                      // Se ambos têm weightedScore, ordenar por weightedScore
+                      if (a.weightedScore && b.weightedScore) {
+                        return b.weightedScore - a.weightedScore;
+                      }
+                      // Caso contrário, ordenar por porcentagem
+                      return b.percentage - a.percentage;
+                    });
+                    
+                    if (sortedTraits.length > 0) {
+                      dominantTraitsByGroup[groupId] = sortedTraits[0];
+                    }
+                  });
+                  
+                  recommendationText += `\n\nPerfis dominantes por grupo:\n`;
+                  
+                  Object.entries(dominantTraitsByGroup).forEach(([groupId, trait], index) => {
+                    recommendationText += `- Grupo ${index + 1}: "${trait.trait}" (${trait.percentage.toFixed(1)}%)\n`;
+                  });
+                  
+                  recommendationText += `\n`;
+                }
+                
+                recommendationText += `Recomendamos considerar outros candidatos para esta posição. `;
+              }
+            } else if (accuracy >= 80 || (!performance.multipleChoiceQuestionsCount && compatibilityScore >= 80)) {
+              // Lógica para testes com perguntas de múltipla escolha ou misto
+              recommendationClass = 'bg-green-50 border-l-4 border-green-500';
+              recommendationTitle = 'Candidato Recomendado';
+              
+              if (performance.multipleChoiceQuestionsCount) {
+                recommendationText = `Este candidato demonstrou excelente desempenho técnico com ${accuracy.toFixed(1)}% de acertos. `;
+              } else {
+                recommendationText = `Este candidato demonstrou excelente compatibilidade com o perfil desejado. `;
+              }
+              
+              if (dominantPersonality) {
+                recommendationText += `Seu perfil dominante é "${dominantPersonality}" (${performance?.personalityAnalysis?.dominantPersonality?.percentage.toFixed(1)}%), `;
+                recommendationText += 'o que complementa suas habilidades técnicas. ';
+                
+                // Adicionar informações sobre o perfil procurado
+                if (hasTraitWeights && targetProfile) {
+                  recommendationText += `\n\nO perfil procurado para esta vaga é "${targetProfile}" `;
+                  
+                  if (profileMatch) {
+                    recommendationText += `e o candidato demonstra forte alinhamento com este perfil (${profileMatchPercentage.toFixed(1)}%). `;
+                    recommendationText += `Esta correspondência de perfil, combinada com o excelente desempenho técnico, torna este candidato altamente recomendado para a posição. `;
+                  } else {
+                    // Verificar se o perfil procurado está entre os perfis do candidato
+                    const targetProfileInCandidate = allPersonalities.find(p => p.trait === targetProfile);
+                    if (targetProfileInCandidate && targetProfileInCandidate.percentage > 30) {
+                      recommendationText += `e, embora o perfil dominante do candidato seja diferente, ele demonstra características significativas deste perfil (${targetProfileInCandidate.percentage.toFixed(1)}%). `;
+                      recommendationText += `Considerando seu excelente desempenho técnico, recomendamos prosseguir com o processo de contratação. `;
+                    } else {
+                      recommendationText += `enquanto o perfil dominante do candidato é diferente. Isto pode indicar uma abordagem alternativa, mas potencialmente valiosa para a função. `;
+                      recommendationText += `Recomendamos avaliar durante a entrevista se esta diferença de perfil pode trazer diversidade positiva para a equipe. `;
+                    }
+                  }
+                }
               }
             } else if (accuracy >= 60) {
               recommendationClass = 'bg-yellow-50 border-l-4 border-yellow-500';
@@ -1542,11 +1694,11 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
               }
               
               if (dominantPersonality) {
-                recommendationText += `\n\nSeu perfil dominante é &ldquo;${dominantPersonality}&rdquo; (${performance?.personalityAnalysis?.dominantPersonality?.percentage.toFixed(1)}%). `;
+                recommendationText += `\n\nSeu perfil dominante é "${dominantPersonality}" (${performance?.personalityAnalysis?.dominantPersonality?.percentage.toFixed(1)}%). `;
                 
                 // Adicionar informações sobre o perfil procurado
                 if (hasTraitWeights && targetProfile) {
-                  recommendationText += `O perfil procurado para esta vaga é &ldquo;${targetProfile}&rdquo;. `;
+                  recommendationText += `O perfil procurado para esta vaga é "${targetProfile}". `;
                   
                   if (profileMatch) {
                     recommendationText += `O alinhamento do candidato com o perfil desejado (${profileMatchPercentage.toFixed(1)}%) é um ponto positivo que pode compensar parcialmente seu desempenho técnico moderado. `;
@@ -1573,10 +1725,10 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                 }
               }
               
-              if (performance?.stagePerformance?.some(stage => stage.accuracy >= 70)) {
+              if (performance.stagePerformance && performance.stagePerformance.some(stage => stage.accuracy >= 70)) {
                 recommendationText += 'No entanto, demonstrou bom desempenho em algumas áreas específicas. ';
                 
-                const bestStage = performance?.stagePerformance?.reduce(
+                const bestStage = performance.stagePerformance.reduce(
                   (best, current) => current.accuracy > best.accuracy ? current : best, 
                   { accuracy: 0, stageName: '' }
                 );

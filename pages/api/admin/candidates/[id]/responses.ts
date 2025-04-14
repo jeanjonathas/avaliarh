@@ -278,6 +278,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         categoryNameUuid: string
       }> = {};
       
+      // Contar respostas por grupo para calcular porcentagens corretamente
+      const responsesByGroup: Record<string, number> = {};
+      
       let hasTraitWeights = false;
       
       opinionResponses.forEach(response => {
@@ -289,6 +292,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const trait = selectedOption.categoryName || response.optionCharacteristic || 'Desconhecido';
           const weight = selectedOption.weight || 1;
           const categoryNameUuid = response.stageId || 'default';
+          
+          // Incrementar contador de respostas para este grupo
+          if (!responsesByGroup[categoryNameUuid]) {
+            responsesByGroup[categoryNameUuid] = 0;
+          }
+          responsesByGroup[categoryNameUuid]++;
           
           if (weight > 1) {
             hasTraitWeights = true;
@@ -346,8 +355,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         // Atualizar a porcentagem e pontuação ponderada
         if (personalityTraits[trait]) {
-          personalityTraits[trait].percentage = Math.round((count / totalResponses) * 100);
-          personalityTraits[trait].weightedScore = Math.round((averageWeight / 5) * 100);
+          // Calcular a porcentagem com base no número de respostas do grupo específico
+          const groupResponseCount = responsesByGroup[categoryNameUuid] || 1;
+          personalityTraits[trait].percentage = Math.round((count / groupResponseCount) * 100);
+          personalityTraits[trait].weightedScore = Math.min(100, Math.round((averageWeight / 5) * 100));
         }
       });
       

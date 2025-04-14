@@ -22,14 +22,23 @@ export const CandidateAnswersTab = ({ candidate }: CandidateAnswersTabProps) => 
       setLoading(true);
       setError(null);
       
+      console.log(`Buscando respostas para o candidato ${candidate.id}`);
       const response = await fetch(`/api/admin/candidates/${candidate.id}/responses`);
       
       if (!response.ok) {
-        throw new Error('Erro ao buscar respostas do candidato');
+        throw new Error(`Erro ao buscar respostas do candidato: ${response.status} ${response.statusText}`);
       }
       
       const data = await response.json();
-      setResponses(data);
+      console.log('Dados recebidos da API:', data);
+      
+      if (data && Array.isArray(data.responses)) {
+        setResponses(data.responses);
+        console.log(`Recebidas ${data.responses.length} respostas`);
+      } else {
+        console.error('Formato de dados inválido:', data);
+        setResponses([]);
+      }
       
       // Buscar os pesos das alternativas se o candidato tiver um teste associado
       if (candidate.testId) {
