@@ -202,7 +202,221 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         };
       }));
       
-      return res.status(200).json(processedResponses)
+      // Processar as respostas e analisar os traços de personalidade
+      const opinionResponses = processedResponses.filter(r => 
+        r.optionCharacteristic || 
+        (r.question.options && r.question.options.some(o => o.categoryName))
+      );
+      
+      const multipleChoiceResponses = processedResponses.filter(r => 
+        r.isCorrect !== undefined && !opinionResponses.includes(r)
+      );
+      
+      console.log(`Número de respostas opinativas: ${opinionResponses.length}`);
+      console.log(`Número de respostas de múltipla escolha: ${multipleChoiceResponses.length}`);
+      
+      // Agrupar respostas por etapa
+      const responsesByStage: Record<string, ProcessedResponse[]> = {};
+      processedResponses.forEach(response => {
+        const stageId = response.stageId || 'unknown';
+        if (!responsesByStage[stageId]) {
+          responsesByStage[stageId] = [];
+        }
+        responsesByStage[stageId].push(response);
+      });
+      
+      // Calcular pontuação para perguntas de múltipla escolha por etapa
+      const stageScores: Record<string, { total: number, correct: number, percentage: number, stageName: string }> = {};
+      
+      for (const [stageId, responses] of Object.entries(responsesByStage)) {
+        const multipleChoiceInStage = responses.filter(r => 
+          r.isCorrect !== undefined && !opinionResponses.includes(r)
+        );
+        
+        if (multipleChoiceInStage.length === 0) {
+          console.log(`Etapa ${responses[0]?.stageName || stageId} não tem perguntas de múltipla escolha - ignorando`);
+          continue;
+        }
+        
+        const correctCount = multipleChoiceInStage.filter(r => r.isCorrect).length;
+        const percentage = multipleChoiceInStage.length > 0 
+          ? (correctCount / multipleChoiceInStage.length) * 100 
+          : 0;
+        
+        stageScores[stageId] = {
+          total: multipleChoiceInStage.length,
+          correct: correctCount,
+          percentage,
+          stageName: responses[0]?.stageName || 'Desconhecida'
+        };
+      }
+      
+      // Analisar respostas opinativas para traços de personalidade
+      const personalityTraits: Record<string, { 
+        count: number, 
+        percentage: number,
+        weight: number,
+        weightedScore: number,
+        categoryNameUuid?: string
+      }> = {};
+      
+      // Verificar se temos respostas opinativas com pesos
+      const opinionResponsesWithWeights = opinionResponses.filter(r => {
+        const selectedOption = r.question.options?.find(
+          o => o.id === r.optionId || o.text === r.optionText
+        );
+        return selectedOption && selectedOption.weight;
+      });
+      
+      console.log(`Analisando respostas opinativas com pesos: ${opinionResponsesWithWeights.length}`);
+      
+      // Agrupar traços por UUID para calcular médias por grupo
+      const traitsByUuid: Record<string, { 
+        trait: string, 
+        count: number, 
+        totalWeight: number,
+        categoryNameUuid: string
+      }> = {};
+      
+      let hasTraitWeights = false;
+      
+      opinionResponses.forEach(response => {
+        const selectedOption = response.question.options?.find(
+          o => o.id === response.optionId || o.text === response.optionText
+        );
+        
+        if (selectedOption) {
+          const trait = selectedOption.categoryName || response.optionCharacteristic || 'Desconhecido';
+          const weight = selectedOption.weight || 1;
+          const categoryNameUuid = response.stageId || 'default';
+          
+          if (weight > 1) {
+            hasTraitWeights = true;
+          }
+          
+          if (!traitsByUuid[`${trait}-${categoryNameUuid}`]) {
+            traitsByUuid[`${trait}-${categoryNameUuid}`] = {
+              trait,
+              count: 0,
+              totalWeight: 0,
+              categoryNameUuid
+            };
+          }
+          
+          traitsByUuid[`${trait}-${categoryNameUuid}`].count++;
+          traitsByUuid[`${trait}-${categoryNameUuid}`].totalWeight += weight;
+          
+          if (!personalityTraits[trait]) {
+            personalityTraits[trait] = {
+              count: 0,
+              percentage: 0,
+              weight: 0,
+              weightedScore: 0,
+              categoryNameUuid
+            };
+          }
+          
+          personalityTraits[trait].count++;
+          personalityTraits[trait].weight = Math.max(personalityTraits[trait].weight, weight);
+          personalityTraits[trait].categoryNameUuid = categoryNameUuid;
+        }
+      });
+      
+      // Calcular a pontuação ponderada para cada traço e por grupo
+      const totalResponses = opinionResponses.length;
+      let totalWeightedScore = 0;
+      
+      // Calcular a média de peso por grupo de traços
+      const groupAverages: Record<string, number> = {};
+      
+      Object.entries(traitsByUuid).forEach(([key, data]) => {
+        const { trait, count, totalWeight, categoryNameUuid } = data;
+        
+        // Calcular a média de peso para este traço neste grupo
+        const averageWeight = totalWeight / count;
+        
+        // Adicionar à média do grupo
+        if (!groupAverages[categoryNameUuid]) {
+          groupAverages[categoryNameUuid] = 0;
+          groupAverages[categoryNameUuid] = averageWeight;
+        } else {
+          // Acumular para calcular a média depois
+          groupAverages[categoryNameUuid] += averageWeight;
+        }
+        
+        // Atualizar a porcentagem e pontuação ponderada
+        if (personalityTraits[trait]) {
+          personalityTraits[trait].percentage = Math.round((count / totalResponses) * 100);
+          personalityTraits[trait].weightedScore = Math.round((averageWeight / 5) * 100);
+        }
+      });
+      
+      // Calcular a média final por grupo
+      const groupCounts: Record<string, number> = {};
+      Object.entries(traitsByUuid).forEach(([key, data]) => {
+        const { categoryNameUuid } = data;
+        if (!groupCounts[categoryNameUuid]) {
+          groupCounts[categoryNameUuid] = 0;
+        }
+        groupCounts[categoryNameUuid]++;
+      });
+      
+      // Calcular a média final por grupo
+      Object.entries(groupAverages).forEach(([uuid, total]) => {
+        groupAverages[uuid] = total / (groupCounts[uuid] || 1);
+      });
+      
+      // Calcular a pontuação ponderada total (média de todos os grupos)
+      if (Object.keys(groupAverages).length > 0) {
+        // Calcular a compatibilidade para cada grupo (máximo 100%)
+        const groupCompatibilities: Record<string, number> = {};
+        
+        Object.entries(groupAverages).forEach(([uuid, avgWeight]) => {
+          // Converter o peso médio (1-5) para porcentagem (0-100%)
+          const groupCompatibility = Math.min(100, Math.round((avgWeight / 5) * 100));
+          groupCompatibilities[uuid] = groupCompatibility;
+          console.log(`Grupo ${uuid}: Peso médio = ${avgWeight}, Compatibilidade = ${groupCompatibility}%`);
+        });
+        
+        // Calcular a média das compatibilidades de todos os grupos
+        const totalGroupCompatibility = Object.values(groupCompatibilities).reduce((sum, comp) => sum + comp, 0);
+        const overallCompatibility = totalGroupCompatibility / Object.keys(groupCompatibilities).length;
+        
+        // Garantir que o valor final esteja entre 0 e 100
+        totalWeightedScore = Math.min(100, Math.round(overallCompatibility));
+        
+        console.log(`Compatibilidades dos grupos: ${JSON.stringify(groupCompatibilities)}`);
+        console.log(`Média das compatibilidades: ${totalWeightedScore}%`);
+      }
+      
+      // Ordenar os traços por contagem (do maior para o menor)
+      const sortedTraits = Object.entries(personalityTraits)
+        .map(([trait, data]) => ({
+          trait,
+          ...data
+        }))
+        .sort((a, b) => b.count - a.count);
+      
+      // Identificar o traço dominante
+      const dominantPersonality = sortedTraits.length > 0 ? sortedTraits[0] : null;
+      
+      // Construir o objeto de análise de personalidade
+      const personalityAnalysis = {
+        dominantPersonality,
+        allPersonalities: sortedTraits,
+        totalResponses,
+        hasTraitWeights,
+        weightedScore: totalWeightedScore
+      };
+      
+      console.log('Análise de Personalidade:', JSON.stringify(personalityAnalysis, null, 2));
+      
+      // Retornar as respostas processadas e a análise de personalidade
+      return res.status(200).json({
+        responses: processedResponses,
+        personalityAnalysis,
+        stageScores
+      });
     }
 
     return res.status(405).json({ message: 'Método não permitido' })

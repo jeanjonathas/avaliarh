@@ -73,161 +73,156 @@ const CandidateCompatibilityChart: React.FC<CandidateCompatibilityChartProps> = 
     console.log('- Traços do processo:', processTraits);
     console.log('- Perfil esperado:', expectedProfile);
     
-    // Mapear traços por nome para facilitar o acesso
-    const candidateTraitsMap: Record<string, PersonalityTrait> = {};
-    candidateTraits.forEach(trait => {
-      candidateTraitsMap[trait.trait.toLowerCase().trim()] = trait;
-    });
+    // Verificar se temos o weightedScore disponível na análise de personalidade
+    const hasWeightedScore = candidateTraits.length > 0 && 
+      ('weightedScore' in candidateTraits[0] || 
+       (candidateTraits[0] as any).weightedScore !== undefined);
     
-    // Mapear traços do processo por nome
-    const processTraitsMap: Record<string, {name: string, weight: number, categoryNameUuid?: string}> = {};
-    processTraits.forEach(trait => {
-      processTraitsMap[trait.name.toLowerCase().trim()] = trait;
-    });
-    
-    // Obter todos os nomes de traços únicos
-    const allTraitNames = Array.from(new Set([
-      ...Object.keys(candidateTraitsMap),
-      ...Object.keys(processTraitsMap)
-    ]));
-    
-    if (allTraitNames.length === 0) {
-      console.error('Nenhum traço em comum entre candidato e processo');
-      return { traitGroups: [], totalCompatibility: 0 };
+    if (hasWeightedScore) {
+      // Se temos o weightedScore, usar diretamente
+      const weightedScore = (candidateTraits[0] as any).weightedScore || 0;
+      console.log(`Usando weightedScore diretamente: ${weightedScore}`);
+      
+      // Garantir que o valor esteja entre 0 e 100
+      const normalizedScore = Math.min(100, Math.max(0, weightedScore));
+      
+      // Criar grupos de traços com compatibilidade para retornar
+      const traitGroups: TraitGroup[] = [];
+      
+      // Agrupar traços por categoryNameUuid
+      const traitsByGroup: Record<string, PersonalityTrait[]> = {};
+      
+      candidateTraits.forEach(trait => {
+        const groupId = trait.categoryNameUuid || 'default';
+        if (!traitsByGroup[groupId]) {
+          traitsByGroup[groupId] = [];
+        }
+        traitsByGroup[groupId].push(trait);
+      });
+      
+      // Criar grupos com compatibilidade baseada no weightedScore
+      Object.entries(traitsByGroup).forEach(([groupId, traits]) => {
+        const traitsWithCompatibility: TraitWithCompatibility[] = traits.map(trait => {
+          // Usar o weightedScore do traço se disponível, caso contrário usar 100%
+          const traitScore = (trait as any).weightedScore !== undefined ? 
+            Math.min(100, (trait as any).weightedScore) : 100;
+          
+          return {
+            ...trait,
+            compatibility: traitScore,
+            realCompatibility: traitScore,
+            weight: 5,
+            expectedValue: 5,
+            position: 0,
+            categoryNameUuid: trait.categoryNameUuid
+          };
+        });
+        
+        traitGroups.push({
+          id: groupId,
+          traits: traitsWithCompatibility,
+          totalCompatibility: 100
+        });
+      });
+      
+      return {
+        traitGroups,
+        totalCompatibility: normalizedScore
+      };
     }
     
-    // Calcular a compatibilidade para cada traço
-    const traitsWithCompatibility: TraitWithCompatibility[] = allTraitNames
-      .filter(traitName => 
-        candidateTraitsMap[traitName] && 
-        (processTraitsMap[traitName] || expectedProfile[traitName])
-      )
-      .map(traitName => {
-        const candidateTrait = candidateTraitsMap[traitName];
-        const processTrait = processTraitsMap[traitName];
-        const expectedValue = expectedProfile[traitName] || (processTrait ? processTrait.weight : 0);
-        
-        // Para perguntas opinativas, se o candidato escolheu a opção com peso máximo (5),
-        // a compatibilidade deve ser 100%
-        let compatibility = 0;
-        
-        // Verificar se estamos lidando com pesos (escala 1-5) ou porcentagens (0-100)
-        const isWeightScale = expectedValue <= 5;
-        const maxWeight = 5; // Peso máximo possível
-        
-        if (isWeightScale) {
-          // Se o candidato escolheu a alternativa com peso máximo, a compatibilidade é 100%
-          // Consideramos que o peso máximo é 5 e que o valor do candidato está em porcentagem (0-100)
-          // Então, se o valor do candidato é 50%, isso corresponde a um peso de 2.5 na escala 1-5
-          const normalizedCandidateValue = (candidateTrait.percentage / 100) * maxWeight;
-          
-          // Se o valor normalizado do candidato é igual ou maior que o valor esperado,
-          // a compatibilidade é 100%
-          if (Math.abs(normalizedCandidateValue - expectedValue) < 0.1) {
-            compatibility = 100;
-          } else if (normalizedCandidateValue >= expectedValue) {
-            compatibility = 100;
-          } else {
-            // Caso contrário, calculamos a compatibilidade com base na diferença
-            const normalizedDifference = Math.abs(normalizedCandidateValue - expectedValue);
-            compatibility = Math.max(0, 100 - (normalizedDifference * 100 / maxWeight));
-          }
-        } else {
-          // Se estamos na escala de porcentagem (0-100), calcular normalmente
-          const difference = Math.abs(candidateTrait.percentage - expectedValue);
-          compatibility = Math.max(0, 100 - difference);
-        }
-        
-        // Para testes apenas com perguntas opinativas, verificar se o candidato escolheu a alternativa com peso máximo
-        // Se sim, a compatibilidade deve ser 100%
-        if (candidateTrait.isOpinionQuestion && candidateTrait.percentage >= 80) {
-          compatibility = 100;
-        }
-        
-        console.log(`Traço: ${candidateTrait.trait}, Valor: ${candidateTrait.percentage}%, Esperado: ${expectedValue}, Compatibilidade: ${compatibility}%`);
-        
-        return {
-          ...candidateTrait,
-          compatibility,
-          realCompatibility: compatibility,
-          weight: processTrait ? processTrait.weight : 1,
-          expectedValue,
-          position: 0,
-          categoryNameUuid: processTrait?.categoryNameUuid || candidateTrait.categoryNameUuid
-        };
-      });
+    // Se não temos o weightedScore, continuar com o cálculo normal
+    // Agrupar traços por categoryNameUuid (que representa o grupo de traços)
+    const traitsByGroup: Record<string, PersonalityTrait[]> = {};
     
-    // Agrupar traços por categoryNameUuid (que representa a etapa do teste)
-    const groupedTraits: Record<string, TraitWithCompatibility[]> = {};
-    traitsWithCompatibility.forEach(trait => {
+    candidateTraits.forEach(trait => {
       const groupId = trait.categoryNameUuid || 'default';
-      if (!groupedTraits[groupId]) {
-        groupedTraits[groupId] = [];
+      if (!traitsByGroup[groupId]) {
+        traitsByGroup[groupId] = [];
       }
-      groupedTraits[groupId].push(trait);
+      traitsByGroup[groupId].push(trait);
     });
     
-    // Calcular compatibilidade para cada grupo (etapa do teste)
-    const traitGroups: TraitGroup[] = Object.entries(groupedTraits).map(([groupId, traits]) => {
-      // Ordenar traços por porcentagem dentro do grupo
-      traits.sort((a, b) => b.percentage - a.percentage);
+    console.log('Traços agrupados por grupo:', traitsByGroup);
+    
+    // Calcular a média de peso para cada grupo de traços
+    const groupAverages: Record<string, number> = {};
+    
+    Object.entries(traitsByGroup).forEach(([groupId, traits]) => {
+      // Somar os pesos das alternativas escolhidas em cada pergunta deste grupo
+      const totalWeight = traits.reduce((sum, trait) => {
+        // Obter o peso da alternativa escolhida
+        // Considerando que trait.percentage representa o valor normalizado (0-100)
+        // e queremos convertê-lo para uma escala de 1-5
+        const traitWeight = (trait.percentage / 100) * 5;
+        console.log(`Traço: ${trait.trait}, Porcentagem: ${trait.percentage}%, Peso calculado: ${traitWeight}`);
+        return sum + traitWeight;
+      }, 0);
       
-      // Atribuir posições dentro do grupo
-      traits = traits.map((trait, index) => ({
-        ...trait,
-        position: index + 1
-      }));
+      // Calcular a média dividindo pelo número de perguntas no grupo
+      const averageWeight = totalWeight / traits.length;
       
-      // Calcular pesos hierárquicos dentro do grupo
-      const totalPositions = traits.length;
-      traits = traits.map(trait => {
-        const hierarchicalWeight = (totalPositions - trait.position + 1) / totalPositions;
+      console.log(`Grupo ${groupId}: Total de pesos = ${totalWeight}, Número de perguntas = ${traits.length}, Média = ${averageWeight}`);
+      
+      groupAverages[groupId] = averageWeight;
+    });
+    
+    // Calcular a compatibilidade total somando as compatibilidades de todos os grupos
+    const totalCompatibilitySum = Object.entries(groupAverages).reduce((sum, [groupId, avgWeight]) => {
+      const groupCompatibility = (avgWeight / 5) * 100;
+      console.log(`Grupo ${groupId}: Peso médio = ${avgWeight}, Compatibilidade = ${groupCompatibility}%`);
+      return sum + groupCompatibility;
+    }, 0);
+    
+    // Se temos mais de um grupo, calcular a média
+    const totalCompatibility = Object.keys(groupAverages).length > 0 
+      ? totalCompatibilitySum / Object.keys(groupAverages).length 
+      : 0;
+    
+    console.log(`Soma das compatibilidades de todos os grupos: ${totalCompatibilitySum}`);
+    console.log(`Número de grupos: ${Object.keys(groupAverages).length}`);
+    console.log(`Compatibilidade total (média): ${totalCompatibility}%`);
+    
+    // Verificar se todos os grupos têm compatibilidade 100%
+    const allGroupsMaxCompatibility = Object.values(groupAverages).every(avg => Math.abs(avg - 5) < 0.1);
+    
+    // Se todos os grupos têm peso máximo (5), a compatibilidade deve ser 100%
+    const finalCompatibility = allGroupsMaxCompatibility ? 100 : totalCompatibility;
+    
+    console.log(`Todos os grupos têm compatibilidade máxima? ${allGroupsMaxCompatibility}`);
+    console.log(`Compatibilidade final: ${finalCompatibility}%`);
+    
+    // Criar grupos de traços com compatibilidade para retornar
+    const traitGroups: TraitGroup[] = Object.entries(traitsByGroup).map(([groupId, traits]) => {
+      // Calcular a compatibilidade para cada traço individual
+      const traitsWithCompatibility: TraitWithCompatibility[] = traits.map(trait => {
+        // Obter o peso da alternativa escolhida (1-5)
+        const traitWeight = (trait.percentage / 100) * 5;
+        
+        // Calcular a compatibilidade individual do traço (0-100%)
+        const traitCompatibility = (traitWeight / 5) * 100;
+        
         return {
           ...trait,
-          hierarchicalWeight
+          compatibility: traitCompatibility,
+          realCompatibility: traitCompatibility,
+          weight: traitWeight,
+          expectedValue: 5, // Valor esperado máximo
+          position: 0,
+          categoryNameUuid: trait.categoryNameUuid
         };
       });
-      
-      // Verificar se todos os traços do grupo têm compatibilidade 100%
-      const allTraitsMaxCompatibility = traits.every(trait => trait.compatibility === 100);
-      
-      // Se todos os traços têm compatibilidade 100%, o grupo também tem compatibilidade 100%
-      let groupCompatibility = 0;
-      if (allTraitsMaxCompatibility) {
-        groupCompatibility = 100;
-      } else {
-        // Caso contrário, calcular a média ponderada das compatibilidades
-        groupCompatibility = traits.reduce((sum, trait) => {
-          return sum + (trait.compatibility * (trait.hierarchicalWeight || 1));
-        }, 0) / traits.reduce((sum, trait) => sum + (trait.hierarchicalWeight || 1), 0);
-      }
-      
-      console.log(`Grupo: ${groupId}, Compatibilidade: ${groupCompatibility}%`);
       
       return {
         id: groupId,
-        traits,
-        totalCompatibility: Number(groupCompatibility.toFixed(1))
+        traits: traitsWithCompatibility,
+        totalCompatibility: groupAverages[groupId] ? (groupAverages[groupId] / 5) * 100 : 0
       };
     });
     
-    // Verificar se todos os grupos têm compatibilidade 100%
-    const allGroupsMaxCompatibility = traitGroups.every(group => group.totalCompatibility === 100);
-    
-    // Se todos os grupos têm compatibilidade 100%, a compatibilidade total também é 100%
-    let totalCompatibility = 0;
-    if (allGroupsMaxCompatibility) {
-      totalCompatibility = 100;
-    } else {
-      // Caso contrário, calcular a média das compatibilidades dos grupos
-      totalCompatibility = traitGroups.reduce((sum, group) => sum + group.totalCompatibility, 0) / traitGroups.length;
-    }
-    
-    console.log(`Compatibilidade total: ${totalCompatibility}%`);
-    
     return {
       traitGroups,
-      totalCompatibility: Number(totalCompatibility.toFixed(1))
+      totalCompatibility: Math.round(finalCompatibility)
     };
   }, []);
 
