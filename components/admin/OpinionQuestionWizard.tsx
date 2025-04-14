@@ -19,6 +19,7 @@ function generateUUID() {
 interface OpinionGroup {
   id: string;
   name: string;
+  uuid?: string;
   categories: {
     id: string;
     name: string;
@@ -49,7 +50,6 @@ interface OpinionQuestionWizardProps {
   initialData?: any;
   isEditing?: boolean;
   questionType?: string;
-  categoriesEndpoint?: string;
 }
 
 interface SystemCategory {
@@ -63,15 +63,13 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
   onCancel, 
   initialData = null,
   isEditing = false,
-  questionType,
-  categoriesEndpoint
+  questionType
 }) => {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [opinionGroups, setOpinionGroups] = useState<OpinionGroup[]>([]);
   const [systemCategories, setSystemCategories] = useState<SystemCategory[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<OpinionGroup | null>(null);
-  const [groupsLoaded, setGroupsLoaded] = useState(false);
   const [originalCategories, setOriginalCategories] = useState<{[key: string]: string}>({});
   const [originalCategoryCount, setOriginalCategoryCount] = useState(0);
   const [categoriesModified, setCategoriesModified] = useState(false);
@@ -80,6 +78,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error' | 'info' | 'warning'>('warning');
   const [isCreatingNewGroup, setIsCreatingNewGroup] = useState(false);
+  const [newGroupUuid, setNewGroupUuid] = useState<string>(''); 
   const firstEmptyCategoryRef = React.useRef<HTMLInputElement>(null);
   const hasLoadedGroupsRef = useRef(false);
 
@@ -133,18 +132,19 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
         const data = await response.json();
         console.log(`Grupos de opinião carregados com sucesso: ${data.length}`);
         setOpinionGroups(data);
-        setGroupsLoaded(true);
+        hasLoadedGroupsRef.current = true;
       } catch (error) {
         console.error('Erro ao carregar grupos de opinião:', error);
-        // Mesmo em caso de erro, não tentaremos carregar novamente
+        // Mesmo em caso de erro, marcar como carregado para não tentar novamente
+        hasLoadedGroupsRef.current = true;
       }
     };
-
-    // Função para carregar categorias do sistema
+    
+    // Função para buscar categorias do sistema
     const fetchSystemCategories = async () => {
       try {
         console.log("Buscando categorias do sistema...");
-        const endpoint = categoriesEndpoint || '/api/admin/categories';
+        const endpoint = '/api/admin/categories';
         const response = await fetch(endpoint, {
           // Adicionar cabeçalhos para evitar problemas de cache
           headers: {
@@ -247,6 +247,10 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
     
     // Resetar o grupo selecionado
     setSelectedGroup(null);
+    
+    // Gerar um UUID para o novo grupo
+    const groupUuid = generateUUID();
+    setNewGroupUuid(groupUuid);
     
     // Marcar que estamos criando um novo grupo
     setIsCreatingNewGroup(true);
@@ -505,6 +509,13 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
         options: formattedOptions
       };
       
+      // Se estamos criando um novo grupo, adicionar o UUID do grupo aos dados
+      // e usar o UUID como nome do grupo
+      if (isCreatingNewGroup && newGroupUuid) {
+        formData.newGroupUuid = newGroupUuid;
+        formData.opinionGroupName = newGroupUuid; // Usar o UUID como nome do grupo
+      }
+      
       setIsSubmitting(true);
       await onSubmit(formData);
     } catch (error) {
@@ -582,9 +593,9 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
         {/* Etapa 1: Definir categorias de opinião - Layout mais compacto */}
         {step === 1 && (
           <div>
-            <h2 className="text-lg font-semibold mb-2">CRIAR CATEGORIAS</h2>
+            <h2 className="text-lg font-semibold mb-2">CRIAR GRUPO DE TRAÇOS</h2>
             <p className="text-sm text-gray-600 mb-3">
-              Defina as categorias de personalidade para esta pergunta.
+              Defina os traços de personalidade para esta pergunta. Você pode criar um novo conjunto de traços ou usar um existente.
             </p>
 
             {/* Seleção de grupo existente ou criação de novo */}
@@ -593,13 +604,13 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
                 className={`p-3 border rounded-lg cursor-pointer transition-all ${isCreatingNewGroup ? 'border-primary-500 bg-primary-50' : 'border-gray-300 hover:border-primary-300'}`}
                 onClick={handleCreateNewGroup}
               >
-                <h4 className="font-medium text-sm">CRIAR NOVO GRUPO</h4>
-                <p className="text-xs text-gray-600">Defina novas categorias para esta pergunta</p>
+                <h4 className="font-medium text-sm">CRIAR NOVO GRUPO DE TRAÇOS</h4>
+                <p className="text-xs text-gray-600">Defina novos traços de personalidade para esta pergunta</p>
               </div>
               
               <div className="p-3 border rounded-lg">
                 <h4 className="font-medium text-sm mb-1">USAR GRUPO EXISTENTE</h4>
-                {groupsLoaded ? (
+                {hasLoadedGroupsRef.current ? (
                   <select 
                     className="w-full p-1.5 text-sm border border-gray-300 rounded-md"
                     onChange={(e) => handleSelectGroup(e.target.value)}
@@ -630,7 +641,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
                       {watch('categories').map((category, index) => (
                         <div key={category.uuid} className="p-3 border border-gray-200 rounded-lg">
                           <div className="flex justify-between items-center mb-2">
-                            <h3 className="text-sm font-medium">CATEGORIA {index + 1}</h3>
+                            <h3 className="text-sm font-medium">TRAÇO {index + 1}</h3>
                             {index > 0 && (
                               <button
                                 type="button"
@@ -650,7 +661,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
                               ref={index === 0 ? firstEmptyCategoryRef : null}
                               type="text"
                               className="w-full p-2 border border-gray-300 rounded-md text-sm"
-                              placeholder="Nome da categoria"
+                              placeholder="Nome do traço"
                               value={category.name}
                               onChange={(e) => {
                                 const newCategories = [...watch('categories')];
@@ -671,7 +682,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
                             <textarea 
                               className="w-full p-2 border border-gray-300 rounded-md text-sm"
                               rows={2}
-                              placeholder="Descrição breve da categoria..."
+                              placeholder="Descrição breve do traço..."
                               value={category.description}
                               onChange={(e) => {
                                 const newCategories = [...watch('categories')];

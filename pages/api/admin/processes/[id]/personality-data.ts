@@ -95,9 +95,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       testName?: string;
     }[] = [];
 
+    // Flag para verificar se encontramos pesos personalizados
+    let hasCustomWeights = false;
+
     // Coletar todos os traços de todas as etapas
     process.stages.forEach(stage => {
-      if (stage.personalityConfig && stage.personalityConfig.traitWeights) {
+      if (stage.personalityConfig && stage.personalityConfig.traitWeights && stage.personalityConfig.traitWeights.length > 0) {
+        hasCustomWeights = true;
         stage.personalityConfig.traitWeights.forEach(trait => {
           if (trait.traitName) {
             allTraits.push({
@@ -113,7 +117,55 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     });
 
-    // Se não temos traços, retornar array vazio
+    // Se não encontramos pesos personalizados, buscar os pesos padrão das questões
+    if (!hasCustomWeights || allTraits.length === 0) {
+      // Coletar os IDs dos testes associados ao processo
+      const testIds = process.stages
+        .filter(stage => stage.test)
+        .map(stage => stage.test?.id)
+        .filter(Boolean) as string[];
+
+      if (testIds.length > 0) {
+        // Buscar as etapas (stages) dos testes com suas questões opinativas
+        const stagesWithQuestions = await prisma.stage.findMany({
+          where: {
+            testId: {
+              in: testIds
+            }
+          },
+          include: {
+            questions: {
+              where: {
+                type: 'OPINION_MULTIPLE'
+              },
+              include: {
+                options: true
+              }
+            }
+          }
+        });
+
+        // Extrair os traços e pesos das opções das questões
+        stagesWithQuestions.forEach(stage => {
+          stage.questions.forEach(question => {
+            question.options.forEach(option => {
+              if (option.categoryName && option.weight) {
+                allTraits.push({
+                  id: option.id,
+                  traitName: option.categoryName,
+                  weight: option.weight,
+                  stageId: stage.id,
+                  stageName: stage.title || 'Etapa sem nome',
+                  testName: 'Teste padrão'
+                });
+              }
+            });
+          });
+        });
+      }
+    }
+
+    // Se ainda não temos traços, retornar array vazio
     if (allTraits.length === 0) {
       return res.status(200).json({
         groups: []
