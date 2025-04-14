@@ -756,52 +756,88 @@ export const CandidateResultsTab = ({ candidate }: CandidateResultsTabProps) => 
                 {performance.personalityAnalysis && performance.personalityAnalysis.allPersonalities && performance.personalityAnalysis.allPersonalities.length > 0 && (
                   <div className="bg-white rounded-lg p-4 border border-gray-200">
                     <h3 className="text-lg font-medium text-gray-700 mb-4">Detalhamento de Traços de Personalidade</h3>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Traço de Personalidade
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Porcentagem
-                            </th>
-                            {performance.personalityAnalysis.hasTraitWeights && (
-                              <>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Peso
-                                </th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Pontuação Ponderada
-                                </th>
-                              </>
-                            )}
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {performance.personalityAnalysis.allPersonalities.map((trait, index) => (
-                            <tr key={index} className={index === 0 ? "bg-green-50" : ""}>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                {trait.trait} {index === 0 && <span className="text-xs text-green-600 font-medium ml-1">(Dominante)</span>}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {trait.percentage}%
-                              </td>
-                              {performance.personalityAnalysis?.hasTraitWeights && (
-                                <>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {trait.weight || 1}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {trait.weightedScore?.toFixed(2) || '-'}
-                                  </td>
-                                </>
-                              )}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    
+                    {/* Agrupar traços por categoryNameUuid */}
+                    {(() => {
+                      // Agrupar traços por UUID
+                      const traitsByGroup: Record<string, any[]> = {};
+                      
+                      performance.personalityAnalysis.allPersonalities.forEach(trait => {
+                        const groupId = trait.categoryNameUuid || 'default';
+                        if (!traitsByGroup[groupId]) {
+                          traitsByGroup[groupId] = [];
+                        }
+                        traitsByGroup[groupId].push(trait);
+                      });
+                      
+                      // Ordenar traços dentro de cada grupo por porcentagem ou peso
+                      Object.values(traitsByGroup).forEach(traits => {
+                        traits.sort((a, b) => {
+                          // Se ambos têm weightedScore, ordenar por weightedScore
+                          if (a.weightedScore && b.weightedScore) {
+                            return b.weightedScore - a.weightedScore;
+                          }
+                          // Caso contrário, ordenar por porcentagem
+                          return b.percentage - a.percentage;
+                        });
+                      });
+                      
+                      // Renderizar cada grupo separadamente
+                      return Object.entries(traitsByGroup).map(([groupId, traits], groupIndex) => (
+                        <div key={groupId} className="mb-6">
+                          <h4 className="text-md font-medium text-gray-700 mb-2">
+                            Grupo {groupIndex + 1}
+                          </h4>
+                          
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                              <thead className="bg-gray-50">
+                                <tr>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Traço de Personalidade
+                                  </th>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Porcentagem
+                                  </th>
+                                  {performance.personalityAnalysis.hasTraitWeights && (
+                                    <>
+                                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Peso
+                                      </th>
+                                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Pontuação Ponderada
+                                      </th>
+                                    </>
+                                  )}
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {traits.map((trait, index) => (
+                                  <tr key={index} className={index === 0 ? "bg-green-50" : ""}>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                      {trait.trait} {index === 0 && <span className="text-xs text-green-600 font-medium ml-1">(Dominante no grupo)</span>}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                      {trait.percentage}%
+                                    </td>
+                                    {performance.personalityAnalysis?.hasTraitWeights && (
+                                      <>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                          {trait.weight || 1}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                          {trait.weightedScore?.toFixed(2) || '-'}
+                                        </td>
+                                      </>
+                                    )}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      ));
+                    })()}
                   </div>
                 )}
                 
