@@ -664,7 +664,9 @@ const TestDetail: NextPage = () => {
         throw new Error('Erro ao buscar perguntas disponíveis');
       }
       
-      const data = await response.json();
+      const responseData = await response.json();
+      // Verificar se os dados retornados têm a estrutura esperada (com items)
+      const data = responseData.items || responseData;
       console.log(`[AddQuestions] Perguntas recebidas: ${data.length}`);
       
       // Processar perguntas para garantir que todas tenham a propriedade categories
