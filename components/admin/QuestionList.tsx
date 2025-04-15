@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { QuestionType, QuestionDifficulty } from '../../types/questions';
-import Link from 'next/link';
 import { useNotification } from '../../contexts/NotificationContext';
 import QuestionPreview from './QuestionPreview';
 import toast from 'react-hot-toast';
@@ -713,8 +712,8 @@ const QuestionList: React.FC<QuestionListProps> = ({
                             <span className="hidden sm:inline">Visualizar</span>
                           </span>
                         </button>
-                        <Link
-                          href={`/admin/questions/edit/${question.id}`}
+                        <button
+                          onClick={() => handleEditQuestion(question.id)}
                           className="text-primary-600 hover:text-primary-800 transition-colors px-2 py-1 rounded hover:bg-primary-50"
                         >
                           <span className="flex items-center justify-center">
@@ -723,7 +722,7 @@ const QuestionList: React.FC<QuestionListProps> = ({
                             </svg>
                             <span className="hidden sm:inline">Editar</span>
                           </span>
-                        </Link>
+                        </button>
                         <button
                           onClick={() => handleDelete(question.id)}
                           className="text-red-600 hover:text-red-900 text-sm"
