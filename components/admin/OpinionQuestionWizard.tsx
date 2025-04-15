@@ -205,7 +205,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
             text: opt.text,
             categoryNameUuid: category?.uuid || generateUUID(),
             category: opt.category,
-            weight: opt.weight || 1,
+            weight: opt.weight !== undefined ? opt.weight : 1,
             position: opt.position || 0
           };
         });
@@ -230,6 +230,27 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
       }
     }
   }, [initialData, isEditing, setValue]);
+
+  // Efeito para inicializar os pesos das opções quando o componente é montado
+  useEffect(() => {
+    const options = watch('options');
+    if (options && options.length > 0) {
+      // Verificar se os pesos estão todos com valor 1
+      const allWeightsAreOne = options.every(opt => opt.weight === 1);
+      
+      // Se todos os pesos forem 1, recalcular os pesos
+      if (allWeightsAreOne) {
+        console.log('Inicializando pesos das opções...');
+        const updatedOptions = options.map((option, index) => ({
+          ...option,
+          weight: calculateWeight(index, options.length)
+        }));
+        
+        console.log('Pesos recalculados:', updatedOptions.map(o => o.weight));
+        setValue('options', updatedOptions);
+      }
+    }
+  }, [watch, setValue]);
 
   // Função para criar um novo grupo de categorias
   const handleCreateNewGroup = () => {
@@ -371,33 +392,18 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
 
   const handleNextStep = () => {
     if (step === 1) {
-      // Se as categorias foram modificadas, resetar a seleção de grupo
-      if (categoriesModified) {
-        setSelectedGroup(null);
-      }
-      
-      // Verificar se temos pelo menos 2 categorias
+      // Verificar se há categorias definidas
       const currentCategories = watch('categories');
-      if (currentCategories.length < 2) {
-        setToastMessage('É necessário ter pelo menos 2 categorias para avançar.');
-        setToastType('warning');
-        setShowToast(true);
-        return;
-      }
       
-      // Verificar se todas as categorias têm nome preenchido
-      const emptyCategoryIndex = currentCategories.findIndex(cat => !cat.name || cat.name.trim() === '');
-      if (emptyCategoryIndex >= 0) {
-        setToastMessage('Por favor, preencha o nome de todas as categorias antes de avançar.');
+      if (currentCategories.length === 0) {
+        // Mostrar mensagem de aviso usando o Toast
+        setToastMessage('Por favor, adicione pelo menos uma categoria antes de avançar.');
         setToastType('warning');
         setShowToast(true);
         
-        // Focar no primeiro campo de categoria vazio
+        // Esconder o toast após alguns segundos
         setTimeout(() => {
-          const categoryInputs = document.querySelectorAll('input[name^="categories"][name$="name"]');
-          if (categoryInputs[emptyCategoryIndex]) {
-            (categoryInputs[emptyCategoryIndex] as HTMLInputElement).focus();
-          }
+          setShowToast(false);
         }, 100);
         
         return;
@@ -415,17 +421,35 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
         
         // Adicionar uma opção para cada categoria
         currentCategories.forEach((category, index) => {
+          // Calcular o peso com base na posição
+          const totalOptions = currentCategories.length;
+          const weight = calculateWeight(index, totalOptions);
+          
+          console.log(`Categoria ${index + 1}/${totalOptions}: ${category.name}, peso calculado: ${weight}`);
+          
           newOptions.push({
             text: '',
             categoryNameUuid: category.uuid || generateUUID(),
             category: category.name,
-            weight: 1,
+            weight: weight,
             position: index
           });
         });
         
         // Definir todas as opções de uma vez
         setValue('options', newOptions);
+        
+        // Verificar se os pesos foram definidos corretamente
+        console.log('Opções com pesos definidos:', newOptions);
+      } else {
+        // Mesmo que o número de opções corresponda, atualizar os pesos
+        const updatedOptions = currentOptions.map((option, index) => ({
+          ...option,
+          weight: calculateWeight(index, currentOptions.length)
+        }));
+        
+        console.log('Atualizando pesos das opções existentes:', updatedOptions.map(o => o.weight));
+        setValue('options', updatedOptions);
       }
       
       // Avançar para o próximo passo
@@ -490,12 +514,14 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
       // Formatar as opções para garantir que cada opção tenha a categoria correta
       const formattedOptions = data.options.map((option: any, index: number) => {
         const category = data.categories[index];
+        console.log(`Formatando opção ${index + 1}, peso atual: ${option.weight}`);
+        
         return {
           id: option.id, // Manter o ID original se estiver editando
           text: option.text,
           category: category?.name || '',
           categoryNameUuid: category?.uuid || option.categoryNameUuid,
-          weight: option.weight || 1,
+          weight: option.weight !== undefined ? option.weight : calculateWeight(index, data.categories.length),
           position: index,
           isCorrect: true // Todas as opções em perguntas opinativas são "corretas"
         };
@@ -553,6 +579,20 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
       }
     }
   }, [watch, selectedGroup, originalCategoryCount]);
+
+  // Função para calcular o peso com base na posição e no total de opções
+  const calculateWeight = (index: number, totalOptions: number) => {
+    // Se tiver apenas uma opção, o peso é 5
+    if (totalOptions === 1) return 5;
+    
+    // Se tiver mais de uma opção, calcular o peso baseado na posição
+    // Primeira opção (index 0) tem peso 5, última opção tem peso 1
+    // Usar valores decimais com uma casa decimal
+    const weight = 5 - (4 * index / (totalOptions - 1));
+    
+    // Arredondar para uma casa decimal
+    return Math.round(weight * 10) / 10;
+  };
 
   return (
     <div className="w-full max-w-4xl mx-auto">
@@ -827,7 +867,7 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
                             min={1}
                             max={10}
                             className="w-full p-2 border border-gray-300 rounded-md text-sm"
-                            value={option.weight}
+                            value={option.weight !== undefined ? option.weight : calculateWeight(index, watch('options').length)}
                             onChange={(e) => {
                               const newOptions = [...watch('options')];
                               newOptions[index].weight = parseInt(e.target.value);

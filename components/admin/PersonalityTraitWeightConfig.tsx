@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
-import { PlusIcon, XMarkIcon, ArrowsUpDownIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, XMarkIcon, ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 
 interface PersonalityTrait {
   id?: string;
@@ -34,6 +33,64 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
   const [error, setError] = useState<string | null>(null);
   const hasInitializedRef = useRef<{[key: string]: boolean}>({});
   const previousValueRef = useRef<PersonalityTrait[]>([]);
+  const pendingChangesRef = useRef<TraitGroup[]>([]);
+  const [lastMovedItem, setLastMovedItem] = useState<{id: string, direction: 'up' | 'down'} | null>(null);
+
+  // Referência para o temporizador de debounce
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Flag para controlar se devemos sincronizar com o componente pai
+  const shouldSyncRef = useRef<boolean>(false);
+
+  // Estado para rastrear se há alterações não salvas
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Função para notificar o componente pai sobre as mudanças
+  const notifyParentOfChanges = useCallback((groups: TraitGroup[]) => {
+    // Armazenar as alterações no buffer
+    pendingChangesRef.current = groups;
+    
+    // Só notificar o componente pai se a flag estiver ativa
+    if (shouldSyncRef.current) {
+      // Extrair apenas os dados necessários para o componente pai
+      const traitsForParent = groups.flatMap(group => 
+        group.selectedTraits.map(trait => ({
+          id: trait.id,
+          traitName: trait.traitName,
+          weight: trait.weight,
+          order: trait.order,
+          groupId: trait.groupId,
+          groupName: trait.groupName
+        }))
+      );
+      
+      // Atualizar o valor no componente pai
+      onChange(traitsForParent);
+      
+      console.log('Notificando o componente pai sobre as mudanças:', traitsForParent);
+      
+      // Resetar a flag
+      shouldSyncRef.current = false;
+    }
+  }, [onChange]);
+
+  // Função para sincronizar as alterações com o componente pai
+  const handleSyncChanges = useCallback(() => {
+    // Ativar a flag de sincronização
+    shouldSyncRef.current = true;
+    
+    // Notificar o componente pai sobre as alterações
+    if (pendingChangesRef.current.length > 0) {
+      notifyParentOfChanges(pendingChangesRef.current);
+      setHasUnsavedChanges(false);
+    }
+  }, [notifyParentOfChanges]);
+
+  // Atualizar o estado de alterações não salvas quando os grupos forem alterados
+  useEffect(() => {
+    if (traitGroups.length > 0) {
+      setHasUnsavedChanges(true);
+    }
+  }, [traitGroups]);
 
   // Função para buscar traços de personalidade do teste selecionado
   const fetchPersonalityTraits = useCallback(async (testId: string) => {
@@ -447,57 +504,6 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
     return Math.max(W_min, Math.min(W_max, roundedWeight));
   };
 
-  // Notificar o componente pai sobre a mudança
-  const notifyParentOfChanges = useCallback((updatedGroups: TraitGroup[]) => {
-    // Extrair todos os traços de todos os grupos
-    const allTraits = updatedGroups.flatMap(group => group.selectedTraits);
-    
-    // Garantir que cada traço tenha todas as propriedades necessárias
-    const completeTraits = allTraits.map(trait => ({
-      id: trait.id,
-      traitName: trait.traitName,
-      weight: trait.weight,
-      order: trait.order,
-      groupId: trait.groupId,
-      groupName: trait.groupName
-    }));
-    
-    // Agrupar traços por grupo para melhor visualização nos logs
-    const traitsByGroup = updatedGroups.reduce((acc, group) => {
-      if (group.selectedTraits.length > 0) {
-        acc[group.name] = group.selectedTraits.map(trait => ({
-          traitName: trait.traitName,
-          weight: trait.weight,
-          order: trait.order
-        }));
-      }
-      return acc;
-    }, {} as Record<string, any[]>);
-    
-    console.log('=== VALORES DE PESO CAPTURADOS ===');
-    console.log('Traços atualizados:', completeTraits);
-    
-    // Log detalhado por categoria
-    console.log('=== VALORES DE PESO POR CATEGORIA ===');
-    Object.entries(traitsByGroup).forEach(([groupName, traits]) => {
-      console.log(`Categoria: ${groupName}`);
-      console.table(traits.map(t => ({
-        'Traço': t.traitName,
-        'Peso': t.weight,
-        'Ordem': t.order
-      })));
-    });
-    
-    // Log de resumo
-    console.log('=== RESUMO DE PESOS SALVOS ===');
-    console.log(`Total de traços: ${completeTraits.length}`);
-    console.log(`Total de categorias: ${Object.keys(traitsByGroup).length}`);
-    console.log('Valores de peso por categoria salvos:', traitsByGroup);
-    
-    // Enviar os traços completos para o componente pai
-    onChange(completeTraits);
-  }, [onChange]);
-
   // Adicionar um traço ao grupo
   const handleAddTrait = useCallback((groupId: string, traitName: string) => {
     // Encontrar o grupo
@@ -547,9 +553,10 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
       console.log(`Pesos recalculados para ${sortedTraits.length} traços no grupo "${updatedGroups[groupIndex].name}"`);
     }
     
-    // Notificar o componente pai sobre a mudança
-    notifyParentOfChanges(updatedGroups);
-  }, [traitGroups, notifyParentOfChanges]);
+    // Armazenar as alterações no buffer local, mas não notificar o componente pai
+    pendingChangesRef.current = updatedGroups;
+    setHasUnsavedChanges(true);
+  }, [traitGroups]);
 
   // Remover um traço de um grupo
   const handleRemoveTrait = useCallback((traitId: string, groupId: string) => {
@@ -594,9 +601,10 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
     // Atualizar o estado
     setTraitGroups(updatedGroups);
     
-    // Notificar o componente pai sobre a mudança
-    notifyParentOfChanges(updatedGroups);
-  }, [traitGroups, notifyParentOfChanges]);
+    // Armazenar as alterações no buffer local, mas não notificar o componente pai
+    pendingChangesRef.current = updatedGroups;
+    setHasUnsavedChanges(true);
+  }, [traitGroups]);
 
   // Função para normalizar os pesos de todos os traços em todos os grupos
   const normalizeAllWeights = useCallback(() => {
@@ -644,7 +652,12 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
   useEffect(() => {
     if (testId) {
       console.log('TestId mudou, buscando traços:', testId);
-      fetchPersonalityTraits(testId);
+      // Verificar se já inicializamos para este testId para evitar múltiplas requisições
+      if (!hasInitializedRef.current[testId]) {
+        console.log(`Inicializando traços para o teste ${testId}`);
+        hasInitializedRef.current[testId] = true;
+        fetchPersonalityTraits(testId);
+      }
     } else {
       // Se não houver testId, limpar os grupos
       setTraitGroups([]);
@@ -652,62 +665,83 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
     }
   }, [testId, fetchPersonalityTraits]);
 
-  useEffect(() => {
-    if (testId) {
-      // Verificar se já inicializamos para este testId
-      if (!hasInitializedRef.current[testId]) {
-        console.log(`Inicializando traços para o teste ${testId}`);
-        hasInitializedRef.current[testId] = true;
-      }
-    }
-  }, [testId]);
-
-  // Lidar com o reordenamento por drag and drop dentro de um grupo
-  const handleDragEnd = useCallback((result: DropResult) => {
-    // Se não houver destino ou se a origem e o destino forem iguais, não fazer nada
-    if (!result.destination) return;
+  // Mover um traço para cima na lista
+  const handleMoveUp = useCallback((groupId: string, index: number) => {
+    if (index === 0) return; // Já está no topo
     
-    // Extrair o ID do grupo do droppableId
-    const groupId = result.source.droppableId.replace('droppable-', '');
-    
-    // Encontrar o grupo
     const groupIndex = traitGroups.findIndex(g => g.id === groupId);
     if (groupIndex === -1) return;
     
-    // Criar uma cópia dos grupos
     const updatedGroups = [...traitGroups];
+    const traits = [...updatedGroups[groupIndex].selectedTraits];
     
-    // Reordenar os traços dentro do grupo
-    const items = Array.from(updatedGroups[groupIndex].selectedTraits);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
+    // Marcar os itens que estão sendo movidos
+    const movingUpItem = traits[index];
+    const movingDownItem = traits[index - 1];
     
-    // Atualizar as ordens e pesos dos traços
-    const updatedTraits = items.map((trait, index) => {
-      const newOrder = index + 1;
-      const newWeight = calculateWeight(newOrder, items.length);
-      
-      // Verificar se houve mudança na ordem ou no peso
-      if (trait.order !== newOrder || trait.weight !== newWeight) {
-        console.log(`Traço "${trait.traitName}" reordenado: ordem ${trait.order} -> ${newOrder}, peso ${trait.weight} -> ${newWeight}`);
-        return { ...trait, order: newOrder, weight: newWeight };
-      }
-      
-      return trait;
-    });
+    // Trocar o traço com o anterior
+    [traits[index], traits[index - 1]] = [traits[index - 1], traits[index]];
     
-    // Atualizar os traços do grupo
-    updatedGroups[groupIndex].selectedTraits = updatedTraits;
+    // Atualizar a ordem e os pesos
+    updatedGroups[groupIndex].selectedTraits = traits.map((trait, idx) => ({
+      ...trait,
+      order: idx + 1,
+      weight: calculateWeight(idx + 1, traits.length)
+    }));
     
     // Atualizar o estado
     setTraitGroups(updatedGroups);
     
-    console.log(`Reordenamento concluído no grupo "${updatedGroups[groupIndex].name}"`);
-    console.log('Nova ordem dos traços:', updatedTraits.map(t => ({ nome: t.traitName, ordem: t.order, peso: t.weight })));
+    // Definir o último item movido para destacá-lo
+    setLastMovedItem({id: movingUpItem.id, direction: 'up'});
     
-    // Notificar o componente pai sobre a mudança
-    notifyParentOfChanges(updatedGroups);
-  }, [traitGroups, notifyParentOfChanges]);
+    // Armazenar as alterações no buffer local, mas não notificar o componente pai
+    pendingChangesRef.current = updatedGroups;
+  }, [traitGroups]);
+
+  // Mover um traço para baixo na lista
+  const handleMoveDown = useCallback((groupId: string, index: number) => {
+    const groupIndex = traitGroups.findIndex(g => g.id === groupId);
+    if (groupIndex === -1) return;
+    
+    const traits = traitGroups[groupIndex].selectedTraits;
+    if (index === traits.length - 1) return; // Já está no final
+    
+    const updatedGroups = [...traitGroups];
+    const updatedTraits = [...traits];
+    
+    // Marcar os itens que estão sendo movidos
+    const movingDownItem = updatedTraits[index];
+    const movingUpItem = updatedTraits[index + 1];
+    
+    // Trocar o traço com o próximo
+    [updatedTraits[index], updatedTraits[index + 1]] = [updatedTraits[index + 1], updatedTraits[index]];
+    
+    // Atualizar a ordem e os pesos
+    updatedGroups[groupIndex].selectedTraits = updatedTraits.map((trait, idx) => ({
+      ...trait,
+      order: idx + 1,
+      weight: calculateWeight(idx + 1, updatedTraits.length)
+    }));
+    
+    // Atualizar o estado
+    setTraitGroups(updatedGroups);
+    
+    // Definir o último item movido para destacá-lo
+    setLastMovedItem({id: movingDownItem.id, direction: 'down'});
+    
+    // Armazenar as alterações no buffer local, mas não notificar o componente pai
+    pendingChangesRef.current = updatedGroups;
+  }, [traitGroups]);
+
+  useEffect(() => {
+    if (lastMovedItem) {
+      const timer = setTimeout(() => {
+        setLastMovedItem(null);
+      }, 1500); // 1.5 segundos
+      return () => clearTimeout(timer);
+    }
+  }, [lastMovedItem]);
 
   // Inicializar os grupos com os traços já selecionados
   useEffect(() => {
@@ -786,9 +820,6 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
     }
   }, [testId, value, traitGroups]);
 
-  // Gerar um ID único
-  const generateId = () => `trait-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
   // Verificar se um traço já foi adicionado a um grupo
   const isTraitAddedToGroup = (traitName: string, groupId: string) => {
     const group = traitGroups.find(g => g.id === groupId);
@@ -797,92 +828,189 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
     return group.selectedTraits.some(t => t.traitName.toLowerCase() === traitName.toLowerCase());
   };
 
-  // Componente de item arrastável memoizado para melhor performance
-  const DraggableItem = React.memo(({ trait, index, groupId, onRemove }: {
+  // Gerar um ID único
+  const generateId = () => `trait-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+  // Sincronizar as alterações pendentes quando o componente for desmontado
+  useEffect(() => {
+    return () => {
+      // Ativar a flag de sincronização
+      shouldSyncRef.current = true;
+      
+      // Notificar o componente pai sobre as alterações
+      if (pendingChangesRef.current.length > 0) {
+        notifyParentOfChanges(pendingChangesRef.current);
+      }
+    };
+  }, [notifyParentOfChanges]);
+
+  // Sincronizar as alterações pendentes quando o valor do teste for alterado
+  useEffect(() => {
+    if (testId) {
+      // Ativar a flag de sincronização
+      shouldSyncRef.current = true;
+      
+      // Notificar o componente pai sobre as alterações
+      if (pendingChangesRef.current.length > 0) {
+        notifyParentOfChanges(pendingChangesRef.current);
+      }
+    }
+  }, [testId, notifyParentOfChanges]);
+
+  // Atualizar a flag de sincronização quando o componente for montado
+  useEffect(() => {
+    shouldSyncRef.current = true;
+  }, []);
+
+  // Atualizar a flag de sincronização quando o componente for desmontado
+  useEffect(() => {
+    return () => {
+      shouldSyncRef.current = false;
+    };
+  }, []);
+
+  // Componente de item memoizado para melhor performance
+  const TraitItem = React.memo(({ trait, index, groupId, onRemove, onMoveUp, onMoveDown }: {
     trait: PersonalityTrait;
     index: number;
     groupId: string;
     onRemove: (id: string, groupId: string) => void;
+    onMoveUp: (groupId: string, index: number) => void;
+    onMoveDown: (groupId: string, index: number) => void;
   }) => {
+    // Determinar a classe de animação com base no último item movido
+    const animationClass = lastMovedItem && lastMovedItem.id === trait.id 
+      ? lastMovedItem.direction === 'up' 
+        ? 'moved-up' 
+        : 'moved-down'
+      : '';
+    
     return (
-      <Draggable
+      <div
         key={trait.id}
-        draggableId={trait.id}
-        index={index}
+        className={`trait-item flex items-center justify-between p-4 rounded-md border ${
+          index === 0 
+            ? 'bg-blue-50 border-blue-300 shadow-lg' 
+            : 'bg-white border-secondary-200'
+        } ${animationClass}`}
       >
-        {(provided, snapshot) => (
-          <div
-            ref={provided.innerRef}
-            {...provided.draggableProps}
-            {...provided.dragHandleProps}
-            style={provided.draggableProps.style}
-            className={`flex items-center justify-between p-4 rounded-md border ${
-              snapshot.isDragging 
-                ? 'bg-blue-50 border-blue-300 shadow-lg' 
-                : 'bg-white border-secondary-200'
-            }`}
-          >
-            <div className="flex items-center space-x-4">
-              <div className="cursor-move text-secondary-400 hover:text-secondary-600">
-                <ArrowsUpDownIcon className="h-6 w-6" />
-              </div>
-              <div>
-                <span className="font-medium text-secondary-800 text-base">{trait.traitName}</span>
-                <div className="text-sm text-secondary-500 mt-1">
-                  Peso: {trait.weight.toFixed(1)} (Posição: {index + 1})
-                </div>
-              </div>
+        <div className="flex items-center space-x-4">
+          <div>
+            <span className="font-medium text-secondary-800 text-base">{trait.traitName}</span>
+            <div className="text-sm text-secondary-500 mt-1">
+              Peso: {trait.weight.toFixed(1)} (Posição: {index + 1})
             </div>
-            <button
-              type="button"
-              onClick={() => onRemove(trait.id, groupId)}
-              className="text-secondary-400 hover:text-red-600 ml-4"
-            >
-              <XMarkIcon className="h-6 w-6" />
-            </button>
           </div>
-        )}
-      </Draggable>
+        </div>
+        <div className="flex items-center space-x-2">
+          <button
+            type="button"
+            onClick={() => onMoveUp(groupId, index)}
+            disabled={index === 0}
+            className={`text-secondary-400 ${index === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:text-secondary-600'}`}
+          >
+            <ChevronUpIcon className="h-6 w-6" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onMoveDown(groupId, index)}
+            disabled={index === traitGroups.find(g => g.id === groupId)?.selectedTraits.length - 1}
+            className={`text-secondary-400 ${index === traitGroups.find(g => g.id === groupId)?.selectedTraits.length - 1 ? 'opacity-50 cursor-not-allowed' : 'hover:text-secondary-600'}`}
+          >
+            <ChevronDownIcon className="h-6 w-6" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onRemove(trait.id, groupId)}
+            className="text-secondary-400 hover:text-red-600 ml-4"
+          >
+            <XMarkIcon className="h-6 w-6" />
+          </button>
+        </div>
+      </div>
     );
   });
 
-  DraggableItem.displayName = 'DraggableItem';
+  TraitItem.displayName = 'TraitItem';
 
-  // Componente de área soltável memoizado para melhor performance
-  const DroppableArea = React.memo(({ group, onRemoveTrait }: {
+  // Componente de área memoizado para melhor performance
+  const TraitArea = React.memo(({ group, onRemoveTrait, onMoveUp, onMoveDown }: {
     group: TraitGroup;
     onRemoveTrait: (id: string, groupId: string) => void;
+    onMoveUp: (groupId: string, index: number) => void;
+    onMoveDown: (groupId: string, index: number) => void;
   }) => {
     return (
-      <Droppable droppableId={`droppable-${group.id}`}>
-        {(provided) => (
-          <div
-            {...provided.droppableProps}
-            ref={provided.innerRef}
-            className="space-y-2 bg-secondary-50 p-3 rounded-md"
-          >
-            {group.selectedTraits
-              .sort((a, b) => a.order - b.order)
-              .map((trait, index) => (
-                <DraggableItem 
-                  key={trait.id} 
-                  trait={trait} 
-                  index={index} 
-                  groupId={group.id} 
-                  onRemove={onRemoveTrait} 
-                />
-              ))}
-            {provided.placeholder}
-          </div>
-        )}
-      </Droppable>
+      <div
+        className="space-y-4 bg-secondary-50 p-3 rounded-md relative"
+        style={{ paddingLeft: '25px' }} // Espaço para os indicadores de direção
+      >
+        {group.selectedTraits
+          .sort((a, b) => a.order - b.order)
+          .map((trait, index) => (
+            <TraitItem 
+              key={trait.id} 
+              trait={trait} 
+              index={index} 
+              groupId={group.id} 
+              onRemove={onRemoveTrait} 
+              onMoveUp={onMoveUp} 
+              onMoveDown={onMoveDown} 
+            />
+          ))}
+      </div>
     );
   });
 
-  DroppableArea.displayName = 'DroppableArea';
+  TraitArea.displayName = 'TraitArea';
 
   return (
     <div className="space-y-6">
+      <style jsx global>{`
+        .trait-item {
+          transition: all 0.3s ease-in-out;
+          position: relative;
+        }
+        
+        .moved-up {
+          background-color: #e0f2fe !important;
+          border-color: #38bdf8 !important;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+          transform: translateY(-4px);
+        }
+        
+        .moved-down {
+          background-color: #fef3c7 !important;
+          border-color: #fbbf24 !important;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+          transform: translateY(4px);
+        }
+        
+        .moved-up::before {
+          content: "▲";
+          position: absolute;
+          left: -20px;
+          color: #38bdf8;
+          font-size: 14px;
+          animation: pulse 1s infinite;
+        }
+        
+        .moved-down::before {
+          content: "▼";
+          position: absolute;
+          left: -20px;
+          color: #fbbf24;
+          font-size: 14px;
+          animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+          0% { opacity: 0.5; }
+          50% { opacity: 1; }
+          100% { opacity: 0.5; }
+        }
+      `}</style>
+      
       {isLoadingTraits ? (
         <div className="flex justify-center items-center p-4">
           <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary-500"></div>
@@ -898,68 +1026,68 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
           {/* Grupos de traços disponíveis */}
           {testId ? (
             traitGroups.length > 0 ? (
-              <DragDropContext onDragEnd={handleDragEnd}>
-                <div className="space-y-8">
-                  {traitGroups.map(group => (
-                    <div key={group.id} className="bg-white p-6 rounded-lg border border-secondary-200 shadow-sm">
-                      <h3 className="text-xl font-medium text-secondary-800 mb-4">
-                        Grupo: {group.name}
-                      </h3>
-                      
-                      {/* Traços disponíveis para seleção */}
-                      <div className="mb-5">
-                        <h4 className="text-base font-medium text-secondary-700 mb-3">
-                          Traços disponíveis:
-                        </h4>
-                        <div className="flex flex-wrap gap-3">
-                          {group.traits.map(trait => (
-                            <button
-                              key={`${group.id}-${trait}`}
-                              type="button"
-                              onClick={() => handleAddTrait(group.id, trait)}
-                              disabled={isTraitAddedToGroup(trait, group.id)}
-                              className={`px-3 py-2 text-sm rounded-full transition-colors ${
-                                isTraitAddedToGroup(trait, group.id)
-                                  ? 'bg-secondary-100 text-secondary-400 cursor-not-allowed'
-                                  : 'bg-white border border-secondary-300 hover:bg-primary-50 hover:border-primary-300 text-secondary-700'
-                              }`}
-                            >
-                              {trait}
-                            </button>
-                          ))}
-                        </div>
-                        
-                        {group.traits.every(trait => isTraitAddedToGroup(trait, group.id)) && (
-                          <p className="text-xs text-secondary-500 mt-2">
-                            Todos os traços deste grupo já foram adicionados.
-                          </p>
-                        )}
+              <div className="space-y-8">
+                {traitGroups.map(group => (
+                  <div key={group.id} className="bg-white p-6 rounded-lg border border-secondary-200 shadow-sm">
+                    <h3 className="text-xl font-medium text-secondary-800 mb-4">
+                      Grupo: {group.name}
+                    </h3>
+                    
+                    {/* Traços disponíveis para seleção */}
+                    <div className="mb-5">
+                      <h4 className="text-base font-medium text-secondary-700 mb-3">
+                        Traços disponíveis:
+                      </h4>
+                      <div className="flex flex-wrap gap-3">
+                        {group.traits.map(trait => (
+                          <button
+                            key={`${group.id}-${trait}`}
+                            type="button"
+                            onClick={() => handleAddTrait(group.id, trait)}
+                            disabled={isTraitAddedToGroup(trait, group.id)}
+                            className={`px-3 py-2 text-sm rounded-full transition-colors ${
+                              isTraitAddedToGroup(trait, group.id)
+                                ? 'bg-secondary-100 text-secondary-400 cursor-not-allowed'
+                                : 'bg-white border border-secondary-300 hover:bg-primary-50 hover:border-primary-300 text-secondary-700'
+                            }`}
+                          >
+                            {trait}
+                          </button>
+                        ))}
                       </div>
                       
-                      {/* Traços selecionados e ordenados */}
-                      {group.selectedTraits.length > 0 ? (
-                        <div className="mt-4">
-                          <div className="flex justify-between items-center mb-3">
-                            <h4 className="text-base font-medium text-secondary-700">
-                              Priorização de traços ({group.selectedTraits.length}):
-                            </h4>
-                            <p className="text-sm text-secondary-500">Arraste para reordenar por importância</p>
-                          </div>
-                          
-                          <DroppableArea 
-                            group={group} 
-                            onRemoveTrait={handleRemoveTrait} 
-                          />
-                        </div>
-                      ) : (
-                        <div className="bg-secondary-50 p-5 rounded-lg text-center text-secondary-500 mt-4">
-                          <p className="text-base">Selecione traços de personalidade acima para priorizar a importância de cada um na avaliação.</p>
-                        </div>
+                      {group.traits.every(trait => isTraitAddedToGroup(trait, group.id)) && (
+                        <p className="text-xs text-secondary-500 mt-2">
+                          Todos os traços deste grupo já foram adicionados.
+                        </p>
                       )}
                     </div>
-                  ))}
-                </div>
-              </DragDropContext>
+                    
+                    {/* Traços selecionados e ordenados */}
+                    {group.selectedTraits.length > 0 ? (
+                      <div className="mt-4">
+                        <div className="flex justify-between items-center mb-3">
+                          <h4 className="text-base font-medium text-secondary-700">
+                            Priorização de traços ({group.selectedTraits.length}):
+                          </h4>
+                          <p className="text-sm text-secondary-500">Mover para cima ou para baixo para reordenar por importância</p>
+                        </div>
+                        
+                        <TraitArea 
+                          group={group} 
+                          onRemoveTrait={handleRemoveTrait} 
+                          onMoveUp={handleMoveUp} 
+                          onMoveDown={handleMoveDown} 
+                        />
+                      </div>
+                    ) : (
+                      <div className="bg-secondary-50 p-5 rounded-lg text-center text-secondary-500 mt-4">
+                        <p className="text-base">Selecione traços de personalidade acima para priorizar a importância de cada um na avaliação.</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             ) : (
               <div className="bg-yellow-50 p-5 rounded-lg">
                 <p className="text-base text-yellow-700">
@@ -978,6 +1106,18 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
             </div>
           )}
         </>
+      )}
+      {hasUnsavedChanges && (
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={handleSyncChanges}
+            className="flex items-center px-4 py-2 rounded-md text-white bg-primary-600 hover:bg-primary-700"
+          >
+            <span className="mr-2 w-2 h-2 rounded-full bg-white animate-pulse"></span>
+            Salvar alterações
+          </button>
+        </div>
       )}
     </div>
   );
