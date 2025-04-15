@@ -847,11 +847,12 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
   // Sincronizar as alterações pendentes quando o valor do teste for alterado
   useEffect(() => {
     if (testId) {
-      // Ativar a flag de sincronização
-      shouldSyncRef.current = true;
-      
-      // Notificar o componente pai sobre as alterações
+      // Verificar se já temos alterações pendentes antes de notificar
       if (pendingChangesRef.current.length > 0) {
+        // Ativar a flag de sincronização
+        shouldSyncRef.current = true;
+        
+        // Notificar o componente pai sobre as alterações
         notifyParentOfChanges(pendingChangesRef.current);
       }
     }
