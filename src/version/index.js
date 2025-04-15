@@ -1,9 +1,9 @@
-// Gerado automaticamente em 2025-03-29T01:46:57.433Z
+// Gerado automaticamente em 2025-04-15T00:30:27.793Z
 module.exports = {
-  "commitHash": "eff97e9",
+  "commitHash": "87d7cf7",
   "branch": "master",
-  "commitDate": "2025-03-28",
-  "commitTime": "22:36:19",
-  "commitMessage": "corrigido erro em deletedquestionshnndler",
-  "buildDate": "2025-03-29T01:46:57.432Z"
+  "commitDate": "2025-04-14",
+  "commitTime": "21:28:09",
+  "commitMessage": "agora tem peso automatico na hora de criar o grupo",
+  "buildDate": "2025-04-15T00:30:27.793Z"
 };

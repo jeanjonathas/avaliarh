@@ -50,6 +50,7 @@ interface OpinionQuestionWizardProps {
   initialData?: any;
   isEditing?: boolean;
   questionType?: string;
+  categoriesEndpoint?: string;
 }
 
 interface SystemCategory {
@@ -63,7 +64,8 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
   onCancel, 
   initialData = null,
   isEditing = false,
-  questionType
+  questionType,
+  categoriesEndpoint
 }) => {
   const router = useRouter();
   const [step, setStep] = useState(1);
@@ -144,7 +146,10 @@ const OpinionQuestionWizard: React.FC<OpinionQuestionWizardProps> = ({
     const fetchSystemCategories = async () => {
       try {
         console.log("Buscando categorias do sistema...");
-        const endpoint = '/api/admin/categories';
+        // Usar o endpoint personalizado se fornecido, caso contrário usar o padrão
+        const endpoint = categoriesEndpoint || '/api/admin/categories';
+        console.log(`Usando endpoint para categorias: ${endpoint}`);
+        
         const response = await fetch(endpoint, {
           // Adicionar cabeçalhos para evitar problemas de cache
           headers: {
