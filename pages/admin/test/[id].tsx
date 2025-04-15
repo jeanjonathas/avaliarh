@@ -713,7 +713,8 @@ const TestDetail: NextPage = () => {
     }
   };
 
-  const filteredQuestions = availableQuestions.filter(question => {
+  // Garantir que availableQuestions seja sempre um array antes de aplicar o filtro
+  const filteredQuestions = (Array.isArray(availableQuestions) ? availableQuestions : []).filter(question => {
     // Excluir perguntas que já estão sendo usadas no teste
     if (questionsAlreadyInTest.includes(question.id)) {
       console.log(`[Filter] Pergunta ${question.id} rejeitada: já está sendo usada no teste`);
