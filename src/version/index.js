@@ -1,9 +1,9 @@
-// Gerado automaticamente em 2025-04-15T00:30:27.793Z
+// Gerado automaticamente em 2026-03-23T19:55:56.252Z
 module.exports = {
-  "commitHash": "87d7cf7",
+  "commitHash": "025b71c",
   "branch": "master",
   "commitDate": "2025-04-14",
-  "commitTime": "21:28:09",
-  "commitMessage": "agora tem peso automatico na hora de criar o grupo",
-  "buildDate": "2025-04-15T00:30:27.793Z"
+  "commitTime": "22:15:48",
+  "commitMessage": "erro ao carregar perguntas",
+  "buildDate": "2026-03-23T19:55:56.251Z"
 };

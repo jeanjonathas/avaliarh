@@ -72,7 +72,9 @@ const TrainingModules: NextPage = () => {
     setLoading(true);
     axios.get(`/api/admin/training/modules?courseId=${courseId}`)
       .then(response => {
-        const modulesData = Array.isArray(response.data) ? response.data : [];
+        const modulesData = response.data.modules && Array.isArray(response.data.modules) 
+          ? response.data.modules 
+          : [];
         setModules(modulesData);
         setLoading(false);
       })
@@ -226,13 +228,13 @@ const TrainingModules: NextPage = () => {
                     
                     <div className="mt-4 flex justify-between">
                       <Link
-                        href={`/admin/training/modules/${module.id}/lessons`}
+                        href={`/admin/training/lessons?moduleId=${module.id}`}
                         className="px-3 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors duration-200 text-sm"
                       >
                         Ver Aulas
                       </Link>
                       <Link
-                        href={`/admin/training/modules/${module.id}`}
+                        href={`/admin/training/lessons?moduleId=${module.id}`}
                         className="px-3 py-1 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors duration-200 text-sm"
                       >
                         Gerenciar Módulo

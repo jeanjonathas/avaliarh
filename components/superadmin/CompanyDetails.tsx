@@ -77,7 +77,7 @@ const CompanyDetails: React.FC<CompanyDetailsProps> = ({ company, onClose }) => 
           <div className="space-y-3">
             <div>
               <p className="text-sm font-medium text-gray-500">Plano</p>
-              <p className="mt-1 text-sm text-gray-900">{company.plan}</p>
+              <p className="mt-1 text-sm text-gray-900">{company.plan || company.planType}</p>
             </div>
             <div>
               <p className="text-sm font-medium text-gray-500">Data de Criação</p>

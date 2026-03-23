@@ -1,8 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import { prisma, reconnectPrisma } from '@/lib/prisma';
-import { countUsersForCompany } from '@/lib/user-counter';
+import { authOptions } from '../../auth/[...nextauth]';
+import { prisma, reconnectPrisma } from '../../../../lib/prisma';
+import { countUsersForCompany } from '../../../../lib/user-counter';
 
 // Função para normalizar CNPJ (remover formatação)
 function normalizeCNPJ(cnpj: string | null | undefined): string | null {
@@ -45,6 +45,9 @@ async function getCompanies(req: NextApiRequest, res: NextApiResponse) {
     
     // Buscar empresas com ordenação por nome
     const companies = await prisma.company.findMany({
+      include: {
+        plan: true
+      },
       orderBy: {
         name: 'asc'
       },
@@ -92,6 +95,7 @@ async function getCompanies(req: NextApiRequest, res: NextApiResponse) {
       
       return {
         ...company,
+        planType: (company as any).plan?.name || company.planType,
         createdAt: company.createdAt?.toISOString() || null,
         updatedAt: company.updatedAt?.toISOString() || null,
         lastPaymentDate: company.lastPaymentDate?.toISOString() || null,

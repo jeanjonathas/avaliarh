@@ -126,7 +126,7 @@ export default async function handler(
       LIMIT 10
     `;
 
-    return res.status(200).json({
+    const data = {
       courses,
       enrollmentStats,
       accessStats,
@@ -136,7 +136,14 @@ export default async function handler(
         endDate,
         courseId
       }
-    });
+    };
+
+    // Serializar BigInt para evitar erros de JSON.stringify
+    const serializedData = JSON.parse(JSON.stringify(data, (key, value) =>
+      typeof value === 'bigint' ? Number(value) : value
+    ));
+
+    return res.status(200).json(serializedData);
   } catch (error) {
     console.error('Erro ao buscar estatísticas de treinamento:', error);
     

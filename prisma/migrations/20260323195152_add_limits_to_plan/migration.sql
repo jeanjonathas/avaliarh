@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Plan" ADD COLUMN     "maxCandidates" INTEGER NOT NULL DEFAULT 100,
+ADD COLUMN     "maxUsers" INTEGER NOT NULL DEFAULT 10;

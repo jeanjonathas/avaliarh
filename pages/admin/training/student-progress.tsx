@@ -87,7 +87,7 @@ const StudentProgressPage: NextPage = () => {
 
           // Acessar os dados com a nova estrutura de resposta
           setStudents(studentsRes.data?.students || []);
-          setCourses(coursesRes.data?.courses || []);
+          setCourses(Array.isArray(coursesRes.data) ? coursesRes.data : []);
           setModules(modulesRes.data?.modules || []);
           setProgressData(progressRes.data?.progress || []);
           setFilteredProgressData(progressRes.data?.progress || []);

@@ -9,36 +9,37 @@ datasource db {
 }
 
 model Company {
-  id                String              @id @default(uuid())
-  name              String
-  cnpj              String?             @unique
-  isActive          Boolean             @default(true)
-  maxUsers          Int                 @default(10)
-  maxCandidates     Int                 @default(100)
-  lastPaymentDate   DateTime?
-  trialEndDate      DateTime?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  planId            String?
-  planType          String              @default("Free")
-  candidates        Candidate[]
-  candidateProgress CandidateProgress[]
-  plan              Plan?               @relation(fields: [planId], references: [id])
-  globalAccess      GlobalAccess[]
-  paymentHistory    PaymentHistory[]
-  questions         Question[]
-  responses         Response[]
-  processes         SelectionProcess[]
-  students          Student[]
-  subscription      Subscription?
-  tests             Test[]
-  testInvitations   TestInvitation[]
-  trainingCourses   TrainingCourse[]
-  trainingMaterials TrainingMaterial[]
-  trainingSectors   TrainingSector[]
-  trainingTests     TrainingTest[]
-  usedInviteCodes   UsedInviteCode[]
-  users             User[]
+  id                   String                @id @default(uuid())
+  name                 String
+  cnpj                 String?               @unique
+  isActive             Boolean               @default(true)
+  maxUsers             Int                   @default(10)
+  maxCandidates        Int                   @default(100)
+  lastPaymentDate      DateTime?
+  trialEndDate         DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  planId               String?
+  planType             String                @default("Free")
+  candidates           Candidate[]
+  candidateProgress    CandidateProgress[]
+  plan                 Plan?                 @relation(fields: [planId], references: [id])
+  globalAccess         GlobalAccess[]
+  paymentHistory       PaymentHistory[]
+  questions            Question[]
+  responses            Response[]
+  processes            SelectionProcess[]
+  students             Student[]
+  subscription         Subscription?
+  tests                Test[]
+  testInvitations      TestInvitation[]
+  trainingCertificates TrainingCertificate[]
+  trainingCourses      TrainingCourse[]
+  trainingMaterials    TrainingMaterial[]
+  trainingSectors      TrainingSector[]
+  trainingTests        TrainingTest[]
+  usedInviteCodes      UsedInviteCode[]
+  users                User[]
 }
 
 model User {
@@ -56,49 +57,49 @@ model User {
 }
 
 model Candidate {
-  id             String              @id @default(uuid())
-  name           String
-  email          String
-  phone          String?
-  position       String?
-  birthDate      DateTime?           // Novo campo para data de nascimento
-  gender         String?             // Campo para armazenar o sexo do candidato
-  testDate       DateTime?
-  completed      Boolean             @default(false)
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  infoJobsLink   String?
-  interviewDate  DateTime?
-  observations   String?
-  rating         Float?
-  resumeFile     String?
-  socialMediaUrl String?
-  status         Status              @default(PENDING)
-  inviteCode     String?             @unique
-  inviteSent     Boolean             @default(false)
-  inviteAttempts Int                 @default(0)
-  inviteExpires  DateTime?
-  resumeUrl      String?
-  testId         String?
-  timeSpent      Int?                @default(0)
-  photoUrl       String?
-  score          Int?                @default(0)
-  requestPhoto   Boolean             @default(true)
-  showResults    Boolean             @default(true)
-  requiresProfileCompletion Boolean  @default(false)  // Indica se o candidato precisa completar o perfil
-  instagram      String?
-  companyId      String
-  overallStatus  ApprovalStatus      @default(PENDING_EVALUATION)
-  processId      String?
-  interviewNotes Json?
-  company        Company             @relation(fields: [companyId], references: [id])
-  process        SelectionProcess?   @relation(fields: [processId], references: [id])
-  test           Test?               @relation(fields: [testId], references: [id])
-  progresses     CandidateProgress[]
-  responses      Response[]
-  convertedTo    Student?
-  testInvites    TestInvitation[]
-  inviteHistory  UsedInviteCode[]
+  id                        String              @id @default(uuid())
+  name                      String
+  email                     String
+  phone                     String?
+  position                  String?
+  testDate                  DateTime?
+  completed                 Boolean             @default(false)
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+  infoJobsLink              String?
+  interviewDate             DateTime?
+  observations              String?
+  rating                    Float?
+  resumeFile                String?
+  socialMediaUrl            String?
+  status                    Status              @default(PENDING)
+  inviteCode                String?             @unique
+  inviteSent                Boolean             @default(false)
+  inviteAttempts            Int                 @default(0)
+  inviteExpires             DateTime?
+  resumeUrl                 String?
+  testId                    String?
+  timeSpent                 Int?                @default(0)
+  photoUrl                  String?
+  score                     Int?                @default(0)
+  requestPhoto              Boolean             @default(true)
+  showResults               Boolean             @default(true)
+  instagram                 String?
+  companyId                 String
+  overallStatus             ApprovalStatus      @default(PENDING_EVALUATION)
+  processId                 String?
+  interviewNotes            Json?
+  birthDate                 DateTime?
+  gender                    String?
+  requiresProfileCompletion Boolean             @default(false)
+  company                   Company             @relation(fields: [companyId], references: [id])
+  process                   SelectionProcess?   @relation(fields: [processId], references: [id])
+  test                      Test?               @relation(fields: [testId], references: [id])
+  progresses                CandidateProgress[]
+  responses                 Response[]
+  convertedTo               Student?
+  testInvites               TestInvitation[]
+  inviteHistory             UsedInviteCode[]
 }
 
 model SelectionProcess {
@@ -239,23 +240,23 @@ model TestStage {
 model Question {
   id               String          @id @default(uuid())
   text             String
-  stageId          String?         // Tornando o campo opcional com ?
+  stageId          String?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
   companyId        String?
   difficulty       DifficultyLevel @default(MEDIUM)
   globalQuestionId String?
   showResults      Boolean         @default(true)
-  deleted          Boolean         @default(false)
   type             QuestionType    @default(MULTIPLE_CHOICE)
   categoryId       String?         @db.Uuid
   emotionGroupId   String?
   questionType     String          @default("selection")
+  deleted          Boolean         @default(false)
   options          Option[]
   company          Company?        @relation(fields: [companyId], references: [id])
   emotionGroup     EmotionGroup?   @relation(fields: [emotionGroupId], references: [id])
   globalQuestion   GlobalQuestion? @relation(fields: [globalQuestionId], references: [id])
-  stage            Stage?          @relation(fields: [stageId], references: [id])  // Tornando a relação opcional com ?
+  stage            Stage?          @relation(fields: [stageId], references: [id])
   responses        Response[]
   categories       Category[]      @relation("CategoryToQuestion")
 }
@@ -341,21 +342,22 @@ model UsedInviteCode {
 }
 
 model Student {
-  id                String              @id @default(uuid())
-  enrollmentDate    DateTime            @default(now())
-  progress          Float               @default(0)
-  userId            String              @unique
-  convertedFromId   String?             @unique
+  id                String                @id @default(uuid())
+  enrollmentDate    DateTime              @default(now())
+  progress          Float                 @default(0)
+  userId            String                @unique
+  convertedFromId   String?               @unique
   companyId         String
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
   courseEnrollments CourseEnrollment[]
   lessonProgress    LessonProgress[]
-  company           Company             @relation(fields: [companyId], references: [id])
-  convertedFrom     Candidate?          @relation(fields: [convertedFromId], references: [id])
-  user              User                @relation(fields: [userId], references: [id])
+  company           Company               @relation(fields: [companyId], references: [id])
+  convertedFrom     Candidate?            @relation(fields: [convertedFromId], references: [id])
+  user              User                  @relation(fields: [userId], references: [id])
   testAttempts      TestAttempt[]
   accessLogs        TrainingAccessLog[]
+  certificates      TrainingCertificate[]
 }
 
 model Category {
@@ -377,6 +379,8 @@ model Plan {
   isActive      Boolean        @default(true)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+  maxCandidates Int            @default(100)
+  maxUsers      Int            @default(10)
   companies     Company[]
   features      PlanFeature[]
   subscriptions Subscription[]
@@ -500,22 +504,23 @@ model EmotionGroup {
 }
 
 model TrainingCourse {
-  id                String              @id @default(uuid())
+  id                String                @id @default(uuid())
   name              String
   description       String?
   sectorId          String?
   companyId         String
-  showResults       Boolean             @default(true)
-  finalTestRequired Boolean             @default(false)
+  showResults       Boolean               @default(true)
+  finalTestRequired Boolean               @default(false)
   finalTestId       String?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
   imageUrl          String?
   enrollments       CourseEnrollment[]
   accessLogs        TrainingAccessLog[]
-  company           Company             @relation(fields: [companyId], references: [id])
-  finalTest         TrainingTest?       @relation("CourseFinalTest", fields: [finalTestId], references: [id])
-  sector            TrainingSector?     @relation(fields: [sectorId], references: [id])
+  certificates      TrainingCertificate[]
+  company           Company               @relation(fields: [companyId], references: [id])
+  finalTest         TrainingTest?         @relation("CourseFinalTest", fields: [finalTestId], references: [id])
+  sector            TrainingSector?       @relation(fields: [sectorId], references: [id])
   modules           TrainingModule[]
 }
 
@@ -691,6 +696,23 @@ model TrainingMaterial {
   company     Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   lesson      TrainingLesson? @relation(fields: [lessonId], references: [id])
   module      TrainingModule  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+}
+
+model TrainingCertificate {
+  id                String         @id @default(uuid())
+  studentId         String
+  courseId          String
+  companyId         String
+  issueDate         DateTime       @default(now())
+  expiryDate        DateTime?
+  certificateNumber String         @unique
+  status            String         @default("valid")
+  downloadUrl       String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  company           Company        @relation(fields: [companyId], references: [id])
+  course            TrainingCourse @relation(fields: [courseId], references: [id])
+  student           Student        @relation(fields: [studentId], references: [id])
 }
 
 enum Role {

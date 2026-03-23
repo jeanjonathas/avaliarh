@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { authOptions } from '../../auth/[...nextauth]';
+import { prisma, reconnectPrisma } from '../../../../lib/prisma';
 
 
 
@@ -41,7 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         orderBy: {
           price: 'asc',
         },
-      });
+      }) as any[];
 
       // Formatar os dados para o frontend
       const formattedPlans = plans.map(plan => {
@@ -50,6 +50,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           name: plan.name,
           description: plan.description,
           price: plan.price,
+          maxUsers: plan.maxUsers,
+          maxCandidates: plan.maxCandidates,
           isActive: plan.isActive,
           features: plan.features.map(pf => ({
             id: pf.feature.id,
@@ -73,7 +75,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // POST - Criar um novo plano
     if (req.method === 'POST') {
-      const { name, description, price, isActive } = req.body;
+      const { name, description, price, maxUsers, maxCandidates, isActive } = req.body;
 
       if (!name || price === undefined) {
         return res.status(400).json({ message: 'Nome e preço são obrigatórios' });
@@ -85,12 +87,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           name,
           description: description || null,
           price: parseFloat(price.toString()),
+          maxUsers: maxUsers || 10,
+          maxCandidates: maxCandidates || 100,
           isActive: isActive !== undefined ? isActive : true,
-        },
+        } as any,
         include: {
           companies: true,
         },
-      });
+      }) as any;
 
       // Formatar a resposta
       const response = {
@@ -98,6 +102,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         name: newPlan.name,
         description: newPlan.description,
         price: newPlan.price,
+        maxUsers: newPlan.maxUsers,
+        maxCandidates: newPlan.maxCandidates,
         isActive: newPlan.isActive,
         features: [],
         companiesCount: 0,

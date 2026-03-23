@@ -152,7 +152,7 @@ const CompanyList: React.FC<CompanyListProps> = ({
                       : (company.userCount !== undefined 
                           ? company.userCount 
                           : 0)
-                    }
+                    } / {company.maxUsers || 10}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {company._candidateCount !== undefined 
@@ -160,7 +160,7 @@ const CompanyList: React.FC<CompanyListProps> = ({
                       : (company.candidateCount !== undefined 
                           ? company.candidateCount 
                           : 0)
-                    }
+                    } / {company.maxCandidates || 100}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {company.createdAt ? new Date(company.createdAt).toLocaleDateString() : '-'}

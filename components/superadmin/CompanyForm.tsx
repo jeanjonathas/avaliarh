@@ -16,6 +16,13 @@ interface Company {
   updatedAt: Date;
 }
 
+interface Plan {
+  id: string;
+  name: string;
+  maxUsers: number;
+  maxCandidates: number;
+}
+
 interface CompanyFormProps {
   company?: Company | null;
   onSubmit: (companyData: Partial<Company>) => void;
@@ -30,19 +37,42 @@ const CompanyForm: React.FC<CompanyFormProps> = ({
   const [formData, setFormData] = useState<Partial<Company>>({
     name: '',
     cnpj: '',
+    planId: '',
     planType: 'Free',
     isActive: true,
     maxUsers: 10,
     maxCandidates: 100,
   });
 
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        setLoadingPlans(true);
+        const response = await fetch('/api/superadmin/plans');
+        if (response.ok) {
+          const data = await response.json();
+          setPlans(data);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar planos:', error);
+      } finally {
+        setLoadingPlans(false);
+      }
+    };
+
+    fetchPlans();
+  }, []);
 
   useEffect(() => {
     if (company) {
       setFormData({
         name: company.name,
         cnpj: company.cnpj || '',
+        planId: company.planId || '',
         planType: company.planType,
         isActive: company.isActive,
         maxUsers: company.maxUsers,
@@ -69,6 +99,19 @@ const CompanyForm: React.FC<CompanyFormProps> = ({
       setFormData(prev => ({ ...prev, [name]: value ? parseInt(value) : null }));
     } else if (type === 'date') {
       setFormData(prev => ({ ...prev, [name]: value ? new Date(value) : null }));
+    } else if (name === 'planType') {
+      const selectedPlan = plans.find(p => p.name === value);
+      if (selectedPlan) {
+        setFormData(prev => ({ 
+          ...prev, 
+          [name]: value,
+          planId: selectedPlan.id,
+          maxUsers: selectedPlan.maxUsers,
+          maxCandidates: selectedPlan.maxCandidates
+        }));
+      } else {
+        setFormData(prev => ({ ...prev, [name]: value }));
+      }
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
@@ -184,13 +227,35 @@ const CompanyForm: React.FC<CompanyFormProps> = ({
               name="planType"
               value={formData.planType}
               onChange={handleChange}
+              disabled={loadingPlans}
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 ${
                 errors.planType ? 'border-red-500' : 'border-gray-300'
-              }`}
+              } ${loadingPlans ? 'bg-gray-100 cursor-not-allowed' : ''}`}
             >
-              <option value="Free">Free</option>
-              <option value="Pro">Pro</option>
-              <option value="Enterprise">Enterprise</option>
+              {plans.length > 0 ? (
+                <>
+                  {plans.map((plan) => (
+                    <option key={plan.id} value={plan.name}>
+                      {plan.name}
+                    </option>
+                  ))}
+                  {/* Se o plano atual não estiver na lista dinâmica, exibi-lo como opção */}
+                  {formData.planType && !plans.some(p => p.name === formData.planType) && (
+                    <option value={formData.planType}>{formData.planType}</option>
+                  )}
+                </>
+              ) : (
+                <>
+                  <option value="Free">Free</option>
+                  <option value="Pro">Pro</option>
+                  <option value="Premium">Premium</option>
+                  <option value="Enterprise">Enterprise</option>
+                  {/* Fallback para outros tipos de plano que possam existir no banco */}
+                  {formData.planType && !['Free', 'Pro', 'Premium', 'Enterprise'].includes(formData.planType) && (
+                    <option value={formData.planType}>{formData.planType}</option>
+                  )}
+                </>
+              )}
             </select>
             {errors.planType && (
               <p className="mt-1 text-sm text-red-500">{errors.planType}</p>

@@ -118,8 +118,10 @@ const MaterialsPage: NextPage = () => {
       setLoading(true);
       axios.get(`/api/admin/training/modules?courseId=${selectedCourseId}`)
         .then(response => {
-          const modulesData = Array.isArray(response.data) ? response.data : [];
-          setModules(modulesData);
+        const modulesData = response.data.modules && Array.isArray(response.data.modules) 
+          ? response.data.modules 
+          : [];
+        setModules(modulesData);
           setSelectedModuleId('');
           setSelectedLessonId('');
           setLessons([]);

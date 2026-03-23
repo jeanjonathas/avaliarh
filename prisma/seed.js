@@ -4,92 +4,68 @@ const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 
 async function main() {
-  // Verificar se já existe um superadmin
-  const superAdminCount = await prisma.user.count({
-    where: {
-      role: 'SUPER_ADMIN'
-    }
-  });
-  
-  if (superAdminCount === 0) {
-    // Criar superadmin com as credenciais fornecidas
-    const hashedPassword = await bcrypt.hash('Je@nfree16', 10);
-    
-    // Criar usuário no modelo User com o papel de SUPER_ADMIN
-    await prisma.user.create({
-      data: {
-        name: 'Jean Jonathas',
-        email: 'jeanjonathasfb@gmail.com',
-        password: hashedPassword,
-        role: 'SUPER_ADMIN',
-      },
-    });
-    
-    console.log('Superadmin criado com sucesso:');
-    console.log('Email: jeanjonathasfb@gmail.com');
-    console.log('Senha: Je@nfree16');
-  } else {
-    console.log('Superadmin já existe, pulando criação.');
-  }
+  console.log('🌱 Iniciando seeding do banco de dados...');
 
-  // Verificar se já existe a empresa Dr. Animal
-  const drAnimalCount = await prisma.company.count({
-    where: {
-      cnpj: '37256198000189'
-    }
+  // 1. Criar ou buscar a empresa Dr. Animal
+  const drAnimal = await prisma.company.upsert({
+    where: { cnpj: '37256198000189' },
+    update: {},
+    create: {
+      name: 'Dr. Animal',
+      cnpj: '37256198000189',
+      isActive: true,
+      maxUsers: 50,
+      maxCandidates: 500,
+      planType: 'Premium',
+    },
   });
 
-  if (drAnimalCount === 0) {
-    // Criar a empresa Dr. Animal
-    const drAnimal = await prisma.company.create({
-      data: {
-        name: 'Dr. Animal',
-        cnpj: '37256198000189',
-        isActive: true,
-        maxUsers: 50,
-        maxCandidates: 500,
-        planType: 'Premium',
-      }
-    });
+  console.log(`✅ Empresa: ${drAnimal.name} (${drAnimal.id})`);
 
-    console.log('Empresa Dr. Animal criada com sucesso:', drAnimal.id);
+  const hashedPassword = await bcrypt.hash('Je@nfree16', 10);
 
-    // Verificar se já existe o usuário COMPANY_ADMIN para Dr. Animal
-    const companyAdminCount = await prisma.user.count({
-      where: {
-        email: 'jean@dranimal.com.br'
-      }
-    });
+  // 2. Criar ou atualizar SuperAdmin
+  const superAdmin = await prisma.user.upsert({
+    where: { email: 'jeanjonathasfb@gmail.com' },
+    update: {
+      companyId: drAnimal.id,
+      role: 'SUPER_ADMIN',
+    },
+    create: {
+      name: 'Jean Jonathas',
+      email: 'jeanjonathasfb@gmail.com',
+      password: hashedPassword,
+      role: 'SUPER_ADMIN',
+      companyId: drAnimal.id,
+    },
+  });
 
-    if (companyAdminCount === 0) {
-      // Criar usuário COMPANY_ADMIN
-      const hashedPassword = await bcrypt.hash('Je@nfree16', 10);
-      
-      const companyAdmin = await prisma.user.create({
-        data: {
-          name: 'Jean Administrador',
-          email: 'jean@dranimal.com.br',
-          password: hashedPassword,
-          role: 'COMPANY_ADMIN',
-          companyId: drAnimal.id,
-        }
-      });
-      
-      console.log('Administrador da empresa criado com sucesso:');
-      console.log('Email: jean@dranimal.com.br');
-      console.log('Senha: Je@nfree16');
-      console.log('Empresa: Dr. Animal');
-    } else {
-      console.log('Administrador da empresa já existe, pulando criação.');
-    }
-  } else {
-    console.log('Empresa Dr. Animal já existe, pulando criação.');
-  }
+  console.log(`✅ SuperAdmin: ${superAdmin.email} vinculado à ${drAnimal.name}`);
+
+  // 3. Criar ou atualizar CompanyAdmin
+  const companyAdmin = await prisma.user.upsert({
+    where: { email: 'jean@dranimal.com.br' },
+    update: {
+      companyId: drAnimal.id,
+      role: 'COMPANY_ADMIN',
+    },
+    create: {
+      name: 'Jean Administrador',
+      email: 'jean@dranimal.com.br',
+      password: hashedPassword,
+      role: 'COMPANY_ADMIN',
+      companyId: drAnimal.id,
+    },
+  });
+
+  console.log(`✅ CompanyAdmin: ${companyAdmin.email} vinculado à ${drAnimal.name}`);
+
+  console.log('🌱 Seeding finalizado com sucesso!');
 }
 
 main()
   .catch((e) => {
-    console.error(e);
+    console.error('❌ Erro durante o seeding:', e);
     process.exit(1);
   })
   .finally(async () => {

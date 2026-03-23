@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { authOptions } from '../../auth/[...nextauth]';
+import { prisma, reconnectPrisma } from '../../../../lib/prisma';
 import { ReadStream } from 'fs';
 import { join } from 'path';
 
@@ -68,7 +68,13 @@ async function getCompany(req: NextApiRequest, res: NextApiResponse, id: string)
         id: true,
         name: true,
         cnpj: true,
+        planId: true,
         planType: true,
+        plan: {
+          select: {
+            name: true
+          }
+        },
         isActive: true,
         maxUsers: true,
         maxCandidates: true,
@@ -99,6 +105,7 @@ async function getCompany(req: NextApiRequest, res: NextApiResponse, id: string)
     console.log(`[COMPANY] Serializando empresa ${id} para o frontend`);
     const serializedCompany = {
       ...company,
+      planType: (company as any).plan?.name || company.planType,
       userCount: company._count.users,
       candidateCount: company._count.candidates,
       testCount: company._count.questions, // Usamos questions como proxy para testes
@@ -150,6 +157,7 @@ async function updateCompany(req: NextApiRequest, res: NextApiResponse, id: stri
       name,
       cnpj,
       planType,
+      planId,
       isActive,
       maxUsers,
       maxCandidates,
@@ -192,6 +200,7 @@ async function updateCompany(req: NextApiRequest, res: NextApiResponse, id: stri
         name,
         cnpj: cnpj || null,
         planType,
+        planId: planId || null,
         isActive: isActive !== undefined ? isActive : true,
         maxUsers: maxUsers || 10,
         maxCandidates: maxCandidates || 100,

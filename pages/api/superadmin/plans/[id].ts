@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import { prisma, reconnectPrisma } from '@/lib/prisma';
+import { authOptions } from '../../auth/[...nextauth]';
+import { prisma, reconnectPrisma } from '../../../../lib/prisma';
 
 
 
@@ -46,7 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             },
           },
         },
-      });
+      }) as any;
 
       if (!plan) {
         return res.status(404).json({ message: 'Plano não encontrado' });
@@ -58,6 +58,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         name: plan.name,
         description: plan.description,
         price: plan.price,
+        maxUsers: plan.maxUsers,
+        maxCandidates: plan.maxCandidates,
         isActive: plan.isActive,
         features: plan.features.map(pf => ({
           id: pf.feature.id,
@@ -87,7 +89,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // PUT - Atualizar um plano
     if (req.method === 'PUT') {
-      const { name, description, price, isActive } = req.body;
+      const { name, description, price, maxUsers, maxCandidates, isActive } = req.body;
 
       if (!name || price === undefined) {
         return res.status(400).json({ message: 'Nome e preço são obrigatórios' });
@@ -109,8 +111,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           name,
           description: description || null,
           price: parseFloat(price.toString()),
+          maxUsers: maxUsers || 10,
+          maxCandidates: maxCandidates || 100,
           isActive: isActive !== undefined ? isActive : true,
-        },
+        } as any,
         include: {
           features: {
             include: {
@@ -119,7 +123,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           },
           companies: true,
         },
-      });
+      }) as any;
 
       // Formatar a resposta
       const response = {
@@ -127,6 +131,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         name: updatedPlan.name,
         description: updatedPlan.description,
         price: updatedPlan.price,
+        maxUsers: updatedPlan.maxUsers,
+        maxCandidates: updatedPlan.maxCandidates,
         isActive: updatedPlan.isActive,
         features: updatedPlan.features.map(pf => ({
           id: pf.feature.id,
