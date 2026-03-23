@@ -4,12 +4,12 @@ services:
     image: node:18
     entrypoint: ["/bin/bash", "-c"]
     command: [
-      "git clone https://github.com/jeanjonathas/avaliarh.git /tmp/app && cd /tmp/app && npm install --no-fund --no-audit --legacy-peer-deps && npx prisma generate && cp /opt/avaliarh/.env /tmp/app/.env && node scripts/setup-db-config.js && npx prisma migrate deploy && npx prisma db seed && npm run build && NODE_ENV=production npm run start"
+      "rm -rf /tmp/app && git clone https://github.com/jeanjonathas/avaliarh.git /tmp/app && cd /tmp/app && npm install --no-fund --no-audit --legacy-peer-deps && npx prisma generate && (cp /opt/avaliarh/.env /tmp/app/.env || echo '.env not found as file') && node scripts/setup-db-config.js && npx prisma migrate deploy && npx prisma db seed && npm run build && NODE_ENV=production npm run start"
     ]
     environment:
-      - DATABASE_URL=postgresql://postgres:02e821629ceff274c853f24327a36132@avaliarh_postgres:5432/avaliacao_candidatos?schema=public
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-02e821629ceff274c853f24327a36132}@avaliarh-db:5432/${POSTGRES_DB:-avaliacao_candidatos}?schema=public
       - NODE_ENV=production
-      - NEXTAUTH_SECRET=02e821629ceff274c853f24327a36132
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-02e821629ceff274c853f24327a36132}
       - NEXTAUTH_URL=https://admitto.com.br
       - NEXTAUTH_URL_INTERNAL=http://localhost:3000
       - NEXT_PUBLIC_DOMAIN=admitto.com.br
@@ -17,9 +17,10 @@ services:
     volumes:
       - /opt/avaliarh/.env:/opt/avaliarh/.env
     networks:
-      - avaliarh_network
+      - public
     depends_on:
-      - avaliarh_postgres
+      db:
+        condition: service_healthy
     deploy:
       mode: replicated
       replicas: 1
@@ -36,22 +37,22 @@ services:
         - traefik.http.routers.avaliarh.rule=Host(`admitto.com.br`) || Host(`admitto.app`)
         - traefik.http.routers.avaliarh.entrypoints=websecure
         - traefik.http.routers.avaliarh.tls=true
-        - traefik.http.routers.avaliarh.tls.certresolver=letsencryptresolver
+        - traefik.http.routers.avaliarh.tls.certresolver=myresolver
         - traefik.http.services.avaliarh.loadbalancer.server.port=3000
         - traefik.http.services.avaliarh.loadbalancer.passHostHeader=true
         - traefik.http.routers.avaliarh.service=avaliarh
 
-  postgres:
-    image: postgres:14
-    container_name: avaliarh_postgres
+  db:
+    image: postgres:15-alpine
+    container_name: avaliarh-db
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - avaliarh_network
+      - public
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=02e821629ceff274c853f24327a36132
-      - POSTGRES_DB=avaliacao_candidatos
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-02e821629ceff274c853f24327a36132}
+      - POSTGRES_DB=${POSTGRES_DB:-avaliacao_candidatos}
     deploy:
       mode: replicated
       replicas: 1
@@ -63,7 +64,7 @@ services:
           cpus: "0.5"
           memory: 1024M
       restart_policy:
-        condition: any
+        condition: on-failure
         delay: 5s
         max_attempts: 3
         window: 120s
@@ -78,6 +79,6 @@ volumes:
     name: avaliarh_postgres_data
 
 networks:
-  avaliarh_network:
+  public:
     external: true
-    name: ralliugaNet
+    name: traefik-public
