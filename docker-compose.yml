@@ -7,7 +7,7 @@ services:
       "rm -rf /tmp/app && git clone https://github.com/jeanjonathas/avaliarh.git /tmp/app && cd /tmp/app && npm install --no-fund --no-audit --legacy-peer-deps && npx prisma generate && (cp /opt/avaliarh/.env /tmp/app/.env || echo '.env not found as file') && node scripts/setup-db-config.js && npx prisma migrate deploy && npx prisma db seed && npm run build && NODE_ENV=production npm run start"
     ]
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-02e821629ceff274c853f24327a36132}@avaliarh-db:5432/${POSTGRES_DB:-avaliacao_candidatos}?schema=public
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-02e821629ceff274c853f24327a36132}@avaliarh_postgres:5432/${POSTGRES_DB:-avaliacao_candidatos}?schema=public
       - NODE_ENV=production
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-02e821629ceff274c853f24327a36132}
       - NEXTAUTH_URL=https://admitto.com.br
@@ -19,7 +19,7 @@ services:
     networks:
       - public
     depends_on:
-      db:
+      avaliarh_postgres:
         condition: service_healthy
     deploy:
       mode: replicated
@@ -39,12 +39,10 @@ services:
         - traefik.http.routers.avaliarh.tls=true
         - traefik.http.routers.avaliarh.tls.certresolver=myresolver
         - traefik.http.services.avaliarh.loadbalancer.server.port=3000
-        - traefik.http.services.avaliarh.loadbalancer.passHostHeader=true
-        - traefik.http.routers.avaliarh.service=avaliarh
 
-  db:
+  avaliarh_postgres:
     image: postgres:15-alpine
-    container_name: avaliarh-db
+    container_name: avaliarh_postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
