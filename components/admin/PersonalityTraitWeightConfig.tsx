@@ -172,7 +172,16 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
       }
       
       const data = await response.json();
-      const questions = Array.isArray(data) ? data : [];
+      
+      // Ajustar para lidar com resposta paginada { items: [...], totalItems: ... }
+      let questions = [];
+      if (Array.isArray(data)) {
+        questions = data;
+      } else if (data && data.items && Array.isArray(data.items)) {
+        questions = data.items;
+      } else if (data && data.questions && Array.isArray(data.questions)) {
+        questions = data.questions;
+      }
       
       console.log('Resposta da API:', data);
       console.log('Questões encontradas:', questions);

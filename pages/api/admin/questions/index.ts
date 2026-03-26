@@ -1,4 +1,3 @@
-/// <reference types="next" />
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/pages/api/auth/[...nextauth]'
@@ -12,16 +11,11 @@ export default async function handler(
   // Verificar autenticação
   const session = await getServerSession(req, res, authOptions)
   
-  // Log para depuração
-  console.log('[PRISMA] Verificando sessão em questions:', session ? 'Autenticado' : 'Não autenticado');
-  
   if (!session) {
-    console.log('[PRISMA] Erro de autenticação: Sessão não encontrada');
     return res.status(401).json({ error: 'Não autorizado' })
   }
 
   // Garantir que temos uma conexão fresca com o banco de dados
-  console.log('[PRISMA] Forçando reconexão do Prisma antes de buscar questões');
   await reconnectPrisma();
 
   if (req.method === 'GET') {
@@ -269,7 +263,8 @@ export default async function handler(
               text: option.text,
               isCorrect: option.isCorrect,
               categoryName: option.categoryName || option.category?.name || null,
-              categoryId: option.categoryId || option.category?.id || null,
+              categoryId: option.categoryId || option.category?.id || option.categoryNameUuid || null, // Usar UUID se disponível para traços
+              categoryNameUuid: option.categoryNameUuid || null,
               weight: option.weight || 0,
               position: option.position || 0,
               explanation: option.explanation || null
