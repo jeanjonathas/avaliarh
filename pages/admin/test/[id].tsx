@@ -218,7 +218,7 @@ const TestDetail: NextPage = () => {
         setCategories(categoriesData)
         
         // Buscar todas as perguntas
-        const questionsResponse = await fetch('/api/admin/questions')
+        const questionsResponse = await fetch('/api/admin/questions?limit=1000')
         if (!questionsResponse.ok) {
           throw new Error('Erro ao carregar as perguntas')
         }
@@ -659,7 +659,7 @@ const TestDetail: NextPage = () => {
       setSelectedStageQuestionType(questionType);
       
       // Buscar todas as perguntas disponíveis
-      const response = await fetch(`/api/admin/questions?questionType=selection`);
+      const response = await fetch(`/api/admin/questions?questionType=selection&limit=1000`);
       if (!response.ok) {
         throw new Error('Erro ao buscar perguntas disponíveis');
       }
@@ -995,7 +995,7 @@ const TestDetail: NextPage = () => {
       }
 
       // Atualizar a lista de perguntas disponíveis
-      const questionsResponse = await fetch('/api/admin/questions');
+      const questionsResponse = await fetch('/api/admin/questions?limit=1000');
       const questionsData = await questionsResponse.json();
       setAvailableQuestions(questionsData);
       
@@ -1029,7 +1029,7 @@ const TestDetail: NextPage = () => {
           }
 
           // Recarregar as perguntas
-          const questionsResponse = await fetch('/api/admin/questions');
+          const questionsResponse = await fetch('/api/admin/questions?limit=1000');
           const questionsData = await questionsResponse.json();
           setAvailableQuestions(questionsData);
 

@@ -35,7 +35,7 @@ export default async function handler(
       
       // Parâmetros de paginação
       const pageNumber = page ? parseInt(page as string, 10) : 1;
-      const pageSize = limit ? parseInt(limit as string, 10) : 10;
+      const pageSize = limit ? parseInt(limit as string, 10) : 100;
       const skip = (pageNumber - 1) * pageSize;
       
       // Contador para o total de itens
