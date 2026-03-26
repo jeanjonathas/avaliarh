@@ -61,10 +61,13 @@ export default async function handler(
         const referer = req.headers.referer || '';
         const questionTypeFromQuery = req.query.questionType as string;
         
-        if (questionTypeFromQuery) {
-          // Se fornecido explicitamente na query, use esse valor
+        if (questionTypeFromQuery && questionTypeFromQuery !== 'all') {
+          // Se fornecido explicitamente na query e não for 'all', use esse valor
           whereCondition.questionType = questionTypeFromQuery;
           console.log(`Filtrando por questionType explícito: ${questionTypeFromQuery}`);
+        } else if (questionTypeFromQuery === 'all') {
+          // Se for 'all', não adiciona filtro de questionType para retornar todos os tipos
+          console.log('Não filtrando por questionType (solicitado todos os tipos)');
         } else if (referer.includes('/admin/training/')) {
           // Se o referer contém '/admin/training/', é uma questão de treinamento
           whereCondition.questionType = 'training';

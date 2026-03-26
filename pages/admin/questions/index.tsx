@@ -25,7 +25,8 @@ const QuestionsPage = () => {
       // Carregar perguntas e categorias para exportação
       const fetchData = async () => {
         try {
-          const questionsRes = await fetch('/api/admin/questions');
+          // Buscar todas as perguntas para exportação (todos os tipos e limite de 1000)
+          const questionsRes = await fetch('/api/admin/questions?limit=1000&questionType=all');
           const categoriesRes = await fetch('/api/admin/categories');
           
           if (questionsRes.ok && categoriesRes.ok) {
@@ -34,17 +35,20 @@ const QuestionsPage = () => {
             
             console.log('Dados de questões recebidos:', questionsData);
             
-            // Verificar a estrutura dos dados recebidos
+            // Verificar a estrutura dos dados recebidos (pode ser array ou objeto com .items ou .questions)
             let formattedQuestions = [];
             if (Array.isArray(questionsData)) {
               formattedQuestions = questionsData;
+            } else if (questionsData.items && Array.isArray(questionsData.items)) {
+              formattedQuestions = questionsData.items;
             } else if (questionsData.questions && Array.isArray(questionsData.questions)) {
               formattedQuestions = questionsData.questions;
-            } else if (typeof questionsData === 'object') {
+            } else if (typeof questionsData === 'object' && !questionsData.items && !questionsData.questions) {
+              // Se for um único objeto (não esperado mas possível)
               formattedQuestions = [questionsData];
             }
             
-            console.log('Questões formatadas:', formattedQuestions);
+            console.log('Questões formatadas para exportação:', formattedQuestions.length);
             setQuestions(formattedQuestions);
             setCategories(categoriesData);
           }
