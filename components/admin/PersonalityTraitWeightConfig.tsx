@@ -165,7 +165,7 @@ const PersonalityTraitWeightConfig: React.FC<PersonalityTraitWeightConfigProps> 
       
       // Se não conseguimos dados do processo, buscar as questões do teste
       // Buscar as questões do teste com tipo OPINION_MULTIPLE
-      const response = await fetch(`/api/admin/questions?testId=${testId}&type=OPINION_MULTIPLE`);
+      const response = await fetch(`/api/admin/questions?testId=${testId}&type=OPINION_MULTIPLE&limit=1000`);
       
       if (!response.ok) {
         throw new Error(`Erro ao buscar questões: ${response.status}`);

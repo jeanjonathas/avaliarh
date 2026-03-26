@@ -60,21 +60,23 @@ export default async function handler(
         // Determinar o tipo de questão com base no referer ou query parameter
         const referer = req.headers.referer || '';
         const questionTypeFromQuery = req.query.questionType as string;
-        let questionType = 'selection'; // Valor padrão
         
         if (questionTypeFromQuery) {
           // Se fornecido explicitamente na query, use esse valor
-          questionType = questionTypeFromQuery;
+          whereCondition.questionType = questionTypeFromQuery;
+          console.log(`Filtrando por questionType explícito: ${questionTypeFromQuery}`);
         } else if (referer.includes('/admin/training/')) {
           // Se o referer contém '/admin/training/', é uma questão de treinamento
-          questionType = 'training';
+          whereCondition.questionType = 'training';
+          console.log('Filtrando por questionType training (baseado no referer)');
+        } else if (!testId && !stageId && !ids) {
+          // Apenas aplica o filtro padrão 'selection' se não estiver buscando por um contexto específico
+          // Isso permite que questões de qualquer tipo vinculadas a um teste sejam encontradas
+          whereCondition.questionType = 'selection';
+          console.log('Filtrando por questionType padrão: selection');
+        } else {
+          console.log('Não filtrando por questionType (contexto específico detectado: testId, stageId ou ids)');
         }
-        
-        console.log(`Tipo de questão determinado: ${questionType}`);
-        
-        // Adicionar filtro de questionType à condição where
-        whereCondition.questionType = questionType;
-        console.log(`Filtrando perguntas por questionType: ${questionType}`);
         
         // Add type filter if provided
         if (type) {
